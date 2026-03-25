@@ -63,12 +63,22 @@ export default async function DealPage({
             <span className="text-sm text-zinc-400">Owner: {deal.owner}</span>
           </div>
         </div>
-        <Link
-          href={`/deals/${deal.id}/configurador`}
-          className="inline-flex items-center gap-2 bg-zinc-900 text-white text-sm font-medium px-4 py-2 rounded-lg hover:bg-zinc-700 transition-colors"
-        >
-          Abrir Simulador →
-        </Link>
+        <div className="flex items-center gap-2">
+          {cfg && (
+            <Link
+              href={`/deals/${deal.id}/propuesta`}
+              className="inline-flex items-center gap-2 text-sm font-medium px-4 py-2 rounded-lg border border-zinc-200 text-zinc-600 hover:border-zinc-400 hover:text-zinc-900 transition-colors"
+            >
+              Ver propuesta
+            </Link>
+          )}
+          <Link
+            href={`/deals/${deal.id}/configurador`}
+            className="inline-flex items-center gap-2 bg-zinc-900 text-white text-sm font-medium px-4 py-2 rounded-lg hover:bg-zinc-700 transition-colors"
+          >
+            Abrir Simulador →
+          </Link>
+        </div>
       </div>
 
       {/* Grid */}
