@@ -66,37 +66,71 @@ export function calculateEconomics(input: CalculateInput): DealEconomics {
     }
   }
 
-  // ---- Revenue total ----
-  const totalMonthlyRevenue = planFeeMonthly + addonFeeMonthly + datafonoFeeMonthly
-  const annualRevenue = totalMonthlyRevenue * 12
-  const revenuePerLocation = locations > 0 ? totalMonthlyRevenue / locations : 0
+  const softwareRevenueMonthly = planFeeMonthly + addonFeeMonthly + datafonoFeeMonthly
 
-  // ---- Hardware ---- ⚠️ review_manual
+  // ---- Hardware ----
+  // sold     → client pays unitPrice upfront. Platomico: no ongoing revenue, net cost = 0 (sold at cost)
+  // financed → client pays unitPrice / financeMonths monthly. Platomico pays upfront.
+  // included → Platomico bears full unitCost. No client payment.
+
   let hardwareCostTotal = 0
-  let hardwareRevenueTotal = 0
-  const hasReviewManualItems = hardware.length > 0
+  let hardwareRevenueUpfront = 0
+  let hardwareRevenueMonthly = 0
+  let hardwareIncludedCost = 0
+  let hardwareFinancedCost = 0
 
   for (const item of hardware) {
-    hardwareCostTotal += (item.unitCost ?? 0) * item.quantity
-    if (item.mode === 'sell' && item.unitPrice != null) {
-      hardwareRevenueTotal += item.unitPrice * item.quantity
+    const itemCost = item.unitCost * item.quantity
+    const itemRevenue = item.unitPrice * item.quantity
+    hardwareCostTotal += itemCost
+
+    switch (item.mode) {
+      case 'sold':
+        hardwareRevenueUpfront += itemRevenue
+        break
+      case 'financed': {
+        const months = item.financeMonths ?? 12
+        hardwareRevenueMonthly += itemRevenue / months
+        hardwareFinancedCost += itemCost
+        break
+      }
+      case 'included':
+        hardwareIncludedCost += itemCost
+        break
     }
   }
 
-  // ---- Margen ---- ⚠️ review_manual
-  // Placeholder 20% hasta confirmar coste interno real
-  const ESTIMATED_COST_PERCENT = 20
-  const estimatedCostMonthly = totalMonthlyRevenue * (ESTIMATED_COST_PERCENT / 100)
-  const grossMarginMonthly = totalMonthlyRevenue - estimatedCostMonthly
+  // Net investment = what Platomico must eventually recover from recurring revenue
+  // • sold items: cost fully offset by upfront client payment → 0 net
+  // • financed items: Platomico paid upfront, collects monthly → full cost counts
+  // • included items: pure subsidy, recover from software revenue
+  const hardwareNetInvestment = hardwareFinancedCost + hardwareIncludedCost
+
+  // ---- Revenue total ----
+  const totalMonthlyRevenue = softwareRevenueMonthly + hardwareRevenueMonthly
+  const annualRevenue = totalMonthlyRevenue * 12
+  const revenuePerLocation = locations > 0 ? totalMonthlyRevenue / locations : 0
+
+  // ---- Margin ----
+  // Software: 80% gross (SaaS assumption — server, support, infra ≈ 20%)
+  // Hardware sold/financed: 0% (priced at cost in catalog)
+  // Hardware included: monthly burden = full cost amortized over 24 months
+  const HARDWARE_AMORT_MONTHS = 24
+  const includedHardwareMonthlyBurden = hardwareIncludedCost / HARDWARE_AMORT_MONTHS
+  const grossMarginMonthly =
+    softwareRevenueMonthly * 0.8 +
+    hardwareRevenueMonthly * 0 -
+    includedHardwareMonthlyBurden
   const grossMarginPercent =
     totalMonthlyRevenue > 0
       ? (grossMarginMonthly / totalMonthlyRevenue) * 100
       : 0
 
   // ---- Payback ----
+  // How many months of full MRR to recover net hardware investment
   const paybackMonths =
-    hardwareCostTotal > 0 && totalMonthlyRevenue > 0
-      ? Math.ceil(hardwareCostTotal / totalMonthlyRevenue)
+    hardwareNetInvestment > 0 && totalMonthlyRevenue > 0
+      ? Math.ceil(hardwareNetInvestment / totalMonthlyRevenue)
       : null
 
   return {
@@ -107,14 +141,19 @@ export function calculateEconomics(input: CalculateInput): DealEconomics {
     planFeeMonthly,
     addonFeeMonthly,
     datafonoFeeMonthly,
+    softwareRevenueMonthly,
+    hardwareRevenueUpfront,
+    hardwareRevenueMonthly,
     totalMonthlyRevenue,
     annualRevenue,
     revenuePerLocation,
     hardwareCostTotal,
-    hardwareRevenueTotal,
+    hardwareNetInvestment,
     grossMarginPercent,
     grossMarginMonthly,
     paybackMonths,
-    hasReviewManualItems,
+    // backward compat
+    hardwareRevenueTotal: hardwareRevenueUpfront,
+    hasReviewManualItems: false,
   }
 }

@@ -2,7 +2,7 @@
 
 import { calculateEconomics } from '@/lib/pricing/engine'
 import { saveActiveConfig } from '@/lib/deals'
-import type { PlanTier, AddonId } from '@/types'
+import type { PlanTier, AddonId, HardwareLineItem } from '@/types'
 
 export interface SaveConfigPayload {
   dealId: string
@@ -12,6 +12,7 @@ export interface SaveConfigPayload {
   plan: PlanTier
   planOverridden: boolean
   activeAddons: AddonId[]
+  hardware: HardwareLineItem[]
 }
 
 export interface SaveConfigResult {
@@ -30,7 +31,7 @@ export async function saveConfigAction(
       averageTicket: payload.averageTicket,
       plan: payload.plan,
       activeAddons: payload.activeAddons,
-      hardware: [],
+      hardware: payload.hardware,
     })
 
     const result = await saveActiveConfig(payload.dealId, {
@@ -43,7 +44,7 @@ export async function saveConfigAction(
       plan: payload.plan,
       planOverridden: payload.planOverridden,
       activeAddons: payload.activeAddons,
-      hardware: [],
+      hardware: payload.hardware,
       economics,
       createdAt: new Date().toISOString(),
     })

@@ -13,20 +13,19 @@ export type AddonId =
   | 'datafono'
 
 export type HardwareId =
-  | 'terminal_pos'
-  | 'kds_screen'
-  | 'kiosk_unit'
-  | 'printer'
-  | 'router'
+  | 'ipad'
+  | 'bouncepad_kiosk'
+  | 'counter_stand'
 
-export type HardwareMode = 'sell' | 'rent' | 'free'
+export type HardwareMode = 'included' | 'sold' | 'financed'
 
 export interface HardwareLineItem {
   hardwareId: HardwareId
   quantity: number
   mode: HardwareMode
-  unitCost: number        // internal cost — ⚠️ review_manual
-  unitPrice: number | null // client price — ⚠️ review_manual
+  unitCost: number        // internal cost (Platomico)
+  unitPrice: number       // client price
+  financeMonths?: number  // only for 'financed' mode
 }
 
 // =========================================
@@ -52,7 +51,7 @@ export interface DealConfiguration {
   // Add-ons
   activeAddons: AddonId[]
 
-  // Hardware — ⚠️ review_manual
+  // Hardware
   hardware: HardwareLineItem[]
 
   // Snapshot at save time
@@ -68,26 +67,35 @@ export interface DealEconomics {
   monthlyGMVPerLocation: number     // €
   totalMonthlyGMV: number           // €
 
-  // Revenue breakdown
+  // Software Revenue breakdown
   planFeeMonthly: number            // fixed + variable × locations
   addonFeeMonthly: number           // addon sum (excl. datafono)
   datafonoFeeMonthly: number        // % of GMV
+  softwareRevenueMonthly: number    // plan + addon + datafono
+
+  // Hardware Revenue
+  hardwareRevenueUpfront: number    // sold (one-time)
+  hardwareRevenueMonthly: number    // financed installments
+
+  // Total Revenue (software + hardware monthly)
   totalMonthlyRevenue: number
   annualRevenue: number
   revenuePerLocation: number        // monthly
 
-  // Hardware — ⚠️ review_manual
-  hardwareCostTotal: number
-  hardwareRevenueTotal: number
+  // Hardware Investment
+  hardwareCostTotal: number         // sum cost of all hardware items
+  hardwareNetInvestment: number     // net cost Platomico bears (excl. sold)
 
-  // Margin — ⚠️ review_manual (internal cost unknown)
+  // Margin
   grossMarginPercent: number
   grossMarginMonthly: number
 
-  // Payback — null if hardware cost unknown
+  // Payback — null if no net investment
   paybackMonths: number | null
 
-  hasReviewManualItems: boolean
+  // Backward compat (kept for existing Supabase snapshots)
+  hardwareRevenueTotal: number      // = hardwareRevenueUpfront
+  hasReviewManualItems: boolean     // always false — hardware is now real
 }
 
 // =========================================

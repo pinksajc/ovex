@@ -1,6 +1,6 @@
 // =========================================
 // PRICING CATALOG
-// Source: platomico.com/pricing
+// Source: platomico.com/pricing + internal hardware data
 // =========================================
 
 import type { PlanTier, AddonId, HardwareId } from '@/types'
@@ -113,53 +113,55 @@ export const ADDON_ORDER: AddonId[] = [
 ]
 
 // ---- HARDWARE ----
-// ⚠️ review_manual: precios no publicados en platomico.com
-// Rellenar con datos internos antes de usar en propuestas
+// Precios reales confirmados.
+// unitCost = coste interno (Platomico)
+// unitPrice = precio venta al cliente
+// perLocation = true → default qty = nº de locales
 
 export interface HardwareConfig {
   id: HardwareId
   label: string
   description: string
-  reviewManual: true // siempre true hasta confirmar
+  unitCost: number    // € — coste interno Platomico
+  unitPrice: number   // € — precio venta cliente
+  perLocation: boolean
 }
 
 export const HARDWARE: Record<HardwareId, HardwareConfig> = {
-  terminal_pos: {
-    id: 'terminal_pos',
-    label: 'Terminal POS',
-    description: 'Terminal táctil para TPV',
-    reviewManual: true,
+  ipad: {
+    id: 'ipad',
+    label: 'iPad 10th Gen',
+    description: 'Terminal POS táctil',
+    unitCost: 399,
+    unitPrice: 399,
+    perLocation: true,
   },
-  kds_screen: {
-    id: 'kds_screen',
-    label: 'Pantalla KDS',
-    description: 'Pantalla cocina',
-    reviewManual: true,
+  bouncepad_kiosk: {
+    id: 'bouncepad_kiosk',
+    label: 'Bouncepad Kiosk',
+    description: 'Soporte self-ordering kiosk',
+    unitCost: 200,
+    unitPrice: 200,
+    perLocation: false,
   },
-  kiosk_unit: {
-    id: 'kiosk_unit',
-    label: 'Kiosk Completo',
-    description: 'Kiosk self-ordering',
-    reviewManual: true,
-  },
-  printer: {
-    id: 'printer',
-    label: 'Impresora',
-    description: 'Impresora de tickets',
-    reviewManual: true,
-  },
-  router: {
-    id: 'router',
-    label: 'Router / Red',
-    description: 'Equipamiento de red',
-    reviewManual: true,
+  counter_stand: {
+    id: 'counter_stand',
+    label: 'Counter Stand',
+    description: 'Soporte para mostrador',
+    unitCost: 120,
+    unitPrice: 120,
+    perLocation: true,
   },
 }
 
 export const HARDWARE_ORDER: HardwareId[] = [
-  'terminal_pos',
-  'kds_screen',
-  'kiosk_unit',
-  'printer',
-  'router',
+  'ipad',
+  'bouncepad_kiosk',
+  'counter_stand',
 ]
+
+export const HARDWARE_MODE_LABELS: Record<import('@/types').HardwareMode, string> = {
+  included: 'Incluido',
+  sold: 'Vendido',
+  financed: 'Financiado',
+}
