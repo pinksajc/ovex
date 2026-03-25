@@ -11,7 +11,7 @@
 // Las páginas siempre importan desde aquí — nunca de mock-data directamente.
 // =========================================
 
-import type { Deal, DealConfiguration } from '@/types'
+import type { Deal, DealConfiguration, ProposalRecord, ProposalSections } from '@/types'
 
 // ---- Flags ----
 
@@ -152,6 +152,49 @@ export async function nextVersion(attioDealId: string): Promise<number> {
 
   const { nextVersionForDeal } = await import('./supabase/configs')
   return nextVersionForDeal(attioDealId)
+}
+
+// =========================================
+// PROPOSALS
+// =========================================
+
+/**
+ * Lee la propuesta guardada para un deal.
+ * Devuelve null si no existe o si estamos en modo mock.
+ */
+export async function getProposal(
+  attioDealId: string
+): Promise<ProposalRecord | null> {
+  if (!isAttioConfigured()) return null
+  const { getProposalForDeal } = await import('./supabase/proposals')
+  return getProposalForDeal(attioDealId).catch(() => null)
+}
+
+/**
+ * Guarda (upsert) la propuesta de un deal.
+ * En modo mock devuelve la propuesta sin persistir.
+ */
+export async function saveProposal(
+  attioDealId: string,
+  configId: string,
+  sections: ProposalSections
+): Promise<{ proposal: ProposalRecord; persisted: boolean }> {
+  if (!isAttioConfigured()) {
+    return {
+      proposal: {
+        id: `${attioDealId}-proposal-mock`,
+        attioDealId,
+        configId,
+        sections,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      },
+      persisted: false,
+    }
+  }
+  const { upsertProposal } = await import('./supabase/proposals')
+  const proposal = await upsertProposal(attioDealId, configId, sections)
+  return { proposal, persisted: true }
 }
 
 // =========================================

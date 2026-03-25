@@ -157,3 +157,21 @@ export interface Proposal {
   pdfUrl?: string
   createdAt: string
 }
+
+/** Free-text sections the sales rep edits in the proposal screen */
+export interface ProposalSections {
+  executiveSummary: string
+  solution: string
+  economicsSummary: string
+  nextSteps: string
+}
+
+/** Persisted proposal record (one per deal, tied to config at save time) */
+export interface ProposalRecord {
+  id: string
+  attioDealId: string
+  configId: string
+  sections: ProposalSections
+  createdAt: string
+  updatedAt: string
+}
