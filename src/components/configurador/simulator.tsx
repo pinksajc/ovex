@@ -5,6 +5,7 @@ import { PLANS, ADDONS, ADDON_ORDER, PLAN_ORDER, HARDWARE, HARDWARE_ORDER, HARDW
 import { calculateEconomics, suggestPlan } from '@/lib/pricing/engine'
 import { formatCurrency, formatNumber } from '@/lib/format'
 import { saveConfigAction } from '@/app/actions/save-config'
+import { saveNewVersionAction } from '@/app/actions/save-version'
 import type { Deal, DealConfiguration, DealEconomics, PlanTier, AddonId, HardwareId, HardwareMode, HardwareLineItem } from '@/types'
 
 // =========================================
@@ -80,7 +81,7 @@ export function Simulator({ deal, initialConfig }: SimulatorProps) {
     initHardwareState(init?.locations ?? 1, init?.hardware)
   )
 
-  // ---- Save state ----
+  // ---- Save state (overwrite active) ----
   const [isPending, startTransition] = useTransition()
   const [saveState, setSaveState] = useState<SaveState>('idle')
   const [lastSavePersisted, setLastSavePersisted] = useState(false)
@@ -91,6 +92,19 @@ export function Simulator({ deal, initialConfig }: SimulatorProps) {
       return () => clearTimeout(t)
     }
   }, [saveState])
+
+  // ---- Save new version state ----
+  const [isNewVersionPending, startNewVersionTransition] = useTransition()
+  const [saveNewState, setSaveNewState] = useState<SaveState>('idle')
+  const [lastNewVersion, setLastNewVersion] = useState<number | undefined>()
+  const [lastNewVersionPersisted, setLastNewVersionPersisted] = useState(false)
+
+  useEffect(() => {
+    if (saveNewState === 'saved') {
+      const t = setTimeout(() => setSaveNewState('idle'), 4000)
+      return () => clearTimeout(t)
+    }
+  }, [saveNewState])
 
   // ---- Derived ----
   const suggestedPlan = suggestPlan(dailyOrders)
@@ -150,6 +164,29 @@ export function Simulator({ deal, initialConfig }: SimulatorProps) {
         setLastSavePersisted(result.persisted)
       } else {
         setSaveState('error')
+      }
+    })
+  }
+
+  function handleSaveNew() {
+    setSaveNewState('saving')
+    startNewVersionTransition(async () => {
+      const result = await saveNewVersionAction({
+        dealId: deal.id,
+        dailyOrdersPerLocation: dailyOrders,
+        locations,
+        averageTicket: avgTicket,
+        plan: activePlan,
+        planOverridden: planOverride !== null,
+        activeAddons: Array.from(activeAddons),
+        hardware: hardwareLineItems,
+      })
+      if (result.ok) {
+        setSaveNewState('saved')
+        setLastNewVersion(result.version)
+        setLastNewVersionPersisted(result.persisted)
+      } else {
+        setSaveNewState('error')
       }
     })
   }
@@ -498,6 +535,10 @@ export function Simulator({ deal, initialConfig }: SimulatorProps) {
           saveState={isPending ? 'saving' : saveState}
           lastSavePersisted={lastSavePersisted}
           onSave={handleSave}
+          saveNewState={isNewVersionPending ? 'saving' : saveNewState}
+          lastNewVersion={lastNewVersion}
+          lastNewVersionPersisted={lastNewVersionPersisted}
+          onSaveNew={handleSaveNew}
         />
       </div>
     </div>
@@ -515,6 +556,10 @@ function EconomicsPanel({
   saveState,
   lastSavePersisted,
   onSave,
+  saveNewState,
+  lastNewVersion,
+  lastNewVersionPersisted,
+  onSaveNew,
 }: {
   economics: DealEconomics
   locations: number
@@ -522,6 +567,10 @@ function EconomicsPanel({
   saveState: SaveState
   lastSavePersisted: boolean
   onSave: () => void
+  saveNewState: SaveState
+  lastNewVersion: number | undefined
+  lastNewVersionPersisted: boolean
+  onSaveNew: () => void
 }) {
   const hasDatafono = activeAddons.has('datafono')
   const hasHardware = economics.hardwareCostTotal > 0
@@ -648,7 +697,15 @@ function EconomicsPanel({
       </div>
 
       {/* Save */}
-      <div className="px-5 py-4">
+      <div className="px-5 py-4 space-y-2">
+        {/* Primary: save as new version */}
+        <SaveNewButton
+          saveState={saveNewState}
+          version={lastNewVersion}
+          persisted={lastNewVersionPersisted}
+          onSave={onSaveNew}
+        />
+        {/* Secondary: overwrite active */}
         <SaveButton
           saveState={saveState}
           persisted={lastSavePersisted}
@@ -660,8 +717,63 @@ function EconomicsPanel({
 }
 
 // =========================================
-// Save Button
+// Save Buttons
 // =========================================
+
+function SaveNewButton({
+  saveState,
+  version,
+  persisted,
+  onSave,
+}: {
+  saveState: SaveState
+  version: number | undefined
+  persisted: boolean
+  onSave: () => void
+}) {
+  if (saveState === 'saving') {
+    return (
+      <button disabled className="w-full flex items-center justify-center gap-2 bg-zinc-900 text-white text-sm font-medium px-4 py-2.5 rounded-lg cursor-not-allowed opacity-70">
+        <svg className="w-3.5 h-3.5 animate-spin" viewBox="0 0 16 16" fill="none">
+          <circle cx="8" cy="8" r="6" stroke="currentColor" strokeWidth="2" strokeDasharray="28" strokeDashoffset="10" />
+        </svg>
+        Guardando versión...
+      </button>
+    )
+  }
+
+  if (saveState === 'saved') {
+    return (
+      <button disabled className={`w-full flex items-center justify-center gap-2 text-sm font-medium px-4 py-2.5 rounded-lg cursor-default ${
+        persisted
+          ? 'bg-emerald-600 text-white'
+          : 'bg-zinc-700 text-white'
+      }`}>
+        <svg className="w-3.5 h-3.5" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2">
+          <path d="M3 8l3.5 3.5L13 5" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+        {persisted && version ? `v.${version} guardada` : 'Guardada (sin persistencia)'}
+      </button>
+    )
+  }
+
+  if (saveState === 'error') {
+    return (
+      <button onClick={onSave} className="w-full flex items-center justify-center gap-2 bg-red-50 text-red-600 border border-red-200 text-sm font-medium px-4 py-2.5 rounded-lg hover:bg-red-100 transition-colors">
+        Error · Reintentar nueva versión
+      </button>
+    )
+  }
+
+  return (
+    <button onClick={onSave} className="w-full bg-zinc-900 text-white text-sm font-medium px-4 py-2.5 rounded-lg hover:bg-zinc-700 transition-colors flex items-center justify-center gap-2">
+      <svg className="w-3.5 h-3.5" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2">
+        <path d="M8 3v10M3 8h10" strokeLinecap="round" />
+      </svg>
+      Guardar nueva versión
+    </button>
+  )
+}
 
 function SaveButton({
   saveState,
@@ -709,8 +821,8 @@ function SaveButton({
   }
 
   return (
-    <button onClick={onSave} className="w-full bg-zinc-900 text-white text-sm font-medium px-4 py-2.5 rounded-lg hover:bg-zinc-700 transition-colors">
-      Guardar configuración
+    <button onClick={onSave} className="w-full text-zinc-500 text-xs font-medium px-4 py-2 rounded-lg hover:bg-zinc-50 border border-zinc-200 hover:border-zinc-300 transition-colors">
+      Actualizar versión activa
     </button>
   )
 }

@@ -115,6 +115,32 @@ export async function saveActiveConfig(
 }
 
 /**
+ * Inserta una nueva versión de configuración (no activa).
+ * En mock mode devuelve la config sin persistir.
+ */
+export async function saveNewConfigVersion(
+  attioDealId: string,
+  configData: Omit<DealConfiguration, 'dealId' | 'id' | 'version' | 'createdAt'>
+): Promise<{ config: DealConfiguration; persisted: boolean }> {
+  if (!isAttioConfigured()) {
+    return {
+      config: {
+        ...configData,
+        id: `${attioDealId}-v1-mock`,
+        dealId: attioDealId,
+        version: 1,
+        createdAt: new Date().toISOString(),
+      },
+      persisted: false,
+    }
+  }
+
+  const { insertVersion } = await import('./supabase/configs')
+  const saved = await insertVersion(attioDealId, configData)
+  return { config: saved, persisted: true }
+}
+
+/**
  * Calcula el siguiente número de versión para un deal.
  */
 export async function nextVersion(attioDealId: string): Promise<number> {

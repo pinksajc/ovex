@@ -184,6 +184,40 @@ export async function upsertActiveConfig(
 }
 
 /**
+ * Inserta una nueva versión de configuración (is_active=false).
+ * El número de versión se calcula automáticamente (max + 1).
+ * No toca las otras versiones existentes.
+ */
+export async function insertVersion(
+  attioDealId: string,
+  configData: Omit<DealConfiguration, 'dealId' | 'id' | 'version' | 'createdAt'>
+): Promise<DealConfiguration> {
+  const version = await nextVersionForDeal(attioDealId)
+  const id = `${attioDealId}-v${version}`
+
+  const row = {
+    id,
+    attio_deal_id: attioDealId,
+    version,
+    label: configData.label ?? null,
+    daily_orders_per_location: configData.dailyOrdersPerLocation,
+    locations: configData.locations,
+    average_ticket: configData.averageTicket,
+    estimated_growth_percent: configData.estimatedGrowthPercent,
+    plan: configData.plan,
+    plan_overridden: configData.planOverridden,
+    active_addons: configData.activeAddons,
+    hardware: configData.hardware,
+    economics: configData.economics,
+    is_active: false,
+  }
+
+  const { data, error } = await table().insert(row).select().single()
+  if (error) throw new Error(`Supabase insertVersion: ${error.message}`)
+  return rowToConfig(data as ConfigRow)
+}
+
+/**
  * Calcula el siguiente número de versión para un deal.
  */
 export async function nextVersionForDeal(attioDealId: string): Promise<number> {

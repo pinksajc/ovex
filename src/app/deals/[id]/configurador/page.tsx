@@ -2,18 +2,28 @@ import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { getDeal, getActiveConfig } from '@/lib/deals'
 import { Simulator } from '@/components/configurador/simulator'
+import { VersionList } from '@/components/configurador/version-list'
 
 export default async function ConfiguradorPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>
+  searchParams: Promise<{ [key: string]: string | string[] | undefined }>
 }) {
   const { id } = await params
-  const deal = await getDeal(id)
+  const { config: configQueryParam } = await searchParams
 
+  const deal = await getDeal(id)
   if (!deal) notFound()
 
   const activeConfig = getActiveConfig(deal)
+
+  // If ?config=xxx is present, load that specific version
+  const configId = typeof configQueryParam === 'string' ? configQueryParam : undefined
+  const displayConfig = configId
+    ? (deal.configurations.find((c) => c.id === configId) ?? activeConfig)
+    : activeConfig
 
   return (
     <div className="p-8 max-w-7xl mx-auto">
@@ -34,17 +44,20 @@ export default async function ConfiguradorPage({
       </div>
 
       {/* Header */}
-      <div className="flex items-start justify-between mb-7">
+      <div className="flex items-start justify-between mb-6">
         <div>
           <h1 className="text-2xl font-semibold text-zinc-900 tracking-tight">
             Orvex Simulator
           </h1>
           <p className="text-zinc-500 text-sm mt-1">
-            {deal.company.name} · {deal.company.city}
-            {activeConfig && (
+            {deal.company.name}
+            {deal.company.city && ` · ${deal.company.city}`}
+            {displayConfig && (
               <span className="ml-2 text-zinc-400">
-                v{activeConfig.version}
-                {activeConfig.label && ` · ${activeConfig.label}`}
+                · cargada v{displayConfig.version}
+                {displayConfig.id === deal.activeConfigId && (
+                  <span className="ml-1 text-emerald-500">✓</span>
+                )}
               </span>
             )}
           </p>
@@ -58,8 +71,13 @@ export default async function ConfiguradorPage({
         </button>
       </div>
 
+      {/* Version list (hidden when only 1 or 0 versions) */}
+      {deal.configurations.length > 0 && (
+        <VersionList deal={deal} loadedConfigId={displayConfig?.id} />
+      )}
+
       {/* Simulator */}
-      <Simulator deal={deal} initialConfig={activeConfig} />
+      <Simulator deal={deal} initialConfig={displayConfig} />
     </div>
   )
 }
