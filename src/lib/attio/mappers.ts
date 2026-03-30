@@ -23,8 +23,7 @@ const SLUG = {
     stage: 'stage',                    // attribute_type: "status"
     owner: 'owner',                    // attribute_type: "actor-reference"
     company: 'associated_company',     // attribute_type: "record-reference"
-    person: 'associated_person',       // attribute_type: "record-reference"
-    // Si usas "contacts" o "people" en lugar de associated_person, cámbialo aquí
+    person: 'associated_people',        // attribute_type: "record-reference" (multi-select)
   },
   company: {
     name: 'name',
@@ -43,6 +42,7 @@ const SLUG = {
 // CUSTOMIZE: ajusta los títulos a los de tu pipeline en Attio
 
 const ATTIO_STAGE_TO_DEAL_STAGE: Record<string, DealStage> = {
+  Lead: 'prospecting',
   Prospecting: 'prospecting',
   'In Progress': 'qualified',
   Qualified: 'qualified',
@@ -50,8 +50,10 @@ const ATTIO_STAGE_TO_DEAL_STAGE: Record<string, DealStage> = {
   'Propuesta enviada': 'proposal_sent',
   Negotiation: 'negotiation',
   Negociación: 'negotiation',
+  'Won 🎉': 'closed_won',
   'Closed Won': 'closed_won',
   'Ganado': 'closed_won',
+  Lost: 'closed_lost',
   'Closed Lost': 'closed_lost',
   'Perdido': 'closed_lost',
 }
@@ -86,7 +88,9 @@ export function mapAttioDeal(
   const ownerMember = members.find(
     (m) => m.id.workspace_member_id === ownerMemberId
   )
-  const owner = ownerMember?.name ?? ownerMemberId ?? 'Sin asignar'
+  const owner = ownerMember
+    ? `${ownerMember.first_name} ${ownerMember.last_name}`.trim()
+    : ownerMemberId ?? 'Sin asignar'
 
   // Company ref ID (para saber qué company se adjuntó)
   const companyRefId = attioVal(v, SLUG.deal.company)?.target_record_id
@@ -152,8 +156,13 @@ export function mapAttioDeal(
     stage,
     configurations,
     activeConfigId,
+    // Defaults — overwritten by getDeals() after batch proposal lookup
+    commercialStatus: 'no_config',
+    hasProposal: false,
+    lastActivityAt: null,
+    lastProposalViewAt: null,
     createdAt: dealRecord.created_at,
-    updatedAt: dealRecord.created_at, // Attio no expone updatedAt directamente
+    updatedAt: dealRecord.created_at,
   }
 }
 

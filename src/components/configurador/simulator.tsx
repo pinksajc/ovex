@@ -6,6 +6,7 @@ import { calculateEconomics, suggestPlan } from '@/lib/pricing/engine'
 import { formatCurrency, formatNumber } from '@/lib/format'
 import { saveConfigAction } from '@/app/actions/save-config'
 import { saveNewVersionAction } from '@/app/actions/save-version'
+import { VersionList } from './version-list'
 import type { Deal, DealConfiguration, DealEconomics, PlanTier, AddonId, HardwareId, HardwareMode, HardwareLineItem } from '@/types'
 
 // =========================================
@@ -55,6 +56,24 @@ function hardwareStateToLineItems(hw: HardwareState): HardwareLineItem[] {
     }))
 }
 
+function serializeSimState(
+  dailyOrders: number,
+  locations: number,
+  avgTicket: number,
+  planOverride: PlanTier | null,
+  activeAddons: Set<AddonId>,
+  hardware: HardwareState
+): string {
+  return JSON.stringify({
+    dailyOrders,
+    locations,
+    avgTicket,
+    planOverride,
+    addons: [...activeAddons].sort(),
+    hardware,
+  })
+}
+
 // =========================================
 // Simulator
 // =========================================
@@ -62,13 +81,14 @@ function hardwareStateToLineItems(hw: HardwareState): HardwareLineItem[] {
 interface SimulatorProps {
   deal: Deal
   initialConfig?: DealConfiguration
+  loadedConfigId?: string
 }
 
-export function Simulator({ deal, initialConfig }: SimulatorProps) {
+export function Simulator({ deal, initialConfig, loadedConfigId }: SimulatorProps) {
   const init = initialConfig
 
   // ---- State ----
-  const [dailyOrders, setDailyOrders] = useState(init?.dailyOrdersPerLocation ?? 150)
+  const [dailyOrders, setDailyOrders] = useState(init?.dailyOrdersPerLocation ?? 4500)
   const [locations, setLocations] = useState(init?.locations ?? 1)
   const [avgTicket, setAvgTicket] = useState(init?.averageTicket ?? 18)
   const [planOverride, setPlanOverride] = useState<PlanTier | null>(
@@ -98,6 +118,30 @@ export function Simulator({ deal, initialConfig }: SimulatorProps) {
   const [saveNewState, setSaveNewState] = useState<SaveState>('idle')
   const [lastNewVersion, setLastNewVersion] = useState<number | undefined>()
   const [lastNewVersionPersisted, setLastNewVersionPersisted] = useState(false)
+
+  // ---- Unsaved changes detection ----
+  const [savedSnapshot, setSavedSnapshot] = useState<string>(() =>
+    serializeSimState(
+      init?.dailyOrdersPerLocation ?? 4500,
+      init?.locations ?? 1,
+      init?.averageTicket ?? 18,
+      init?.planOverridden ? (init.plan ?? null) : null,
+      new Set(init?.activeAddons ?? []),
+      initHardwareState(init?.locations ?? 1, init?.hardware)
+    )
+  )
+
+  const hasUnsavedChanges = useMemo(
+    () => serializeSimState(dailyOrders, locations, avgTicket, planOverride, activeAddons, hardware) !== savedSnapshot,
+    [dailyOrders, locations, avgTicket, planOverride, activeAddons, hardware, savedSnapshot]
+  )
+
+  useEffect(() => {
+    if (!hasUnsavedChanges) return
+    function guard(e: BeforeUnloadEvent) { e.preventDefault(); e.returnValue = '' }
+    window.addEventListener('beforeunload', guard)
+    return () => window.removeEventListener('beforeunload', guard)
+  }, [hasUnsavedChanges])
 
   useEffect(() => {
     if (saveNewState === 'saved') {
@@ -162,6 +206,7 @@ export function Simulator({ deal, initialConfig }: SimulatorProps) {
       if (result.ok) {
         setSaveState('saved')
         setLastSavePersisted(result.persisted)
+        setSavedSnapshot(serializeSimState(dailyOrders, locations, avgTicket, planOverride, activeAddons, hardware))
       } else {
         setSaveState('error')
       }
@@ -185,6 +230,7 @@ export function Simulator({ deal, initialConfig }: SimulatorProps) {
         setSaveNewState('saved')
         setLastNewVersion(result.version)
         setLastNewVersionPersisted(result.persisted)
+        setSavedSnapshot(serializeSimState(dailyOrders, locations, avgTicket, planOverride, activeAddons, hardware))
       } else {
         setSaveNewState('error')
       }
@@ -192,6 +238,14 @@ export function Simulator({ deal, initialConfig }: SimulatorProps) {
   }
 
   return (
+    <>
+    {deal.configurations.length > 0 && (
+      <VersionList
+        deal={deal}
+        loadedConfigId={loadedConfigId ?? initialConfig?.id}
+        hasUnsavedChanges={hasUnsavedChanges}
+      />
+    )}
     <div className="grid grid-cols-1 xl:grid-cols-[1fr_340px] gap-6 items-start">
       {/* ============================================================
           LEFT — Inputs
@@ -204,19 +258,19 @@ export function Simulator({ deal, initialConfig }: SimulatorProps) {
             <div>
               <div className="flex justify-between mb-1.5">
                 <label className="text-xs font-medium text-zinc-600">
-                  Pedidos/día por local
+                  Pedidos/mes por local
                 </label>
                 <span className="text-xs font-mono font-semibold text-zinc-900">
                   {formatNumber(dailyOrders)}
                 </span>
               </div>
               <input
-                type="range" min={10} max={1000} step={10} value={dailyOrders}
+                type="range" min={100} max={10000} step={100} value={dailyOrders}
                 onChange={(e) => setDailyOrders(Number(e.target.value))}
                 className="w-full accent-zinc-900"
               />
               <div className="flex justify-between text-[10px] text-zinc-400 mt-0.5">
-                <span>10</span><span>1.000</span>
+                <span>100</span><span>10.000</span>
               </div>
             </div>
 
@@ -259,7 +313,7 @@ export function Simulator({ deal, initialConfig }: SimulatorProps) {
             <div className="mb-3 flex items-center justify-between bg-amber-50 border border-amber-100 rounded-lg px-3 py-2">
               <p className="text-xs text-amber-700">
                 Sugerido <strong>{PLANS[suggestedPlan].label}</strong> para{' '}
-                {formatNumber(dailyOrders)} pedidos/día. Plan actual:{' '}
+                {formatNumber(dailyOrders)} pedidos/mes. Plan actual:{' '}
                 <strong>{PLANS[activePlan].label}</strong> (manual)
               </p>
               <button
@@ -300,7 +354,7 @@ export function Simulator({ deal, initialConfig }: SimulatorProps) {
                   </p>
                   <p className={`text-xs mt-2 font-mono ${isActive ? 'text-zinc-200' : 'text-zinc-600'}`}>
                     {plan.priceMonthly === 0 ? 'Gratis' : `${plan.priceMonthly}€/mes`}
-                    {plan.variableFee > 0 && ` + ${plan.variableFee}€/pedido`}
+                    {plan.variableFee > 0 && ` + ${plan.variableFee}€ × ${formatNumber(economics.totalMonthlyVolume)} tickets/mes`}
                   </p>
                 </button>
               )
@@ -308,16 +362,12 @@ export function Simulator({ deal, initialConfig }: SimulatorProps) {
           </div>
 
           <div className="mt-3 bg-zinc-50 rounded-lg px-4 py-3">
-            <p className="text-xs text-zinc-500">
-              Fee plan ({PLANS[activePlan].label}) ={' '}
-              <span className="font-mono font-semibold text-zinc-800">
-                {formatCurrency(economics.planFeeMonthly)}/mes
-              </span>
-              {locations > 1 && (
-                <span className="text-zinc-400">
-                  {' '}({formatCurrency(economics.planFeeMonthly / locations)}/local)
-                </span>
-              )}
+            <p className="text-xs font-mono text-zinc-500">
+              {PLANS[activePlan].priceMonthly > 0 && `${PLANS[activePlan].priceMonthly}€ × ${locations} local${locations > 1 ? 'es' : ''}`}
+              {PLANS[activePlan].priceMonthly > 0 && PLANS[activePlan].variableFee > 0 && ' + '}
+              {PLANS[activePlan].variableFee > 0 && `${PLANS[activePlan].variableFee}€ × ${formatNumber(economics.totalMonthlyVolume)} tickets/mes`}
+              {' = '}
+              <span className="font-semibold text-zinc-800">{formatCurrency(economics.planFeeMonthly)}/mes</span>
             </p>
           </div>
         </Section>
@@ -331,6 +381,8 @@ export function Simulator({ deal, initialConfig }: SimulatorProps) {
               const price =
                 id === 'datafono'
                   ? `${addon.feePercent}% GMV`
+                  : addon.perConsumption
+                  ? 'por consumo'
                   : addon.perLocation
                   ? `${addon.priceMonthly}€ × ${locations} local${locations > 1 ? 'es' : ''}`
                   : `${addon.priceMonthly}€/mes`
@@ -367,7 +419,7 @@ export function Simulator({ deal, initialConfig }: SimulatorProps) {
                     <p className="text-sm font-medium text-zinc-900">{addon.label}</p>
                     <p className="text-xs text-zinc-500 mt-0.5">{addon.description}</p>
                     <p className="text-xs font-mono text-zinc-600 mt-1">{price}</p>
-                    {active && (
+                    {active && !addon.perConsumption && (
                       <p className="text-xs font-mono font-semibold text-emerald-700 mt-0.5">
                         +{formatCurrency(monthlyImpact)}/mes
                       </p>
@@ -532,6 +584,7 @@ export function Simulator({ deal, initialConfig }: SimulatorProps) {
           economics={economics}
           locations={locations}
           activeAddons={activeAddons}
+          hasUnsavedChanges={hasUnsavedChanges}
           saveState={isPending ? 'saving' : saveState}
           lastSavePersisted={lastSavePersisted}
           onSave={handleSave}
@@ -542,6 +595,7 @@ export function Simulator({ deal, initialConfig }: SimulatorProps) {
         />
       </div>
     </div>
+    </>
   )
 }
 
@@ -553,6 +607,7 @@ function EconomicsPanel({
   economics,
   locations,
   activeAddons,
+  hasUnsavedChanges,
   saveState,
   lastSavePersisted,
   onSave,
@@ -564,6 +619,7 @@ function EconomicsPanel({
   economics: DealEconomics
   locations: number
   activeAddons: Set<AddonId>
+  hasUnsavedChanges: boolean
   saveState: SaveState
   lastSavePersisted: boolean
   onSave: () => void
@@ -698,6 +754,12 @@ function EconomicsPanel({
 
       {/* Save */}
       <div className="px-5 py-4 space-y-2">
+        {hasUnsavedChanges && (
+          <p className="flex items-center gap-1.5 text-xs text-amber-600 font-medium mb-1">
+            <span className="w-1.5 h-1.5 rounded-full bg-amber-500 shrink-0" />
+            Cambios sin guardar
+          </p>
+        )}
         {/* Primary: save as new version */}
         <SaveNewButton
           saveState={saveNewState}

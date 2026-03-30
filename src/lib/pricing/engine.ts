@@ -8,9 +8,9 @@ import type { PlanTier, AddonId, HardwareLineItem, DealEconomics } from '@/types
 
 // ---- PLAN SUGGESTION ----
 
-export function suggestPlan(dailyOrdersPerLocation: number): PlanTier {
-  if (dailyOrdersPerLocation <= 120) return 'starter'
-  if (dailyOrdersPerLocation <= 500) return 'growth'
+export function suggestPlan(monthlyOrdersPerLocation: number): PlanTier {
+  if (monthlyOrdersPerLocation <= 500) return 'starter'
+  if (monthlyOrdersPerLocation <= 1000) return 'growth'
   return 'pro'
 }
 
@@ -38,7 +38,7 @@ export function calculateEconomics(input: CalculateInput): DealEconomics {
   const planConfig = PLANS[plan]
 
   // ---- Volumen ----
-  const monthlyVolumePerLocation = dailyOrdersPerLocation * 30
+  const monthlyVolumePerLocation = dailyOrdersPerLocation  // input is already monthly
   const totalMonthlyVolume = monthlyVolumePerLocation * locations
 
   // ---- GMV ----

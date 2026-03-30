@@ -2,6 +2,7 @@
 
 import { saveProposal } from '@/lib/deals'
 import { revalidatePath } from 'next/cache'
+import { logEvent } from '@/lib/supabase/events'
 import type { ProposalSections } from '@/types'
 
 export interface SaveProposalResult {
@@ -19,6 +20,7 @@ export async function saveProposalAction(
   try {
     const { proposal, persisted } = await saveProposal(attioDealId, configId, sections)
     revalidatePath(`/deals/${attioDealId}/propuesta`)
+    void logEvent('proposal_saved', attioDealId)
     return { ok: true, persisted, updatedAt: proposal.updatedAt }
   } catch (err) {
     return {

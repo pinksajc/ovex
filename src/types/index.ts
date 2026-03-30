@@ -7,7 +7,7 @@ export type PlanTier = 'starter' | 'growth' | 'pro'
 export type AddonId =
   | 'kds'
   | 'kiosk'
-  | 'loyalty'
+  | 'stock'
   | 'analytics_premium'
   | 'delivery_integrations'
   | 'datafono'
@@ -110,6 +110,8 @@ export type DealStage =
   | 'closed_won'
   | 'closed_lost'
 
+export type DealCommercialStatus = 'no_config' | 'configured' | 'proposal_created'
+
 export interface Deal {
   id: string
   attioId?: string
@@ -132,6 +134,15 @@ export interface Deal {
 
   configurations: DealConfiguration[]
   activeConfigId?: string
+
+  /** Computed server-side in getDeals(). Never derive this in components. */
+  commercialStatus: DealCommercialStatus
+  /** true if a saved proposal exists for the active config version. */
+  hasProposal: boolean
+  /** ISO timestamp of the most recent deal_event, or null if none. */
+  lastActivityAt: string | null
+  /** ISO timestamp of the most recent proposal_viewed event, or null if none. */
+  lastProposalViewAt: string | null
 
   notes?: string
 
@@ -172,6 +183,7 @@ export interface ProposalRecord {
   attioDealId: string
   configId: string
   sections: ProposalSections
+  sentForSignatureAt: string | null
   createdAt: string
   updatedAt: string
 }

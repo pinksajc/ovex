@@ -11,9 +11,10 @@ interface VersionListProps {
   deal: Deal
   /** ID de la config que el simulador tiene cargada actualmente */
   loadedConfigId: string | undefined
+  hasUnsavedChanges?: boolean
 }
 
-export function VersionList({ deal, loadedConfigId }: VersionListProps) {
+export function VersionList({ deal, loadedConfigId, hasUnsavedChanges }: VersionListProps) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
   const [activatingId, setActivatingId] = useState<string | null>(null)
@@ -22,7 +23,13 @@ export function VersionList({ deal, loadedConfigId }: VersionListProps) {
 
   if (configs.length === 0) return null
 
+  function confirmIfDirty(): boolean {
+    if (!hasUnsavedChanges) return true
+    return window.confirm('Tienes cambios sin guardar. ¿Continuar sin guardar?')
+  }
+
   function handleActivate(config: DealConfiguration) {
+    if (!confirmIfDirty()) return
     setActivatingId(config.id)
     startTransition(async () => {
       const result = await activateVersionAction(deal.id, config.id)
@@ -112,6 +119,7 @@ export function VersionList({ deal, loadedConfigId }: VersionListProps) {
                 {!isLoaded && (
                   <Link
                     href={`/deals/${deal.id}/configurador?config=${config.id}`}
+                    onClick={(e) => { if (!confirmIfDirty()) e.preventDefault() }}
                     className="text-xs text-zinc-500 hover:text-zinc-900 px-2.5 py-1 rounded-lg border border-zinc-200 hover:border-zinc-400 transition-colors"
                   >
                     Cargar

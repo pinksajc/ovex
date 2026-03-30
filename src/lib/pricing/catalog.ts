@@ -21,27 +21,27 @@ export const PLANS: Record<PlanTier, PlanConfig> = {
   starter: {
     tier: 'starter',
     label: 'Starter',
-    description: 'Hasta 120 pedidos/día',
-    volumeRange: { min: 0, max: 120 },
+    description: 'Hasta 500 tickets/mes',
+    volumeRange: { min: 0, max: 500 },
     priceMonthly: 0,
-    variableFee: 0.05,
+    variableFee: 0.08,
   },
   growth: {
     tier: 'growth',
     label: 'Growth',
-    description: '121–500 pedidos/día',
-    volumeRange: { min: 121, max: 500 },
-    priceMonthly: 149,
-    variableFee: 0.02,
+    description: '501–1.000 tickets/mes',
+    volumeRange: { min: 501, max: 1000 },
+    priceMonthly: 15,
+    variableFee: 0.05,
     highlight: true,
   },
   pro: {
     tier: 'pro',
     label: 'Pro',
-    description: 'Más de 500 pedidos/día',
-    volumeRange: { min: 501, max: Infinity },
-    priceMonthly: 299,
-    variableFee: 0,
+    description: 'Más de 1.000 tickets/mes',
+    volumeRange: { min: 1001, max: Infinity },
+    priceMonthly: 35,
+    variableFee: 0.03,
   },
 }
 
@@ -56,6 +56,7 @@ export interface AddonConfig {
   priceMonthly?: number   // € por local/mes (o plano)
   feePercent?: number     // % de GMV (solo datafono)
   perLocation: boolean
+  perConsumption?: boolean  // true → precio variable, no fijo (mostrar "por consumo")
 }
 
 export const ADDONS: Record<AddonId, AddonConfig> = {
@@ -70,28 +71,29 @@ export const ADDONS: Record<AddonId, AddonConfig> = {
     id: 'kiosk',
     label: 'Kiosk',
     description: 'Self-ordering kiosk',
-    priceMonthly: 39,
+    priceMonthly: 19,
     perLocation: true,
   },
-  loyalty: {
-    id: 'loyalty',
-    label: 'Loyalty',
-    description: 'Programa de fidelización',
-    priceMonthly: 29,
+  stock: {
+    id: 'stock',
+    label: 'Stock',
+    description: 'Gestión de inventario',
+    priceMonthly: 9,
     perLocation: true,
   },
   analytics_premium: {
     id: 'analytics_premium',
-    label: 'Analytics Premium',
-    description: 'Analítica avanzada',
-    priceMonthly: 49,
-    perLocation: false, // nivel cuenta, no por local
+    label: 'Analítica IA',
+    description: 'Por consumo',
+    priceMonthly: 0,
+    perLocation: false,
+    perConsumption: true,
   },
   delivery_integrations: {
     id: 'delivery_integrations',
-    label: 'Delivery Integrations',
+    label: 'Delivery',
     description: 'Glovo, Uber Eats, Just Eat...',
-    priceMonthly: 25,
+    priceMonthly: 45,
     perLocation: true,
   },
   datafono: {
@@ -106,7 +108,7 @@ export const ADDONS: Record<AddonId, AddonConfig> = {
 export const ADDON_ORDER: AddonId[] = [
   'kds',
   'kiosk',
-  'loyalty',
+  'stock',
   'analytics_premium',
   'delivery_integrations',
   'datafono',

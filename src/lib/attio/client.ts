@@ -77,7 +77,8 @@ export interface AttioSingleResponse {
 
 export interface AttioWorkspaceMember {
   id: { workspace_member_id: string }
-  name: string
+  first_name: string
+  last_name: string
   email_address: string
   avatar_url: string | null
 }

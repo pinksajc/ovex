@@ -11,7 +11,8 @@
 // Las páginas siempre importan desde aquí — nunca de mock-data directamente.
 // =========================================
 
-import type { Deal, DealConfiguration, ProposalRecord, ProposalSections } from '@/types'
+import type { Deal, DealCommercialStatus, DealConfiguration, ProposalRecord, ProposalSections } from '@/types'
+import { getLastActivityByDeal, getLastProposalViewByDeal } from './supabase/events'
 
 // ---- Flags ----
 
@@ -28,14 +29,15 @@ function isAttioConfigured(): boolean {
 // =========================================
 
 /**
- * Lista todos los deals.
+ * Lista todos los deals con commercialStatus y hasProposal precalculados.
+ * El componente no necesita saber de proposals.
  */
 export async function getDeals(): Promise<Deal[]> {
-  if (!isAttioConfigured()) {
-    const { MOCK_DEALS } = await import('./mock-data')
-    return MOCK_DEALS
-  }
-  return getDealsFromAttio()
+  const baseDeals = isAttioConfigured()
+    ? await getDealsFromAttio()
+    : await import('./mock-data').then((m) => m.MOCK_DEALS)
+
+  return enrichWithCommercialStatus(baseDeals)
 }
 
 /**
@@ -44,11 +46,13 @@ export async function getDeals(): Promise<Deal[]> {
  * En modo mock, el ID es el mock ID ('deal-001', etc.)
  */
 export async function getDeal(id: string): Promise<Deal | undefined> {
-  if (!isAttioConfigured()) {
-    const { getDealById } = await import('./mock-data')
-    return getDealById(id)
-  }
-  return getDealFromAttio(id)
+  const base = isAttioConfigured()
+    ? await getDealFromAttio(id)
+    : await import('./mock-data').then((m) => m.getDealById(id))
+
+  if (!base) return undefined
+  const [enriched] = await enrichWithCommercialStatus([base])
+  return enriched
 }
 
 /**
@@ -155,19 +159,76 @@ export async function nextVersion(attioDealId: string): Promise<number> {
 }
 
 // =========================================
+// COMMERCIAL STATUS ENRICHMENT (private)
+// =========================================
+
+/**
+ * Annotates each deal with commercialStatus and hasProposal.
+ * Single batch query against proposals table. Never call from components.
+ */
+async function enrichWithCommercialStatus(deals: Deal[]): Promise<Deal[]> {
+  let configIdsWithProposals = new Set<string>()
+  let lastActivityMap = new Map<string, string>()
+  let lastProposalViewMap = new Map<string, string>()
+
+  if (isAttioConfigured() && deals.length > 0) {
+    const dealIds = deals.map((d) => d.id)
+    const [proposalIds, activityMap, proposalViewMap] = await Promise.all([
+      import('./supabase/proposals')
+        .then((m) => m.getConfigIdsWithProposals(dealIds))
+        .catch(() => new Set<string>()),
+      getLastActivityByDeal(dealIds).catch(() => new Map<string, string>()),
+      getLastProposalViewByDeal(dealIds).catch(() => new Map<string, string>()),
+    ])
+    configIdsWithProposals = proposalIds
+    lastActivityMap = activityMap
+    lastProposalViewMap = proposalViewMap
+  }
+
+  const STATUS_PRIORITY: Record<DealCommercialStatus, number> = {
+    proposal_created: 0,
+    configured: 1,
+    no_config: 2,
+  }
+
+  return deals
+    .map((deal) => {
+      const activeCfg = getActiveConfig(deal)
+      const hasProposal = activeCfg ? configIdsWithProposals.has(activeCfg.id) : false
+      const commercialStatus: DealCommercialStatus = !activeCfg
+        ? 'no_config'
+        : hasProposal
+        ? 'proposal_created'
+        : 'configured'
+      const lastActivityAt = lastActivityMap.get(deal.id) ?? null
+      const lastProposalViewAt = lastProposalViewMap.get(deal.id) ?? null
+      return { ...deal, commercialStatus, hasProposal, lastActivityAt, lastProposalViewAt }
+    })
+    .sort((a, b) => {
+      const pa = STATUS_PRIORITY[a.commercialStatus]
+      const pb = STATUS_PRIORITY[b.commercialStatus]
+      if (pa !== pb) return pa - pb
+      const arrA = getActiveConfig(a)?.economics.annualRevenue ?? 0
+      const arrB = getActiveConfig(b)?.economics.annualRevenue ?? 0
+      return arrB - arrA
+    })
+}
+
+// =========================================
 // PROPOSALS
 // =========================================
 
 /**
- * Lee la propuesta guardada para un deal.
+ * Lee la propuesta guardada para un (deal, config) concreto.
  * Devuelve null si no existe o si estamos en modo mock.
  */
 export async function getProposal(
-  attioDealId: string
+  attioDealId: string,
+  configId: string
 ): Promise<ProposalRecord | null> {
   if (!isAttioConfigured()) return null
   const { getProposalForDeal } = await import('./supabase/proposals')
-  return getProposalForDeal(attioDealId).catch(() => null)
+  return getProposalForDeal(attioDealId, configId).catch(() => null)
 }
 
 /**
@@ -186,6 +247,7 @@ export async function saveProposal(
         attioDealId,
         configId,
         sections,
+        sentForSignatureAt: null,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       },

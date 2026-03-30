@@ -2,6 +2,7 @@
 
 import { calculateEconomics } from '@/lib/pricing/engine'
 import { saveNewConfigVersion } from '@/lib/deals'
+import { logEvent } from '@/lib/supabase/events'
 import type { PlanTier, AddonId, HardwareLineItem } from '@/types'
 
 export interface SaveVersionPayload {
@@ -50,6 +51,7 @@ export async function saveNewVersionAction(
       economics,
     })
 
+    void logEvent('config_saved', payload.dealId)
     return {
       ok: true,
       version: result.config.version,

@@ -1,8 +1,8 @@
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { getDeal, getActiveConfig } from '@/lib/deals'
+import { logEvent } from '@/lib/supabase/events'
 import { Simulator } from '@/components/configurador/simulator'
-import { VersionList } from '@/components/configurador/version-list'
 
 export default async function ConfiguradorPage({
   params,
@@ -16,6 +16,7 @@ export default async function ConfiguradorPage({
 
   const deal = await getDeal(id)
   if (!deal) notFound()
+  void logEvent('deal_opened', id)
 
   const activeConfig = getActiveConfig(deal)
 
@@ -62,22 +63,16 @@ export default async function ConfiguradorPage({
             )}
           </p>
         </div>
-        <button
-          disabled
-          title="Próximamente — requiere generar PDF"
-          className="text-sm text-zinc-400 bg-zinc-100 px-4 py-2 rounded-lg cursor-not-allowed"
+        <Link
+          href={`/deals/${deal.id}/propuesta`}
+          className="text-sm font-medium bg-zinc-900 text-white px-4 py-2 rounded-lg hover:bg-zinc-700 transition-colors"
         >
-          Generar propuesta
-        </button>
+          Ver propuesta →
+        </Link>
       </div>
 
-      {/* Version list (hidden when only 1 or 0 versions) */}
-      {deal.configurations.length > 0 && (
-        <VersionList deal={deal} loadedConfigId={displayConfig?.id} />
-      )}
-
-      {/* Simulator */}
-      <Simulator deal={deal} initialConfig={displayConfig} />
+      {/* key forces remount when loaded config changes → rehidrates all simulator state */}
+      <Simulator key={displayConfig?.id ?? 'default'} deal={deal} initialConfig={displayConfig} loadedConfigId={displayConfig?.id} />
     </div>
   )
 }

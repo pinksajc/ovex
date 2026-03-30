@@ -1,9 +1,12 @@
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { getDeal, getActiveConfig, getProposal } from '@/lib/deals'
+import { logEvent, getProposalViewStats } from '@/lib/supabase/events'
 import { formatCurrency, formatNumber } from '@/lib/format'
 import { PLANS, ADDONS, HARDWARE } from '@/lib/pricing/catalog'
 import { ProposalEditor } from '@/components/propuesta/proposal-editor'
+import { CopyLinkButton } from '@/components/propuesta/copy-link-button'
+import { SendForSignatureButton } from '@/components/propuesta/send-for-signature-button'
 import type { Deal, DealConfiguration, ProposalSections } from '@/types'
 
 // =========================================
@@ -18,6 +21,7 @@ export default async function PropuestaPage({
   const { id } = await params
   const deal = await getDeal(id)
   if (!deal) notFound()
+  void logEvent('deal_opened', id)
 
   const cfg = getActiveConfig(deal)
 
@@ -27,10 +31,19 @@ export default async function PropuestaPage({
     year: 'numeric',
   })
 
+  // Load proposal + view stats in parallel
+  const [saved, viewStats] = await Promise.all([
+    cfg ? getProposal(deal.id, cfg.id) : Promise.resolve(null),
+    cfg ? getProposalViewStats(deal.id) : Promise.resolve({ count: 0, lastAt: null }),
+  ])
+  const sections: ProposalSections | null = cfg
+    ? (saved?.sections ?? buildDefaultSections(deal, cfg))
+    : null
+
   return (
     <div className="min-h-screen bg-zinc-50">
-      {/* Nav strip — static Server Component */}
-      <div className="px-8 py-4 flex items-center justify-between border-b border-zinc-200 bg-white">
+      {/* Nav strip */}
+      <div className="px-8 py-4 flex items-center justify-between border-b border-zinc-200 bg-white print:hidden">
         <div className="flex items-center gap-2 text-sm text-zinc-400">
           <Link href="/deals" className="hover:text-zinc-700 transition-colors">Deals</Link>
           <span>/</span>
@@ -39,54 +52,69 @@ export default async function PropuestaPage({
           </Link>
           <span>/</span>
           <span className="text-zinc-700 font-medium">Propuesta</span>
+          {cfg && (
+            <>
+              <span>/</span>
+              <span className="text-[11px] font-mono bg-zinc-100 text-zinc-500 px-2 py-0.5 rounded">
+                v{cfg.version}{cfg.label ? ` · ${cfg.label}` : ''}
+              </span>
+            </>
+          )}
         </div>
-        <Link
-          href={`/deals/${deal.id}/configurador`}
-          className="text-xs text-zinc-400 hover:text-zinc-900 border border-zinc-200 hover:border-zinc-400 px-3 py-1.5 rounded-lg transition-colors"
-        >
-          Editar en Simulator →
-        </Link>
+        <div className="flex items-center gap-3">
+          {cfg && (
+            <span className="text-xs text-zinc-400 hidden md:block">
+              {viewStats.count === 0
+                ? 'No abierta aún'
+                : `Vista ${viewStats.count} ${viewStats.count === 1 ? 'vez' : 'veces'} · Última: ${formatTimeAgo(viewStats.lastAt!)}`}
+            </span>
+          )}
+          {cfg && viewStats.count > 0 && (
+            <div className="w-px h-4 bg-zinc-200 hidden md:block" />
+          )}
+          {cfg && (
+            <SendForSignatureButton
+              dealId={deal.id}
+              configId={cfg.id}
+              sentAt={saved?.sentForSignatureAt ?? null}
+            />
+          )}
+          {cfg && (
+            <CopyLinkButton
+              path={`/deals/${deal.id}/propuesta/view`}
+              label="Reenviar propuesta"
+            />
+          )}
+          <CopyLinkButton path={`/deals/${deal.id}/propuesta/view`} />
+          <Link
+            href={`/deals/${deal.id}/propuesta/view`}
+            className="text-xs font-medium border border-zinc-200 text-zinc-600 px-3 py-1.5 rounded-lg hover:border-zinc-400 hover:text-zinc-900 transition-colors"
+          >
+            Ver modo cliente →
+          </Link>
+          <Link
+            href={`/deals/${deal.id}/configurador`}
+            className="text-xs text-zinc-400 hover:text-zinc-900 border border-zinc-200 hover:border-zinc-400 px-3 py-1.5 rounded-lg transition-colors"
+          >
+            Editar en Simulator →
+          </Link>
+        </div>
       </div>
 
       {/* Content */}
       <div className="max-w-3xl mx-auto px-6 py-10">
-        {cfg ? (
-          <ProposalContent deal={deal} cfg={cfg} today={today} />
+        {cfg && sections ? (
+          <ProposalEditor
+            deal={deal}
+            cfg={cfg}
+            today={today}
+            initialSections={sections}
+          />
         ) : (
           <EmptyState dealId={deal.id} companyName={deal.company.name} />
         )}
       </div>
     </div>
-  )
-}
-
-// =========================================
-// ProposalContent — async, loads saved proposal then renders editor
-// =========================================
-
-async function ProposalContent({
-  deal,
-  cfg,
-  today,
-}: {
-  deal: Deal
-  cfg: DealConfiguration
-  today: string
-}) {
-  // Load saved proposal (null if none or mock mode)
-  const saved = await getProposal(deal.id)
-
-  // Use saved sections or build defaults from deal + cfg
-  const sections: ProposalSections =
-    saved?.sections ?? buildDefaultSections(deal, cfg)
-
-  return (
-    <ProposalEditor
-      deal={deal}
-      cfg={cfg}
-      today={today}
-      initialSections={sections}
-    />
   )
 }
 
@@ -114,7 +142,7 @@ function buildDefaultSections(deal: Deal, cfg: DealConfiguration): ProposalSecti
   return {
     executiveSummary: [
       `Platomico propone a ${deal.company.name} una solución completa de gestión de pedidos en hostelería basada en el plan ${plan.label}.`,
-      `Con ${cfg.locations} local${cfg.locations > 1 ? 'es' : ''} y un volumen estimado de ${formatNumber(cfg.dailyOrdersPerLocation)} pedidos diarios por local, la plataforma digitaliza y optimiza toda la operación.`,
+      `Con ${cfg.locations} local${cfg.locations > 1 ? 'es' : ''} y un volumen estimado de ${formatNumber(cfg.dailyOrdersPerLocation)} pedidos mensuales por local, la plataforma digitaliza y optimiza toda la operación.`,
       `El impacto económico estimado es de ${formatCurrency(eco.totalMonthlyRevenue)}/mes (${formatCurrency(eco.annualRevenue)}/año).`,
     ].join(' '),
 
@@ -147,6 +175,16 @@ function buildDefaultSections(deal: Deal, cfg: DealConfiguration): ProposalSecti
 // =========================================
 // Empty state
 // =========================================
+
+function formatTimeAgo(isoDate: string): string {
+  const diffMs = Date.now() - new Date(isoDate).getTime()
+  const mins = Math.floor(diffMs / 60000)
+  const hours = Math.floor(diffMs / 3600000)
+  const days = Math.floor(diffMs / 86400000)
+  if (mins < 60) return `hace ${mins}m`
+  if (hours < 24) return `hace ${hours}h`
+  return `hace ${days}d`
+}
 
 function EmptyState({ dealId, companyName }: { dealId: string; companyName: string }) {
   return (

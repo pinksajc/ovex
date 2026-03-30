@@ -2,6 +2,7 @@
 
 import { calculateEconomics } from '@/lib/pricing/engine'
 import { saveActiveConfig } from '@/lib/deals'
+import { logEvent } from '@/lib/supabase/events'
 import type { PlanTier, AddonId, HardwareLineItem } from '@/types'
 
 export interface SaveConfigPayload {
@@ -49,6 +50,7 @@ export async function saveConfigAction(
       createdAt: new Date().toISOString(),
     })
 
+    void logEvent('config_saved', payload.dealId)
     return { ok: true, persisted: result.persisted }
   } catch (err) {
     return {

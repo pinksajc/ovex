@@ -25,10 +25,13 @@ interface ProposalEditorProps {
 
 export function ProposalEditor({ deal, cfg, today, initialSections }: ProposalEditorProps) {
   const [sections, setSections] = useState<ProposalSections>(initialSections)
+  const [savedSnapshot, setSavedSnapshot] = useState(() => JSON.stringify(initialSections))
   const [saveState, setSaveState] = useState<SaveState>('idle')
   const [persisted, setPersisted] = useState(false)
   const [savedAt, setSavedAt] = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
+
+  const hasUnsavedChanges = JSON.stringify(sections) !== savedSnapshot
 
   // Reset "saved" banner after 4s
   useEffect(() => {
@@ -37,6 +40,13 @@ export function ProposalEditor({ deal, cfg, today, initialSections }: ProposalEd
       return () => clearTimeout(t)
     }
   }, [saveState])
+
+  useEffect(() => {
+    if (!hasUnsavedChanges) return
+    function guard(e: BeforeUnloadEvent) { e.preventDefault(); e.returnValue = '' }
+    window.addEventListener('beforeunload', guard)
+    return () => window.removeEventListener('beforeunload', guard)
+  }, [hasUnsavedChanges])
 
   function set(key: keyof ProposalSections, value: string) {
     setSections((prev) => ({ ...prev, [key]: value }))
@@ -53,6 +63,7 @@ export function ProposalEditor({ deal, cfg, today, initialSections }: ProposalEd
       if (result.ok) {
         setSaveState('saved')
         setPersisted(result.persisted)
+        setSavedSnapshot(JSON.stringify(sections))
         setSavedAt(
           result.updatedAt
             ? new Date(result.updatedAt).toLocaleTimeString('es-ES', {
@@ -76,17 +87,24 @@ export function ProposalEditor({ deal, cfg, today, initialSections }: ProposalEd
     <>
       {/* ── Save bar (sticky, above document) ── */}
       <div className="mb-4 flex items-center justify-between">
-        <div className="text-xs text-zinc-400">
-          {activeSaveState === 'saved' && savedAt && (
-            <span className={persisted ? 'text-emerald-600' : 'text-zinc-500'}>
-              {persisted ? `✓ Guardado a las ${savedAt}` : `✓ Guardado (modo local · sin persistencia)`}
-            </span>
+        <div className="text-xs">
+          {activeSaveState === 'saving' && (
+            <span className="text-zinc-400">Guardando...</span>
           )}
           {activeSaveState === 'error' && (
             <span className="text-red-500">Error al guardar. Inténtalo de nuevo.</span>
           )}
-          {activeSaveState === 'idle' && savedAt && (
-            <span className="text-zinc-400">Última vez guardado a las {savedAt}</span>
+          {activeSaveState !== 'saving' && activeSaveState !== 'error' && hasUnsavedChanges && (
+            <span className="flex items-center gap-1.5 text-amber-600 font-medium">
+              <span className="w-1.5 h-1.5 rounded-full bg-amber-500 shrink-0" />
+              Cambios sin guardar
+            </span>
+          )}
+          {activeSaveState !== 'saving' && activeSaveState !== 'error' && !hasUnsavedChanges && savedAt && (
+            <span className="flex items-center gap-1.5 text-emerald-600">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" />
+              {persisted ? `Guardado a las ${savedAt}` : 'Guardado (modo local)'}
+            </span>
           )}
         </div>
         <SaveButton state={activeSaveState} onSave={handleSave} />
@@ -159,7 +177,7 @@ export function ProposalEditor({ deal, cfg, today, initialSections }: ProposalEd
             <SnapPill label="Plan" value={plan.label} strong />
             <SnapPill label="Locales" value={String(cfg.locations)} />
             <SnapPill
-              label="Pedidos/día"
+              label="Pedidos/mes"
               value={`${formatNumber(cfg.dailyOrdersPerLocation)} por local`}
             />
             <SnapPill label="GMV mensual" value={formatCurrency(eco.totalMonthlyGMV)} />
@@ -299,7 +317,7 @@ export function ProposalEditor({ deal, cfg, today, initialSections }: ProposalEd
                     mono
                   />
                   <ConfigRow label="Locales" value={String(cfg.locations)} />
-                  <ConfigRow label="Pedidos/día/local" value={formatNumber(cfg.dailyOrdersPerLocation)} />
+                  <ConfigRow label="Pedidos/mes/local" value={formatNumber(cfg.dailyOrdersPerLocation)} />
                   <ConfigRow label="Ticket medio" value={formatCurrency(cfg.averageTicket)} mono />
                   <ConfigRow label="Fee plan/mes" value={formatCurrency(eco.planFeeMonthly)} mono />
                   {eco.addonFeeMonthly > 0 && (
@@ -326,7 +344,7 @@ export function ProposalEditor({ deal, cfg, today, initialSections }: ProposalEd
                         <div key={id} className="flex justify-between text-xs text-zinc-600">
                           <span>{addon.label}</span>
                           <span className="font-mono text-zinc-500">
-                            {id === 'datafono' ? `${addon.feePercent}% GMV` : `${formatCurrency(monthlyFee)}/mes`}
+                            {id === 'datafono' ? `${addon.feePercent}% GMV` : addon.perConsumption ? 'por consumo' : `${formatCurrency(monthlyFee)}/mes`}
                           </span>
                         </div>
                       )
@@ -406,6 +424,33 @@ export function ProposalEditor({ deal, cfg, today, initialSections }: ProposalEd
           </div>
         </div>
 
+        {/* ── Impacto estimado ── */}
+        <div className="px-10 py-8 border-b border-zinc-100">
+          <SectionLabel>Impacto estimado</SectionLabel>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mt-4">
+            <ImpactMetric
+              label="GMV mensual"
+              value={formatCurrency(eco.totalMonthlyGMV)}
+              sub="volumen de negocio gestionado"
+            />
+            <ImpactMetric
+              label="Pedidos/mes"
+              value={formatNumber(eco.totalMonthlyVolume)}
+              sub={`${formatNumber(eco.monthlyVolumePerLocation)} por local`}
+            />
+            <ImpactMetric
+              label="Locales"
+              value={String(cfg.locations)}
+              sub="puntos operativos"
+            />
+            <ImpactMetric
+              label="Ticket medio"
+              value={formatCurrency(cfg.averageTicket)}
+              sub="por pedido"
+            />
+          </div>
+        </div>
+
         {/* ── Próximos pasos ── */}
         <div className="px-10 py-8 border-b border-zinc-100">
           <SectionLabel>Próximos pasos</SectionLabel>
@@ -418,12 +463,31 @@ export function ProposalEditor({ deal, cfg, today, initialSections }: ProposalEd
           />
         </div>
 
+        {/* ── CTA Aceptar ── */}
+        <div className="px-10 py-10 flex flex-col items-center gap-4 border-b border-zinc-100 bg-zinc-900">
+          <p className="text-white text-lg font-semibold tracking-tight text-center">
+            ¿Listo para empezar con {deal.company.name}?
+          </p>
+          <p className="text-zinc-400 text-sm text-center max-w-sm">
+            Acepta esta propuesta y ponemos en marcha el onboarding en menos de 48 horas.
+          </p>
+          <a
+            href={`mailto:${deal.contact.email || 'info@platomico.com'}?subject=Aceptación propuesta Orvex · ${deal.company.name}&body=Hola,%0A%0AConfirmamos la aceptación de la propuesta comercial de Orvex.%0A%0ASaludos`}
+            className="mt-2 inline-flex items-center gap-2 bg-white text-zinc-900 font-semibold text-sm px-6 py-3 rounded-xl hover:bg-zinc-100 transition-colors"
+          >
+            Aceptar propuesta →
+          </a>
+          <p className="text-[10px] text-zinc-600 text-center">
+            O responde a este email para coordinar los detalles.
+          </p>
+        </div>
+
         {/* Footer */}
         <div className="px-10 py-6 bg-zinc-50/50">
           <div className="flex items-center justify-between">
             <p className="text-[10px] text-zinc-400 leading-relaxed max-w-sm">
-              Documento de uso interno. Generado por Orvex · Platomico.
-              Los datos económicos son estimaciones basadas en la configuración activa.
+              Propuesta preparada por Platomico para {deal.company.name}.
+              Los datos económicos son proyecciones basadas en la configuración acordada.
             </p>
             <p className="text-xs font-mono text-zinc-400">v{cfg.version} · {today}</p>
           </div>
@@ -567,5 +631,15 @@ function ConfigRow({ label, value, mono }: { label: string; value: string; mono?
         {value}
       </td>
     </tr>
+  )
+}
+
+function ImpactMetric({ label, value, sub }: { label: string; value: string; sub?: string }) {
+  return (
+    <div className="bg-zinc-50 rounded-xl px-5 py-4 border border-zinc-100">
+      <p className="text-[10px] text-zinc-400 uppercase tracking-wide mb-1">{label}</p>
+      <p className="text-xl font-semibold font-mono text-zinc-900">{value}</p>
+      {sub && <p className="text-[10px] text-zinc-400 mt-1">{sub}</p>}
+    </div>
   )
 }

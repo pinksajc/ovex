@@ -18,3 +18,31 @@ body {
   background: var(--background);
   color: var(--foreground);
 }
+
+@media print {
+  @page {
+    size: A4;
+    margin: 15mm 20mm;
+  }
+
+  body {
+    background: white !important;
+  }
+
+  .proposal-print-wrapper {
+    background: white !important;
+    min-height: unset !important;
+    padding: 0 !important;
+  }
+
+  .proposal-print-wrapper > div {
+    max-width: 100% !important;
+    padding: 0 !important;
+  }
+
+  .proposal-print-card {
+    border: none !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+  }
+}
