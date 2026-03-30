@@ -4,6 +4,7 @@ import { getDeal, getActiveConfig, getProposal } from '@/lib/deals'
 import { logEvent } from '@/lib/supabase/events'
 import { formatCurrency, formatNumber } from '@/lib/format'
 import { PLANS, ADDONS, HARDWARE, HARDWARE_MODE_LABELS } from '@/lib/pricing/catalog'
+import { PrintButton } from '@/components/propuesta/print-button'
 import type { Deal, DealConfiguration, ProposalSections } from '@/types'
 
 export default async function PropuestaViewPage({
@@ -44,6 +45,7 @@ export default async function PropuestaViewPage({
 
   return (
     <div className="min-h-screen bg-zinc-50 proposal-print-wrapper">
+      <PrintButton variant="fab" />
       <div className="max-w-3xl mx-auto px-6 py-12">
         <ProposalView deal={deal} cfg={cfg} sections={sections} today={today} />
       </div>
@@ -76,9 +78,18 @@ function ProposalView({
       {/* ── Header ── */}
       <div className="px-10 pt-10 pb-8 border-b border-zinc-100">
         <div className="flex items-start justify-between mb-8">
-          <div>
-            <span className="text-xl font-semibold text-zinc-900 tracking-tight">Orvex</span>
-            <p className="text-xs text-zinc-400 mt-0.5">Sales Operating System · Platomico</p>
+          {/* Logo mark */}
+          <div className="flex items-center gap-3">
+            <svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg" className="shrink-0">
+              <rect width="32" height="32" rx="8" fill="#09090b"/>
+              <rect x="9" y="9" width="6" height="14" rx="1.5" fill="white"/>
+              <rect x="9" y="9" width="10" height="7" rx="1.5" fill="white"/>
+              <circle cx="23" cy="22" r="3" fill="#10b981"/>
+            </svg>
+            <div>
+              <span className="text-base font-bold text-zinc-900 tracking-tight leading-none block">Platomico</span>
+              <p className="text-[10px] text-zinc-400 mt-0.5 leading-none">Gestión de pedidos · Hostelería</p>
+            </div>
           </div>
           <div className="text-right">
             <span className="inline-block bg-zinc-900 text-white text-[10px] font-bold uppercase tracking-widest px-3 py-1 rounded-full">
@@ -310,13 +321,20 @@ function ProposalView({
       )}
 
       {/* Footer */}
-      <div className="px-10 py-6 bg-zinc-50/50">
+      <div className="px-10 py-6 border-t border-zinc-100">
         <div className="flex items-center justify-between">
-          <p className="text-[10px] text-zinc-400 leading-relaxed max-w-sm">
-            Propuesta preparada por Platomico para {deal.company.name}.
-            Los datos económicos son proyecciones basadas en la configuración acordada.
-          </p>
-          <p className="text-xs font-mono text-zinc-400">v{cfg.version} · {today}</p>
+          <div className="flex items-center gap-2.5">
+            <svg width="16" height="16" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <rect width="32" height="32" rx="8" fill="#09090b"/>
+              <rect x="9" y="9" width="6" height="14" rx="1.5" fill="white"/>
+              <rect x="9" y="9" width="10" height="7" rx="1.5" fill="white"/>
+              <circle cx="23" cy="22" r="3" fill="#10b981"/>
+            </svg>
+            <p className="text-[10px] text-zinc-400 leading-relaxed">
+              Propuesta preparada por Platomico · {deal.company.name} · Los datos son proyecciones.
+            </p>
+          </div>
+          <p className="text-[10px] font-mono text-zinc-400 shrink-0 ml-4">v{cfg.version} · {today}</p>
         </div>
       </div>
     </div>

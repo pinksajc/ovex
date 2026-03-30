@@ -110,7 +110,14 @@ export type DealStage =
   | 'closed_won'
   | 'closed_lost'
 
-export type DealCommercialStatus = 'no_config' | 'configured' | 'proposal_created'
+export type DealCommercialStatus =
+  | 'no_config'
+  | 'configured'
+  | 'proposal_created'  // draft saved, not sent
+  | 'proposal_sent'     // sent for signature, not yet opened
+  | 'proposal_viewed'   // client opened it
+  | 'negotiating'       // deal.stage === 'negotiation' after sending
+  | 'signed'            // DocuSeal confirmed
 
 export interface Deal {
   id: string
@@ -184,6 +191,18 @@ export interface ProposalRecord {
   configId: string
   sections: ProposalSections
   sentForSignatureAt: string | null
+  // DocuSeal
+  docusealSubmissionId: string | null
+  docusealStatus: 'pending' | 'completed' | null  // pending = awaiting; completed = signed
+  signedAt: string | null
   createdAt: string
   updatedAt: string
+}
+
+/** Lightweight summary used for batch status enrichment in getDeals() */
+export interface ProposalSummary {
+  configId: string
+  sentForSignatureAt: string | null
+  docusealStatus: 'pending' | 'completed' | null
+  signedAt: string | null
 }

@@ -21,14 +21,23 @@ body {
 
 @media print {
   @page {
-    size: A4;
-    margin: 15mm 20mm;
+    size: A4 portrait;
+    margin: 12mm 16mm;
+  }
+
+  /* Force background colors & images to print */
+  * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+    color-adjust: exact !important;
   }
 
   body {
     background: white !important;
+    font-size: 11pt;
   }
 
+  /* Strip screen chrome */
   .proposal-print-wrapper {
     background: white !important;
     min-height: unset !important;
@@ -38,11 +47,40 @@ body {
   .proposal-print-wrapper > div {
     max-width: 100% !important;
     padding: 0 !important;
+    margin: 0 !important;
   }
 
   .proposal-print-card {
     border: none !important;
     border-radius: 0 !important;
     box-shadow: none !important;
+    overflow: visible !important;
   }
+
+  /* Page break control */
+  .proposal-print-card > div {
+    break-inside: avoid;
+  }
+
+  /* Ensure metric grid prints with backgrounds */
+  .proposal-print-card .bg-white {
+    background-color: #fff !important;
+  }
+
+  .proposal-print-card .bg-zinc-50 {
+    background-color: #fafafa !important;
+  }
+
+  .proposal-print-card .bg-zinc-50\/50 {
+    background-color: #fafafa !important;
+  }
+
+  .proposal-print-card .bg-zinc-100 {
+    background-color: #f4f4f5 !important;
+  }
+
+  /* Font size adjustments for compact print */
+  .proposal-print-card h1 { font-size: 22pt !important; }
+  .proposal-print-card .text-xl { font-size: 14pt !important; }
+  .proposal-print-card .text-lg { font-size: 12pt !important; }
 }

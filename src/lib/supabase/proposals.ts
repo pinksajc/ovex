@@ -6,10 +6,13 @@
 // =========================================
 
 import { getSupabaseClient } from './client'
-import type { ProposalRecord, ProposalSections } from '@/types'
+import type { ProposalRecord, ProposalSections, ProposalSummary } from '@/types'
 
-// SQL migration:
+// SQL migrations (run once in Supabase):
 //   ALTER TABLE proposals ADD COLUMN IF NOT EXISTS sent_for_signature_at timestamptz;
+//   ALTER TABLE proposals ADD COLUMN IF NOT EXISTS docuseal_submission_id text;
+//   ALTER TABLE proposals ADD COLUMN IF NOT EXISTS docuseal_status text;
+//   ALTER TABLE proposals ADD COLUMN IF NOT EXISTS signed_at timestamptz;
 
 interface ProposalRow {
   id: string
@@ -17,14 +20,15 @@ interface ProposalRow {
   config_id: string
   sections: ProposalSections
   sent_for_signature_at: string | null
+  docuseal_submission_id: string | null
+  docuseal_status: 'pending' | 'completed' | null
+  signed_at: string | null
   created_at: string
   updated_at: string
 }
 
-function table() {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  return getSupabaseClient().from('proposals') as any
-}
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function table() { return getSupabaseClient().from('proposals') as any }
 
 function rowToRecord(row: ProposalRow): ProposalRecord {
   return {
@@ -33,12 +37,16 @@ function rowToRecord(row: ProposalRow): ProposalRecord {
     configId: row.config_id,
     sections: row.sections,
     sentForSignatureAt: row.sent_for_signature_at ?? null,
+    docusealSubmissionId: row.docuseal_submission_id ?? null,
+    docusealStatus: row.docuseal_status ?? null,
+    signedAt: row.signed_at ?? null,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   }
 }
 
-/** Returns the saved proposal for a specific (deal, config) pair, or null. */
+// ---- Reads ----
+
 export async function getProposalForDeal(
   attioDealId: string,
   configId: string
@@ -48,39 +56,73 @@ export async function getProposalForDeal(
     .eq('attio_deal_id', attioDealId)
     .eq('config_id', configId)
     .maybeSingle()
-
   if (error) throw new Error(`Supabase getProposalForDeal: ${error.message}`)
   if (!data) return null
   return rowToRecord(data as ProposalRow)
 }
 
-/**
- * Returns the set of config_ids that have a saved proposal,
- * scoped to the given deal IDs. One query for all deals.
- */
-export async function getConfigIdsWithProposals(
-  dealIds: string[]
-): Promise<Set<string>> {
+/** Returns config_ids that have a saved proposal (backward compat). */
+export async function getConfigIdsWithProposals(dealIds: string[]): Promise<Set<string>> {
   if (dealIds.length === 0) return new Set()
-
-  const { data, error } = await table()
-    .select('config_id')
-    .in('attio_deal_id', dealIds)
-
+  const { data, error } = await table().select('config_id').in('attio_deal_id', dealIds)
   if (error) throw new Error(`Supabase getConfigIdsWithProposals: ${error.message}`)
   return new Set((data as { config_id: string }[]).map((r) => r.config_id))
 }
 
 /**
- * Sets sent_for_signature_at = now() on the proposal row.
- * Updates if exists; inserts a skeleton row if not yet created.
+ * Returns map of configId → ProposalSummary for batch status enrichment.
+ * Called by enrichWithCommercialStatus() once per getDeals() call.
+ */
+export async function getProposalSummariesForDeals(
+  dealIds: string[]
+): Promise<Map<string, ProposalSummary>> {
+  const result = new Map<string, ProposalSummary>()
+  if (dealIds.length === 0) return result
+
+  const { data, error } = await table()
+    .select('config_id, sent_for_signature_at, docuseal_status, signed_at')
+    .in('attio_deal_id', dealIds)
+  if (error) throw new Error(`Supabase getProposalSummariesForDeals: ${error.message}`)
+
+  type SummaryRow = Pick<ProposalRow, 'config_id' | 'sent_for_signature_at' | 'docuseal_status' | 'signed_at'>
+  for (const row of (data ?? []) as SummaryRow[]) {
+    result.set(row.config_id, {
+      configId: row.config_id,
+      sentForSignatureAt: row.sent_for_signature_at ?? null,
+      docusealStatus: row.docuseal_status ?? null,
+      signedAt: row.signed_at ?? null,
+    })
+  }
+  return result
+}
+
+// ---- Writes ----
+
+export async function upsertProposal(
+  attioDealId: string,
+  configId: string,
+  sections: ProposalSections
+): Promise<ProposalRecord> {
+  const { data, error } = await table()
+    .upsert(
+      { attio_deal_id: attioDealId, config_id: configId, sections, updated_at: new Date().toISOString() },
+      { onConflict: 'attio_deal_id,config_id' }
+    )
+    .select()
+    .single()
+  if (error) throw new Error(`Supabase upsertProposal: ${error.message}`)
+  return rowToRecord(data as ProposalRow)
+}
+
+/**
+ * Marks proposal sent without DocuSeal (legacy / fallback).
+ * SELECT + conditional UPDATE/INSERT to avoid overwriting sections.
  */
 export async function markProposalSentForSignature(
   attioDealId: string,
   configId: string
 ): Promise<void> {
   const now = new Date().toISOString()
-
   const { data: existing } = await table()
     .select('id')
     .eq('attio_deal_id', attioDealId)
@@ -92,38 +134,61 @@ export async function markProposalSentForSignature(
       .update({ sent_for_signature_at: now, updated_at: now })
       .eq('id', (existing as { id: string }).id)
   } else {
-    await table()
-      .insert({
-        attio_deal_id: attioDealId,
-        config_id: configId,
-        sections: { executiveSummary: '', solution: '', economicsSummary: '', nextSteps: '' },
-        sent_for_signature_at: now,
-        updated_at: now,
-      })
+    await table().insert({
+      attio_deal_id: attioDealId,
+      config_id: configId,
+      sections: { executiveSummary: '', solution: '', economicsSummary: '', nextSteps: '' },
+      sent_for_signature_at: now,
+      updated_at: now,
+    })
   }
 }
 
 /**
- * Upserts the proposal for a (deal, config) pair.
- * unique constraint: (attio_deal_id, config_id)
+ * Saves DocuSeal submission ID + sets docuseal_status = 'pending'.
+ * Called after createDocuSealSubmission() succeeds.
  */
-export async function upsertProposal(
+export async function markProposalSentWithDocuSeal(
   attioDealId: string,
   configId: string,
-  sections: ProposalSections
-): Promise<ProposalRecord> {
-  const row = {
-    attio_deal_id: attioDealId,
-    config_id: configId,
-    sections,
-    updated_at: new Date().toISOString(),
+  submissionId: string
+): Promise<void> {
+  const now = new Date().toISOString()
+  const { data: existing } = await table()
+    .select('id')
+    .eq('attio_deal_id', attioDealId)
+    .eq('config_id', configId)
+    .maybeSingle()
+
+  if (existing) {
+    await table()
+      .update({
+        sent_for_signature_at: now,
+        docuseal_submission_id: submissionId,
+        docuseal_status: 'pending',
+        updated_at: now,
+      })
+      .eq('id', (existing as { id: string }).id)
+  } else {
+    await table().insert({
+      attio_deal_id: attioDealId,
+      config_id: configId,
+      sections: { executiveSummary: '', solution: '', economicsSummary: '', nextSteps: '' },
+      sent_for_signature_at: now,
+      docuseal_submission_id: submissionId,
+      docuseal_status: 'pending',
+      updated_at: now,
+    })
   }
+}
 
-  const { data, error } = await table()
-    .upsert(row, { onConflict: 'attio_deal_id,config_id' })
-    .select()
-    .single()
-
-  if (error) throw new Error(`Supabase upsertProposal: ${error.message}`)
-  return rowToRecord(data as ProposalRow)
+/**
+ * Called by DocuSeal webhook on submission.completed.
+ * Looks up by submission_id and marks it signed.
+ */
+export async function markProposalSignedByDocuSeal(submissionId: string): Promise<void> {
+  const now = new Date().toISOString()
+  await table()
+    .update({ docuseal_status: 'completed', signed_at: now, updated_at: now })
+    .eq('docuseal_submission_id', submissionId)
 }

@@ -11,7 +11,7 @@
 // Las páginas siempre importan desde aquí — nunca de mock-data directamente.
 // =========================================
 
-import type { Deal, DealCommercialStatus, DealConfiguration, ProposalRecord, ProposalSections } from '@/types'
+import type { Deal, DealCommercialStatus, DealConfiguration, ProposalRecord, ProposalSections, ProposalSummary } from '@/types'
 import { getLastActivityByDeal, getLastProposalViewByDeal } from './supabase/events'
 
 // ---- Flags ----
@@ -163,45 +163,64 @@ export async function nextVersion(attioDealId: string): Promise<number> {
 // =========================================
 
 /**
- * Annotates each deal with commercialStatus and hasProposal.
- * Single batch query against proposals table. Never call from components.
+ * Annotates each deal with commercialStatus, hasProposal, and lastProposalViewAt.
+ * Uses two batch queries (proposals + events). Never call from components.
  */
 async function enrichWithCommercialStatus(deals: Deal[]): Promise<Deal[]> {
-  let configIdsWithProposals = new Set<string>()
+  let proposalSummaries = new Map<string, ProposalSummary>()
   let lastActivityMap = new Map<string, string>()
   let lastProposalViewMap = new Map<string, string>()
 
   if (isAttioConfigured() && deals.length > 0) {
     const dealIds = deals.map((d) => d.id)
-    const [proposalIds, activityMap, proposalViewMap] = await Promise.all([
+    const [summaries, activityMap, proposalViewMap] = await Promise.all([
       import('./supabase/proposals')
-        .then((m) => m.getConfigIdsWithProposals(dealIds))
-        .catch(() => new Set<string>()),
+        .then((m) => m.getProposalSummariesForDeals(dealIds))
+        .catch(() => new Map<string, ProposalSummary>()),
       getLastActivityByDeal(dealIds).catch(() => new Map<string, string>()),
       getLastProposalViewByDeal(dealIds).catch(() => new Map<string, string>()),
     ])
-    configIdsWithProposals = proposalIds
+    proposalSummaries = summaries
     lastActivityMap = activityMap
     lastProposalViewMap = proposalViewMap
   }
 
+  // Higher priority = sorted first
   const STATUS_PRIORITY: Record<DealCommercialStatus, number> = {
-    proposal_created: 0,
-    configured: 1,
-    no_config: 2,
+    signed: 0,
+    negotiating: 1,
+    proposal_viewed: 2,
+    proposal_sent: 3,
+    proposal_created: 4,
+    configured: 5,
+    no_config: 6,
   }
 
   return deals
     .map((deal) => {
       const activeCfg = getActiveConfig(deal)
-      const hasProposal = activeCfg ? configIdsWithProposals.has(activeCfg.id) : false
-      const commercialStatus: DealCommercialStatus = !activeCfg
-        ? 'no_config'
-        : hasProposal
-        ? 'proposal_created'
-        : 'configured'
+      const summary = activeCfg ? proposalSummaries.get(activeCfg.id) : undefined
+      const hasProposal = !!summary
       const lastActivityAt = lastActivityMap.get(deal.id) ?? null
       const lastProposalViewAt = lastProposalViewMap.get(deal.id) ?? null
+
+      let commercialStatus: DealCommercialStatus = 'no_config'
+      if (!activeCfg) {
+        commercialStatus = 'no_config'
+      } else if (!summary) {
+        commercialStatus = 'configured'
+      } else if (summary.docusealStatus === 'completed' || summary.signedAt) {
+        commercialStatus = 'signed'
+      } else if (summary.sentForSignatureAt && deal.stage === 'negotiation') {
+        commercialStatus = 'negotiating'
+      } else if (summary.sentForSignatureAt && lastProposalViewAt) {
+        commercialStatus = 'proposal_viewed'
+      } else if (summary.sentForSignatureAt) {
+        commercialStatus = 'proposal_sent'
+      } else {
+        commercialStatus = 'proposal_created'
+      }
+
       return { ...deal, commercialStatus, hasProposal, lastActivityAt, lastProposalViewAt }
     })
     .sort((a, b) => {
@@ -248,6 +267,9 @@ export async function saveProposal(
         configId,
         sections,
         sentForSignatureAt: null,
+        docusealSubmissionId: null,
+        docusealStatus: null,
+        signedAt: null,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       },

@@ -77,6 +77,10 @@ export default async function PropuestaPage({
               dealId={deal.id}
               configId={cfg.id}
               sentAt={saved?.sentForSignatureAt ?? null}
+              docusealStatus={saved?.docusealStatus ?? null}
+              signedAt={saved?.signedAt ?? null}
+              signerName={deal.contact.name}
+              signerEmail={deal.contact.email}
             />
           )}
           {cfg && (

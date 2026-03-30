@@ -53,29 +53,32 @@ const CTA_STYLES: Record<CTAVariant, string> = {
 
 // ---- Status badge ----
 
+const STATUS_CONFIG: Record<DealCommercialStatus, { label: string; cls: string; dot?: string }> = {
+  no_config:        { label: '+ Configurar',    cls: 'bg-zinc-900 text-white' },
+  configured:       { label: 'Configurado',     cls: 'bg-zinc-100 text-zinc-700', dot: 'bg-zinc-400' },
+  proposal_created: { label: 'Propuesta lista', cls: 'bg-blue-50 text-blue-700 border border-blue-200', dot: 'bg-blue-500' },
+  proposal_sent:    { label: 'Enviada',          cls: 'bg-violet-50 text-violet-700 border border-violet-200', dot: 'bg-violet-500' },
+  proposal_viewed:  { label: 'Vista',            cls: 'bg-amber-50 text-amber-700 border border-amber-200', dot: 'bg-amber-500' },
+  negotiating:      { label: 'Negociando',       cls: 'bg-orange-50 text-orange-700 border border-orange-200', dot: 'bg-orange-500' },
+  signed:           { label: 'Firmada ✓',        cls: 'bg-emerald-600 text-white font-semibold' },
+}
+
 function StatusBadge({ status, dealId }: { status: DealCommercialStatus; dealId: string }) {
+  const cfg = STATUS_CONFIG[status]
   if (status === 'no_config') {
     return (
       <Link
         href={`/deals/${dealId}/configurador`}
-        className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-zinc-900 text-white hover:bg-zinc-700 transition-colors whitespace-nowrap"
+        className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium hover:opacity-80 transition-opacity whitespace-nowrap ${cfg.cls}`}
       >
-        + Configurar
+        {cfg.label}
       </Link>
     )
   }
-  if (status === 'configured') {
-    return (
-      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-50 text-emerald-700 whitespace-nowrap">
-        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" />
-        Configurado
-      </span>
-    )
-  }
   return (
-    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-emerald-600 text-white ring-1 ring-emerald-500/40 whitespace-nowrap">
-      <span className="w-1.5 h-1.5 rounded-full bg-white/80 shrink-0" />
-      Propuesta creada
+    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium whitespace-nowrap ${cfg.cls}`}>
+      {cfg.dot && <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${cfg.dot}`} />}
+      {cfg.label}
     </span>
   )
 }
@@ -86,7 +89,11 @@ type FilterKey = 'all' | DealCommercialStatus
 
 const FILTERS: { key: FilterKey; label: string }[] = [
   { key: 'all',              label: 'Todos' },
-  { key: 'proposal_created', label: 'Propuesta creada' },
+  { key: 'signed',           label: 'Firmadas' },
+  { key: 'negotiating',      label: 'Negociando' },
+  { key: 'proposal_viewed',  label: 'Vista' },
+  { key: 'proposal_sent',    label: 'Enviada' },
+  { key: 'proposal_created', label: 'Propuesta lista' },
   { key: 'configured',       label: 'Configurado' },
   { key: 'no_config',        label: 'Sin config' },
 ]
@@ -142,6 +149,10 @@ export function DealsTable({
 
   const counts: Record<FilterKey, number> = {
     all:              deals.length,
+    signed:           deals.filter((d) => d.commercialStatus === 'signed').length,
+    negotiating:      deals.filter((d) => d.commercialStatus === 'negotiating').length,
+    proposal_viewed:  deals.filter((d) => d.commercialStatus === 'proposal_viewed').length,
+    proposal_sent:    deals.filter((d) => d.commercialStatus === 'proposal_sent').length,
     proposal_created: deals.filter((d) => d.commercialStatus === 'proposal_created').length,
     configured:       deals.filter((d) => d.commercialStatus === 'configured').length,
     no_config:        deals.filter((d) => d.commercialStatus === 'no_config').length,
@@ -215,31 +226,6 @@ export function DealsTable({
   )
 }
 
-// ---- Proposal view badge ----
-
-function ProposalViewBadge({ lastViewAt }: { lastViewAt: string | null }) {
-  if (!lastViewAt) {
-    return (
-      <span className="text-[10px] font-medium text-zinc-400 bg-zinc-100 px-1.5 py-0.5 rounded-full whitespace-nowrap leading-none">
-        No abierta
-      </span>
-    )
-  }
-  const diffH = (Date.now() - new Date(lastViewAt).getTime()) / 3600000
-  if (diffH > 48) {
-    return (
-      <span className="text-[10px] font-medium text-amber-600 bg-amber-50 border border-amber-200 px-1.5 py-0.5 rounded-full whitespace-nowrap leading-none">
-        Vista hace +48h
-      </span>
-    )
-  }
-  return (
-    <span className="text-[10px] font-medium text-emerald-700 bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded-full whitespace-nowrap leading-none">
-      Vista recientemente
-    </span>
-  )
-}
-
 // ---- Row ----
 
 function DealRow({ deal }: { deal: Deal }) {
@@ -248,7 +234,7 @@ function DealRow({ deal }: { deal: Deal }) {
   const arr = cfg?.economics.annualRevenue ?? 0
   const payback = cfg?.economics.paybackMonths ?? null
   const versionLabel = cfg ? `v${cfg.version}${cfg.label ? ` · ${cfg.label}` : ''}` : null
-  const hot = deal.commercialStatus === 'proposal_created'
+  const hot = ['signed', 'negotiating', 'proposal_viewed', 'proposal_sent', 'proposal_created'].includes(deal.commercialStatus)
   const stale = !!deal.lastActivityAt && isStale(deal.lastActivityAt) && !hot
 
   const borderCls = hot
@@ -259,7 +245,8 @@ function DealRow({ deal }: { deal: Deal }) {
 
   return (
     <tr className={`transition-colors group align-middle ${
-      hot ? 'bg-emerald-50/40 hover:bg-emerald-50/70' :
+      deal.commercialStatus === 'signed' ? 'bg-emerald-50/30 hover:bg-emerald-50/50' :
+      hot ? 'hover:bg-zinc-50/60' :
       stale ? 'hover:bg-orange-50/20' :
       'hover:bg-zinc-50/60'
     }`}>
@@ -284,7 +271,6 @@ function DealRow({ deal }: { deal: Deal }) {
                 Sin actividad
               </span>
             )}
-            {hot && <ProposalViewBadge lastViewAt={deal.lastProposalViewAt} />}
           </div>
         </Link>
       </td>
