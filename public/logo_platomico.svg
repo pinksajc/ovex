@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 220 40" width="220" height="40">
+  <!-- Icon: interlocked double-loop mark -->
+  <g transform="translate(0,4)">
+    <!-- Outer rounded rect (left loop) -->
+    <path d="M3 3 Q3 0 6 0 L16 0 Q22 0 22 6 L22 10 Q22 16 16 16 L10 16 L10 26 Q10 32 4 32 L2 32 Q0 32 0 30 L0 6 Q0 3 3 3 Z"
+      fill="#0f172a"/>
+    <!-- Inner cutout to create loop effect -->
+    <rect x="4" y="4" width="9" height="9" rx="2" fill="white"/>
+    <!-- Right overlapping loop -->
+    <path d="M14 6 L24 6 Q30 6 30 12 L30 26 Q30 32 24 32 L20 32 Q14 32 14 26 L14 16 L18 16 Q24 16 24 10 L24 6 Z"
+      fill="#0f172a"/>
+    <rect x="15" y="17" width="9" height="9" rx="2" fill="white"/>
+  </g>
+  <!-- Wordmark -->
+  <text x="42" y="28" font-family="Arial, Helvetica, sans-serif" font-size="21" font-weight="600" fill="#0f172a" letter-spacing="-0.4">Platomico.</text>
+</svg>
