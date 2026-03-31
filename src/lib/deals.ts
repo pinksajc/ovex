@@ -171,25 +171,34 @@ async function enrichWithCommercialStatus(deals: Deal[]): Promise<Deal[]> {
   let lastActivityMap = new Map<string, string>()
   let lastProposalViewMap = new Map<string, string>()
 
+  let ownerMap = new Map<string, string>()
+
   if (isAttioConfigured() && deals.length > 0) {
     const dealIds = deals.map((d) => d.id)
-    const [summaries, activityMap, proposalViewMap] = await Promise.all([
+    const [summaries, activityMap, proposalViewMap, owners] = await Promise.all([
       import('./supabase/proposals')
         .then((m) => m.getProposalSummariesForDeals(dealIds))
         .catch(() => new Map<string, ProposalSummary>()),
       getLastActivityByDeal(dealIds).catch(() => new Map<string, string>()),
       getLastProposalViewByDeal(dealIds).catch(() => new Map<string, string>()),
+      import('./supabase/deal-owners')
+        .then((m) => m.getDealOwnerMap(dealIds))
+        .catch(() => new Map<string, string>()),
     ])
     proposalSummaries = summaries
     lastActivityMap = activityMap
     lastProposalViewMap = proposalViewMap
+    ownerMap = owners
   }
+
+  // Days after last view with no signature before upgrading to 'negotiating'
+  const NEGOTIATING_DAYS = 5
 
   // Higher priority = sorted first
   const STATUS_PRIORITY: Record<DealCommercialStatus, number> = {
     signed: 0,
     negotiating: 1,
-    proposal_viewed: 2,
+    viewed: 2,
     proposal_sent: 3,
     proposal_created: 4,
     configured: 5,
@@ -211,17 +220,19 @@ async function enrichWithCommercialStatus(deals: Deal[]): Promise<Deal[]> {
         commercialStatus = 'configured'
       } else if (summary.docusealStatus === 'completed' || summary.signedAt) {
         commercialStatus = 'signed'
-      } else if (summary.sentForSignatureAt && deal.stage === 'negotiation') {
-        commercialStatus = 'negotiating'
       } else if (summary.sentForSignatureAt && lastProposalViewAt) {
-        commercialStatus = 'proposal_viewed'
+        // Viewed: check if enough time has passed to consider it 'negotiating'
+        const daysSinceView =
+          (Date.now() - new Date(lastProposalViewAt).getTime()) / (1000 * 60 * 60 * 24)
+        commercialStatus = daysSinceView >= NEGOTIATING_DAYS ? 'negotiating' : 'viewed'
       } else if (summary.sentForSignatureAt) {
         commercialStatus = 'proposal_sent'
       } else {
         commercialStatus = 'proposal_created'
       }
 
-      return { ...deal, commercialStatus, hasProposal, lastActivityAt, lastProposalViewAt }
+      const ownerId = ownerMap.get(deal.id) ?? null
+      return { ...deal, commercialStatus, hasProposal, lastActivityAt, lastProposalViewAt, ownerId }
     })
     .sort((a, b) => {
       const pa = STATUS_PRIORITY[a.commercialStatus]

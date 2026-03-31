@@ -1,15 +1,25 @@
 'use client'
 
 import Link from 'next/link'
-import { usePathname } from 'next/navigation'
+import { usePathname, useRouter } from 'next/navigation'
+import { createAuthBrowserClient } from '@/lib/supabase/auth'
+import type { AuthUser } from '@/lib/auth'
 
 const NAV = [
   { href: '/deals', label: 'Deals', icon: IconDeals },
   { href: '/pipeline', label: 'Pipeline', icon: IconPipeline },
 ]
 
-export function Sidebar() {
+export function Sidebar({ user }: { user: AuthUser }) {
   const pathname = usePathname()
+  const router = useRouter()
+
+  async function handleSignOut() {
+    const supabase = createAuthBrowserClient()
+    await supabase.auth.signOut()
+    router.push('/login')
+    router.refresh()
+  }
 
   return (
     <aside className="w-56 shrink-0 bg-zinc-900 flex flex-col h-full">
@@ -45,9 +55,32 @@ export function Sidebar() {
         })}
       </nav>
 
-      {/* Footer */}
-      <div className="px-5 py-4 border-t border-zinc-800">
-        <p className="text-xs text-zinc-600">v0.1 · internal</p>
+      {/* User profile + logout */}
+      <div className="px-4 py-4 border-t border-zinc-800">
+        <div className="flex items-start gap-2.5 px-1 mb-3">
+          <div className="w-7 h-7 rounded-full bg-zinc-700 flex items-center justify-center shrink-0 mt-0.5">
+            <span className="text-xs font-semibold text-zinc-300">
+              {(user.name ?? user.email).charAt(0).toUpperCase()}
+            </span>
+          </div>
+          <div className="min-w-0 flex-1">
+            <p className="text-xs font-semibold text-zinc-200 truncate leading-snug">
+              {user.name ?? user.email.split('@')[0]}
+            </p>
+            <p className="text-[10px] text-zinc-500 truncate leading-snug">
+              {user.email}
+            </p>
+            <span className="inline-block mt-1 text-[9px] font-semibold uppercase tracking-widest text-zinc-600 bg-zinc-800 px-1.5 py-0.5 rounded">
+              {user.role}
+            </span>
+          </div>
+        </div>
+        <button
+          onClick={handleSignOut}
+          className="w-full text-left px-3 py-1.5 rounded-md text-xs text-zinc-500 hover:bg-zinc-800 hover:text-zinc-300 transition-colors"
+        >
+          Cerrar sesión →
+        </button>
       </div>
     </aside>
   )

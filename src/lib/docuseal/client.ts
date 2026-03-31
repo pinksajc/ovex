@@ -18,12 +18,17 @@ export function isDocuSealConfigured(): boolean {
 }
 
 const BASE_URL = () => process.env.DOCUSEAL_API_URL ?? 'https://api.docuseal.com'
+const FETCH_TIMEOUT_MS = 20_000
 
 function authHeaders() {
   return {
     'X-Auth-Token': process.env.DOCUSEAL_API_KEY!,
     'Content-Type': 'application/json',
   }
+}
+
+function timeoutSignal(): AbortSignal {
+  return AbortSignal.timeout(FETCH_TIMEOUT_MS)
 }
 
 // ---- Types ----
@@ -118,6 +123,7 @@ async function createTemplateFromPdf(pdfBuffer: Buffer, name: string): Promise<n
     method: 'POST',
     headers: authHeaders(),
     body: JSON.stringify(body),
+    signal: timeoutSignal(),
   })
 
   if (!res.ok) {
@@ -156,6 +162,7 @@ async function createSubmission(params: {
     method: 'POST',
     headers: authHeaders(),
     body: JSON.stringify(body),
+    signal: timeoutSignal(),
   })
 
   if (!res.ok) {
@@ -198,7 +205,7 @@ export async function verifyDocuSealWebhook(
 // ---- Webhook payload types ----
 
 export interface DocuSealWebhookPayload {
-  event_type: 'submission.completed' | 'submission.created' | 'submission.expired' | string
+  event_type: 'submission.completed' | 'submission.created' | 'submission.expired' | 'submission.declined' | string
   timestamp: string
   data: {
     id: number

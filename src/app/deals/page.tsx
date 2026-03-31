@@ -2,15 +2,39 @@ import Link from 'next/link'
 import { getDeals, getActiveConfig } from '@/lib/deals'
 import { formatCurrency } from '@/lib/format'
 import { DealsTable } from '@/components/deals/deals-table'
+import { getCurrentUser, getWorkspaceMembers } from '@/lib/auth'
+import type { AuthUser } from '@/lib/auth'
 
 export default async function DealsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ status?: string; focus?: string }>
+  searchParams: Promise<{ status?: string; focus?: string; scope?: string }>
 }) {
-  const { status, focus } = await searchParams
+  const { status, focus, scope } = await searchParams
   const focusMode = focus === 'close'
-  const deals = await getDeals()
+
+  const [userOrNull, allDeals] = await Promise.all([
+    getCurrentUser(),
+    getDeals(),
+  ])
+
+  // Middleware guarantees auth, but getCurrentUser can return null if profile
+  // creation fails — default to a sales-scoped view to avoid crash.
+  const user: AuthUser = userOrNull ?? { id: '', email: '', name: null, role: 'sales' }
+
+  // Scope: sales always see 'mine'; admins toggle mine/all (default: all)
+  const isAdmin = user.role === 'admin'
+  const effectiveScope: 'mine' | 'all' = isAdmin
+    ? (scope === 'mine' ? 'mine' : 'all')
+    : 'mine'
+
+  const deals = effectiveScope === 'mine'
+    // 'mine': show deals owned by user + unowned deals (not yet assigned)
+    ? allDeals.filter((d) => !d.ownerId || d.ownerId === user.id)
+    : allDeals
+
+  // Load members only for admins (for reassign UI)
+  const members = isAdmin ? await getWorkspaceMembers() : []
 
   const totalMRR = deals.reduce((sum, d) => sum + (getActiveConfig(d)?.economics.totalMonthlyRevenue ?? 0), 0)
   const totalARR = deals.reduce((sum, d) => sum + (getActiveConfig(d)?.economics.annualRevenue ?? 0), 0)
@@ -20,7 +44,6 @@ export default async function DealsPage({
   if (focusMode) {
     return (
       <div className="p-6 max-w-7xl mx-auto">
-        {/* Focus header */}
         <div className="mb-5 flex items-center justify-between">
           <div>
             <div className="flex items-center gap-2 mb-0.5">
@@ -38,8 +61,7 @@ export default async function DealsPage({
             ← Salir del modo foco
           </Link>
         </div>
-
-        <DealsTable deals={deals} focusMode />
+        <DealsTable deals={deals} focusMode currentUser={user} members={members} />
       </div>
     )
   }
@@ -47,20 +69,47 @@ export default async function DealsPage({
   return (
     <div className="p-8 max-w-7xl mx-auto">
       {/* Header */}
-      <div className="mb-8 flex items-start justify-between">
+      <div className="mb-8 flex items-start justify-between flex-wrap gap-3">
         <div>
           <h1 className="text-2xl font-semibold text-zinc-900 tracking-tight">Deals</h1>
           <p className="text-zinc-500 text-sm mt-1">
-            Pipeline activo · {deals.length} deals · {configured} configurados
+            Pipeline activo · {deals.length} deal{deals.length !== 1 ? 's' : ''} · {configured} configurados
           </p>
         </div>
-        <Link
-          href="/deals?focus=close"
-          className="inline-flex items-center gap-1.5 text-xs font-medium text-emerald-700 bg-emerald-50 border border-emerald-200 hover:bg-emerald-100 px-3 py-1.5 rounded-lg transition-colors"
-        >
-          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-          Modo foco
-        </Link>
+        <div className="flex items-center gap-2">
+          {/* Scope toggle — only for admins */}
+          {isAdmin && (
+            <div className="flex items-center bg-zinc-100 rounded-lg p-0.5">
+              <Link
+                href={`/deals?scope=mine${status ? `&status=${status}` : ''}`}
+                className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
+                  effectiveScope === 'mine'
+                    ? 'bg-white text-zinc-900 shadow-sm'
+                    : 'text-zinc-500 hover:text-zinc-700'
+                }`}
+              >
+                Mis deals
+              </Link>
+              <Link
+                href={`/deals?scope=all${status ? `&status=${status}` : ''}`}
+                className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
+                  effectiveScope === 'all'
+                    ? 'bg-white text-zinc-900 shadow-sm'
+                    : 'text-zinc-500 hover:text-zinc-700'
+                }`}
+              >
+                Todos
+              </Link>
+            </div>
+          )}
+          <Link
+            href={`/deals?focus=close&scope=${effectiveScope}`}
+            className="inline-flex items-center gap-1.5 text-xs font-medium text-emerald-700 bg-emerald-50 border border-emerald-200 hover:bg-emerald-100 px-3 py-1.5 rounded-lg transition-colors"
+          >
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+            Modo foco
+          </Link>
+        </div>
       </div>
 
       {/* KPIs */}
@@ -87,8 +136,13 @@ export default async function DealsPage({
         </div>
       </div>
 
-      {/* Table with filter */}
-      <DealsTable deals={deals} initialFilter={status} />
+      {/* Table */}
+      <DealsTable
+        deals={deals}
+        initialFilter={status}
+        currentUser={user}
+        members={members}
+      />
     </div>
   )
 }

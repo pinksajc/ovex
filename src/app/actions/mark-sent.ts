@@ -14,11 +14,13 @@ export interface SendForSignatureResult {
  * Generates the proposal PDF server-side and sends it to DocuSeal for e-signature.
  *
  * When DOCUSEAL_API_KEY is set:
- *   1. Load deal + config + proposal sections from DB
- *   2. Render self-contained HTML → PDF via puppeteer-core
- *   3. Upload PDF to DocuSeal (creates a one-time template with signature fields)
- *   4. Create a signing submission — DocuSeal emails the client automatically
- *   5. Persist docuseal_submission_id + status = 'pending'
+ *   1. Validate inputs
+ *   2. Load deal + config + proposal sections from DB
+ *   3. Guard: reject if already pending or signed
+ *   4. Render self-contained HTML → PDF via puppeteer-core
+ *   5. Upload PDF to DocuSeal (creates a one-time template with signature fields)
+ *   6. Create a signing submission — DocuSeal emails the client automatically
+ *   7. Persist docuseal_submission_id + status = 'pending'
  *
  * When DOCUSEAL_API_KEY is not set (local / mock mode):
  *   → Falls back to marking sent_for_signature_at only.
@@ -29,26 +31,49 @@ export async function markSentForSignatureAction(
   signerName: string,
   signerEmail: string
 ): Promise<SendForSignatureResult> {
+  const tag = `[mark-sent deal=${dealId} cfg=${configId}]`
+
+  // ── Input validation ──────────────────────────────────────────────────────
+  if (!dealId || !configId) {
+    return { ok: false, error: 'Faltan parámetros obligatorios (dealId, configId)' }
+  }
+  if (!signerEmail || !signerEmail.includes('@')) {
+    return { ok: false, error: 'Email del firmante no válido' }
+  }
+  if (!signerName?.trim()) {
+    return { ok: false, error: 'Nombre del firmante requerido' }
+  }
+
   try {
     const { isDocuSealConfigured } = await import('@/lib/docuseal/client')
 
     if (isDocuSealConfigured()) {
-      // ── 1. Load data ──
+      // ── 1. Load data ─────────────────────────────────────────────────────
+      console.log(`${tag} loading deal and config`)
       const { getDeal, getActiveConfig, getProposal } = await import('@/lib/deals')
       const deal = await getDeal(dealId)
-      if (!deal) throw new Error(`Deal ${dealId} not found`)
+      if (!deal) throw new Error(`Deal ${dealId} no encontrado`)
 
       const cfg = getActiveConfig(deal)
-      if (!cfg) throw new Error(`No active config for deal ${dealId}`)
+      if (!cfg) throw new Error(`No hay configuración activa para el deal ${dealId}`)
+      if (cfg.id !== configId) throw new Error(`La configuración activa (${cfg.id}) no coincide con la solicitada (${configId})`)
 
       const saved = await getProposal(dealId, configId)
-      // Use saved sections if available; otherwise fall through to defaults
+
+      // ── 2. Guard: idempotency ─────────────────────────────────────────────
+      if (saved?.signedAt || saved?.docusealStatus === 'completed') {
+        return { ok: false, error: 'Esta propuesta ya ha sido firmada' }
+      }
+      if (saved?.docusealStatus === 'pending') {
+        return { ok: false, error: 'La propuesta ya está pendiente de firma — revisa el email enviado al cliente' }
+      }
+
+      // ── 3. Resolve sections ───────────────────────────────────────────────
       const { PLANS, ADDONS, HARDWARE } = await import('@/lib/pricing/catalog')
       const { formatCurrency, formatNumber } = await import('@/lib/format')
 
       let sections = saved?.sections
       if (!sections) {
-        // Build default sections inline (mirrors view/page.tsx logic)
         const plan = PLANS[cfg.plan]
         const eco = cfg.economics
         const addonsText = cfg.activeAddons.length > 0
@@ -87,11 +112,16 @@ export async function markSentForSignatureAction(
         }
       }
 
-      // ── 2. Generate PDF ──
+      // ── 4. Generate PDF ───────────────────────────────────────────────────
+      console.log(`${tag} generating PDF`)
+      const t0 = Date.now()
       const { generateProposalPdf } = await import('@/lib/pdf/generate')
       const pdfBuffer = await generateProposalPdf(deal, cfg, sections)
+      console.log(`${tag} PDF ready (${Date.now() - t0}ms, ${pdfBuffer.length} bytes)`)
 
-      // ── 3 & 4. Upload to DocuSeal + create submission ──
+      // ── 5 & 6. Upload to DocuSeal + create submission ─────────────────────
+      console.log(`${tag} uploading to DocuSeal`)
+      const t1 = Date.now()
       const { uploadPdfAndCreateSubmission } = await import('@/lib/docuseal/client')
       const documentName = `orvex-propuesta-${dealId}-v${cfg.version}.pdf`
       const { submissionId, signerUrl } = await uploadPdfAndCreateSubmission({
@@ -101,17 +131,20 @@ export async function markSentForSignatureAction(
         signerEmail,
         metadata: { deal_id: dealId, config_id: configId },
       })
+      console.log(`${tag} DocuSeal submission=${submissionId} (${Date.now() - t1}ms)`)
 
-      // ── 5. Persist ──
+      // ── 7. Persist ────────────────────────────────────────────────────────
       const { markProposalSentWithDocuSeal } = await import('@/lib/supabase/proposals')
       await markProposalSentWithDocuSeal(dealId, configId, submissionId)
       void logEvent('proposal_sent_for_signature', dealId)
       revalidatePath(`/deals/${dealId}/propuesta`)
       revalidatePath('/deals')
+      console.log(`${tag} done`)
       return { ok: true, submissionId, signerUrl }
     }
 
-    // ── Fallback: no DocuSeal ──
+    // ── Fallback: no DocuSeal ─────────────────────────────────────────────
+    console.log(`${tag} DocuSeal not configured — fallback mode`)
     const { markProposalSentForSignature } = await import('@/lib/supabase/proposals')
     await markProposalSentForSignature(dealId, configId)
     void logEvent('proposal_sent_for_signature', dealId)
@@ -119,6 +152,12 @@ export async function markSentForSignatureAction(
     revalidatePath('/deals')
     return { ok: true }
   } catch (err) {
-    return { ok: false, error: err instanceof Error ? err.message : 'Error desconocido' }
+    const msg = err instanceof Error ? err.message : 'Error desconocido'
+    console.error(`${tag} failed:`, msg)
+    // Don't expose raw internal errors to the UI
+    const userMsg = msg.startsWith('Deal ') || msg.startsWith('No hay ') || msg.startsWith('La configuración') || msg.startsWith('Esta propuesta') || msg.startsWith('La propuesta ya')
+      ? msg
+      : 'Error al generar o enviar la propuesta — inténtalo de nuevo'
+    return { ok: false, error: userMsg }
   }
 }

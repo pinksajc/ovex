@@ -2,10 +2,9 @@
 // SERVER-SIDE PDF GENERATOR — Dossier Platomico
 // server-only
 //
-// Genera un PDF completo de 11 secciones:
-// portada, resumen económico, planes, módulos por plan,
-// detalle de módulos, soporte, activación, por qué Platomico,
-// próximos pasos, anexo datos de las partes, página de firma.
+// 10 secciones: portada · resumen económico · plan contratado ·
+// módulos y add-ons · soporte · activación · por qué Platomico ·
+// próximos pasos · anexo de partes · página de firma
 //
 // Env vars:
 //   CHROME_EXECUTABLE_PATH  — local dev (Chrome instalado)
@@ -18,6 +17,19 @@ import { PLANS, ADDONS, ADDON_ORDER, HARDWARE, HARDWARE_MODE_LABELS } from '@/li
 // =========================================
 // Puppeteer launcher
 // =========================================
+
+// Timeouts — keep well under Vercel's 60s function limit
+const SET_CONTENT_TIMEOUT_MS = 15_000
+const PDF_RENDER_TIMEOUT_MS  = 45_000
+
+function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
+  return Promise.race([
+    promise,
+    new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error(`PDF generation timed out: ${label} (>${ms}ms)`)), ms)
+    ),
+  ])
+}
 
 export async function renderHtmlToPdf(html: string): Promise<Buffer> {
   const puppeteer = (await import('puppeteer-core')).default
@@ -35,9 +47,13 @@ export async function renderHtmlToPdf(html: string): Promise<Buffer> {
 
   try {
     const page = await browser.newPage()
-    await page.setContent(html, { waitUntil: 'domcontentloaded' })
+    await withTimeout(
+      page.setContent(html, { waitUntil: 'domcontentloaded' }),
+      SET_CONTENT_TIMEOUT_MS,
+      'setContent'
+    )
 
-    const pdf = await page.pdf({
+    const pdf = await withTimeout(page.pdf({
       format: 'A4',
       printBackground: true,
       displayHeaderFooter: true,
@@ -76,7 +92,7 @@ export async function renderHtmlToPdf(html: string): Promise<Buffer> {
           </span>
         </div>`,
       margin: { top: '18mm', bottom: '15mm', left: '15mm', right: '15mm' },
-    })
+    }), PDF_RENDER_TIMEOUT_MS, 'page.pdf')
     return Buffer.from(pdf)
   } finally {
     await browser.close()
@@ -375,149 +391,136 @@ function sectionEconomics(deal: Deal, cfg: DealConfiguration, sections: Proposal
     </div>` : ''}`
 }
 
-// ── 3. PLANES Y PRICING ──
-function sectionPlans(cfg: DealConfiguration): string {
-  const planTiers: Array<{ tier: string; label: string; monthly: string; variable: string; range: string; highlight: boolean }> = [
-    { tier: 'starter', label: 'Starter', monthly: '0 €/mes/local',  variable: '0,08 €/ticket', range: 'Hasta 500 tickets/mes',  highlight: cfg.plan === 'starter' },
-    { tier: 'growth',  label: 'Growth',  monthly: '15 €/mes/local', variable: '0,05 €/ticket', range: '501–1.000 tickets/mes',  highlight: cfg.plan === 'growth'  },
-    { tier: 'pro',     label: 'Pro',     monthly: '35 €/mes/local', variable: '0,03 €/ticket', range: 'Más de 1.000 tickets/mes', highlight: cfg.plan === 'pro' },
-  ]
+// ── 3. PLAN CONTRATADO ──
+function sectionPlanContracted(cfg: DealConfiguration): string {
+  const plan = PLANS[cfg.plan]
+  const eco = cfg.economics
+  const baseMonthly = plan.priceMonthly * cfg.locations
+  const variableMonthly = eco.planFeeMonthly - baseMonthly
 
   return `
-    ${sectionTitle('Planes y pricing', 'Elige el plan que mejor se adapta a tu volumen de operaciones')}
+    ${sectionTitle('Plan contratado', `${plan.label} · ${cfg.locations} local${cfg.locations > 1 ? 'es' : ''}`)}
 
-    <div style="display:grid; grid-template-columns:repeat(3,1fr); gap:14px; margin-bottom:24px;">
-      ${planTiers.map(p => `
-        <div style="
-          border:${p.highlight ? '2px solid #1e3a5f' : '1px solid #dde6f0'};
-          border-radius:10px; padding:20px;
-          background:${p.highlight ? '#f0f5fb' : '#fff'};
-          position:relative;
-        ">
-          ${p.highlight ? `<div style="
-            position:absolute; top:-1px; left:50%; transform:translateX(-50%);
-            background:#1e3a5f; color:#fff; font-size:8px; font-weight:700;
-            text-transform:uppercase; letter-spacing:1px; padding:3px 12px;
-            border-radius:0 0 6px 6px; white-space:nowrap;
-          ">Plan seleccionado</div>` : ''}
-          <div style="font-size:16px; font-weight:800; color:${p.highlight ? '#1e3a5f' : '#0f172a'}; margin-bottom:4px;">${p.label}</div>
-          <div style="font-size:9px; color:#64748b; margin-bottom:16px;">${p.range}</div>
-          <div style="font-size:11px; font-weight:700; color:#1e3a5f; font-family:'Courier New',monospace; margin-bottom:2px;">${p.monthly}</div>
-          <div style="font-size:11px; color:#0f172a; font-family:'Courier New',monospace;">+ ${p.variable}</div>
-        </div>`).join('')}
-    </div>
+    <!-- Plan card header -->
+    <div style="border:2px solid #1e3a5f; border-radius:10px; overflow:hidden; margin-bottom:20px;">
+      <div style="background:#1e3a5f; padding:16px 20px; display:flex; align-items:center; justify-content:space-between;">
+        <div>
+          <div style="font-size:8px; font-weight:700; color:rgba(255,255,255,0.55); text-transform:uppercase; letter-spacing:2px; margin-bottom:4px;">Plan seleccionado</div>
+          <div style="font-size:24px; font-weight:900; color:#fff; letter-spacing:-0.5px;">${plan.label}</div>
+          ${plan.description ? `<div style="font-size:10px; color:rgba(255,255,255,0.65); margin-top:3px;">${esc(plan.description)}</div>` : ''}
+        </div>
+        <div style="text-align:right;">
+          <div style="font-size:9px; color:rgba(255,255,255,0.55); margin-bottom:2px;">Cuota base</div>
+          <div style="font-size:18px; font-weight:800; color:#fff; font-family:'Courier New',monospace;">
+            ${plan.priceMonthly === 0 ? 'Gratis' : `${plan.priceMonthly} €/local/mes`}
+          </div>
+          ${plan.variableFee > 0 ? `<div style="font-size:11px; color:rgba(255,255,255,0.7); font-family:'Courier New',monospace;">+ ${plan.variableFee} €/ticket</div>` : ''}
+        </div>
+      </div>
 
-    <div style="background:#f8fafc; border:1px solid #e8eef6; border-radius:8px; padding:14px 18px; margin-bottom:14px;">
-      <div style="font-size:9px; font-weight:700; color:#64748b; text-transform:uppercase; letter-spacing:1px; margin-bottom:8px;">Cómo funciona el pricing</div>
-      <div style="font-size:10.5px; color:#334155; line-height:1.7;">
-        El coste mensual de software se calcula como: <strong>cuota fija × nº de locales + fee variable × total de tickets procesados</strong>.
-        No hay comisiones por tipo de pedido, sin permanencia mínima y con facturación mes a mes.
-        El plan se puede cambiar en cualquier momento desde el panel de administración.
+      <!-- Pricing breakdown -->
+      <div style="padding:16px 20px; background:#fff;">
+        ${buildTable(
+          ['Concepto', 'Precio unitario', 'Cantidad', 'Subtotal/mes'],
+          [
+            [
+              'Cuota base',
+              plan.priceMonthly === 0 ? '0 €/local/mes' : `${plan.priceMonthly} €/local/mes`,
+              `${cfg.locations} local${cfg.locations > 1 ? 'es' : ''}`,
+              fmt(baseMonthly),
+            ],
+            [
+              'Fee variable',
+              `${plan.variableFee} €/ticket`,
+              `${fmtN(cfg.dailyOrdersPerLocation * cfg.locations)} tickets/mes`,
+              fmt(variableMonthly),
+            ],
+            [
+              '<strong>Total software</strong>',
+              '', '',
+              `<strong style="color:#1e3a5f;">${fmt(eco.planFeeMonthly)}</strong>`,
+            ],
+          ]
+        )}
       </div>
     </div>
 
-    <div style="font-size:9px; color:#94a3b8; font-style:italic;">
-      * Los módulos adicionales (KDS, Kiosk, Delivery, Analítica IA, Stock) tienen precio independiente y se contratan opcionalmente.
-      El Datáfono integrado aplica una comisión del 0,8% sobre el GMV procesado a través de la plataforma.
+    <div style="background:#f8fafc; border:1px solid #e8eef6; border-radius:8px; padding:12px 16px; font-size:9.5px; color:#64748b; line-height:1.6;">
+      Sin permanencia mínima · facturación mes a mes · el plan se puede cambiar en cualquier momento desde el panel de administración.
     </div>`
 }
 
-// ── 4. MÓDULOS INCLUIDOS POR PLAN ──
-function sectionModulesMatrix(cfg: DealConfiguration): string {
-  const hiCol = cfg.plan === 'starter' ? 1 : cfg.plan === 'growth' ? 2 : 3
+// ── 4. MÓDULOS Y ADD-ONS ──
+function sectionAddons(cfg: DealConfiguration): string {
+  const eco = cfg.economics
+  const hwItems = cfg.hardware.filter(h => h.quantity > 0)
+  const hasAddons = cfg.activeAddons.length > 0
+  const hasHardware = hwItems.length > 0
 
-  const rows: string[][] = [
-    ['TPV / Register (POS)',        check(true),                   check(true),                   check(true)],
-    ['Gestión de pedidos',          check(true),                   check(true),                   check(true)],
-    ['Comandas digitales',          check(true),                   check(true),                   check(true)],
-    ['Reporting básico',            check(true),                   check(true),                   check(true)],
-    ['Gestión de carta',            check(true),                   check(true),                   check(true)],
-    ['Multi-local',                 check(false),                  check(true),                   check(true)],
-    ['Web Ordering propio',         check(false),                  check(true),                   check(true)],
-    ['API acceso',                  check(false),                  check(false),                  check(true)],
-    ['KDS (pantalla cocina)',       `<span style="color:#64748b;font-size:9px;">Módulo +19€/local</span>`,  `<span style="color:#64748b;font-size:9px;">Módulo +19€/local</span>`,  `<span style="color:#64748b;font-size:9px;">Módulo +19€/local</span>`],
-    ['Kiosk (autopedido)',          `<span style="color:#64748b;font-size:9px;">Módulo +19€/local</span>`,  `<span style="color:#64748b;font-size:9px;">Módulo +19€/local</span>`,  `<span style="color:#64748b;font-size:9px;">Módulo +19€/local</span>`],
-    ['Delivery (Glovo, Uber…)',     `<span style="color:#64748b;font-size:9px;">Módulo +45€/local</span>`,  `<span style="color:#64748b;font-size:9px;">Módulo +45€/local</span>`,  `<span style="color:#64748b;font-size:9px;">Módulo +45€/local</span>`],
-    ['Stock / Inventario',          `<span style="color:#64748b;font-size:9px;">Módulo +9€/local</span>`,   `<span style="color:#64748b;font-size:9px;">Módulo +9€/local</span>`,   `<span style="color:#64748b;font-size:9px;">Módulo +9€/local</span>`],
-    ['Analítica IA',                `<span style="color:#64748b;font-size:9px;">Por consumo</span>`,         `<span style="color:#64748b;font-size:9px;">Por consumo</span>`,         `<span style="color:#64748b;font-size:9px;">Por consumo</span>`],
-    ['Datáfono integrado',          `<span style="color:#64748b;font-size:9px;">0,8% GMV</span>`,            `<span style="color:#64748b;font-size:9px;">0,8% GMV</span>`,            `<span style="color:#64748b;font-size:9px;">0,8% GMV</span>`],
-  ]
+  if (!hasAddons && !hasHardware) {
+    return `
+      ${sectionTitle('Módulos y add-ons')}
+      <div style="border:1px solid #e8eef6; border-radius:8px; padding:20px; text-align:center; color:#94a3b8; font-size:10px; font-style:italic;">
+        No incluidos en esta propuesta
+      </div>`
+  }
 
   return `
-    ${sectionTitle('Módulos incluidos por plan')}
-    ${buildTable(['Funcionalidad', 'Starter', 'Growth', 'Pro'], rows, { highlightCol: hiCol, compact: true })}`
-}
+    ${sectionTitle('Módulos y add-ons', hasAddons ? `${cfg.activeAddons.length} módulo${cfg.activeAddons.length > 1 ? 's' : ''} activo${cfg.activeAddons.length > 1 ? 's' : ''}` : undefined)}
 
-// ── 5. DETALLE DE MÓDULOS ──
-function sectionModuleDetails(cfg: DealConfiguration): string {
-  const activeSet = new Set(cfg.activeAddons)
+    ${hasAddons ? `
+    <div style="margin-bottom:20px;">
+      <div style="font-size:9px; font-weight:700; color:#1e3a5f; text-transform:uppercase; letter-spacing:1px; margin-bottom:10px; padding-bottom:6px; border-bottom:1px solid #e8eef6;">
+        Add-ons de software
+      </div>
+      ${buildTable(
+        ['Módulo', 'Precio', 'Alcance', 'Subtotal/mes'],
+        cfg.activeAddons.map(id => {
+          const addon = ADDONS[id]
+          const price = id === 'datafono'
+            ? `${addon.feePercent}% GMV`
+            : addon.perConsumption
+            ? 'Por consumo'
+            : `${addon.priceMonthly} €${addon.perLocation ? '/local/mes' : '/mes'}`
+          const scope = addon.perLocation ? `${cfg.locations} local${cfg.locations > 1 ? 'es' : ''}` : 'Cuenta'
+          const sub = id === 'datafono'
+            ? fmt(eco.datafonoFeeMonthly)
+            : addon.perConsumption
+            ? '—'
+            : fmt((addon.priceMonthly ?? 0) * (addon.perLocation ? cfg.locations : 1))
+          return [addon.label, price, scope, sub]
+        })
+      )}
+      ${eco.addonFeeMonthly > 0 ? `
+        <div style="display:flex; justify-content:flex-end; padding:8px 12px 0; font-size:10px; color:#64748b;">
+          Total add-ons:&nbsp;<strong style="color:#1e3a5f; font-family:'Courier New',monospace;">${fmt(eco.addonFeeMonthly + eco.datafonoFeeMonthly)}/mes</strong>
+        </div>` : ''}
+    </div>` : ''}
 
-  const modules = [
-    {
-      id: 'register', label: 'Register (TPV / POS)', active: true, icon: '🖥',
-      desc: 'El corazón de la operación. Terminal táctil optimizado para hostelería con gestión de mesas, control de turnos, impresión de tickets y comandas, y sincronización en tiempo real con cocina y barra.',
-      features: ['Gestión de carta y modificadores', 'Apertura y cierre de caja', 'Historial de pedidos y auditoría', 'Offline mode con sincronización automática'],
-    },
-    {
-      id: 'kds', label: 'KDS — Kitchen Display System', active: activeSet.has('kds'), icon: '📺',
-      desc: 'Pantalla de cocina digital que recibe los pedidos del TPV en tiempo real. Elimina comandas en papel, reduce errores y mejora los tiempos de preparación por partida.',
-      features: ['Vista por partida (frío, caliente, bebidas)', 'Semáforo de tiempos de espera', 'Estadísticas de rendimiento de cocina', 'Compatible con monitor o tablet existente'],
-    },
-    {
-      id: 'kiosk', label: 'Kiosk de autopedido', active: activeSet.has('kiosk'), icon: '🤖',
-      desc: 'Terminal de autoservicio para que los clientes hagan su pedido sin esperas. Reduce colas en hora punta, aumenta el ticket medio y libera al personal de sala para tareas de mayor valor.',
-      features: ['Upselling automático sugerido por IA', 'Pago integrado con datáfono', 'Personalización de carta y alérgenos', 'Modo accesibilidad'],
-    },
-    {
-      id: 'web', label: 'Web Ordering (pedidos propios)', active: cfg.plan !== 'starter', icon: '🌐',
-      desc: 'Canal de pedidos online propio, sin comisiones de intermediarios. Integrado con tu carta y cocina. Funciona para recogida en local y delivery gestionado internamente.',
-      features: ['URL propia y personalizable', 'Integración directa con TPV', 'Gestión de zonas de reparto', 'Notificaciones push al cliente'],
-    },
-    {
-      id: 'delivery_integrations', label: 'Delivery — Glovo · Uber Eats · Just Eat', active: activeSet.has('delivery_integrations'), icon: '🛵',
-      desc: 'Integración bidireccional con las principales plataformas de delivery. Los pedidos entran directamente en el TPV sin tablet adicional, con sincronización de carta y disponibilidad en tiempo real.',
-      features: ['Un solo panel para todas las plataformas', 'Sincronización de carta en tiempo real', 'Activación/desactivación automática por horario', 'Reporting unificado de ventas delivery'],
-    },
-    {
-      id: 'analytics_premium', label: 'Analítica IA', active: activeSet.has('analytics_premium'), icon: '📊',
-      desc: 'Cuadro de mandos avanzado con inteligencia artificial. Predice la demanda por franja horaria, optimiza el stock, identifica los productos más rentables y genera informes automáticos para dirección.',
-      features: ['Predicción de demanda por hora y día', 'Análisis de rentabilidad por producto', 'Alertas automáticas de anomalías', 'Exportación a Excel/PDF para dirección'],
-    },
-  ]
-
-  return `
-    ${sectionTitle('Detalle de módulos', 'Tecnología diseñada para hostelería de alto rendimiento')}
-
-    <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
-      ${modules.map(m => `
-        <div style="
-          border:${m.active ? '1.5px solid #1e3a5f' : '1px solid #e8eef6'};
-          border-radius:8px; padding:14px 16px;
-          background:${m.active ? '#f0f5fb' : '#fff'};
-        ">
-          <div style="display:flex; align-items:flex-start; justify-content:space-between; margin-bottom:8px;">
-            <div style="display:flex; align-items:center; gap:8px;">
-              <span style="font-size:18px;">${m.icon}</span>
-              <div style="font-size:11px; font-weight:700; color:${m.active ? '#1e3a5f' : '#334155'};">${m.label}</div>
-            </div>
-            ${m.active ? `<span style="
-              font-size:7.5px; font-weight:700; color:#fff; background:#1e3a5f;
-              padding:2px 7px; border-radius:20px; white-space:nowrap; flex-shrink:0;
-            ">INCLUIDO</span>` : `<span style="
-              font-size:7.5px; color:#94a3b8; border:1px solid #e8eef6;
-              padding:2px 7px; border-radius:20px; white-space:nowrap; flex-shrink:0;
-            ">Disponible</span>`}
-          </div>
-          <div style="font-size:9.5px; color:#64748b; line-height:1.55; margin-bottom:8px;">${m.desc}</div>
-          <div style="display:flex; flex-direction:column; gap:3px;">
-            ${m.features.map(f => `
-              <div style="display:flex; align-items:flex-start; gap:6px; font-size:9px; color:#334155;">
-                <span style="color:#1e3a5f; font-weight:700; flex-shrink:0; margin-top:1px;">·</span>
-                ${f}
-              </div>`).join('')}
-          </div>
-        </div>`).join('')}
-    </div>`
+    ${hasHardware ? `
+    <div>
+      <div style="font-size:9px; font-weight:700; color:#1e3a5f; text-transform:uppercase; letter-spacing:1px; margin-bottom:10px; padding-bottom:6px; border-bottom:1px solid #e8eef6;">
+        Hardware
+      </div>
+      ${buildTable(
+        ['Equipo', 'Uds.', 'Modalidad', 'Importe'],
+        hwItems.map(item => {
+          const hw = HARDWARE[item.hardwareId]
+          const lineTotal = item.unitPrice * item.quantity
+          const importe = item.mode === 'financed' && item.financeMonths
+            ? `${fmt(lineTotal / item.financeMonths)}/mes`
+            : item.mode === 'included'
+            ? 'Incluido'
+            : fmt(lineTotal)
+          return [hw.label, String(item.quantity), HARDWARE_MODE_LABELS[item.mode], importe]
+        })
+      )}
+      ${eco.hardwareCostTotal > 0 ? `
+        <div style="display:flex; justify-content:flex-end; padding:8px 12px 0; font-size:10px; color:#64748b;">
+          Total hardware:&nbsp;<strong style="color:#1e3a5f; font-family:'Courier New',monospace;">${fmt(eco.hardwareCostTotal)}</strong>
+        </div>` : ''}
+    </div>` : ''}
+  `
 }
 
 // ── 6. SOPORTE Y ACOMPAÑAMIENTO ──
@@ -755,11 +758,8 @@ function sectionSignature(deal: Deal, today: string): string {
       </div>
     </div>
 
-    <div style="border:1px solid #fee2e2; border-radius:8px; background:#fff9f9; padding:14px 16px; font-size:9px; color:#dc2626; line-height:1.6;">
-      <strong>CONFIDENCIAL:</strong> Este documento contiene información comercial y técnica confidencial.
-      Queda prohibida su reproducción total o parcial sin el consentimiento previo y por escrito de Platomico, S.L.
-      En caso de discrepancia entre este documento y las Condiciones Generales publicadas en platomico.com/legal,
-      prevalecerán estas últimas.
+    <div style="margin-top:20px; text-align:center; font-size:8.5px; color:#94a3b8; line-height:1.6;">
+      Al firmar, el Cliente acepta las Condiciones Generales publicadas en platomico.com/legal.
     </div>`
 }
 
@@ -797,9 +797,8 @@ function buildFullDossier(
   const secs = [
     sectionCover(deal, cfg, today),
     sectionEconomics(deal, cfg, sections),
-    sectionPlans(cfg),
-    sectionModulesMatrix(cfg),
-    sectionModuleDetails(cfg),
+    sectionPlanContracted(cfg),
+    sectionAddons(cfg),
     sectionSupport(cfg),
     sectionActivation(),
     sectionWhyPlatomico(),

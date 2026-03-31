@@ -6,7 +6,7 @@
 // =========================================
 
 import { getSupabaseClient } from './client'
-import type { ProposalRecord, ProposalSections, ProposalSummary } from '@/types'
+import type { DocuSealStatus, ProposalRecord, ProposalSections, ProposalSummary } from '@/types'
 
 // SQL migrations (run once in Supabase):
 //   ALTER TABLE proposals ADD COLUMN IF NOT EXISTS sent_for_signature_at timestamptz;
@@ -21,7 +21,7 @@ interface ProposalRow {
   sections: ProposalSections
   sent_for_signature_at: string | null
   docuseal_submission_id: string | null
-  docuseal_status: 'pending' | 'completed' | null
+  docuseal_status: DocuSealStatus
   signed_at: string | null
   created_at: string
   updated_at: string
@@ -184,11 +184,49 @@ export async function markProposalSentWithDocuSeal(
 
 /**
  * Called by DocuSeal webhook on submission.completed.
- * Looks up by submission_id and marks it signed.
+ * Idempotent: skips if already marked completed.
  */
-export async function markProposalSignedByDocuSeal(submissionId: string): Promise<void> {
+export async function markProposalSignedByDocuSeal(submissionId: string): Promise<{ updated: boolean }> {
+  const { data: existing } = await table()
+    .select('id, docuseal_status')
+    .eq('docuseal_submission_id', submissionId)
+    .maybeSingle()
+
+  if (!existing) return { updated: false }
+  if ((existing as { docuseal_status: DocuSealStatus }).docuseal_status === 'completed') {
+    return { updated: false }
+  }
+
   const now = new Date().toISOString()
   await table()
     .update({ docuseal_status: 'completed', signed_at: now, updated_at: now })
     .eq('docuseal_submission_id', submissionId)
+
+  return { updated: true }
+}
+
+/**
+ * Updates docuseal_status for any terminal or intermediate state.
+ * Idempotent: no-op if row not found or status unchanged.
+ */
+export async function updateProposalDocuSealStatus(
+  submissionId: string,
+  status: DocuSealStatus,
+): Promise<{ updated: boolean }> {
+  const { data: existing } = await table()
+    .select('id, docuseal_status')
+    .eq('docuseal_submission_id', submissionId)
+    .maybeSingle()
+
+  if (!existing) return { updated: false }
+  if ((existing as { docuseal_status: DocuSealStatus }).docuseal_status === status) {
+    return { updated: false }
+  }
+
+  const now = new Date().toISOString()
+  await table()
+    .update({ docuseal_status: status, updated_at: now })
+    .eq('docuseal_submission_id', submissionId)
+
+  return { updated: true }
 }

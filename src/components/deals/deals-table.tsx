@@ -1,11 +1,13 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useTransition } from 'react'
 import { useRouter, usePathname } from 'next/navigation'
 import Link from 'next/link'
 import { getActiveConfig } from '@/lib/deals'
 import { formatCurrency } from '@/lib/format'
+import { assignDealOwnerAction } from '@/app/actions/assign-owner'
 import type { Deal, DealCommercialStatus, DealStage } from '@/types'
+import type { AuthUser } from '@/lib/auth'
 
 // ---- Display maps ----
 
@@ -57,9 +59,9 @@ const STATUS_CONFIG: Record<DealCommercialStatus, { label: string; cls: string; 
   no_config:        { label: '+ Configurar',    cls: 'bg-zinc-900 text-white' },
   configured:       { label: 'Configurado',     cls: 'bg-zinc-100 text-zinc-700', dot: 'bg-zinc-400' },
   proposal_created: { label: 'Propuesta lista', cls: 'bg-blue-50 text-blue-700 border border-blue-200', dot: 'bg-blue-500' },
-  proposal_sent:    { label: 'Enviada',          cls: 'bg-violet-50 text-violet-700 border border-violet-200', dot: 'bg-violet-500' },
-  proposal_viewed:  { label: 'Vista',            cls: 'bg-amber-50 text-amber-700 border border-amber-200', dot: 'bg-amber-500' },
-  negotiating:      { label: 'Negociando',       cls: 'bg-orange-50 text-orange-700 border border-orange-200', dot: 'bg-orange-500' },
+  proposal_sent:    { label: 'Enviada',          cls: 'bg-blue-50 text-blue-700 border border-blue-200', dot: 'bg-blue-400' },
+  viewed:           { label: 'Vista',            cls: 'bg-amber-50 text-amber-700 border border-amber-200', dot: 'bg-amber-500' },
+  negotiating:      { label: 'Negociando',       cls: 'bg-amber-50 text-amber-800 border border-amber-300', dot: 'bg-amber-600' },
   signed:           { label: 'Firmada ✓',        cls: 'bg-emerald-600 text-white font-semibold' },
 }
 
@@ -91,7 +93,7 @@ const FILTERS: { key: FilterKey; label: string }[] = [
   { key: 'all',              label: 'Todos' },
   { key: 'signed',           label: 'Firmadas' },
   { key: 'negotiating',      label: 'Negociando' },
-  { key: 'proposal_viewed',  label: 'Vista' },
+  { key: 'viewed',           label: 'Vista' },
   { key: 'proposal_sent',    label: 'Enviada' },
   { key: 'proposal_created', label: 'Propuesta lista' },
   { key: 'configured',       label: 'Configurado' },
@@ -126,10 +128,14 @@ export function DealsTable({
   deals,
   initialFilter,
   focusMode = false,
+  currentUser,
+  members = [],
 }: {
   deals: Deal[]
   initialFilter?: string
   focusMode?: boolean
+  currentUser?: AuthUser
+  members?: AuthUser[]
 }) {
   const router = useRouter()
   const pathname = usePathname()
@@ -139,8 +145,15 @@ export function DealsTable({
 
   function handleFilter(key: FilterKey) {
     setFilter(key)
-    const params = new URLSearchParams()
-    if (key !== 'all') params.set('status', key)
+    // Preserve existing params (e.g. scope) when changing status filter
+    const params = new URLSearchParams(
+      typeof window !== 'undefined' ? window.location.search : ''
+    )
+    if (key !== 'all') {
+      params.set('status', key)
+    } else {
+      params.delete('status')
+    }
     const qs = params.toString()
     router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false })
   }
@@ -151,7 +164,7 @@ export function DealsTable({
     all:              deals.length,
     signed:           deals.filter((d) => d.commercialStatus === 'signed').length,
     negotiating:      deals.filter((d) => d.commercialStatus === 'negotiating').length,
-    proposal_viewed:  deals.filter((d) => d.commercialStatus === 'proposal_viewed').length,
+    viewed:           deals.filter((d) => d.commercialStatus === 'viewed').length,
     proposal_sent:    deals.filter((d) => d.commercialStatus === 'proposal_sent').length,
     proposal_created: deals.filter((d) => d.commercialStatus === 'proposal_created').length,
     configured:       deals.filter((d) => d.commercialStatus === 'configured').length,
@@ -213,7 +226,14 @@ export function DealsTable({
                 </td>
               </tr>
             ) : (
-              visible.map((deal) => <DealRow key={deal.id} deal={deal} />)
+              visible.map((deal) => (
+                <DealRow
+                  key={deal.id}
+                  deal={deal}
+                  isAdmin={currentUser?.role === 'admin'}
+                  members={members}
+                />
+              ))
             )}
           </tbody>
         </table>
@@ -228,13 +248,21 @@ export function DealsTable({
 
 // ---- Row ----
 
-function DealRow({ deal }: { deal: Deal }) {
+function DealRow({
+  deal,
+  isAdmin = false,
+  members = [],
+}: {
+  deal: Deal
+  isAdmin?: boolean
+  members?: AuthUser[]
+}) {
   const cfg = getActiveConfig(deal)
   const mrr = cfg?.economics.totalMonthlyRevenue ?? 0
   const arr = cfg?.economics.annualRevenue ?? 0
   const payback = cfg?.economics.paybackMonths ?? null
   const versionLabel = cfg ? `v${cfg.version}${cfg.label ? ` · ${cfg.label}` : ''}` : null
-  const hot = ['signed', 'negotiating', 'proposal_viewed', 'proposal_sent', 'proposal_created'].includes(deal.commercialStatus)
+  const hot = ['signed', 'negotiating', 'viewed', 'proposal_sent', 'proposal_created'].includes(deal.commercialStatus)
   const stale = !!deal.lastActivityAt && isStale(deal.lastActivityAt) && !hot
 
   const borderCls = hot
@@ -339,7 +367,11 @@ function DealRow({ deal }: { deal: Deal }) {
 
       {/* Owner */}
       <td className="px-4 py-3 hidden md:table-cell">
-        <span className="text-xs text-zinc-500 truncate block max-w-[90px]">{deal.owner.split(' ')[0]}</span>
+        {isAdmin && members.length > 0 ? (
+          <OwnerSelect deal={deal} members={members} />
+        ) : (
+          <span className="text-xs text-zinc-500 truncate block max-w-[90px]">{deal.owner.split(' ')[0]}</span>
+        )}
       </td>
 
       {/* Última actividad */}
@@ -383,5 +415,39 @@ function DealRow({ deal }: { deal: Deal }) {
         </div>
       </td>
     </tr>
+  )
+}
+
+// ---- Owner assign (admin only) ----
+
+function OwnerSelect({ deal, members }: { deal: Deal; members: AuthUser[] }) {
+  const router = useRouter()
+  const [, startTransition] = useTransition()
+
+  function handleChange(e: React.ChangeEvent<HTMLSelectElement>) {
+    const newOwnerId = e.target.value
+    if (!newOwnerId) return
+    startTransition(async () => {
+      await assignDealOwnerAction(deal.id, newOwnerId)
+      router.refresh()
+    })
+  }
+
+  const current = members.find((m) => m.id === deal.ownerId)
+
+  return (
+    <select
+      defaultValue={deal.ownerId ?? ''}
+      onChange={handleChange}
+      className="text-xs text-zinc-600 border-0 bg-transparent focus:outline-none focus:ring-1 focus:ring-zinc-300 rounded px-0 py-0 max-w-[90px] cursor-pointer"
+      title="Asignar responsable"
+    >
+      <option value="" disabled>{current ? current.name ?? current.email.split('@')[0] : '—'}</option>
+      {members.map((m) => (
+        <option key={m.id} value={m.id}>
+          {m.name ?? m.email.split('@')[0]}
+        </option>
+      ))}
+    </select>
   )
 }

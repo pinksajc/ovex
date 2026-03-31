@@ -114,10 +114,10 @@ export type DealCommercialStatus =
   | 'no_config'
   | 'configured'
   | 'proposal_created'  // draft saved, not sent
-  | 'proposal_sent'     // sent for signature, not yet opened
-  | 'proposal_viewed'   // client opened it
-  | 'negotiating'       // deal.stage === 'negotiation' after sending
-  | 'signed'            // DocuSeal confirmed
+  | 'proposal_sent'     // sent, not yet opened
+  | 'viewed'            // client opened at least once
+  | 'negotiating'       // viewed + no signature after NEGOTIATING_DAYS
+  | 'signed'            // DocuSeal completed
 
 export interface Deal {
   id: string
@@ -150,6 +150,8 @@ export interface Deal {
   lastActivityAt: string | null
   /** ISO timestamp of the most recent proposal_viewed event, or null if none. */
   lastProposalViewAt: string | null
+  /** UUID of the Supabase user who owns this deal, or null if unassigned. */
+  ownerId: string | null
 
   notes?: string
 
@@ -193,16 +195,18 @@ export interface ProposalRecord {
   sentForSignatureAt: string | null
   // DocuSeal
   docusealSubmissionId: string | null
-  docusealStatus: 'pending' | 'completed' | null  // pending = awaiting; completed = signed
+  docusealStatus: DocuSealStatus
   signedAt: string | null
   createdAt: string
   updatedAt: string
 }
 
+export type DocuSealStatus = 'pending' | 'completed' | 'declined' | 'expired' | null
+
 /** Lightweight summary used for batch status enrichment in getDeals() */
 export interface ProposalSummary {
   configId: string
   sentForSignatureAt: string | null
-  docusealStatus: 'pending' | 'completed' | null
+  docusealStatus: DocuSealStatus
   signedAt: string | null
 }

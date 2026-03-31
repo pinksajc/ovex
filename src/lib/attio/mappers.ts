@@ -161,6 +161,7 @@ export function mapAttioDeal(
     hasProposal: false,
     lastActivityAt: null,
     lastProposalViewAt: null,
+    ownerId: null,
     createdAt: dealRecord.created_at,
     updatedAt: dealRecord.created_at,
   }

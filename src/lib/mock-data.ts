@@ -63,6 +63,7 @@ export const MOCK_DEALS: Deal[] = [
     hasProposal: false,
     lastActivityAt: null,
     lastProposalViewAt: null,
+    ownerId: null,
   },
   {
     id: 'deal-002',
@@ -111,6 +112,7 @@ export const MOCK_DEALS: Deal[] = [
     hasProposal: false,
     lastActivityAt: null,
     lastProposalViewAt: null,
+    ownerId: null,
   },
   {
     id: 'deal-003',
@@ -156,6 +158,7 @@ export const MOCK_DEALS: Deal[] = [
     hasProposal: false,
     lastActivityAt: null,
     lastProposalViewAt: null,
+    ownerId: null,
   },
   {
     id: 'deal-004',
@@ -204,6 +207,7 @@ export const MOCK_DEALS: Deal[] = [
     hasProposal: false,
     lastActivityAt: null,
     lastProposalViewAt: null,
+    ownerId: null,
   },
 ]
 

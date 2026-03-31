@@ -47,3 +47,51 @@ create index if not exists deal_configurations_active_idx
 
 -- RLS: desactivado (acceso solo con service role desde servidor)
 alter table deal_configurations disable row level security;
+
+-- =========================================
+-- AUTH — profiles + deal_owners
+-- Ejecutar después de activar Supabase Auth
+-- =========================================
+
+-- Profiles: extiende auth.users con role y nombre
+create table if not exists profiles (
+  id     uuid primary key references auth.users(id) on delete cascade,
+  email  text not null,
+  name   text,
+  role   text not null default 'sales' check (role in ('admin', 'sales')),
+  created_at timestamptz not null default now()
+);
+
+-- Auto-crear perfil al registrar usuario
+create or replace function handle_new_user()
+returns trigger as $$
+begin
+  insert into profiles (id, email, name)
+  values (
+    new.id,
+    new.email,
+    coalesce(new.raw_user_meta_data->>'name', split_part(new.email, '@', 1))
+  )
+  on conflict (id) do nothing;
+  return new;
+end;
+$$ language plpgsql security definer;
+
+drop trigger if exists on_auth_user_created on auth.users;
+create trigger on_auth_user_created
+  after insert on auth.users
+  for each row execute function handle_new_user();
+
+-- Deal ownership: attio_deal_id → owner (usuario de Supabase)
+create table if not exists deal_owners (
+  attio_deal_id text primary key,
+  owner_id      uuid references profiles(id) on delete set null,
+  assigned_at   timestamptz not null default now(),
+  assigned_by   uuid references profiles(id) on delete set null
+);
+
+create index if not exists deal_owners_owner_id_idx on deal_owners (owner_id);
+
+-- RLS desactivado — acceso vía service role
+alter table profiles    disable row level security;
+alter table deal_owners disable row level security;
