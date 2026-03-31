@@ -93,7 +93,7 @@ export async function markSentForSignatureAction(
 
       // ── 3 & 4. Upload to DocuSeal + create submission ──
       const { uploadPdfAndCreateSubmission } = await import('@/lib/docuseal/client')
-      const documentName = `Propuesta · ${deal.company.name} · v${cfg.version}`
+      const documentName = `orvex-propuesta-${dealId}-v${cfg.version}.pdf`
       const { submissionId, signerUrl } = await uploadPdfAndCreateSubmission({
         pdfBuffer,
         documentName,
