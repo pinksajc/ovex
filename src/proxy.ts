@@ -1,5 +1,5 @@
 // =========================================
-// AUTH MIDDLEWARE
+// AUTH PROXY (formerly middleware)
 // Protects all routes except:
 //   /login                  — auth page
 //   /setup-error            — env config error page
@@ -24,7 +24,7 @@ function isPublic(pathname: string): boolean {
   return PUBLIC_PATTERNS.some((re) => re.test(pathname))
 }
 
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl
 
   if (isPublic(pathname)) return NextResponse.next()
