@@ -95,3 +95,36 @@ create index if not exists deal_owners_owner_id_idx on deal_owners (owner_id);
 -- RLS desactivado — acceso vía service role
 alter table profiles    disable row level security;
 alter table deal_owners disable row level security;
+
+-- =========================================
+-- PROPOSALS — propuestas comerciales
+-- Una por (deal, config). Cada versión de
+-- config tiene su propio borrador.
+-- =========================================
+
+create table if not exists proposals (
+  id                      text primary key default gen_random_uuid()::text,
+  attio_deal_id           text not null,
+  config_id               text not null,
+  sections                jsonb not null default '{}',
+  sent_for_signature_at   timestamptz,
+  docuseal_submission_id  text,
+  docuseal_status         text,
+  signed_at               timestamptz,
+  created_at              timestamptz not null default now(),
+  updated_at              timestamptz not null default now(),
+  unique (attio_deal_id, config_id)
+);
+
+create index if not exists proposals_attio_deal_id_idx
+  on proposals (attio_deal_id);
+
+create index if not exists proposals_config_id_idx
+  on proposals (config_id);
+
+create index if not exists proposals_docuseal_submission_id_idx
+  on proposals (docuseal_submission_id)
+  where docuseal_submission_id is not null;
+
+-- RLS desactivado — acceso vía service role
+alter table proposals disable row level security;
