@@ -56,11 +56,22 @@ function withTimeout<T>(p: Promise<T>, ms: number, label: string): Promise<T> {
 export async function renderHtmlToPdf(html: string): Promise<Buffer> {
   const puppeteer = (await import('puppeteer-core')).default
   const chromium  = (await import('@sparticuz/chromium')).default
+
+  // Vercel/Lambda: chromium.executablePath() decompresses the .br binary
+  // from node_modules/@sparticuz/chromium/bin/chromium.br on first call.
+  // CHROME_EXECUTABLE_PATH overrides for local dev (e.g. /usr/bin/google-chrome).
   const executablePath =
-    process.env.CHROME_EXECUTABLE_PATH ?? (await chromium.executablePath())
+    process.env.CHROME_EXECUTABLE_PATH ??
+    (await chromium.executablePath())
+
+  console.log('[renderHtmlToPdf] executablePath:', executablePath)
 
   const browser = await puppeteer.launch({
-    args: chromium.args,
+    args: [
+      ...chromium.args,
+      '--disable-dev-shm-usage', // avoids /dev/shm exhaustion in Lambda
+      '--no-zygote',             // required in some Lambda environments
+    ],
     defaultViewport: { width: 1240, height: 1754 },
     executablePath,
     headless: true,
