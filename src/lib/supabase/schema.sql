@@ -128,3 +128,6 @@ create index if not exists proposals_docuseal_submission_id_idx
 
 -- RLS desactivado — acceso vía service role
 alter table proposals disable row level security;
+
+-- Si la tabla ya existía sin la constraint, añadirla:
+-- ALTER TABLE proposals ADD CONSTRAINT proposals_attio_deal_id_config_id_key UNIQUE (attio_deal_id, config_id);

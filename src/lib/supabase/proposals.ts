@@ -103,14 +103,34 @@ export async function upsertProposal(
   configId: string,
   sections: ProposalSections
 ): Promise<ProposalRecord> {
+  const now = new Date().toISOString()
+
+  // SELECT first — works whether or not the UNIQUE constraint exists in the DB
+  const { data: existing, error: selErr } = await table()
+    .select('id')
+    .eq('attio_deal_id', attioDealId)
+    .eq('config_id', configId)
+    .maybeSingle()
+
+  if (selErr) throw new Error(`Supabase upsertProposal (select): ${selErr.message}`)
+
+  if (existing) {
+    // UPDATE existing row
+    const { data, error } = await table()
+      .update({ sections, updated_at: now })
+      .eq('id', (existing as { id: string }).id)
+      .select()
+      .single()
+    if (error) throw new Error(`Supabase upsertProposal (update): ${error.message}`)
+    return rowToRecord(data as ProposalRow)
+  }
+
+  // INSERT new row
   const { data, error } = await table()
-    .upsert(
-      { attio_deal_id: attioDealId, config_id: configId, sections, updated_at: new Date().toISOString() },
-      { onConflict: 'attio_deal_id,config_id' }
-    )
+    .insert({ attio_deal_id: attioDealId, config_id: configId, sections, updated_at: now })
     .select()
     .single()
-  if (error) throw new Error(`Supabase upsertProposal: ${error.message}`)
+  if (error) throw new Error(`Supabase upsertProposal (insert): ${error.message}`)
   return rowToRecord(data as ProposalRow)
 }
 

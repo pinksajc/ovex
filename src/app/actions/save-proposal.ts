@@ -17,16 +17,27 @@ export async function saveProposalAction(
   configId: string,
   sections: ProposalSections
 ): Promise<SaveProposalResult> {
+  console.log('[saveProposalAction] start', { attioDealId, configId })
   try {
     const { proposal, persisted } = await saveProposal(attioDealId, configId, sections)
+    console.log('[saveProposalAction] ok', { persisted, updatedAt: proposal.updatedAt })
     revalidatePath(`/deals/${attioDealId}/propuesta`)
     void logEvent('proposal_saved', attioDealId)
     return { ok: true, persisted, updatedAt: proposal.updatedAt }
   } catch (err) {
+    const message = err instanceof Error ? err.message : 'Error desconocido'
+    console.error('[saveProposalAction] ERROR', {
+      message,
+      stack: err instanceof Error ? err.stack : undefined,
+      attioDealId,
+      configId,
+      SUPABASE_URL: process.env.SUPABASE_URL ?? 'MISSING',
+      SUPABASE_SERVICE_KEY: process.env.SUPABASE_SERVICE_KEY ? 'set' : 'MISSING',
+    })
     return {
       ok: false,
       persisted: false,
-      error: err instanceof Error ? err.message : 'Error desconocido',
+      error: message,
     }
   }
 }
