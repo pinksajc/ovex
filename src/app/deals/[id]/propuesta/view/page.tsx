@@ -45,7 +45,7 @@ export default async function PropuestaViewPage({
 
   return (
     <div className="min-h-screen bg-zinc-50 proposal-print-wrapper">
-      <PrintButton variant="fab" />
+      <PrintButton variant="fab" dealId={deal.id} configId={cfg.id} />
       <div className="max-w-3xl mx-auto px-6 py-12">
         <ProposalView deal={deal} cfg={cfg} sections={sections} today={today} />
       </div>
