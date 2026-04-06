@@ -1,5 +1,6 @@
 'use client'
 
+import Image from 'next/image'
 import { useState, useTransition, useEffect, useCallback } from 'react'
 import { PLANS, ADDONS, HARDWARE, HARDWARE_MODE_LABELS } from '@/lib/pricing/catalog'
 import { formatCurrency, formatNumber } from '@/lib/format'
@@ -117,8 +118,13 @@ export function ProposalEditor({ deal, cfg, today, initialSections }: ProposalEd
         <div className="px-10 pt-10 pb-8 border-b border-zinc-100">
           <div className="flex items-start justify-between mb-8">
             <div>
-              <span className="text-xl font-semibold text-zinc-900 tracking-tight">Orvex</span>
-              <p className="text-xs text-zinc-400 mt-0.5">Sales Operating System · Platomico</p>
+              <Image
+                src="/logo_platomico.png"
+                alt="Platomico"
+                width={140}
+                height={36}
+                className="h-8 w-auto object-contain"
+              />
             </div>
             <div className="text-right">
               <span className="inline-block bg-zinc-900 text-white text-[10px] font-bold uppercase tracking-widest px-3 py-1 rounded-full">
@@ -461,25 +467,6 @@ export function ProposalEditor({ deal, cfg, today, initialSections }: ProposalEd
             className="mt-3"
             rows={5}
           />
-        </div>
-
-        {/* ── CTA Aceptar ── */}
-        <div className="px-10 py-10 flex flex-col items-center gap-4 border-b border-zinc-100 bg-zinc-900">
-          <p className="text-white text-lg font-semibold tracking-tight text-center">
-            ¿Listo para empezar con {deal.company.name}?
-          </p>
-          <p className="text-zinc-400 text-sm text-center max-w-sm">
-            Acepta esta propuesta y ponemos en marcha el onboarding en menos de 48 horas.
-          </p>
-          <a
-            href={`mailto:${deal.contact.email || 'info@platomico.com'}?subject=Aceptación propuesta Orvex · ${deal.company.name}&body=Hola,%0A%0AConfirmamos la aceptación de la propuesta comercial de Orvex.%0A%0ASaludos`}
-            className="mt-2 inline-flex items-center gap-2 bg-white text-zinc-900 font-semibold text-sm px-6 py-3 rounded-xl hover:bg-zinc-100 transition-colors"
-          >
-            Aceptar propuesta →
-          </a>
-          <p className="text-[10px] text-zinc-600 text-center">
-            O responde a este email para coordinar los detalles.
-          </p>
         </div>
 
         {/* Footer */}
