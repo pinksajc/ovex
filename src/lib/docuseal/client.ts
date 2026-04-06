@@ -89,37 +89,30 @@ async function createTemplateFromPdf(pdfBuffer: Buffer, name: string): Promise<n
     documents: [
       {
         name: `${name}.pdf`,
-        type: 'pdf',
-        content: base64,
-        // Signature field at bottom-right of last page; date at bottom-left.
-        // x/y/w/h are percentages of the page dimensions.
+        // DocuSeal expects a data URI or a URL; base64 with data URI prefix
+        file: `data:application/pdf;base64,${base64}`,
+        // Signature field at bottom-left of last page; date at bottom-right.
+        // x/y/w/h are normalized 0–1 fractions of the page dimensions.
+        // page: -1 = last page (DocuSeal counts from 1; negative = from end)
         fields: [
           {
             name: 'Firma del cliente',
             role: 'Firmante',
             type: 'signature',
-            page: -1,   // last page
-            x: 5,
-            y: 78,
-            w: 42,
-            h: 12,
+            areas: [{ x: 0.05, y: 0.78, w: 0.42, h: 0.12, page: -1 }],
           },
           {
             name: 'Fecha de firma',
             role: 'Firmante',
             type: 'date',
-            page: -1,
-            x: 53,
-            y: 78,
-            w: 42,
-            h: 12,
+            areas: [{ x: 0.53, y: 0.78, w: 0.42, h: 0.12, page: -1 }],
           },
         ],
       },
     ],
   }
 
-  const res = await fetch(`${BASE_URL()}/templates`, {
+  const res = await fetch(`${BASE_URL()}/templates/pdf`, {
     method: 'POST',
     headers: authHeaders(),
     body: JSON.stringify(body),
