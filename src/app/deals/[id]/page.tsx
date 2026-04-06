@@ -105,6 +105,7 @@ export default async function DealPage({
           {deal.contact.personRecordId ? (
             <ContactEditor
               personRecordId={deal.contact.personRecordId}
+              dealId={deal.id}
               name={deal.contact.name}
               email={deal.contact.email}
               phone={deal.contact.phone}
