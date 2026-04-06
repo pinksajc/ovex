@@ -109,6 +109,12 @@ export default async function DealsPage({
             <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
             Modo foco
           </Link>
+          <Link
+            href="/deals/new"
+            className="inline-flex items-center gap-1.5 text-xs font-medium bg-zinc-900 text-white hover:bg-zinc-700 px-3 py-1.5 rounded-lg transition-colors"
+          >
+            + Nuevo deal
+          </Link>
         </div>
       </div>
 

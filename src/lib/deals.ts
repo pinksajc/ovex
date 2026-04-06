@@ -1,14 +1,7 @@
 // =========================================
 // DEALS SERVICE LAYER
-// Abstracción sobre la fuente de datos.
-//
-// Comportamiento automático:
-//   ATTIO_API_KEY + SUPABASE_URL + SUPABASE_SERVICE_KEY definidas
-//     → datos reales de Attio + configuraciones de Supabase
-//   Si alguna falta
-//     → mock data (sin cambiar comportamiento ni pantallas)
-//
-// Las páginas siempre importan desde aquí — nunca de mock-data directamente.
+// Reads from native Supabase deals table.
+// Falls back to mock data when Supabase is not configured.
 // =========================================
 
 import { unstable_cache } from 'next/cache'
@@ -18,12 +11,8 @@ import type { ContactOverride } from './supabase/contact-overrides'
 
 // ---- Flags ----
 
-function isAttioConfigured(): boolean {
-  return !!(
-    process.env.ATTIO_API_KEY &&
-    process.env.SUPABASE_URL &&
-    process.env.SUPABASE_SERVICE_KEY
-  )
+function isSupabaseConfigured(): boolean {
+  return !!(process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_KEY)
 }
 
 // =========================================
@@ -32,118 +21,90 @@ function isAttioConfigured(): boolean {
 
 /**
  * Lista todos los deals con commercialStatus y hasProposal precalculados.
- * El componente no necesita saber de proposals.
  * Cacheado 60 s — invalidar con revalidateTag('attio-deals').
  */
 export const getDeals: () => Promise<Deal[]> = unstable_cache(
   async () => {
-    const baseDeals = isAttioConfigured()
-      ? await getDealsFromAttio()
+    const baseDeals = isSupabaseConfigured()
+      ? await getDealsFromSupabase()
       : await import('./mock-data').then((m) => m.MOCK_DEALS)
 
     return enrichWithCommercialStatus(baseDeals)
   },
-  ['attio-deals-list'],
+  ['deals-list'],
   { revalidate: 60, tags: ['attio-deals'] }
 )
 
 /**
  * Obtiene un deal por ID.
- * En modo Attio, el ID es el record_id de Attio.
- * En modo mock, el ID es el mock ID ('deal-001', etc.)
  * Cacheado 60 s — invalidar con revalidateTag('attio-deals').
  */
 export const getDeal: (id: string) => Promise<Deal | undefined> = unstable_cache(
   async (id: string) => {
-    const base = isAttioConfigured()
-      ? await getDealFromAttio(id)
+    const base = isSupabaseConfigured()
+      ? await getDealFromSupabase(id)
       : await import('./mock-data').then((m) => m.getDealById(id))
 
     if (!base) return undefined
     const [enriched] = await enrichWithCommercialStatus([base])
     return enriched
   },
-  ['attio-deal'],
+  ['deal'],
   { revalidate: 60, tags: ['attio-deals'] }
 )
 
 /**
  * Retorna la configuración activa de un deal.
- * Función pura sobre el tipo Deal — funciona igual en mock y Attio.
  */
-export function getActiveConfig(
-  deal: Deal
-): DealConfiguration | undefined {
+export function getActiveConfig(deal: Deal): DealConfiguration | undefined {
   if (!deal.activeConfigId) return deal.configurations[0]
   return deal.configurations.find((c) => c.id === deal.activeConfigId)
 }
 
 // =========================================
-// WRITES (solo en modo Attio+Supabase)
+// WRITES
 // =========================================
 
-/**
- * Guarda una configuración nueva o actualiza una existente.
- * No hace nada en modo mock.
- */
 export async function saveConfig(
-  attioDealId: string,
+  dealId: string,
   config: Omit<DealConfiguration, 'dealId'>
 ): Promise<DealConfiguration> {
-  if (!isAttioConfigured()) {
-    // En mock, devuelve la config tal cual (state-only, sin persistencia)
-    return { ...config, dealId: attioDealId }
-  }
+  if (!isSupabaseConfigured()) return { ...config, dealId }
 
   const { saveConfig: sbSave } = await import('./supabase/configs')
-  return sbSave(attioDealId, config)
+  return sbSave(dealId, config)
 }
 
-/**
- * Marca una configuración como la activa del deal.
- */
-export async function setActiveConfig(
-  attioDealId: string,
-  configId: string
-): Promise<void> {
-  if (!isAttioConfigured()) return
+export async function setActiveConfig(dealId: string, configId: string): Promise<void> {
+  if (!isSupabaseConfigured()) return
 
   const { setActiveConfig: sbSet } = await import('./supabase/configs')
-  return sbSet(attioDealId, configId)
+  return sbSet(dealId, configId)
 }
 
-/**
- * Upserts la configuración activa de un deal (modelo single-config-per-deal).
- * En modo Attio persiste en Supabase y devuelve { config, persisted: true }.
- * En modo mock devuelve la config sin persistir y persisted: false.
- */
 export async function saveActiveConfig(
-  attioDealId: string,
+  dealId: string,
   config: Omit<DealConfiguration, 'dealId'>
 ): Promise<{ config: DealConfiguration; persisted: boolean }> {
-  if (!isAttioConfigured()) {
-    return { config: { ...config, dealId: attioDealId }, persisted: false }
+  if (!isSupabaseConfigured()) {
+    return { config: { ...config, dealId }, persisted: false }
   }
 
   const { upsertActiveConfig } = await import('./supabase/configs')
-  const saved = await upsertActiveConfig(attioDealId, config)
+  const saved = await upsertActiveConfig(dealId, config)
   return { config: saved, persisted: true }
 }
 
-/**
- * Inserta una nueva versión de configuración (no activa).
- * En mock mode devuelve la config sin persistir.
- */
 export async function saveNewConfigVersion(
-  attioDealId: string,
+  dealId: string,
   configData: Omit<DealConfiguration, 'dealId' | 'id' | 'version' | 'createdAt'>
 ): Promise<{ config: DealConfiguration; persisted: boolean }> {
-  if (!isAttioConfigured()) {
+  if (!isSupabaseConfigured()) {
     return {
       config: {
         ...configData,
-        id: `${attioDealId}-v1-mock`,
-        dealId: attioDealId,
+        id: `${dealId}-v1-mock`,
+        dealId,
         version: 1,
         createdAt: new Date().toISOString(),
       },
@@ -152,41 +113,72 @@ export async function saveNewConfigVersion(
   }
 
   const { insertVersion } = await import('./supabase/configs')
-  const saved = await insertVersion(attioDealId, configData)
+  const saved = await insertVersion(dealId, configData)
   return { config: saved, persisted: true }
 }
 
-/**
- * Calcula el siguiente número de versión para un deal.
- */
-export async function nextVersion(attioDealId: string): Promise<number> {
-  if (!isAttioConfigured()) {
-    // En mock, contamos las configs del deal
-    const deal = await getDeal(attioDealId)
+export async function nextVersion(dealId: string): Promise<number> {
+  if (!isSupabaseConfigured()) {
+    const deal = await getDeal(dealId)
     return (deal?.configurations.length ?? 0) + 1
   }
 
   const { nextVersionForDeal } = await import('./supabase/configs')
-  return nextVersionForDeal(attioDealId)
+  return nextVersionForDeal(dealId)
 }
 
 // =========================================
-// COMMERCIAL STATUS ENRICHMENT (private)
+// PROPOSALS
 // =========================================
 
-/**
- * Annotates each deal with commercialStatus, hasProposal, and lastProposalViewAt.
- * Uses two batch queries (proposals + events). Never call from components.
- */
+export async function getProposal(
+  dealId: string,
+  configId: string
+): Promise<ProposalRecord | null> {
+  if (!isSupabaseConfigured()) return null
+  const { getProposalForDeal } = await import('./supabase/proposals')
+  return getProposalForDeal(dealId, configId).catch(() => null)
+}
+
+export async function saveProposal(
+  dealId: string,
+  configId: string,
+  sections: ProposalSections
+): Promise<{ proposal: ProposalRecord; persisted: boolean }> {
+  if (!isSupabaseConfigured()) {
+    return {
+      proposal: {
+        id: `${dealId}-proposal-mock`,
+        attioDealId: dealId,
+        configId,
+        sections,
+        sentForSignatureAt: null,
+        docusealSubmissionId: null,
+        docusealStatus: null,
+        signedAt: null,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      },
+      persisted: false,
+    }
+  }
+  const { upsertProposal } = await import('./supabase/proposals')
+  const proposal = await upsertProposal(dealId, configId, sections)
+  return { proposal, persisted: true }
+}
+
+// =========================================
+// ENRICHMENT (private)
+// =========================================
+
 async function enrichWithCommercialStatus(deals: Deal[]): Promise<Deal[]> {
   let proposalSummaries = new Map<string, ProposalSummary>()
   let lastActivityMap = new Map<string, string>()
   let lastProposalViewMap = new Map<string, string>()
-
   let ownerMap = new Map<string, string>()
   let contactOverrideMap = new Map<string, ContactOverride>()
 
-  if (isAttioConfigured() && deals.length > 0) {
+  if (isSupabaseConfigured() && deals.length > 0) {
     const dealIds = deals.map((d) => d.id)
     const [summaries, activityMap, proposalViewMap, owners, contactOverrides] = await Promise.all([
       import('./supabase/proposals')
@@ -208,10 +200,8 @@ async function enrichWithCommercialStatus(deals: Deal[]): Promise<Deal[]> {
     contactOverrideMap = contactOverrides
   }
 
-  // Days after last view with no signature before upgrading to 'negotiating'
   const NEGOTIATING_DAYS = 5
 
-  // Higher priority = sorted first
   const STATUS_PRIORITY: Record<DealCommercialStatus, number> = {
     signed: 0,
     negotiating: 1,
@@ -238,7 +228,6 @@ async function enrichWithCommercialStatus(deals: Deal[]): Promise<Deal[]> {
       } else if (summary.docusealStatus === 'completed' || summary.signedAt) {
         commercialStatus = 'signed'
       } else if (summary.sentForSignatureAt && lastProposalViewAt) {
-        // Viewed: check if enough time has passed to consider it 'negotiating'
         const daysSinceView =
           (Date.now() - new Date(lastProposalViewAt).getTime()) / (1000 * 60 * 60 * 24)
         commercialStatus = daysSinceView >= NEGOTIATING_DAYS ? 'negotiating' : 'viewed'
@@ -248,9 +237,10 @@ async function enrichWithCommercialStatus(deals: Deal[]): Promise<Deal[]> {
         commercialStatus = 'proposal_created'
       }
 
-      const ownerId = ownerMap.get(deal.id) ?? null
+      // deal_owners overrides deals.owner_id for admin reassignments
+      const ownerId = ownerMap.get(deal.id) ?? deal.ownerId ?? null
 
-      // Apply contact override if one exists for this deal
+      // Apply contact override if present
       const override = contactOverrideMap.get(deal.id)
       const contact = override
         ? {
@@ -273,137 +263,75 @@ async function enrichWithCommercialStatus(deals: Deal[]): Promise<Deal[]> {
 }
 
 // =========================================
-// PROPOSALS
+// IMPLEMENTATION — Supabase
 // =========================================
 
-/**
- * Lee la propuesta guardada para un (deal, config) concreto.
- * Devuelve null si no existe o si estamos en modo mock.
- */
-export async function getProposal(
-  attioDealId: string,
-  configId: string
-): Promise<ProposalRecord | null> {
-  if (!isAttioConfigured()) return null
-  const { getProposalForDeal } = await import('./supabase/proposals')
-  return getProposalForDeal(attioDealId, configId).catch(() => null)
-}
+async function getDealsFromSupabase(): Promise<Deal[]> {
+  const { listDeals } = await import('./supabase/deals')
+  const { getConfigsForDeal, getActiveConfigForDeal } = await import('./supabase/configs')
+  const { getSupabaseClient } = await import('./supabase/client')
 
-/**
- * Guarda (upsert) la propuesta de un deal.
- * En modo mock devuelve la propuesta sin persistir.
- */
-export async function saveProposal(
-  attioDealId: string,
-  configId: string,
-  sections: ProposalSections
-): Promise<{ proposal: ProposalRecord; persisted: boolean }> {
-  if (!isAttioConfigured()) {
-    return {
-      proposal: {
-        id: `${attioDealId}-proposal-mock`,
-        attioDealId,
-        configId,
-        sections,
-        sentForSignatureAt: null,
-        docusealSubmissionId: null,
-        docusealStatus: null,
-        signedAt: null,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      },
-      persisted: false,
-    }
-  }
-  const { upsertProposal } = await import('./supabase/proposals')
-  const proposal = await upsertProposal(attioDealId, configId, sections)
-  return { proposal, persisted: true }
-}
+  const baseDeals = await listDeals()
+  if (baseDeals.length === 0) return []
 
-// =========================================
-// IMPLEMENTACIÓN ATTIO
-// =========================================
+  // Fetch profiles once for owner name resolution
+  const db = getSupabaseClient()
+  type ProfileRow = { id: string; name: string | null; email: string }
+  const { data: profiles } = await db
+    .from('profiles')
+    .select('id, name, email') as { data: ProfileRow[] | null; error: unknown }
+  const profileMap = new Map((profiles ?? []).map((p) => [p.id, p.name ?? p.email]))
 
-async function getDealsFromAttio(): Promise<Deal[]> {
-  const [
-    { listAttioDeals, listAttioMembers },
-    { getConfigsForDeal, getActiveConfigForDeal },
-    { mapAttioDeal, getCompanyRefId, getPersonRefId },
-    { getAttioCompany, getAttioPerson },
-  ] = await Promise.all([
-    import('./attio/client'),
-    import('./supabase/configs'),
-    import('./attio/mappers'),
-    import('./attio/client'),
-  ])
-
-  const [dealRecords, members] = await Promise.all([
-    listAttioDeals(),
-    listAttioMembers().catch(() => []), // silencia error de permisos
-  ])
-
-  // Fetch configs y detalles en paralelo para todos los deals
   const deals = await Promise.all(
-    dealRecords.map(async (record) => {
-      const attioId = record.id.record_id
-
-      // Refs de empresa y persona
-      const companyRefId = getCompanyRefId(record)
-      const personRefId = getPersonRefId(record)
-
-      // Parallelizar fetches por deal
-      const [companyRecord, personRecord, configs, activeConfig] =
-        await Promise.all([
-          companyRefId ? getAttioCompany(companyRefId) : Promise.resolve(null),
-          personRefId ? getAttioPerson(personRefId) : Promise.resolve(null),
-          getConfigsForDeal(attioId).catch(() => []),
-          getActiveConfigForDeal(attioId).catch(() => undefined),
-        ])
-
-      return mapAttioDeal(record, {
-        companyRecord,
-        personRecord,
-        members,
+    baseDeals.map(async (deal) => {
+      const [configs, activeConfig] = await Promise.all([
+        getConfigsForDeal(deal.id).catch(() => [] as DealConfiguration[]),
+        getActiveConfigForDeal(deal.id).catch(() => undefined),
+      ])
+      const ownerName = deal.ownerId
+        ? (profileMap.get(deal.ownerId) ?? 'Sin asignar')
+        : 'Sin asignar'
+      return {
+        ...deal,
+        owner: ownerName,
         configurations: configs,
         activeConfigId: activeConfig?.id,
-      })
+      }
     })
   )
 
   return deals
 }
 
-async function getDealFromAttio(recordId: string): Promise<Deal | undefined> {
-  const [
-    { getAttioDeal, getAttioCompany, getAttioPerson, listAttioMembers },
-    { getConfigsForDeal, getActiveConfigForDeal },
-    { mapAttioDeal, getCompanyRefId, getPersonRefId },
-  ] = await Promise.all([
-    import('./attio/client'),
-    import('./supabase/configs'),
-    import('./attio/mappers'),
+async function getDealFromSupabase(id: string): Promise<Deal | undefined> {
+  const { getDealById } = await import('./supabase/deals')
+  const { getConfigsForDeal, getActiveConfigForDeal } = await import('./supabase/configs')
+  const { getSupabaseClient } = await import('./supabase/client')
+
+  const deal = await getDealById(id)
+  if (!deal) return undefined
+
+  const [configs, activeConfig] = await Promise.all([
+    getConfigsForDeal(deal.id).catch(() => [] as DealConfiguration[]),
+    getActiveConfigForDeal(deal.id).catch(() => undefined),
   ])
 
-  const record = await getAttioDeal(recordId)
-  if (!record) return undefined
+  let ownerName = 'Sin asignar'
+  if (deal.ownerId) {
+    const db = getSupabaseClient()
+    type ProfileRow = { name: string | null; email: string }
+    const { data: profile } = await db
+      .from('profiles')
+      .select('name, email')
+      .eq('id', deal.ownerId)
+      .maybeSingle() as { data: ProfileRow | null; error: unknown }
+    if (profile) ownerName = profile.name ?? profile.email
+  }
 
-  const companyRefId = getCompanyRefId(record)
-  const personRefId = getPersonRefId(record)
-
-  const [companyRecord, personRecord, members, configs, activeConfig] =
-    await Promise.all([
-      companyRefId ? getAttioCompany(companyRefId) : Promise.resolve(null),
-      personRefId ? getAttioPerson(personRefId) : Promise.resolve(null),
-      listAttioMembers().catch(() => []),
-      getConfigsForDeal(recordId).catch(() => []),
-      getActiveConfigForDeal(recordId).catch(() => undefined),
-    ])
-
-  return mapAttioDeal(record, {
-    companyRecord,
-    personRecord,
-    members,
+  return {
+    ...deal,
+    owner: ownerName,
     configurations: configs,
     activeConfigId: activeConfig?.id,
-  })
+  }
 }
