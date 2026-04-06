@@ -164,23 +164,10 @@ export async function patchAttioPerson(
       method: 'PATCH',
       body: JSON.stringify({
         data: {
-          attributes: [
-            {
-              attribute_type: 'personal-name',
-              slug: 'name',
-              value: {
-                full_name: `${firstName} ${lastName}`.trim(),
-              },
-            },
-            {
-              attribute_type: 'email-address',
-              slug: 'email_addresses',
-              value: {
-                email_address: email,
-                is_primary: true,
-              },
-            },
-          ],
+          values: {
+            name: [{ first_name: firstName, last_name: lastName, full_name: `${firstName} ${lastName}`.trim() }],
+            email_addresses: [email],
+          },
         },
       }),
     }
