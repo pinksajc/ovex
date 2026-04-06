@@ -71,9 +71,11 @@ export default async function PropuestaPage({
           )}
         </div>
 
-        {/* Actions — text links only */}
+        {/* Actions — single row, right-aligned */}
         {cfg && (
-          <div className="flex flex-col items-end gap-0.5">
+          <div className="flex items-center gap-5 shrink-0">
+            {/* Text-only: no border */}
+            <CopyLinkButton path={`/deals/${deal.id}/propuesta/view`} />
             <SendForSignatureButton
               dealId={deal.id}
               configId={cfg.id}
@@ -83,23 +85,17 @@ export default async function PropuestaPage({
               signerName={deal.contact.name}
               signerEmail={deal.contact.email}
             />
-            <CopyLinkButton path={`/deals/${deal.id}/propuesta/view`} />
+            {/* Bordered */}
+            <Link
+              href={`/deals/${deal.id}/propuesta/view`}
+              className="text-xs font-medium border border-zinc-200 text-zinc-600 px-3 py-1.5 rounded-lg hover:border-zinc-400 hover:text-zinc-900 transition-colors whitespace-nowrap"
+            >
+              Ver modo cliente →
+            </Link>
+            <PrintButton variant="inline" dealId={deal.id} configId={cfg.id} />
           </div>
         )}
       </div>
-
-      {/* Fixed corner: Ver modo cliente + Guardar PDF */}
-      {cfg && (
-        <div className="fixed top-4 right-6 z-40 flex flex-col items-end gap-2 print:hidden">
-          <Link
-            href={`/deals/${deal.id}/propuesta/view`}
-            className="text-xs font-medium bg-white border border-zinc-200 text-zinc-600 px-3 py-1.5 rounded-lg hover:border-zinc-400 hover:text-zinc-900 transition-colors shadow-sm whitespace-nowrap"
-          >
-            Ver modo cliente →
-          </Link>
-          <PrintButton variant="inline" dealId={deal.id} configId={cfg.id} />
-        </div>
-      )}
 
       {/* Content */}
       <div className="max-w-3xl mx-auto px-6 py-10">
