@@ -1,23 +1,22 @@
 'use server'
 
 import { revalidateTag, revalidatePath } from 'next/cache'
-import { patchAttioPerson } from '@/lib/attio/client'
+import { upsertContactOverride } from '@/lib/supabase/contact-overrides'
 
 export async function updateContactAction(
-  personRecordId: string,
+  _personRecordId: string,
   firstName: string,
   lastName: string,
   email: string,
   dealId?: string,
 ): Promise<{ ok: true } | { ok: false; error: string }> {
+  if (!dealId) return { ok: false, error: 'dealId requerido' }
   try {
-    await patchAttioPerson(personRecordId, firstName, lastName, email)
+    await upsertContactOverride(dealId, firstName, lastName, email)
     revalidateTag('attio-deals', 'max')
     revalidatePath('/deals')
-    if (dealId) {
-      revalidatePath(`/deals/${dealId}`)
-      revalidatePath(`/deals/${dealId}/propuesta`)
-    }
+    revalidatePath(`/deals/${dealId}`)
+    revalidatePath(`/deals/${dealId}/propuesta`)
     return { ok: true }
   } catch (err) {
     return {
