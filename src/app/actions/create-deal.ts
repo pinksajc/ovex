@@ -22,17 +22,23 @@ export async function createDealAction(formData: FormData): Promise<void> {
   const ownerIdRaw       = (formData.get('ownerId') as string | null)?.trim()
   const ownerId          = ownerIdRaw || user.id
 
-  const deal = await createDeal({
-    companyName,
-    contactFirstName,
-    contactLastName,
-    contactEmail,
-    contactPhone,
-    stage,
-    ownerId,
-  })
+  let dealId: string
+  try {
+    const deal = await createDeal({
+      companyName,
+      contactFirstName,
+      contactLastName,
+      contactEmail,
+      contactPhone,
+      stage,
+      ownerId,
+    })
+    dealId = deal.id
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : 'Error al crear el deal.'
+    redirect('/deals/new?error=' + encodeURIComponent(msg))
+  }
 
   revalidateTag('attio-deals', 'max')
-
-  redirect(`/deals/${deal.id}`)
+  redirect(`/deals/${dealId}`)
 }
