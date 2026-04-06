@@ -616,25 +616,17 @@ function s11Economics(deal: Deal, cfg: DealConfiguration, sections: ProposalSect
     : eco.paybackMonths <= 12 ? '#16a34a'
     : eco.paybackMonths <= 24 ? '#d97706' : '#dc2626'
 
-  const kpis = [
-    { l:'MRR',     v: fmt(eco.totalMonthlyRevenue),  s:'ingresos rec./mes' },
-    { l:'ARR',     v: fmt(eco.annualRevenue),          s:'ingresos rec./año' },
-    { l:'Hardware',v: eco.hardwareCostTotal > 0 ? fmt(eco.hardwareCostTotal) : '—', s: eco.hardwareCostTotal > 0 ? 'inversión total' : 'sin hardware' },
-    { l:'Payback', v: eco.paybackMonths != null ? `${eco.paybackMonths} m` : '—', s:'recuperación', c: paybackColor },
-    { l:'GMV/mes', v: fmt(eco.totalMonthlyGMV),       s:'volumen gestionado' },
-    { l:'Margen',  v: `${eco.grossMarginPercent.toFixed(0)}%`, s: fmt(eco.grossMarginMonthly)+'/mes' },
-  ]
+  const totalMes = eco.softwareRevenueMonthly + eco.hardwareRevenueMonthly
 
   const content = `
     ${sectionTitle('Resumen económico', `${deal.company.name} · Plan ${plan.label} · ${cfg.locations} local${cfg.locations > 1 ? 'es' : ''}`)}
 
-    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:9px;margin-bottom:18px;">
-      ${kpis.map(k => `
-        <div style="border:1px solid #dde6f0;border-radius:8px;padding:12px 14px;background:#fff;">
-          <div style="font-size:8px;color:#94a3b8;text-transform:uppercase;letter-spacing:1px;margin-bottom:5px;">${k.l}</div>
-          <div style="font-size:20px;font-weight:800;color:${k.c||'#0f172a'};font-family:'Courier New',monospace;line-height:1;">${k.v}</div>
-          <div style="font-size:9px;color:#94a3b8;margin-top:3px;">${k.s}</div>
-        </div>`).join('')}
+    <div style="border:2px solid #1e3a5f;border-radius:12px;padding:22px 28px;background:#f0f5fb;margin-bottom:18px;text-align:center;">
+      <div style="font-size:9px;color:#64748b;text-transform:uppercase;letter-spacing:1.5px;margin-bottom:8px;">Total / mes</div>
+      <div style="font-size:42px;font-weight:900;color:#0f172a;font-family:'Courier New',monospace;line-height:1;">${fmt(totalMes)}</div>
+      <div style="font-size:9.5px;color:#64748b;margin-top:6px;">
+        Software ${fmt(eco.softwareRevenueMonthly)}/mes${eco.hardwareRevenueMonthly > 0 ? ` · Hardware ${fmt(eco.hardwareRevenueMonthly)}/mes` : ''}
+      </div>
     </div>
 
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:16px;">
@@ -647,7 +639,6 @@ function s11Economics(deal: Deal, cfg: DealConfiguration, sections: ProposalSect
           ['Fee variable', `${plan.variableFee}€/ticket`],
           ['Locales', String(cfg.locations)],
           ['Pedidos/mes/local', fmtN(cfg.dailyOrdersPerLocation)],
-          ['Ticket medio', fmt(cfg.averageTicket)],
           ['Fee software/mes', fmt(eco.softwareRevenueMonthly)],
         ].map(([k,v]) => `
           <div style="display:flex;justify-content:space-between;padding:3px 0;border-bottom:1px solid #f1f5f9;">
