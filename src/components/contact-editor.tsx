@@ -5,6 +5,7 @@ import { updateContactAction } from '@/app/actions/update-contact'
 
 interface ContactEditorProps {
   personRecordId: string
+  dealId: string
   name: string        // full name as stored (e.g. "Juan García")
   email: string
   phone?: string
@@ -19,7 +20,7 @@ function splitName(full: string): { first: string; last: string } {
   return { first, last }
 }
 
-export function ContactEditor({ personRecordId, name, email, phone }: ContactEditorProps) {
+export function ContactEditor({ personRecordId, dealId, name, email, phone }: ContactEditorProps) {
   const [editing, setEditing] = useState(false)
   const [isPending, startTransition] = useTransition()
   const [error, setError] = useState<string | null>(null)
@@ -45,7 +46,7 @@ export function ContactEditor({ personRecordId, name, email, phone }: ContactEdi
   function handleSave() {
     setError(null)
     startTransition(async () => {
-      const result = await updateContactAction(personRecordId, firstName, lastName, emailVal)
+      const result = await updateContactAction(personRecordId, firstName, lastName, emailVal, dealId)
       if (result.ok) {
         const newName = `${firstName} ${lastName}`.trim()
         setDisplayName(newName)
