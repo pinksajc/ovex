@@ -1,6 +1,6 @@
 'use server'
 
-import { revalidatePath } from 'next/cache'
+import { revalidatePath, revalidateTag } from 'next/cache'
 import { requireAuth } from '@/lib/auth'
 
 export async function assignDealOwnerAction(
@@ -14,6 +14,7 @@ export async function assignDealOwnerAction(
     const { setDealOwner } = await import('@/lib/supabase/deal-owners')
     await setDealOwner(attioDealId, newOwnerId, user.id)
     revalidatePath('/deals')
+    revalidateTag('attio-deals', 'max')
     return { ok: true }
   } catch (err) {
     return { ok: false, error: err instanceof Error ? err.message : 'Error' }

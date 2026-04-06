@@ -11,6 +11,7 @@
 // Las páginas siempre importan desde aquí — nunca de mock-data directamente.
 // =========================================
 
+import { unstable_cache } from 'next/cache'
 import type { Deal, DealCommercialStatus, DealConfiguration, ProposalRecord, ProposalSections, ProposalSummary } from '@/types'
 import { getLastActivityByDeal, getLastProposalViewByDeal } from './supabase/events'
 
@@ -31,29 +32,39 @@ function isAttioConfigured(): boolean {
 /**
  * Lista todos los deals con commercialStatus y hasProposal precalculados.
  * El componente no necesita saber de proposals.
+ * Cacheado 60 s — invalidar con revalidateTag('attio-deals').
  */
-export async function getDeals(): Promise<Deal[]> {
-  const baseDeals = isAttioConfigured()
-    ? await getDealsFromAttio()
-    : await import('./mock-data').then((m) => m.MOCK_DEALS)
+export const getDeals: () => Promise<Deal[]> = unstable_cache(
+  async () => {
+    const baseDeals = isAttioConfigured()
+      ? await getDealsFromAttio()
+      : await import('./mock-data').then((m) => m.MOCK_DEALS)
 
-  return enrichWithCommercialStatus(baseDeals)
-}
+    return enrichWithCommercialStatus(baseDeals)
+  },
+  ['attio-deals-list'],
+  { revalidate: 60, tags: ['attio-deals'] }
+)
 
 /**
  * Obtiene un deal por ID.
  * En modo Attio, el ID es el record_id de Attio.
  * En modo mock, el ID es el mock ID ('deal-001', etc.)
+ * Cacheado 60 s — invalidar con revalidateTag('attio-deals').
  */
-export async function getDeal(id: string): Promise<Deal | undefined> {
-  const base = isAttioConfigured()
-    ? await getDealFromAttio(id)
-    : await import('./mock-data').then((m) => m.getDealById(id))
+export const getDeal: (id: string) => Promise<Deal | undefined> = unstable_cache(
+  async (id: string) => {
+    const base = isAttioConfigured()
+      ? await getDealFromAttio(id)
+      : await import('./mock-data').then((m) => m.getDealById(id))
 
-  if (!base) return undefined
-  const [enriched] = await enrichWithCommercialStatus([base])
-  return enriched
-}
+    if (!base) return undefined
+    const [enriched] = await enrichWithCommercialStatus([base])
+    return enriched
+  },
+  ['attio-deal'],
+  { revalidate: 60, tags: ['attio-deals'] }
+)
 
 /**
  * Retorna la configuración activa de un deal.

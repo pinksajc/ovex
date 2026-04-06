@@ -1,6 +1,6 @@
 'use server'
 
-import { revalidatePath } from 'next/cache'
+import { revalidatePath, revalidateTag } from 'next/cache'
 import { logEvent } from '@/lib/supabase/events'
 
 export interface SendForSignatureResult {
@@ -139,6 +139,7 @@ export async function markSentForSignatureAction(
       void logEvent('proposal_sent_for_signature', dealId)
       revalidatePath(`/deals/${dealId}/propuesta`)
       revalidatePath('/deals')
+      revalidateTag('attio-deals', 'max')
       console.log(`${tag} done`)
       return { ok: true, submissionId, signerUrl }
     }
@@ -150,6 +151,7 @@ export async function markSentForSignatureAction(
     void logEvent('proposal_sent_for_signature', dealId)
     revalidatePath(`/deals/${dealId}/propuesta`)
     revalidatePath('/deals')
+    revalidateTag('attio-deals', 'max')
     return { ok: true }
   } catch (err) {
     const msg = err instanceof Error ? err.message : 'Error desconocido'
