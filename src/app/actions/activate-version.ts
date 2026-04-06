@@ -1,6 +1,6 @@
 'use server'
 
-import { revalidatePath } from 'next/cache'
+import { revalidatePath, revalidateTag } from 'next/cache'
 import { setActiveConfig } from '@/lib/deals'
 
 export async function activateVersionAction(
@@ -10,6 +10,7 @@ export async function activateVersionAction(
   try {
     await setActiveConfig(dealId, configId)
     revalidatePath(`/deals/${dealId}/configurador`)
+    revalidateTag('attio-deals', 'max')
     return { ok: true }
   } catch (err) {
     return {

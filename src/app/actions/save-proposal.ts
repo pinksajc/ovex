@@ -1,7 +1,7 @@
 'use server'
 
 import { saveProposal } from '@/lib/deals'
-import { revalidatePath } from 'next/cache'
+import { revalidatePath, revalidateTag } from 'next/cache'
 import { logEvent } from '@/lib/supabase/events'
 import type { ProposalSections } from '@/types'
 
@@ -22,6 +22,7 @@ export async function saveProposalAction(
     const { proposal, persisted } = await saveProposal(attioDealId, configId, sections)
     console.log('[saveProposalAction] ok', { persisted, updatedAt: proposal.updatedAt })
     revalidatePath(`/deals/${attioDealId}/propuesta`)
+    revalidateTag('attio-deals', 'max')
     void logEvent('proposal_saved', attioDealId)
     return { ok: true, persisted, updatedAt: proposal.updatedAt }
   } catch (err) {
