@@ -115,22 +115,37 @@ export async function markSentForSignatureAction(
       // ── 4. Generate PDF ───────────────────────────────────────────────────
       console.log(`${tag} generating PDF`)
       const t0 = Date.now()
-      const { generateProposalPdf } = await import('@/lib/pdf/generate')
-      const pdfBuffer = await generateProposalPdf(deal, cfg, sections)
+      let pdfBuffer: Buffer
+      try {
+        const { generateProposalPdf } = await import('@/lib/pdf/generate')
+        pdfBuffer = await generateProposalPdf(deal, cfg, sections)
+      } catch (pdfErr) {
+        console.error(`${tag} PDF generation failed:`, pdfErr)
+        throw new Error(`PDF: ${pdfErr instanceof Error ? pdfErr.message : String(pdfErr)}`)
+      }
       console.log(`${tag} PDF ready (${Date.now() - t0}ms, ${pdfBuffer.length} bytes)`)
 
       // ── 5 & 6. Upload to DocuSeal + create submission ─────────────────────
       console.log(`${tag} uploading to DocuSeal`)
       const t1 = Date.now()
-      const { uploadPdfAndCreateSubmission } = await import('@/lib/docuseal/client')
-      const documentName = `orvex-propuesta-${dealId}-v${cfg.version}.pdf`
-      const { submissionId, signerUrl } = await uploadPdfAndCreateSubmission({
-        pdfBuffer,
-        documentName,
-        signerName,
-        signerEmail,
-        metadata: { deal_id: dealId, config_id: configId },
-      })
+      let submissionId: string
+      let signerUrl: string
+      try {
+        const { uploadPdfAndCreateSubmission } = await import('@/lib/docuseal/client')
+        const documentName = `platomico-propuesta-${dealId}-v${cfg.version}.pdf`
+        const result = await uploadPdfAndCreateSubmission({
+          pdfBuffer,
+          documentName,
+          signerName,
+          signerEmail,
+          metadata: { deal_id: dealId, config_id: configId },
+        })
+        submissionId = result.submissionId
+        signerUrl = result.signerUrl
+      } catch (dsErr) {
+        console.error(`${tag} DocuSeal failed:`, dsErr)
+        throw new Error(`DocuSeal: ${dsErr instanceof Error ? dsErr.message : String(dsErr)}`)
+      }
       console.log(`${tag} DocuSeal submission=${submissionId} (${Date.now() - t1}ms)`)
 
       // ── 7. Persist ────────────────────────────────────────────────────────
@@ -154,12 +169,8 @@ export async function markSentForSignatureAction(
     revalidateTag('attio-deals', 'max')
     return { ok: true }
   } catch (err) {
-    const msg = err instanceof Error ? err.message : 'Error desconocido'
-    console.error(`${tag} failed:`, msg)
-    // Don't expose raw internal errors to the UI
-    const userMsg = msg.startsWith('Deal ') || msg.startsWith('No hay ') || msg.startsWith('La configuración') || msg.startsWith('Esta propuesta') || msg.startsWith('La propuesta ya')
-      ? msg
-      : 'Error al generar o enviar la propuesta — inténtalo de nuevo'
-    return { ok: false, error: userMsg }
+    console.error(`${tag} failed:`, err)
+    const msg = err instanceof Error ? err.message : String(err)
+    return { ok: false, error: msg || 'Error al generar o enviar la propuesta — inténtalo de nuevo' }
   }
 }
