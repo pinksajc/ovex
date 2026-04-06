@@ -14,6 +14,7 @@ export type AddonId =
 
 export type HardwareId =
   | 'ipad'
+  | 'tablet_lenovo_m11'
   | 'bouncepad_kiosk'
   | 'counter_stand'
 
