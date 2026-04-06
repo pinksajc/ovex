@@ -122,7 +122,6 @@ export type DealCommercialStatus =
 
 export interface Deal {
   id: string
-  attioId?: string
 
   company: {
     name: string
