@@ -1,7 +1,6 @@
 'use client'
 
 import { useState, useTransition } from 'react'
-import { useRouter } from 'next/navigation'
 import { updateContactAction } from '@/app/actions/update-contact'
 
 interface ContactEditorProps {
@@ -21,21 +20,24 @@ function splitName(full: string): { first: string; last: string } {
 }
 
 export function ContactEditor({ personRecordId, name, email, phone }: ContactEditorProps) {
-  const router = useRouter()
   const [editing, setEditing] = useState(false)
   const [isPending, startTransition] = useTransition()
   const [error, setError] = useState<string | null>(null)
 
-  const { first: initialFirst, last: initialLast } = splitName(name)
+  // Display state — updated locally on save so UI reflects changes immediately
+  const [displayName, setDisplayName] = useState(name)
+  const [displayEmail, setDisplayEmail] = useState(email)
+
+  const { first: initialFirst, last: initialLast } = splitName(displayName)
   const [firstName, setFirstName] = useState(initialFirst)
   const [lastName, setLastName] = useState(initialLast)
-  const [emailVal, setEmailVal] = useState(email)
+  const [emailVal, setEmailVal] = useState(displayEmail)
 
   function handleCancel() {
-    const { first, last } = splitName(name)
+    const { first, last } = splitName(displayName)
     setFirstName(first)
     setLastName(last)
-    setEmailVal(email)
+    setEmailVal(displayEmail)
     setError(null)
     setEditing(false)
   }
@@ -45,8 +47,10 @@ export function ContactEditor({ personRecordId, name, email, phone }: ContactEdi
     startTransition(async () => {
       const result = await updateContactAction(personRecordId, firstName, lastName, emailVal)
       if (result.ok) {
+        const newName = `${firstName} ${lastName}`.trim()
+        setDisplayName(newName)
+        setDisplayEmail(emailVal)
         setEditing(false)
-        router.refresh()
       } else {
         setError(result.error)
       }
@@ -124,8 +128,8 @@ export function ContactEditor({ personRecordId, name, email, phone }: ContactEdi
     <dl className="space-y-2">
       <div className="flex items-center justify-between group">
         <div className="flex-1 space-y-2">
-          <ContactRow label="Nombre" value={name} />
-          <ContactRow label="Email" value={email} />
+          <ContactRow label="Nombre" value={displayName} />
+          <ContactRow label="Email" value={displayEmail} />
           {phone && <ContactRow label="Teléfono" value={phone} mono />}
         </div>
         <button
