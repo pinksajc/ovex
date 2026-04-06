@@ -218,20 +218,20 @@ function pg(logoUri: string, content: string, last = false): string {
   position:relative; min-height:220mm;
   font-family:Helvetica,Arial,sans-serif; font-size:11px; color:#0f172a;
 ">
-  <!-- CONFIDENCIAL watermark — repeats inside every page div -->
+  <!-- Content layer -->
+  <div style="position:relative;">
+    ${pageHeader(logoUri)}
+    ${content}
+  </div>
+  <!-- CONFIDENCIAL watermark — rendered after content so it paints on top -->
   <div style="
     position:absolute; top:50%; left:50%;
     transform:translate(-50%,-50%) rotate(-38deg);
     font-size:72px; font-weight:900; letter-spacing:10px;
     color:rgba(30,58,95,0.04); white-space:nowrap;
-    pointer-events:none; user-select:none; z-index:0;
-    font-family:Helvetica,sans-serif;
+    pointer-events:none; user-select:none;
+    z-index:9999; font-family:Helvetica,sans-serif;
   ">CONFIDENCIAL</div>
-  <!-- Content layer -->
-  <div style="position:relative; z-index:1;">
-    ${pageHeader(logoUri)}
-    ${content}
-  </div>
 </div>`
 }
 
@@ -292,11 +292,10 @@ function s1Cover(deal: Deal, cfg: DealConfiguration, today: string, logoUri: str
       </div>
     </div>`
 
-  // Portada: sin pageHeader (tiene su propio logo), sin watermark en el z-index (logo es visualmente limpio)
   return `
 <div style="break-after:page; position:relative; min-height:220mm; font-family:Helvetica,Arial,sans-serif; font-size:11px; color:#0f172a;">
-  <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%) rotate(-38deg);font-size:72px;font-weight:900;letter-spacing:10px;color:rgba(30,58,95,0.04);white-space:nowrap;pointer-events:none;user-select:none;z-index:0;font-family:Helvetica,sans-serif;">CONFIDENCIAL</div>
-  <div style="position:relative;z-index:1;">${content}</div>
+  <div style="position:relative;">${content}</div>
+  <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%) rotate(-38deg);font-size:72px;font-weight:900;letter-spacing:10px;color:rgba(30,58,95,0.04);white-space:nowrap;pointer-events:none;user-select:none;z-index:9999;font-family:Helvetica,sans-serif;">CONFIDENCIAL</div>
 </div>`
 }
 
