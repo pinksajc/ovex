@@ -14,6 +14,7 @@
 import { unstable_cache } from 'next/cache'
 import type { Deal, DealCommercialStatus, DealConfiguration, ProposalRecord, ProposalSections, ProposalSummary } from '@/types'
 import { getLastActivityByDeal, getLastProposalViewByDeal } from './supabase/events'
+import type { ContactOverride } from './supabase/contact-overrides'
 
 // ---- Flags ----
 
@@ -183,10 +184,11 @@ async function enrichWithCommercialStatus(deals: Deal[]): Promise<Deal[]> {
   let lastProposalViewMap = new Map<string, string>()
 
   let ownerMap = new Map<string, string>()
+  let contactOverrideMap = new Map<string, ContactOverride>()
 
   if (isAttioConfigured() && deals.length > 0) {
     const dealIds = deals.map((d) => d.id)
-    const [summaries, activityMap, proposalViewMap, owners] = await Promise.all([
+    const [summaries, activityMap, proposalViewMap, owners, contactOverrides] = await Promise.all([
       import('./supabase/proposals')
         .then((m) => m.getProposalSummariesForDeals(dealIds))
         .catch(() => new Map<string, ProposalSummary>()),
@@ -195,11 +197,15 @@ async function enrichWithCommercialStatus(deals: Deal[]): Promise<Deal[]> {
       import('./supabase/deal-owners')
         .then((m) => m.getDealOwnerMap(dealIds))
         .catch(() => new Map<string, string>()),
+      import('./supabase/contact-overrides')
+        .then((m) => m.getContactOverridesForDeals(dealIds))
+        .catch(() => new Map<string, ContactOverride>()),
     ])
     proposalSummaries = summaries
     lastActivityMap = activityMap
     lastProposalViewMap = proposalViewMap
     ownerMap = owners
+    contactOverrideMap = contactOverrides
   }
 
   // Days after last view with no signature before upgrading to 'negotiating'
@@ -243,7 +249,18 @@ async function enrichWithCommercialStatus(deals: Deal[]): Promise<Deal[]> {
       }
 
       const ownerId = ownerMap.get(deal.id) ?? null
-      return { ...deal, commercialStatus, hasProposal, lastActivityAt, lastProposalViewAt, ownerId }
+
+      // Apply contact override if one exists for this deal
+      const override = contactOverrideMap.get(deal.id)
+      const contact = override
+        ? {
+            ...deal.contact,
+            name: `${override.firstName} ${override.lastName}`.trim() || deal.contact.name,
+            email: override.email || deal.contact.email,
+          }
+        : deal.contact
+
+      return { ...deal, contact, commercialStatus, hasProposal, lastActivityAt, lastProposalViewAt, ownerId }
     })
     .sort((a, b) => {
       const pa = STATUS_PRIORITY[a.commercialStatus]

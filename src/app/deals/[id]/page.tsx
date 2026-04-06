@@ -102,21 +102,12 @@ export default async function DealPage({
           <h3 className="text-xs font-medium text-zinc-500 uppercase tracking-wide mb-4">
             Contacto
           </h3>
-          {deal.contact.personRecordId ? (
-            <ContactEditor
-              personRecordId={deal.contact.personRecordId}
-              dealId={deal.id}
-              name={deal.contact.name}
-              email={deal.contact.email}
-              phone={deal.contact.phone}
-            />
-          ) : (
-            <dl className="space-y-2">
-              <Row label="Nombre" value={deal.contact.name} />
-              <Row label="Email" value={deal.contact.email} />
-              {deal.contact.phone && <Row label="Teléfono" value={deal.contact.phone} mono />}
-            </dl>
-          )}
+          <ContactEditor
+            dealId={deal.id}
+            name={deal.contact.name}
+            email={deal.contact.email}
+            phone={deal.contact.phone}
+          />
         </div>
       </div>
 
