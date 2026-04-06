@@ -7,6 +7,7 @@ import { PLANS, ADDONS, HARDWARE } from '@/lib/pricing/catalog'
 import { ProposalEditor } from '@/components/propuesta/proposal-editor'
 import { CopyLinkButton } from '@/components/propuesta/copy-link-button'
 import { SendForSignatureButton } from '@/components/propuesta/send-for-signature-button'
+import { PrintButton } from '@/components/propuesta/print-button'
 import type { Deal, DealConfiguration, ProposalSections } from '@/types'
 
 // =========================================
@@ -44,6 +45,7 @@ export default async function PropuestaPage({
     <div className="min-h-screen bg-zinc-50">
       {/* Nav strip */}
       <div className="px-8 py-4 flex items-center justify-between border-b border-zinc-200 bg-white print:hidden">
+        {/* Breadcrumb */}
         <div className="flex items-center gap-2 text-sm text-zinc-400">
           <Link href="/deals" className="hover:text-zinc-700 transition-colors">Deals</Link>
           <span>/</span>
@@ -60,19 +62,18 @@ export default async function PropuestaPage({
               </span>
             </>
           )}
-        </div>
-        <div className="flex items-center gap-3">
           {cfg && (
-            <span className="text-xs text-zinc-400 hidden md:block">
+            <span className="text-[11px] text-zinc-400 hidden md:inline">
               {viewStats.count === 0
-                ? 'No abierta aún'
-                : `Vista ${viewStats.count} ${viewStats.count === 1 ? 'vez' : 'veces'} · Última: ${formatTimeAgo(viewStats.lastAt!)}`}
+                ? '· No abierta aún'
+                : `· Vista ${viewStats.count} ${viewStats.count === 1 ? 'vez' : 'veces'}`}
             </span>
           )}
-          {cfg && viewStats.count > 0 && (
-            <div className="w-px h-4 bg-zinc-200 hidden md:block" />
-          )}
-          {cfg && (
+        </div>
+
+        {/* Actions — text links only */}
+        {cfg && (
+          <div className="flex flex-col items-end gap-0.5">
             <SendForSignatureButton
               dealId={deal.id}
               configId={cfg.id}
@@ -82,28 +83,23 @@ export default async function PropuestaPage({
               signerName={deal.contact.name}
               signerEmail={deal.contact.email}
             />
-          )}
-          {cfg && (
-            <CopyLinkButton
-              path={`/deals/${deal.id}/propuesta/view`}
-              label="Reenviar propuesta"
-            />
-          )}
-          <CopyLinkButton path={`/deals/${deal.id}/propuesta/view`} />
+            <CopyLinkButton path={`/deals/${deal.id}/propuesta/view`} />
+          </div>
+        )}
+      </div>
+
+      {/* Fixed corner: Ver modo cliente + Guardar PDF */}
+      {cfg && (
+        <div className="fixed top-4 right-6 z-40 flex flex-col items-end gap-2 print:hidden">
           <Link
             href={`/deals/${deal.id}/propuesta/view`}
-            className="text-xs font-medium border border-zinc-200 text-zinc-600 px-3 py-1.5 rounded-lg hover:border-zinc-400 hover:text-zinc-900 transition-colors"
+            className="text-xs font-medium bg-white border border-zinc-200 text-zinc-600 px-3 py-1.5 rounded-lg hover:border-zinc-400 hover:text-zinc-900 transition-colors shadow-sm whitespace-nowrap"
           >
             Ver modo cliente →
           </Link>
-          <Link
-            href={`/deals/${deal.id}/configurador`}
-            className="text-xs text-zinc-400 hover:text-zinc-900 border border-zinc-200 hover:border-zinc-400 px-3 py-1.5 rounded-lg transition-colors"
-          >
-            Editar en Simulator →
-          </Link>
+          <PrintButton variant="inline" dealId={deal.id} configId={cfg.id} />
         </div>
-      </div>
+      )}
 
       {/* Content */}
       <div className="max-w-3xl mx-auto px-6 py-10">
