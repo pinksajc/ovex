@@ -352,28 +352,7 @@ function s3About(logoUri: string): string {
       </p>
     </div>
 
-    <!-- KPIs -->
-    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:22px;">
-      ${[['100+','Clientes activos'],['3','Países'],['99,9%','Uptime garantizado']].map(([v,l]) => `
-        <div style="background:#1e3a5f;border-radius:10px;padding:18px 14px;text-align:center;">
-          <div style="font-size:26px;font-weight:900;color:#fff;font-family:'Courier New',monospace;line-height:1;margin-bottom:5px;">${v}</div>
-          <div style="font-size:9px;color:rgba(255,255,255,0.65);text-transform:uppercase;letter-spacing:1px;">${l}</div>
-        </div>`).join('')}
-    </div>
-
-    <!-- Tipos de cliente -->
-    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:11px;">
-      ${[
-        ['🍽️','Restaurantes independientes','De 1 a 10 locales. Gestión centralizada sin estructura IT.'],
-        ['🏢','Grupos de restauración','Multi-local, multi-concepto. Reporting consolidado en tiempo real.'],
-        ['🌑','Dark kitchens','Operación 100% delivery. Integración nativa con todas las plataformas.'],
-      ].map(([ic,t,d]) => `
-        <div style="border:1px solid #e8eef6;border-radius:8px;padding:14px;text-align:center;">
-          <div style="font-size:22px;margin-bottom:6px;">${ic}</div>
-          <div style="font-size:10px;font-weight:700;color:#1e3a5f;margin-bottom:4px;">${t}</div>
-          <div style="font-size:9px;color:#64748b;line-height:1.55;">${d}</div>
-        </div>`).join('')}
-    </div>`
+    `
   return pg(logoUri, content)
 }
 
@@ -434,18 +413,6 @@ function s5Plans(deal: Deal, cfg: DealConfiguration, logoUri: string): string {
     return i + 1 === hiCol ? `${lbl} ✓` : lbl
   })]
 
-  const moduleRows: string[][] = [
-    ['Register POS',       chk(true),  chk(true),  chk(true)],
-    ['Analítica básica',   chk(true),  chk(true),  chk(true)],
-    ['Web Ordering',       chk(false), chk(true),  chk(true)],
-    ['Multi-local',        chk(false), chk(true),  chk(true)],
-    ['KDS',                chk(false), chk('Add-on'), chk(true)],
-    ['Kiosk',              chk(false), chk('Add-on'), chk('Add-on')],
-    ['Delivery integraciones', chk(false), chk('Add-on'), chk('Add-on')],
-    ['Analítica IA',       chk(false), chk('Add-on'), chk('Add-on')],
-    ['Account Manager',    chk(false), chk(false), chk(true)],
-  ]
-
   const activeAddons = cfg.activeAddons
 
   const content = `
@@ -453,9 +420,6 @@ function s5Plans(deal: Deal, cfg: DealConfiguration, logoUri: string): string {
 
     <div style="font-size:9px;font-weight:700;color:#1e3a5f;text-transform:uppercase;letter-spacing:1px;margin-bottom:4px;">Comparativa de planes</div>
     ${buildTable(planHeaders, planRows, { hi: hiCol })}
-
-    <div style="font-size:9px;font-weight:700;color:#1e3a5f;text-transform:uppercase;letter-spacing:1px;margin-top:20px;margin-bottom:4px;">Módulos incluidos por plan</div>
-    ${buildTable(['Módulo', 'Starter', 'Growth', 'Pro'], moduleRows, { hi: hiCol, compact: true })}
 
     ${activeAddons.length > 0 || hwItems.length > 0 ? `
     <div style="font-size:9px;font-weight:700;color:#1e3a5f;text-transform:uppercase;letter-spacing:1px;margin-top:20px;margin-bottom:8px;">Add-ons y hardware incluidos en esta propuesta</div>
