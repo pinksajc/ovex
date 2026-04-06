@@ -165,7 +165,7 @@ export async function patchAttioPerson(
       body: JSON.stringify({
         data: {
           values: {
-            name: [{ full_name: [firstName, lastName].filter(Boolean).join(' ') }],
+            name: [{ first_name: firstName, last_name: lastName }],
             email_addresses: [{ email_address: email, is_primary: true }],
           },
         },
