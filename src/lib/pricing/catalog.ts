@@ -138,6 +138,14 @@ export const HARDWARE: Record<HardwareId, HardwareConfig> = {
     unitPrice: 399,
     perLocation: true,
   },
+  tablet_lenovo_m11: {
+    id: 'tablet_lenovo_m11',
+    label: 'Tablet Lenovo M11',
+    description: 'Terminal POS táctil',
+    unitCost: 218,
+    unitPrice: 218,
+    perLocation: true,
+  },
   bouncepad_kiosk: {
     id: 'bouncepad_kiosk',
     label: 'Bouncepad Kiosk',
@@ -158,6 +166,7 @@ export const HARDWARE: Record<HardwareId, HardwareConfig> = {
 
 export const HARDWARE_ORDER: HardwareId[] = [
   'ipad',
+  'tablet_lenovo_m11',
   'bouncepad_kiosk',
   'counter_stand',
 ]

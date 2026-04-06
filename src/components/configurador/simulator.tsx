@@ -26,6 +26,7 @@ type HardwareState = Record<HardwareId, HardwareItemState>
 function initHardwareState(locations: number, saved?: HardwareLineItem[]): HardwareState {
   const defaults: HardwareState = {
     ipad: { quantity: locations, mode: 'sold', financeMonths: 12 },
+    tablet_lenovo_m11: { quantity: 0, mode: 'sold', financeMonths: 12 },
     bouncepad_kiosk: { quantity: 0, mode: 'sold', financeMonths: 12 },
     counter_stand: { quantity: locations, mode: 'sold', financeMonths: 12 },
   }
