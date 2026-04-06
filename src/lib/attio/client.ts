@@ -150,6 +150,32 @@ export async function getAttioPerson(recordId: string): Promise<AttioRecord | nu
 }
 
 /**
+ * Actualiza nombre y email de una persona en Attio.
+ */
+export async function patchAttioPerson(
+  recordId: string,
+  firstName: string,
+  lastName: string,
+  email: string
+): Promise<AttioRecord> {
+  const res = await attioFetch<AttioSingleResponse>(
+    `/objects/people/records/${recordId}`,
+    {
+      method: 'PATCH',
+      body: JSON.stringify({
+        data: {
+          values: {
+            name: [{ first_name: firstName, last_name: lastName }],
+            email_addresses: [{ email_address: email, is_primary: true }],
+          },
+        },
+      }),
+    }
+  )
+  return res.data
+}
+
+/**
  * Lista los miembros del workspace (para resolver nombres de owner).
  */
 export async function listAttioMembers(): Promise<AttioWorkspaceMember[]> {
