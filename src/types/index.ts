@@ -134,6 +134,7 @@ export interface Deal {
     name: string
     email: string
     phone?: string
+    personRecordId?: string
   }
 
   owner: string

@@ -144,6 +144,7 @@ export function mapAttioDeal(
       name: attioText(pv, SLUG.person.name) ?? 'Sin nombre',
       email,
       phone,
+      personRecordId: personRecord.id.record_id,
     }
   }
 
