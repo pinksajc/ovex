@@ -1,8 +1,11 @@
 'use server'
 
 import { redirect } from 'next/navigation'
+import { cookies } from 'next/headers'
+import { createServerClient } from '@supabase/ssr'
 import { requireAuth } from '@/lib/auth'
 import { getSupabaseClient } from '@/lib/supabase/client'
+import { getAuthEnv } from '@/lib/supabase/auth-env'
 
 export async function changePasswordAction(formData: FormData): Promise<void> {
   const user = await requireAuth()
@@ -18,13 +21,36 @@ export async function changePasswordAction(formData: FormData): Promise<void> {
     redirect('/change-password?error=' + encodeURIComponent('Las contraseñas no coinciden.'))
   }
 
-  const db = getSupabaseClient()
+  // ── Update password using the user's own session (anon key + cookies) ───────
+  // supabase.auth.updateUser() refreshes the session tokens automatically,
+  // keeping the user logged in. The admin API (updateUserById) does NOT do this.
+  const envResult = getAuthEnv()
+  if (!envResult.ok) {
+    redirect('/change-password?error=' + encodeURIComponent('Error de configuración del servidor.'))
+  }
 
-  const { error: updateError } = await db.auth.admin.updateUserById(user.id, { password })
+  const cookieStore = await cookies()
+  const supabase = createServerClient(envResult.env.url, envResult.env.anonKey, {
+    cookies: {
+      getAll() {
+        return cookieStore.getAll()
+      },
+      setAll(cookiesToSet) {
+        // In server actions cookies() is writable — this propagates the new tokens
+        cookiesToSet.forEach(({ name, value, options }) => {
+          cookieStore.set(name, value, options)
+        })
+      },
+    },
+  })
+
+  const { error: updateError } = await supabase.auth.updateUser({ password })
   if (updateError) {
     redirect('/change-password?error=' + encodeURIComponent(updateError.message))
   }
 
+  // ── Clear the must_change_password flag using service role ───────────────────
+  const db = getSupabaseClient()
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { error: profileUpdateError } = await (db.from('profiles') as any)
     .update({ must_change_password: false })
