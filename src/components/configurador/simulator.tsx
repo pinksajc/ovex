@@ -2,7 +2,7 @@
 
 import { useState, useMemo, useTransition, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { PLANS, ADDONS, ADDON_ORDER, PLAN_ORDER, HARDWARE, HARDWARE_ORDER, HARDWARE_MODE_LABELS } from '@/lib/pricing/catalog'
+import { PLANS, ADDONS, ADDON_ORDER, PLAN_ORDER, HARDWARE, HARDWARE_ORDER, HARDWARE_MODE_LABELS, RENTAL_MONTHLY_PRICE } from '@/lib/pricing/catalog'
 import { calculateEconomics, suggestPlan } from '@/lib/pricing/engine'
 import { formatCurrency, formatNumber } from '@/lib/format'
 import { saveConfigAction } from '@/app/actions/save-config'
@@ -443,7 +443,8 @@ export function Simulator({ deal, initialConfig, loadedConfigId }: SimulatorProp
             {HARDWARE_ORDER.map((id) => {
               const item = HARDWARE[id]
               const state = hardware[id]
-              const lineTotal = item.unitPrice * state.quantity
+              const unitDisplayPrice = state.mode === 'rented' ? RENTAL_MONTHLY_PRICE : item.unitPrice
+              const lineTotal = unitDisplayPrice * state.quantity
 
               return (
                 <div
@@ -458,7 +459,9 @@ export function Simulator({ deal, initialConfig, loadedConfigId }: SimulatorProp
                       <p className="text-sm font-medium text-zinc-900">{item.label}</p>
                       <p className="text-xs text-zinc-500 mt-0.5">{item.description}</p>
                       <p className="text-xs font-mono text-zinc-400 mt-0.5">
-                        {formatCurrency(item.unitPrice)}/ud.
+                        {state.mode === 'rented'
+                          ? `${formatCurrency(RENTAL_MONTHLY_PRICE)}/mes`
+                          : `${formatCurrency(item.unitPrice)}/ud.`}
                       </p>
                     </div>
 
@@ -530,18 +533,26 @@ export function Simulator({ deal, initialConfig, loadedConfigId }: SimulatorProp
                   {state.quantity > 0 && (
                     <div className="mt-3 flex items-center justify-between">
                       <span className="text-xs text-zinc-400">
-                        {state.quantity} × {formatCurrency(item.unitPrice)}
-                        {state.mode === 'included' && ' · asumido por Platomico'}
-                        {state.mode === 'sold' && ' · cliente paga upfront'}
-                        {state.mode === 'financed' && ` · ${state.financeMonths} meses`}
+                        {state.mode === 'rented'
+                          ? `${state.quantity} × ${formatCurrency(RENTAL_MONTHLY_PRICE)}/mes · alquiler`
+                          : <>
+                              {state.quantity} × {formatCurrency(item.unitPrice)}
+                              {state.mode === 'included' && ' · asumido por Platomico'}
+                              {state.mode === 'sold' && ' · cliente paga upfront'}
+                              {state.mode === 'financed' && ` · ${state.financeMonths} meses`}
+                            </>
+                        }
                       </span>
                       <span className={`text-xs font-mono font-semibold ${
                         state.mode === 'included' ? 'text-red-600' :
+                        state.mode === 'rented' ? 'text-blue-600' :
                         state.mode === 'financed' ? 'text-amber-600' :
                         'text-zinc-700'
                       }`}>
                         {state.mode === 'financed'
                           ? `${formatCurrency(lineTotal / state.financeMonths)}/mes`
+                          : state.mode === 'rented'
+                          ? `${formatCurrency(lineTotal)}/mes`
                           : formatCurrency(lineTotal)
                         }
                       </span>
@@ -553,32 +564,56 @@ export function Simulator({ deal, initialConfig, loadedConfigId }: SimulatorProp
           </div>
 
           {/* Hardware summary */}
-          {economics.hardwareCostTotal > 0 && (
-            <div className="mt-4 bg-zinc-50 rounded-lg px-4 py-3 space-y-1.5">
-              <div className="flex justify-between">
-                <span className="text-xs text-zinc-500">Inversión total hardware</span>
-                <span className="text-xs font-mono font-semibold text-zinc-800">
-                  {formatCurrency(economics.hardwareCostTotal)}
-                </span>
+          {(() => {
+            const rentedMonthly = HARDWARE_ORDER.reduce((sum, id) => {
+              const s = hardware[id]
+              return s.mode === 'rented' ? sum + RENTAL_MONTHLY_PRICE * s.quantity : sum
+            }, 0)
+            const purchasedCostTotal = HARDWARE_ORDER.reduce((sum, id) => {
+              const s = hardware[id]
+              if (s.mode === 'rented' || s.mode === 'included') return sum
+              return sum + HARDWARE[id].unitPrice * s.quantity
+            }, 0)
+            if (purchasedCostTotal === 0 && rentedMonthly === 0) return null
+            return (
+              <div className="mt-4 bg-zinc-50 rounded-lg px-4 py-3 space-y-1.5">
+                {purchasedCostTotal > 0 && (
+                  <>
+                    <div className="flex justify-between">
+                      <span className="text-xs text-zinc-500">Inversión total hardware</span>
+                      <span className="text-xs font-mono font-semibold text-zinc-800">
+                        {formatCurrency(purchasedCostTotal)}
+                      </span>
+                    </div>
+                    {locations > 1 && (
+                      <div className="flex justify-between">
+                        <span className="text-xs text-zinc-500">Coste por local</span>
+                        <span className="text-xs font-mono text-zinc-600">
+                          {formatCurrency(purchasedCostTotal / locations)}
+                        </span>
+                      </div>
+                    )}
+                    {economics.hardwareNetInvestment > 0 && economics.hardwareNetInvestment !== economics.hardwareCostTotal && (
+                      <div className="flex justify-between pt-1.5 border-t border-zinc-200">
+                        <span className="text-xs text-zinc-500">Inversión neta Platomico</span>
+                        <span className="text-xs font-mono font-semibold text-red-600">
+                          {formatCurrency(economics.hardwareNetInvestment)}
+                        </span>
+                      </div>
+                    )}
+                  </>
+                )}
+                {rentedMonthly > 0 && (
+                  <div className={`flex justify-between ${purchasedCostTotal > 0 ? 'pt-1.5 border-t border-zinc-200' : ''}`}>
+                    <span className="text-xs text-zinc-500">Alquiler mensual hardware</span>
+                    <span className="text-xs font-mono font-semibold text-blue-600">
+                      {formatCurrency(rentedMonthly)}/mes
+                    </span>
+                  </div>
+                )}
               </div>
-              {locations > 1 && (
-                <div className="flex justify-between">
-                  <span className="text-xs text-zinc-500">Coste por local</span>
-                  <span className="text-xs font-mono text-zinc-600">
-                    {formatCurrency(economics.hardwareCostTotal / locations)}
-                  </span>
-                </div>
-              )}
-              {economics.hardwareNetInvestment > 0 && economics.hardwareNetInvestment !== economics.hardwareCostTotal && (
-                <div className="flex justify-between pt-1.5 border-t border-zinc-200">
-                  <span className="text-xs text-zinc-500">Inversión neta Platomico</span>
-                  <span className="text-xs font-mono font-semibold text-red-600">
-                    {formatCurrency(economics.hardwareNetInvestment)}
-                  </span>
-                </div>
-              )}
-            </div>
-          )}
+            )
+          })()}
         </Section>
       </div>
 
@@ -590,6 +625,7 @@ export function Simulator({ deal, initialConfig, loadedConfigId }: SimulatorProp
           economics={economics}
           locations={locations}
           activeAddons={activeAddons}
+          hardware={hardware}
           hasUnsavedChanges={hasUnsavedChanges}
           saveState={isPending ? 'saving' : saveState}
           lastSavePersisted={lastSavePersisted}
@@ -613,6 +649,7 @@ function EconomicsPanel({
   economics,
   locations,
   activeAddons,
+  hardware,
   hasUnsavedChanges,
   saveState,
   lastSavePersisted,
@@ -625,6 +662,7 @@ function EconomicsPanel({
   economics: DealEconomics
   locations: number
   activeAddons: Set<AddonId>
+  hardware: HardwareState
   hasUnsavedChanges: boolean
   saveState: SaveState
   lastSavePersisted: boolean
@@ -635,7 +673,16 @@ function EconomicsPanel({
   onSaveNew: () => void
 }) {
   const hasDatafono = activeAddons.has('datafono')
-  const hasHardware = economics.hardwareCostTotal > 0
+  const rentedMonthly = HARDWARE_ORDER.reduce((sum, id) => {
+    const s = hardware[id]
+    return s.mode === 'rented' ? sum + RENTAL_MONTHLY_PRICE * s.quantity : sum
+  }, 0)
+  const purchasedCostTotal = HARDWARE_ORDER.reduce((sum, id) => {
+    const s = hardware[id]
+    if (s.mode === 'rented' || s.mode === 'included') return sum
+    return sum + HARDWARE[id].unitPrice * s.quantity
+  }, 0)
+  const hasHardware = purchasedCostTotal > 0 || rentedMonthly > 0
 
   return (
     <div className="bg-white border border-zinc-200 rounded-xl overflow-hidden">
@@ -694,22 +741,34 @@ function EconomicsPanel({
           <p className="text-xs font-medium text-zinc-500 uppercase tracking-wide mb-3">
             Inversión hardware
           </p>
-          <BreakdownRow
-            label="Coste total"
-            value={formatCurrency(economics.hardwareCostTotal)}
-          />
-          {economics.hardwareRevenueUpfront > 0 && (
-            <BreakdownRow
-              label="Pago cliente (upfront)"
-              value={formatCurrency(economics.hardwareRevenueUpfront)}
-            />
-          )}
-          {economics.hardwareNetInvestment > 0 && (
-            <div className="pt-2 border-t border-zinc-100 mt-2">
+          {purchasedCostTotal > 0 && (
+            <>
               <BreakdownRow
-                label="Inversión neta Platomico"
-                value={formatCurrency(economics.hardwareNetInvestment)}
-                highlight
+                label="Coste total (compra/financiado)"
+                value={formatCurrency(purchasedCostTotal)}
+              />
+              {economics.hardwareRevenueUpfront > 0 && (
+                <BreakdownRow
+                  label="Pago cliente (upfront)"
+                  value={formatCurrency(economics.hardwareRevenueUpfront)}
+                />
+              )}
+              {economics.hardwareNetInvestment > 0 && (
+                <div className="pt-2 border-t border-zinc-100 mt-2">
+                  <BreakdownRow
+                    label="Inversión neta Platomico"
+                    value={formatCurrency(economics.hardwareNetInvestment)}
+                    highlight
+                  />
+                </div>
+              )}
+            </>
+          )}
+          {rentedMonthly > 0 && (
+            <div className={purchasedCostTotal > 0 ? 'pt-2 border-t border-zinc-100 mt-2' : ''}>
+              <BreakdownRow
+                label="Alquiler mensual hardware"
+                value={`${formatCurrency(rentedMonthly)}/mes`}
               />
             </div>
           )}
