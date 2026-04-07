@@ -83,7 +83,10 @@ export async function proxy(request: NextRequest) {
         if (res.ok) {
           const rows = (await res.json()) as Array<{ must_change_password: boolean | null }>
           if (rows[0]?.must_change_password === true) {
-            return NextResponse.redirect(new URL('/change-password', request.url))
+            // Carry any refreshed session cookies so the browser stays logged in
+            const redirectRes = NextResponse.redirect(new URL('/change-password', request.url))
+            response.cookies.getAll().forEach((c) => redirectRes.cookies.set(c.name, c.value, c))
+            return redirectRes
           }
         }
       } catch {

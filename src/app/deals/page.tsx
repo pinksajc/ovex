@@ -20,7 +20,7 @@ export default async function DealsPage({
 
   // Middleware guarantees auth, but getCurrentUser can return null if profile
   // creation fails — default to a sales-scoped view to avoid crash.
-  const user: AuthUser = userOrNull ?? { id: '', email: '', name: null, role: 'sales' }
+  const user: AuthUser = userOrNull ?? { id: '', email: '', name: null, role: 'sales', mustChangePassword: false }
 
   // Scope: sales always see 'mine'; admins toggle mine/all (default: all)
   const isAdmin = user.role === 'admin'

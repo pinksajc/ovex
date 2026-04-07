@@ -25,15 +25,17 @@ export default async function RootLayout({
   children: React.ReactNode
 }) {
   const user = await getCurrentUser()
+  // Don't show the sidebar while the user is forced to change their password
+  const showShell = user && !user.mustChangePassword
 
   return (
     <html
       lang="es"
       className={`${geistSans.variable} ${geistMono.variable} h-full`}
     >
-      <body className={`h-full antialiased bg-zinc-50 ${user ? 'flex' : ''}`}>
-        {user && <Sidebar user={user} />}
-        <main className={user ? 'flex-1 overflow-y-auto' : 'min-h-screen'}>
+      <body className={`h-full antialiased bg-zinc-50 ${showShell ? 'flex' : ''}`}>
+        {showShell && <Sidebar user={user} />}
+        <main className={showShell ? 'flex-1 overflow-y-auto' : 'min-h-screen'}>
           {children}
         </main>
       </body>

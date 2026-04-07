@@ -15,6 +15,8 @@ export interface AuthUser {
   email: string
   name: string | null
   role: UserRole
+  /** true when the user must change their password before using the app */
+  mustChangePassword: boolean
 }
 
 /**
@@ -60,9 +62,9 @@ export async function getCurrentUser(): Promise<AuthUser | null> {
     const db = getSupabaseClient()
     let { data: profile } = await db
       .from('profiles')
-      .select('role, full_name')
+      .select('role, full_name, must_change_password')
       .eq('id', authUser.id)
-      .maybeSingle() as { data: { role: string; full_name: string | null } | null; error: unknown }
+      .maybeSingle() as { data: { role: string; full_name: string | null; must_change_password: boolean | null } | null; error: unknown }
 
     if (!profile) {
       // Auto-create profile (user created via Supabase dashboard, trigger may not exist)
@@ -73,7 +75,7 @@ export async function getCurrentUser(): Promise<AuthUser | null> {
         full_name: derivedName,
         role: autoRole,
       })
-      profile = { role: autoRole, full_name: derivedName }
+      profile = { role: autoRole, full_name: derivedName, must_change_password: null }
     }
 
     return {
@@ -82,6 +84,7 @@ export async function getCurrentUser(): Promise<AuthUser | null> {
       name: profile.full_name ?? derivedName,
       // ADMIN_EMAIL always wins over whatever is stored in the DB
       role: isAdminByEnv ? 'admin' : ((profile.role as UserRole) ?? 'sales'),
+      mustChangePassword: profile.must_change_password === true,
     }
   } catch {
     // profiles table not migrated yet or other DB error — return user with defaults
@@ -91,6 +94,7 @@ export async function getCurrentUser(): Promise<AuthUser | null> {
       email,
       name: derivedName,
       role: isAdminByEnv ? 'admin' : 'sales',
+      mustChangePassword: false,
     }
   }
 }
@@ -119,6 +123,7 @@ export async function getWorkspaceMembers(): Promise<AuthUser[]> {
       email: '',
       name: r.full_name,
       role: r.role as UserRole,
+      mustChangePassword: false,
     }))
   } catch {
     return []
