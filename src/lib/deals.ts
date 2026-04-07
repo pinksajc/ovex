@@ -277,11 +277,11 @@ async function getDealsFromSupabase(): Promise<Deal[]> {
 
   // Fetch profiles once for owner name resolution
   const db = getSupabaseClient()
-  type ProfileRow = { id: string; name: string | null; email: string }
+  type ProfileRow = { id: string; full_name: string | null }
   const { data: profiles } = await db
     .from('profiles')
-    .select('id, name, email') as { data: ProfileRow[] | null; error: unknown }
-  const profileMap = new Map((profiles ?? []).map((p) => [p.id, p.name ?? p.email]))
+    .select('id, full_name') as { data: ProfileRow[] | null; error: unknown }
+  const profileMap = new Map((profiles ?? []).map((p) => [p.id, p.full_name ?? 'Sin asignar']))
 
   const deals = await Promise.all(
     baseDeals.map(async (deal) => {
@@ -320,13 +320,13 @@ async function getDealFromSupabase(id: string): Promise<Deal | undefined> {
   let ownerName = 'Sin asignar'
   if (deal.ownerId) {
     const db = getSupabaseClient()
-    type ProfileRow = { name: string | null; email: string }
+    type ProfileRow = { full_name: string | null }
     const { data: profile } = await db
       .from('profiles')
-      .select('name, email')
+      .select('full_name')
       .eq('id', deal.ownerId)
       .maybeSingle() as { data: ProfileRow | null; error: unknown }
-    if (profile) ownerName = profile.name ?? profile.email
+    if (profile) ownerName = profile.full_name ?? 'Sin asignar'
   }
 
   return {

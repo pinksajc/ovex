@@ -39,7 +39,7 @@ export async function createUserAction(formData: FormData): Promise<void> {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { error: profileError } = await (db.from('profiles') as any).upsert({
       id: data.user.id,
-      name: name || email.split('@')[0],
+      full_name: name || email.split('@')[0],
       role,
     })
 
