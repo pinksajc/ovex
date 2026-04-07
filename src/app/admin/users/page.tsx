@@ -28,7 +28,7 @@ export default async function AdminUsersPage({
       )}
       {success && (
         <div className="mb-6 bg-emerald-50 border border-emerald-200 text-emerald-700 text-sm px-4 py-3 rounded-lg">
-          Usuario creado correctamente.
+          Invitación enviada. El usuario recibirá un email para configurar su contraseña.
         </div>
       )}
 
@@ -46,8 +46,7 @@ export default async function AdminUsersPage({
             {members.map((m) => (
               <li key={m.id} className="flex items-center justify-between px-5 py-3">
                 <div>
-                  <p className="text-sm font-medium text-zinc-900">{m.name ?? m.email.split('@')[0]}</p>
-                  <p className="text-xs text-zinc-400">{m.email}</p>
+                  <p className="text-sm font-medium text-zinc-900">{m.name || 'Sin nombre'}</p>
                 </div>
                 <span
                   className={`text-[10px] font-semibold uppercase tracking-widest px-2 py-0.5 rounded-full ${
@@ -64,11 +63,14 @@ export default async function AdminUsersPage({
         )}
       </div>
 
-      {/* Create user form */}
+      {/* Invite user form */}
       <div className="bg-white border border-zinc-200 rounded-xl p-6">
-        <h2 className="text-xs font-semibold text-zinc-500 uppercase tracking-widest mb-5">
-          Crear nuevo usuario
+        <h2 className="text-xs font-semibold text-zinc-500 uppercase tracking-widest mb-1">
+          Invitar usuario
         </h2>
+        <p className="text-xs text-zinc-400 mb-5">
+          Se enviará un email con un enlace para que el usuario cree su propia contraseña.
+        </p>
 
         <form action={createUserAction} className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
@@ -100,19 +102,6 @@ export default async function AdminUsersPage({
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-zinc-700 mb-1.5">
-                Contraseña <span className="text-red-500">*</span>
-              </label>
-              <input
-                type="password"
-                name="password"
-                required
-                minLength={8}
-                placeholder="Mín. 8 caracteres"
-                className="w-full text-sm border border-zinc-300 rounded-lg px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-zinc-400 focus:border-transparent transition"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-zinc-700 mb-1.5">
                 Rol
               </label>
               <select
@@ -131,7 +120,7 @@ export default async function AdminUsersPage({
               type="submit"
               className="bg-zinc-900 text-white text-sm font-medium px-6 py-2.5 rounded-lg hover:bg-zinc-700 transition-colors"
             >
-              Crear usuario →
+              Enviar invitación →
             </button>
           </div>
         </form>

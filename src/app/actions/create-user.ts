@@ -6,49 +6,37 @@ import { getSupabaseClient } from '@/lib/supabase/client'
 
 export async function createUserAction(formData: FormData): Promise<void> {
   const me = await requireAuth()
-  if (me.role !== 'admin') {
-    redirect('/deals')
+  if (me.role !== 'admin') redirect('/deals')
+
+  const name  = (formData.get('name')  as string | null)?.trim() ?? ''
+  const email = (formData.get('email') as string | null)?.trim() ?? ''
+  const role  = (formData.get('role')  as string | null) === 'admin' ? 'admin' : 'sales'
+
+  if (!email) {
+    redirect('/admin/users?error=' + encodeURIComponent('El email es obligatorio.'))
   }
 
-  const name    = (formData.get('name')     as string | null)?.trim() ?? ''
-  const email   = (formData.get('email')    as string | null)?.trim() ?? ''
-  const password = (formData.get('password') as string | null)?.trim() ?? ''
-  const role    = (formData.get('role')     as string | null) === 'admin' ? 'admin' : 'sales'
+  const db = getSupabaseClient()
 
-  if (!email || !password) {
-    redirect('/admin/users?error=' + encodeURIComponent('Email y contraseña son obligatorios.'))
+  // Invite user — Supabase sends an email with a magic link so the user sets their own password
+  const { data, error: inviteError } = await db.auth.admin.inviteUserByEmail(email, {
+    data: { full_name: name || email.split('@')[0] },
+  })
+
+  if (inviteError || !data.user) {
+    redirect('/admin/users?error=' + encodeURIComponent(inviteError?.message ?? 'Error enviando invitación'))
   }
 
-  try {
-    const db = getSupabaseClient()
+  // Upsert profile with the assigned role
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { error: profileError } = await (db.from('profiles') as any).upsert({
+    id: data.user.id,
+    full_name: name || email.split('@')[0],
+    role,
+  })
 
-    // Create auth user via admin API
-    const { data, error: authError } = await db.auth.admin.createUser({
-      email,
-      password,
-      email_confirm: true,
-      user_metadata: { name },
-    })
-
-    if (authError || !data.user) {
-      const msg = authError?.message ?? 'Error creando usuario en Auth'
-      redirect('/admin/users?error=' + encodeURIComponent(msg))
-    }
-
-    // Upsert profile
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { error: profileError } = await (db.from('profiles') as any).upsert({
-      id: data.user.id,
-      full_name: name || email.split('@')[0],
-      role,
-    })
-
-    if (profileError) {
-      redirect('/admin/users?error=' + encodeURIComponent(profileError.message))
-    }
-  } catch (err) {
-    const msg = err instanceof Error ? err.message : 'Error inesperado'
-    redirect('/admin/users?error=' + encodeURIComponent(msg))
+  if (profileError) {
+    redirect('/admin/users?error=' + encodeURIComponent(profileError.message))
   }
 
   redirect('/admin/users?success=1')
