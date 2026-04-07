@@ -12,6 +12,7 @@ const STAGE_LABELS: Record<DealStage, string> = {
   negotiation: 'Negociación',
   closed_won: 'Cerrado ganado',
   closed_lost: 'Cerrado perdido',
+  rejected: 'Rechazado',
 }
 
 const STAGE_COLORS: Record<DealStage, string> = {
@@ -21,6 +22,7 @@ const STAGE_COLORS: Record<DealStage, string> = {
   negotiation: 'bg-amber-50 text-amber-700',
   closed_won: 'bg-emerald-50 text-emerald-700',
   closed_lost: 'bg-red-50 text-red-600',
+  rejected: 'bg-red-100 text-red-700',
 }
 
 export default async function DealPage({

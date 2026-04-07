@@ -40,7 +40,8 @@ interface DocuSealSubmitter {
   name: string
   slug: string
   embed_src: string
-  status: 'awaiting' | 'completed'
+  status: 'awaiting' | 'completed' | 'declined'
+  decline_message?: string | null
   metadata?: Record<string, string>
 }
 
@@ -202,7 +203,8 @@ export interface DocuSealWebhookPayload {
   timestamp: string
   data: {
     id: number
-    status: 'completed' | 'pending' | 'expired'
+    status: 'completed' | 'pending' | 'expired' | 'declined'
     submitters: DocuSealSubmitter[]
+    decline_message?: string | null
   }
 }

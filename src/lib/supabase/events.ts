@@ -123,6 +123,7 @@ export type DealEventType =
   | 'proposal_saved'
   | 'proposal_sent_for_signature'
   | 'proposal_signed'
+  | 'proposal_declined'
 
 /**
  * Logs a deal event to Supabase.

@@ -13,6 +13,7 @@ export function SendForSignatureButton({
   signedAt,
   signerName,
   signerEmail,
+  declineReason,
 }: {
   dealId: string
   configId: string
@@ -21,6 +22,7 @@ export function SendForSignatureButton({
   signedAt: string | null
   signerName: string
   signerEmail: string
+  declineReason?: string | null
 }) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
@@ -64,10 +66,38 @@ export function SendForSignatureButton({
     )
   }
 
+  // ── Declined ──
+  if (docusealStatus === 'declined') {
+    return (
+      <div className="flex flex-col items-end gap-1">
+        <span className="inline-flex items-center gap-1.5 text-xs font-medium text-red-600">
+          <svg className="w-3 h-3 shrink-0" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="2.5">
+            <path d="M2 2l8 8M10 2l-8 8" strokeLinecap="round" />
+          </svg>
+          Rechazada
+        </span>
+        {declineReason && (
+          <span className="text-[10px] text-red-400 max-w-[220px] text-right leading-tight">
+            {declineReason}
+          </span>
+        )}
+        <button
+          disabled={isPending}
+          onClick={send}
+          className="text-[10px] text-zinc-500 hover:text-zinc-800 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed transition-colors underline underline-offset-2 leading-tight"
+        >
+          {isPending ? 'Enviando…' : 'Reenviar propuesta'}
+        </button>
+        {error && (
+          <span className="text-[10px] text-red-500 max-w-[220px] text-right leading-tight">{error}</span>
+        )}
+      </div>
+    )
+  }
+
   // ── Text send / re-send button ──
   const isResend =
     (sentAt && !docusealStatus) ||
-    docusealStatus === 'declined' ||
     docusealStatus === 'expired'
 
   const label = isPending

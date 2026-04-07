@@ -84,6 +84,7 @@ export default async function PropuestaPage({
               signedAt={saved?.signedAt ?? null}
               signerName={deal.contact.name}
               signerEmail={deal.contact.email}
+              declineReason={saved?.declineReason ?? null}
             />
             {/* Bordered */}
             <Link

@@ -156,6 +156,7 @@ export async function saveProposal(
         docusealSubmissionId: null,
         docusealStatus: null,
         signedAt: null,
+        declineReason: null,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       },

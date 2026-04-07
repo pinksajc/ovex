@@ -110,6 +110,7 @@ export type DealStage =
   | 'negotiation'
   | 'closed_won'
   | 'closed_lost'
+  | 'rejected'
 
 export type DealCommercialStatus =
   | 'no_config'
@@ -198,6 +199,7 @@ export interface ProposalRecord {
   docusealSubmissionId: string | null
   docusealStatus: DocuSealStatus
   signedAt: string | null
+  declineReason: string | null
   createdAt: string
   updatedAt: string
 }
@@ -210,4 +212,5 @@ export interface ProposalSummary {
   sentForSignatureAt: string | null
   docusealStatus: DocuSealStatus
   signedAt: string | null
+  declineReason: string | null
 }
