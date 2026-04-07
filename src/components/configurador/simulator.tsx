@@ -534,7 +534,7 @@ export function Simulator({ deal, initialConfig, loadedConfigId }: SimulatorProp
                     <div className="mt-3 flex items-center justify-between">
                       <span className="text-xs text-zinc-400">
                         {state.mode === 'rented'
-                          ? `${state.quantity} × ${formatCurrency(RENTAL_MONTHLY_PRICE)}/mes · alquiler`
+                          ? `${state.quantity} × ${formatCurrency(RENTAL_MONTHLY_PRICE)}/mes · mensualidad`
                           : <>
                               {state.quantity} × {formatCurrency(item.unitPrice)}
                               {state.mode === 'included' && ' · asumido por Platomico'}
@@ -605,7 +605,7 @@ export function Simulator({ deal, initialConfig, loadedConfigId }: SimulatorProp
                 )}
                 {rentedMonthly > 0 && (
                   <div className={`flex justify-between ${purchasedCostTotal > 0 ? 'pt-1.5 border-t border-zinc-200' : ''}`}>
-                    <span className="text-xs text-zinc-500">Alquiler mensual hardware</span>
+                    <span className="text-xs text-zinc-500">Mensualidad de hardware</span>
                     <span className="text-xs font-mono font-semibold text-blue-600">
                       {formatCurrency(rentedMonthly)}/mes
                     </span>
@@ -767,7 +767,7 @@ function EconomicsPanel({
           {rentedMonthly > 0 && (
             <div className={purchasedCostTotal > 0 ? 'pt-2 border-t border-zinc-100 mt-2' : ''}>
               <BreakdownRow
-                label="Alquiler mensual hardware"
+                label="Mensualidad de hardware"
                 value={`${formatCurrency(rentedMonthly)}/mes`}
               />
             </div>
