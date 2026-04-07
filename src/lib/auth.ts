@@ -105,7 +105,7 @@ export async function requireAuth(): Promise<AuthUser> {
 }
 
 /**
- * Fetch all workspace members (for admin assign UI).
+ * Fetch all workspace members (for owner-assign UI — lightweight, no auth.admin).
  */
 export async function getWorkspaceMembers(): Promise<AuthUser[]> {
   try {
@@ -120,6 +120,55 @@ export async function getWorkspaceMembers(): Promise<AuthUser[]> {
       name: r.full_name,
       role: r.role as UserRole,
     }))
+  } catch {
+    return []
+  }
+}
+
+export interface WorkspaceMember {
+  id: string
+  email: string
+  name: string | null
+  role: UserRole
+  /** true if the user has completed their first sign-in */
+  hasLoggedIn: boolean
+}
+
+/**
+ * Fetch all workspace members with email + login status (uses auth.admin API).
+ * Admin-only.
+ */
+export async function getWorkspaceMembersAdmin(): Promise<WorkspaceMember[]> {
+  try {
+    const db = getSupabaseClient()
+
+    const [{ data: authData }, profilesRes] = await Promise.all([
+      db.auth.admin.listUsers({ perPage: 1000 }),
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (db.from('profiles').select('id, full_name, role') as any) as Promise<{
+        data: Array<{ id: string; full_name: string | null; role: string }> | null
+        error: unknown
+      }>,
+    ])
+
+    const authMap = new Map(
+      (authData?.users ?? []).map((u) => ({
+        id: u.id,
+        email: u.email ?? '',
+        lastSignIn: u.last_sign_in_at ?? null,
+      })).map((u) => [u.id, u])
+    )
+
+    return (profilesRes.data ?? []).map((p) => {
+      const auth = authMap.get(p.id)
+      return {
+        id: p.id,
+        email: auth?.email ?? '',
+        name: p.full_name,
+        role: p.role as UserRole,
+        hasLoggedIn: !!auth?.lastSignIn,
+      }
+    })
   } catch {
     return []
   }
