@@ -47,6 +47,15 @@ export async function getCurrentUser(): Promise<AuthUser | null> {
   const email = authUser.email ?? ''
   const derivedName = (authUser.user_metadata?.name as string | undefined) ?? email.split('@')[0]
 
+  // ADMIN_EMAIL env var: comma-separated list of emails that are always admin.
+  // Useful to bootstrap the first admin without touching the DB directly.
+  // Example: ADMIN_EMAIL=antonio@platomico.com
+  const adminEmails = (process.env.ADMIN_EMAIL ?? '')
+    .split(',')
+    .map((s) => s.trim().toLowerCase())
+    .filter(Boolean)
+  const isAdminByEnv = adminEmails.length > 0 && adminEmails.includes(email.toLowerCase())
+
   try {
     const db = getSupabaseClient()
     let { data: profile } = await db
@@ -57,20 +66,22 @@ export async function getCurrentUser(): Promise<AuthUser | null> {
 
     if (!profile) {
       // Auto-create profile (user created via Supabase dashboard, trigger may not exist)
+      const autoRole = isAdminByEnv ? 'admin' : 'sales'
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       await (db.from('profiles') as any).upsert({
         id: authUser.id,
         name: derivedName,
-        role: 'sales',
+        role: autoRole,
       })
-      profile = { role: 'sales', name: derivedName }
+      profile = { role: autoRole, name: derivedName }
     }
 
     return {
       id: authUser.id,
       email,
       name: profile.name ?? derivedName,
-      role: (profile.role as UserRole) ?? 'sales',
+      // ADMIN_EMAIL always wins over whatever is stored in the DB
+      role: isAdminByEnv ? 'admin' : ((profile.role as UserRole) ?? 'sales'),
     }
   } catch {
     // profiles table not migrated yet or other DB error — return user with defaults
@@ -79,7 +90,7 @@ export async function getCurrentUser(): Promise<AuthUser | null> {
       id: authUser.id,
       email,
       name: derivedName,
-      role: 'sales',
+      role: isAdminByEnv ? 'admin' : 'sales',
     }
   }
 }
