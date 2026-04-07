@@ -53,7 +53,13 @@ export async function reinviteUserAction(
   try {
     await assertAdmin()
     const db = getSupabaseClient()
-    const { error } = await db.auth.admin.inviteUserByEmail(email)
+    // generateLink({ type: 'invite' }) works for already-registered users
+    // (unlike inviteUserByEmail which fails if the user exists).
+    // GoTrue sends the invite email automatically and regenerates the token.
+    const { error } = await db.auth.admin.generateLink({
+      type: 'invite',
+      email,
+    })
     if (error) return { ok: false, error: error.message }
     return { ok: true }
   } catch (err) {
