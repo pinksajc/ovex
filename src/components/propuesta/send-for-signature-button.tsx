@@ -27,13 +27,19 @@ export function SendForSignatureButton({
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
   const [error, setError] = useState<string | null>(null)
+  // Optimistic local status — overrides prop immediately after a successful send
+  const [localStatus, setLocalStatus] = useState<DocuSealStatus>(null)
+
+  // Effective status: local optimistic state wins over server prop
+  const effectiveStatus = localStatus ?? docusealStatus
 
   function send() {
     setError(null)
     startTransition(async () => {
       const result = await markSentForSignatureAction(dealId, configId, signerName, signerEmail)
       if (result.ok) {
-        router.refresh()
+        setLocalStatus('pending') // show pending immediately
+        router.refresh()          // sync server state in background
       } else {
         setError(result.error ?? 'Error desconocido')
       }
@@ -41,7 +47,7 @@ export function SendForSignatureButton({
   }
 
   // ── Signed ──
-  if (docusealStatus === 'completed' || signedAt) {
+  if (effectiveStatus === 'completed' || signedAt) {
     const date = new Date(signedAt ?? sentAt ?? '').toLocaleDateString('es-ES', {
       day: 'numeric',
       month: 'short',
@@ -57,7 +63,7 @@ export function SendForSignatureButton({
   }
 
   // ── Pending DocuSeal signature ──
-  if (docusealStatus === 'pending') {
+  if (effectiveStatus === 'pending') {
     return (
       <span className="inline-flex items-center gap-1.5 text-xs text-amber-600">
         <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse shrink-0" />
@@ -67,7 +73,7 @@ export function SendForSignatureButton({
   }
 
   // ── Declined ──
-  if (docusealStatus === 'declined') {
+  if (effectiveStatus === 'declined') {
     return (
       <div className="flex flex-col items-end gap-1">
         <span className="inline-flex items-center gap-1.5 text-xs font-medium text-red-600">
@@ -97,8 +103,8 @@ export function SendForSignatureButton({
 
   // ── Text send / re-send button ──
   const isResend =
-    (sentAt && !docusealStatus) ||
-    docusealStatus === 'expired'
+    (sentAt && !effectiveStatus) ||
+    effectiveStatus === 'expired'
 
   const label = isPending
     ? 'Enviando…'
