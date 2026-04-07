@@ -3,6 +3,7 @@ import { notFound } from 'next/navigation'
 import { getDeal, getActiveConfig } from '@/lib/deals'
 import { formatCurrency } from '@/lib/format'
 import { ContactEditor } from '@/components/contact-editor'
+import { CompanyEditor } from '@/components/company-editor'
 import type { DealStage } from '@/types'
 
 const STAGE_LABELS: Record<DealStage, string> = {
@@ -91,12 +92,12 @@ export default async function DealPage({
           <h3 className="text-xs font-medium text-zinc-500 uppercase tracking-wide mb-4">
             Empresa
           </h3>
-          <dl className="space-y-2">
-            <Row label="Nombre" value={deal.company.name} />
-            {deal.company.cif && <Row label="CIF" value={deal.company.cif} mono />}
-            {deal.company.address && <Row label="Dirección" value={deal.company.address} />}
-            {deal.company.city && <Row label="Ciudad" value={deal.company.city} />}
-          </dl>
+          <CompanyEditor
+            dealId={deal.id}
+            name={deal.company.name}
+            cif={deal.company.cif}
+            address={deal.company.address}
+          />
         </div>
 
         {/* Contacto */}

@@ -446,7 +446,9 @@ function s5Plans(deal: Deal, cfg: DealConfiguration, logoUri: string): string {
       ${hwItems.map(item => {
         const hw = HARDWARE[item.hardwareId]
         const lineTotal = item.unitPrice * item.quantity
-        const importe = item.mode === 'financed' && item.financeMonths
+        const importe = item.mode === 'rented'
+          ? `${fmt(19 * item.quantity)}/mes`
+          : item.mode === 'financed' && item.financeMonths
           ? `${fmt(lineTotal / item.financeMonths)}/mes`
           : item.mode === 'included' ? 'Incluido' : fmt(lineTotal)
         return `<div style="display:flex;justify-content:space-between;align-items:center;padding:7px 11px;background:#f8fafc;border:1px solid #e8eef6;border-radius:6px;">

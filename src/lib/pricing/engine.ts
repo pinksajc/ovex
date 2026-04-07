@@ -3,7 +3,7 @@
 // Funciones puras — sin side effects, sin UI
 // =========================================
 
-import { PLANS, ADDONS } from './catalog'
+import { PLANS, ADDONS, RENTAL_MONTHLY_PRICE } from './catalog'
 import type { PlanTier, AddonId, HardwareLineItem, DealEconomics } from '@/types'
 
 // ---- PLAN SUGGESTION ----
@@ -72,6 +72,7 @@ export function calculateEconomics(input: CalculateInput): DealEconomics {
   // sold     → client pays unitPrice upfront. Platomico: no ongoing revenue, net cost = 0 (sold at cost)
   // financed → client pays unitPrice / financeMonths monthly. Platomico pays upfront.
   // included → Platomico bears full unitCost. No client payment.
+  // rented   → client pays RENTAL_MONTHLY_PRICE €/unit/month. Platomico bears upfront cost.
 
   let hardwareCostTotal = 0
   let hardwareRevenueUpfront = 0
@@ -96,6 +97,11 @@ export function calculateEconomics(input: CalculateInput): DealEconomics {
       }
       case 'included':
         hardwareIncludedCost += itemCost
+        break
+      case 'rented':
+        // Fixed RENTAL_MONTHLY_PRICE per unit regardless of catalog price
+        hardwareRevenueMonthly += RENTAL_MONTHLY_PRICE * item.quantity
+        hardwareFinancedCost += itemCost  // Platomico bears upfront hardware cost
         break
     }
   }
