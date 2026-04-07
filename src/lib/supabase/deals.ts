@@ -116,6 +116,13 @@ export async function updateDealStage(id: string, stage: DealStage): Promise<voi
   if (error) throw new Error(`Supabase updateDealStage: ${error.message}`)
 }
 
+export async function updateDealOwner(id: string, ownerId: string | null): Promise<void> {
+  const { error } = await table()
+    .update({ owner_id: ownerId, updated_at: new Date().toISOString() })
+    .eq('id', id)
+  if (error) throw new Error(`Supabase updateDealOwner: ${error.message}`)
+}
+
 export async function updateDealCompany(id: string, input: UpdateCompanyInput): Promise<void> {
   const patch: Record<string, string | null> = {
     updated_at: new Date().toISOString(),

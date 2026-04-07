@@ -10,6 +10,10 @@ const NAV = [
   { href: '/pipeline', label: 'Pipeline', icon: IconPipeline },
 ]
 
+const ADMIN_NAV = [
+  { href: '/admin/users', label: 'Usuarios', icon: IconUsers },
+]
+
 export function Sidebar({ user }: { user: AuthUser }) {
   const pathname = usePathname()
   const router = useRouter()
@@ -53,6 +57,34 @@ export function Sidebar({ user }: { user: AuthUser }) {
             </Link>
           )
         })}
+
+        {/* Admin-only section */}
+        {user.role === 'admin' && (
+          <>
+            <div className="pt-3 pb-1 px-3">
+              <span className="text-[9px] font-semibold uppercase tracking-widest text-zinc-600">
+                Admin
+              </span>
+            </div>
+            {ADMIN_NAV.map(({ href, label, icon: Icon }) => {
+              const active = pathname.startsWith(href)
+              return (
+                <Link
+                  key={href}
+                  href={href}
+                  className={`flex items-center gap-2.5 px-3 py-2 rounded-md text-sm transition-colors ${
+                    active
+                      ? 'bg-zinc-800 text-white'
+                      : 'text-zinc-400 hover:bg-zinc-800/60 hover:text-zinc-100'
+                  }`}
+                >
+                  <Icon className="w-4 h-4 shrink-0" />
+                  {label}
+                </Link>
+              )
+            })}
+          </>
+        )}
       </nav>
 
       {/* User profile + logout */}
@@ -118,6 +150,23 @@ function IconPipeline({ className }: { className?: string }) {
       <path d="M2 12h12" />
       <path d="M6 12v2" />
       <path d="M10 12v2" />
+    </svg>
+  )
+}
+
+function IconUsers({ className }: { className?: string }) {
+  return (
+    <svg
+      className={className}
+      viewBox="0 0 16 16"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.5"
+    >
+      <circle cx="6" cy="5" r="2.5" />
+      <path d="M1 13c0-2.76 2.24-5 5-5" />
+      <circle cx="12" cy="5" r="2" />
+      <path d="M10.5 8.5c.5-.1 1-.15 1.5-.15 1.93 0 3.5 1.57 3.5 3.5" />
     </svg>
   )
 }
