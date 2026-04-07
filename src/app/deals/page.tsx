@@ -28,10 +28,10 @@ export default async function DealsPage({
     ? (scope === 'mine' ? 'mine' : 'all')
     : 'mine'
 
-  const deals = effectiveScope === 'mine'
-    // 'mine': show deals owned by user + unowned deals (not yet assigned)
-    ? allDeals.filter((d) => !d.ownerId || d.ownerId === user.id)
-    : allDeals
+  const deals = effectiveScope === 'all'
+    ? allDeals
+    // sales (or admin viewing 'mine'): own deals + unassigned deals
+    : allDeals.filter((d) => d.ownerId === null || d.ownerId === user.id)
 
   // Load members only for admins (for reassign UI)
   const members = isAdmin ? await getWorkspaceMembers() : []
