@@ -454,7 +454,7 @@ function s5Plans(deal: Deal, cfg: DealConfiguration, logoUri: string): string {
         return `<div style="display:flex;justify-content:space-between;align-items:center;padding:7px 11px;background:#f8fafc;border:1px solid #e8eef6;border-radius:6px;">
           <div>
             <span style="font-size:10px;font-weight:600;color:#0f172a;">${hw.label}</span>
-            <span style="font-size:9px;color:#94a3b8;margin-left:7px;">${item.quantity} ud. · ${HARDWARE_MODE_LABELS[item.mode]}</span>
+            <span style="font-size:9px;color:#94a3b8;margin-left:7px;">${item.quantity} ud. · ${item.mode === 'rented' ? 'Mensualidad' : HARDWARE_MODE_LABELS[item.mode]}</span>
           </div>
           <span style="font-size:10px;font-weight:700;color:#1e3a5f;font-family:'Courier New',monospace;">${importe}</span>
         </div>`
