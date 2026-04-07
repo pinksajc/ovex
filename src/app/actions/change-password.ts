@@ -26,9 +26,13 @@ export async function changePasswordAction(formData: FormData): Promise<void> {
   }
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  await (db.from('profiles') as any)
+  const { error: profileUpdateError } = await (db.from('profiles') as any)
     .update({ must_change_password: false })
     .eq('id', user.id)
+
+  if (profileUpdateError) {
+    redirect('/change-password?error=' + encodeURIComponent('Error al actualizar el perfil: ' + profileUpdateError.message))
+  }
 
   redirect('/deals')
 }

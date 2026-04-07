@@ -238,8 +238,10 @@ async function enrichWithCommercialStatus(deals: Deal[]): Promise<Deal[]> {
         commercialStatus = 'proposal_created'
       }
 
-      // deal_owners overrides deals.owner_id for admin reassignments
-      const ownerId = ownerMap.get(deal.id) ?? deal.ownerId ?? null
+      // deals.owner_id is the primary source (set via OwnerSelector / createDeal).
+      // deal_owners is the legacy Attio-era table — only use it as fallback when
+      // deals.owner_id is null (i.e. pre-migration rows that haven't been reassigned yet).
+      const ownerId = deal.ownerId ?? ownerMap.get(deal.id) ?? null
 
       // Apply contact override if present
       const override = contactOverrideMap.get(deal.id)

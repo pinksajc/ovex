@@ -69,8 +69,9 @@ export async function proxy(request: NextRequest) {
     const serviceKey = process.env.SUPABASE_SERVICE_KEY
     if (serviceKey) {
       try {
+        const supabaseUrl = process.env.SUPABASE_URL ?? envResult.env.url
         const res = await fetch(
-          `${envResult.env.url}/rest/v1/profiles?id=eq.${user.id}&select=must_change_password`,
+          `${supabaseUrl}/rest/v1/profiles?id=eq.${user.id}&select=must_change_password`,
           {
             headers: {
               apikey: serviceKey,
