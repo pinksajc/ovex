@@ -33,6 +33,12 @@ export async function markSentForSignatureAction(
 ): Promise<SendForSignatureResult> {
   const tag = `[mark-sent deal=${dealId} cfg=${configId}]`
 
+  // ── Temporary env debug log ───────────────────────────────────────────────
+  const keyPreview = process.env.DOCUSEAL_API_KEY
+    ? `${process.env.DOCUSEAL_API_KEY.slice(0, 10)}…`
+    : '(not set)'
+  console.log(`${tag} env: DOCUSEAL_API_KEY=${keyPreview} DOCUSEAL_API_URL=${process.env.DOCUSEAL_API_URL ?? '(not set)'}`)
+
   // ── Input validation ──────────────────────────────────────────────────────
   if (!dealId || !configId) {
     return { ok: false, error: 'Faltan parámetros obligatorios (dealId, configId)' }
