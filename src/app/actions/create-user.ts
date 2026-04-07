@@ -75,6 +75,7 @@ export async function createUserManualAction(formData: FormData): Promise<void> 
     id: data.user.id,
     full_name: name || email.split('@')[0],
     role,
+    must_change_password: true,
   })
 
   if (profileError) {

@@ -64,6 +64,34 @@ export async function proxy(request: NextRequest) {
     return NextResponse.redirect(loginUrl)
   }
 
+  // ── must_change_password — force new users to set their own password ────────
+  if (pathname !== '/change-password') {
+    const serviceKey = process.env.SUPABASE_SERVICE_KEY
+    if (serviceKey) {
+      try {
+        const supabaseUrl = process.env.SUPABASE_URL ?? envResult.env.url
+        const res = await fetch(
+          `${supabaseUrl}/rest/v1/profiles?id=eq.${user.id}&select=must_change_password`,
+          {
+            headers: {
+              apikey: serviceKey,
+              Authorization: `Bearer ${serviceKey}`,
+            },
+            cache: 'no-store',
+          }
+        )
+        if (res.ok) {
+          const rows = (await res.json()) as Array<{ must_change_password: boolean | null }>
+          if (rows[0]?.must_change_password === true) {
+            return NextResponse.redirect(new URL('/change-password', request.url))
+          }
+        }
+      } catch {
+        // Profile fetch failed — allow through, don't block the user
+      }
+    }
+  }
+
   return response
 }
 
