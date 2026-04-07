@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation'
-import { getCurrentUser, getWorkspaceMembers } from '@/lib/auth'
+import { getCurrentUser, getWorkspaceMembersAdmin } from '@/lib/auth'
 import { createUserAction } from '@/app/actions/create-user'
+import { UserList } from '@/components/admin/user-list'
 
 export default async function AdminUsersPage({
   searchParams,
@@ -12,7 +13,7 @@ export default async function AdminUsersPage({
   if (user.role !== 'admin') redirect('/deals')
 
   const { error, success } = await searchParams
-  const members = await getWorkspaceMembers()
+  const members = await getWorkspaceMembersAdmin()
 
   return (
     <div className="p-8 max-w-4xl mx-auto">
@@ -42,24 +43,7 @@ export default async function AdminUsersPage({
         {members.length === 0 ? (
           <p className="px-5 py-6 text-sm text-zinc-400">No hay usuarios registrados.</p>
         ) : (
-          <ul className="divide-y divide-zinc-100">
-            {members.map((m) => (
-              <li key={m.id} className="flex items-center justify-between px-5 py-3">
-                <div>
-                  <p className="text-sm font-medium text-zinc-900">{m.name || 'Sin nombre'}</p>
-                </div>
-                <span
-                  className={`text-[10px] font-semibold uppercase tracking-widest px-2 py-0.5 rounded-full ${
-                    m.role === 'admin'
-                      ? 'bg-violet-50 text-violet-700'
-                      : 'bg-zinc-100 text-zinc-500'
-                  }`}
-                >
-                  {m.role}
-                </span>
-              </li>
-            ))}
-          </ul>
+          <UserList members={members} currentUserId={user.id} />
         )}
       </div>
 
