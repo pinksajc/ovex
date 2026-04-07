@@ -60,7 +60,6 @@ export async function getCurrentUser(): Promise<AuthUser | null> {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       await (db.from('profiles') as any).upsert({
         id: authUser.id,
-        email,
         name: derivedName,
         role: 'sales',
       })
@@ -102,11 +101,11 @@ export async function getWorkspaceMembers(): Promise<AuthUser[]> {
     const db = getSupabaseClient()
     const { data } = await db
       .from('profiles')
-      .select('id, email, name, role')
-      .order('name') as { data: Array<{ id: string; email: string; name: string | null; role: string }> | null; error: unknown }
+      .select('id, name, role')
+      .order('name') as { data: Array<{ id: string; name: string | null; role: string }> | null; error: unknown }
     return (data ?? []).map((r) => ({
       id: r.id,
-      email: r.email,
+      email: '',
       name: r.name,
       role: r.role as UserRole,
     }))
