@@ -60,9 +60,9 @@ export async function getCurrentUser(): Promise<AuthUser | null> {
     const db = getSupabaseClient()
     let { data: profile } = await db
       .from('profiles')
-      .select('role, name')
+      .select('role, full_name')
       .eq('id', authUser.id)
-      .maybeSingle() as { data: { role: string; name: string | null } | null; error: unknown }
+      .maybeSingle() as { data: { role: string; full_name: string | null } | null; error: unknown }
 
     if (!profile) {
       // Auto-create profile (user created via Supabase dashboard, trigger may not exist)
@@ -70,16 +70,16 @@ export async function getCurrentUser(): Promise<AuthUser | null> {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       await (db.from('profiles') as any).upsert({
         id: authUser.id,
-        name: derivedName,
+        full_name: derivedName,
         role: autoRole,
       })
-      profile = { role: autoRole, name: derivedName }
+      profile = { role: autoRole, full_name: derivedName }
     }
 
     return {
       id: authUser.id,
       email,
-      name: profile.name ?? derivedName,
+      name: profile.full_name ?? derivedName,
       // ADMIN_EMAIL always wins over whatever is stored in the DB
       role: isAdminByEnv ? 'admin' : ((profile.role as UserRole) ?? 'sales'),
     }
@@ -112,12 +112,12 @@ export async function getWorkspaceMembers(): Promise<AuthUser[]> {
     const db = getSupabaseClient()
     const { data } = await db
       .from('profiles')
-      .select('id, name, role')
-      .order('name') as { data: Array<{ id: string; name: string | null; role: string }> | null; error: unknown }
+      .select('id, full_name, role')
+      .order('full_name') as { data: Array<{ id: string; full_name: string | null; role: string }> | null; error: unknown }
     return (data ?? []).map((r) => ({
       id: r.id,
       email: '',
-      name: r.name,
+      name: r.full_name,
       role: r.role as UserRole,
     }))
   } catch {

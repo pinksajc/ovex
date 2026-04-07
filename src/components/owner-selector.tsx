@@ -31,7 +31,7 @@ export function OwnerSelector({ dealId, currentOwnerId, members }: OwnerSelector
   }
 
   const current = members.find((m) => m.id === ownerId)
-  const displayName = current ? (current.name ?? current.email) : 'Sin asignar'
+  const displayName = current ? (current.name || current.email || 'Usuario') : 'Sin asignar'
 
   return (
     <div className="flex items-center gap-2 group relative">
@@ -51,7 +51,7 @@ export function OwnerSelector({ dealId, currentOwnerId, members }: OwnerSelector
         <option value="">Sin asignar</option>
         {members.map((m) => (
           <option key={m.id} value={m.id}>
-            {m.name ?? m.email}
+            {m.name || m.email || 'Usuario'}
           </option>
         ))}
       </select>
