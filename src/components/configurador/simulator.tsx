@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useMemo, useTransition, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 import { PLANS, ADDONS, ADDON_ORDER, PLAN_ORDER, HARDWARE, HARDWARE_ORDER, HARDWARE_MODE_LABELS } from '@/lib/pricing/catalog'
 import { calculateEconomics, suggestPlan } from '@/lib/pricing/engine'
 import { formatCurrency, formatNumber } from '@/lib/format'
@@ -101,6 +102,8 @@ export function Simulator({ deal, initialConfig, loadedConfigId }: SimulatorProp
   const [hardware, setHardware] = useState<HardwareState>(() =>
     initHardwareState(init?.locations ?? 1, init?.hardware)
   )
+
+  const router = useRouter()
 
   // ---- Save state (overwrite active) ----
   const [isPending, startTransition] = useTransition()
@@ -208,6 +211,7 @@ export function Simulator({ deal, initialConfig, loadedConfigId }: SimulatorProp
         setSaveState('saved')
         setLastSavePersisted(result.persisted)
         setSavedSnapshot(serializeSimState(dailyOrders, locations, avgTicket, planOverride, activeAddons, hardware))
+        router.refresh()
       } else {
         setSaveState('error')
       }
@@ -232,6 +236,7 @@ export function Simulator({ deal, initialConfig, loadedConfigId }: SimulatorProp
         setLastNewVersion(result.version)
         setLastNewVersionPersisted(result.persisted)
         setSavedSnapshot(serializeSimState(dailyOrders, locations, avgTicket, planOverride, activeAddons, hardware))
+        router.refresh()
       } else {
         setSaveNewState('error')
       }
