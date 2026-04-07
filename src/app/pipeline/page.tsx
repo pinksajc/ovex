@@ -10,6 +10,7 @@ const STAGE_ORDER: DealStage[] = [
   'negotiation',
   'closed_won',
   'closed_lost',
+  'rejected',
 ]
 
 const STAGE_LABELS: Record<DealStage, string> = {
@@ -19,6 +20,7 @@ const STAGE_LABELS: Record<DealStage, string> = {
   negotiation: 'Negociación',
   closed_won: 'Cerrado ganado',
   closed_lost: 'Cerrado perdido',
+  rejected: 'Rechazado',
 }
 
 const STAGE_COLORS: Record<DealStage, { header: string; card: string }> = {
@@ -28,6 +30,7 @@ const STAGE_COLORS: Record<DealStage, { header: string; card: string }> = {
   negotiation:   { header: 'bg-amber-50 text-amber-700',   card: 'border-amber-100' },
   closed_won:    { header: 'bg-emerald-50 text-emerald-700', card: 'border-emerald-100' },
   closed_lost:   { header: 'bg-red-50 text-red-600',       card: 'border-red-100' },
+  rejected:      { header: 'bg-red-100 text-red-700',      card: 'border-red-200' },
 }
 
 export default async function PipelinePage() {

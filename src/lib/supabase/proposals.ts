@@ -13,6 +13,7 @@ import type { DocuSealStatus, ProposalRecord, ProposalSections, ProposalSummary 
 //   ALTER TABLE proposals ADD COLUMN IF NOT EXISTS docuseal_submission_id text;
 //   ALTER TABLE proposals ADD COLUMN IF NOT EXISTS docuseal_status text;
 //   ALTER TABLE proposals ADD COLUMN IF NOT EXISTS signed_at timestamptz;
+//   ALTER TABLE proposals ADD COLUMN IF NOT EXISTS decline_reason text;
 
 interface ProposalRow {
   id: string
@@ -23,6 +24,7 @@ interface ProposalRow {
   docuseal_submission_id: string | null
   docuseal_status: DocuSealStatus
   signed_at: string | null
+  decline_reason: string | null
   created_at: string
   updated_at: string
 }
@@ -40,6 +42,7 @@ function rowToRecord(row: ProposalRow): ProposalRecord {
     docusealSubmissionId: row.docuseal_submission_id ?? null,
     docusealStatus: row.docuseal_status ?? null,
     signedAt: row.signed_at ?? null,
+    declineReason: row.decline_reason ?? null,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   }
@@ -80,17 +83,18 @@ export async function getProposalSummariesForDeals(
   if (dealIds.length === 0) return result
 
   const { data, error } = await table()
-    .select('config_id, sent_for_signature_at, docuseal_status, signed_at')
+    .select('config_id, sent_for_signature_at, docuseal_status, signed_at, decline_reason')
     .in('attio_deal_id', dealIds)
   if (error) throw new Error(`Supabase getProposalSummariesForDeals: ${error.message}`)
 
-  type SummaryRow = Pick<ProposalRow, 'config_id' | 'sent_for_signature_at' | 'docuseal_status' | 'signed_at'>
+  type SummaryRow = Pick<ProposalRow, 'config_id' | 'sent_for_signature_at' | 'docuseal_status' | 'signed_at' | 'decline_reason'>
   for (const row of (data ?? []) as SummaryRow[]) {
     result.set(row.config_id, {
       configId: row.config_id,
       sentForSignatureAt: row.sent_for_signature_at ?? null,
       docusealStatus: row.docuseal_status ?? null,
       signedAt: row.signed_at ?? null,
+      declineReason: row.decline_reason ?? null,
     })
   }
   return result
@@ -228,10 +232,12 @@ export async function markProposalSignedByDocuSeal(submissionId: string): Promis
 /**
  * Updates docuseal_status for any terminal or intermediate state.
  * Idempotent: no-op if row not found or status unchanged.
+ * Pass declineReason when status = 'declined'.
  */
 export async function updateProposalDocuSealStatus(
   submissionId: string,
   status: DocuSealStatus,
+  declineReason?: string | null,
 ): Promise<{ updated: boolean }> {
   const { data: existing } = await table()
     .select('id, docuseal_status')
@@ -244,8 +250,12 @@ export async function updateProposalDocuSealStatus(
   }
 
   const now = new Date().toISOString()
+  const patch: Record<string, unknown> = { docuseal_status: status, updated_at: now }
+  if (status === 'declined' && declineReason != null) {
+    patch.decline_reason = declineReason
+  }
   await table()
-    .update({ docuseal_status: status, updated_at: now })
+    .update(patch)
     .eq('docuseal_submission_id', submissionId)
 
   return { updated: true }

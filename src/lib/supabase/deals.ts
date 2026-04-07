@@ -90,6 +90,13 @@ export interface CreateDealInput {
   ownerId?: string
 }
 
+export async function updateDealStage(id: string, stage: DealStage): Promise<void> {
+  const { error } = await table()
+    .update({ stage, updated_at: new Date().toISOString() })
+    .eq('id', id)
+  if (error) throw new Error(`Supabase updateDealStage: ${error.message}`)
+}
+
 export async function createDeal(input: CreateDealInput): Promise<Deal> {
   const { data, error } = await table()
     .insert({
