@@ -171,8 +171,12 @@ export const HARDWARE_ORDER: HardwareId[] = [
   'counter_stand',
 ]
 
+/** Fixed monthly rental price per unit (€/unit/month). */
+export const RENTAL_MONTHLY_PRICE = 19
+
 export const HARDWARE_MODE_LABELS: Record<import('@/types').HardwareMode, string> = {
   included: 'Incluido',
   sold: 'Vendido',
   financed: 'Financiado',
+  rented: 'Alquiler',
 }

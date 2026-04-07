@@ -18,7 +18,7 @@ export type HardwareId =
   | 'bouncepad_kiosk'
   | 'counter_stand'
 
-export type HardwareMode = 'included' | 'sold' | 'financed'
+export type HardwareMode = 'included' | 'sold' | 'financed' | 'rented'
 
 export interface HardwareLineItem {
   hardwareId: HardwareId

@@ -60,6 +60,27 @@ export default async function NewDealPage({
               className="w-full text-sm border border-zinc-300 rounded-lg px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-zinc-400 focus:border-transparent transition"
             />
           </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-zinc-700 mb-1.5">CIF</label>
+              <input
+                type="text"
+                name="companyCif"
+                placeholder="Ej: B12345678"
+                className="w-full text-sm border border-zinc-300 rounded-lg px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-zinc-400 focus:border-transparent transition font-mono"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-zinc-700 mb-1.5">Dirección fiscal</label>
+              <input
+                type="text"
+                name="companyAddress"
+                placeholder="Ej: Calle Mayor 1, Madrid"
+                className="w-full text-sm border border-zinc-300 rounded-lg px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-zinc-400 focus:border-transparent transition"
+              />
+            </div>
+          </div>
         </section>
 
         {/* Contacto */}
