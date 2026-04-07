@@ -1,5 +1,6 @@
 'use server'
 
+import { revalidateTag, revalidatePath } from 'next/cache'
 import { calculateEconomics } from '@/lib/pricing/engine'
 import { saveNewConfigVersion } from '@/lib/deals'
 import { logEvent } from '@/lib/supabase/events'
@@ -52,6 +53,8 @@ export async function saveNewVersionAction(
     })
 
     void logEvent('config_saved', payload.dealId)
+    revalidateTag('attio-deals', 'max')
+    revalidatePath(`/deals/${payload.dealId}/configurador`)
     return {
       ok: true,
       version: result.config.version,
