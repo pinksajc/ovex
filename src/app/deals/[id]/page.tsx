@@ -4,6 +4,8 @@ import { getDeal, getActiveConfig } from '@/lib/deals'
 import { formatCurrency } from '@/lib/format'
 import { ContactEditor } from '@/components/contact-editor'
 import { CompanyEditor } from '@/components/company-editor'
+import { OwnerSelector } from '@/components/owner-selector'
+import { getWorkspaceMembers } from '@/lib/auth'
 import type { DealStage } from '@/types'
 
 const STAGE_LABELS: Record<DealStage, string> = {
@@ -32,7 +34,7 @@ export default async function DealPage({
   params: Promise<{ id: string }>
 }) {
   const { id } = await params
-  const deal = await getDeal(id)
+  const [deal, members] = await Promise.all([getDeal(id), getWorkspaceMembers()])
 
   if (!deal) notFound()
 
@@ -64,7 +66,11 @@ export default async function DealPage({
             {deal.company.city && (
               <span className="text-sm text-zinc-400">{deal.company.city}</span>
             )}
-            <span className="text-sm text-zinc-400">Owner: {deal.owner}</span>
+            <OwnerSelector
+              dealId={deal.id}
+              currentOwnerId={deal.ownerId ?? null}
+              members={members}
+            />
           </div>
         </div>
         <div className="flex items-center gap-2">
