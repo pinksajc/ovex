@@ -138,7 +138,7 @@ export async function markSentForSignatureAction(
       let signerUrl: string
       try {
         const { uploadPdfAndCreateSubmission } = await import('@/lib/docuseal/client')
-        const documentName = `platomico-propuesta-${dealId}-v${cfg.version}.pdf`
+        const documentName = `Propuesta Platomico - ${deal.company.name}`
         const result = await uploadPdfAndCreateSubmission({
           pdfBuffer,
           documentName,
