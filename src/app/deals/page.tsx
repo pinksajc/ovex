@@ -22,16 +22,15 @@ export default async function DealsPage({
   // creation fails — default to a sales-scoped view to avoid crash.
   const user: AuthUser = userOrNull ?? { id: '', email: '', name: null, role: 'sales', mustChangePassword: false }
 
-  // Scope: sales always see 'mine'; admins toggle mine/all (default: all)
+  // Admins can toggle mine/all; sales always see all deals
   const isAdmin = user.role === 'admin'
   const effectiveScope: 'mine' | 'all' = isAdmin
     ? (scope === 'mine' ? 'mine' : 'all')
-    : 'mine'
+    : 'all'
 
-  const deals = effectiveScope === 'all'
-    ? allDeals
-    // sales (or admin viewing 'mine'): own deals + unassigned deals
-    : allDeals.filter((d) => d.ownerId === null || d.ownerId === user.id)
+  const deals = effectiveScope === 'mine'
+    ? allDeals.filter((d) => d.ownerId === null || d.ownerId === user.id)
+    : allDeals
 
   // Load members only for admins (for reassign UI)
   const members = isAdmin ? await getWorkspaceMembers() : []
