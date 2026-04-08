@@ -15,7 +15,10 @@ export async function deleteUserAction(
   try {
     await assertAdmin()
     const db = getSupabaseClient()
-    // Delete auth user (profiles row will cascade if FK is set; also delete explicitly)
+    // Sign out from all devices first — invalidates every active session token
+    await db.auth.admin.signOut(userId, 'global').catch(() => {/* ignore if user has no active session */})
+    // Delete auth user — removes from auth.users and invalidates any remaining tokens
+    // profiles row is also deleted explicitly (in case FK cascade is not configured)
     const { error: authErr } = await db.auth.admin.deleteUser(userId)
     if (authErr) return { ok: false, error: authErr.message }
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
