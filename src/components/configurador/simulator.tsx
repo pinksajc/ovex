@@ -589,14 +589,14 @@ export function Simulator({ deal, initialConfig, loadedConfigId }: SimulatorProp
                         <input
                           type="number"
                           min={1}
-                          max={locations}
+                          max={999}
                           step={1}
                           value={renVenues}
-                          onChange={(e) => setRenVenues(Math.min(locations, Math.max(1, Number(e.target.value))))}
+                          onChange={(e) => setRenVenues(Math.max(1, Number(e.target.value)))}
                           onClick={(e) => e.stopPropagation()}
                           className="flex-1 px-2 py-1.5 text-sm font-mono text-zinc-900 outline-none bg-white"
                         />
-                        <span className="px-2 text-xs text-zinc-400 bg-zinc-50 border-l border-zinc-200 py-1.5 whitespace-nowrap">/ {locations}</span>
+                        <span className="px-2 text-xs text-zinc-400 bg-zinc-50 border-l border-zinc-200 py-1.5 whitespace-nowrap">ud.</span>
                       </div>
                     </div>
                   </div>
