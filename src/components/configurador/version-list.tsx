@@ -7,6 +7,24 @@ import { formatCurrency } from '@/lib/format'
 import { activateVersionAction } from '@/app/actions/activate-version'
 import type { Deal, DealConfiguration } from '@/types'
 
+function computeAdjustedMRR(config: DealConfiguration): number {
+  const eco = config.economics
+  const locations = config.locations
+  const kdsVenues = config.kdsVenues ?? locations
+  const kioskVenues = config.kioskVenues ?? locations
+  const kdsAdj = config.activeAddons.includes('kds') ? 19 * (kdsVenues - locations) : 0
+  const kioskAdj = config.activeAddons.includes('kiosk') ? 19 * (kioskVenues - locations) : 0
+  const adjustedSoftwareBase = eco.softwareRevenueMonthly + kdsAdj + kioskAdj
+  const discountPercent = config.discountPercent ?? 0
+  const discountAmount = adjustedSoftwareBase * (discountPercent / 100)
+  const adjustedSoftware = adjustedSoftwareBase - discountAmount
+  const renFeePerOrder = config.renFeePerOrder ?? 0.20
+  const renVenues = config.renVenues ?? 1
+  const deliveryPerVenue = config.deliveryOrdersPerVenue ?? 0
+  const renMonthly = config.renEnabled ? renFeePerOrder * deliveryPerVenue * renVenues : 0
+  return adjustedSoftware + renMonthly + eco.hardwareRevenueMonthly
+}
+
 interface VersionListProps {
   deal: Deal
   /** ID de la config que el simulador tiene cargada actualmente */
@@ -86,7 +104,7 @@ export function VersionList({ deal, loadedConfigId, hasUnsavedChanges }: Version
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-3 flex-wrap">
                   <span className="text-xs font-mono font-semibold text-zinc-800">
-                    {formatCurrency(config.economics.totalMonthlyRevenue)}/mes
+                    {formatCurrency(computeAdjustedMRR(config))}/mes
                   </span>
                   <span className="text-xs text-zinc-400">
                     {config.locations} local{config.locations > 1 ? 'es' : ''} ·{' '}
