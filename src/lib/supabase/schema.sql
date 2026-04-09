@@ -129,5 +129,9 @@ create index if not exists proposals_docuseal_submission_id_idx
 -- RLS desactivado — acceso vía service role
 alter table proposals disable row level security;
 
--- Si la tabla ya existía sin la constraint, añadirla:
--- ALTER TABLE proposals ADD CONSTRAINT proposals_attio_deal_id_config_id_key UNIQUE (attio_deal_id, config_id);
+-- Migración: la tabla fue creada originalmente con UNIQUE(attio_deal_id) en lugar de
+-- UNIQUE(attio_deal_id, config_id). Ejecutar en Supabase SQL Editor si es necesario:
+--
+-- ALTER TABLE proposals DROP CONSTRAINT IF EXISTS proposals_attio_deal_id_key;
+-- ALTER TABLE proposals ADD CONSTRAINT proposals_attio_deal_id_config_id_key
+--   UNIQUE (attio_deal_id, config_id);

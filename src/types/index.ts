@@ -49,6 +49,9 @@ export interface DealConfiguration {
   plan: PlanTier
   planOverridden: boolean
 
+  // Delivery volume (separate from main order volume)
+  deliveryOrdersPerVenue?: number  // pedidos delivery/mes por local (default 500)
+
   // Add-ons
   activeAddons: AddonId[]
 

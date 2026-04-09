@@ -9,6 +9,7 @@ import type { PlanTier, AddonId, HardwareLineItem } from '@/types'
 export interface SaveVersionPayload {
   dealId: string
   dailyOrdersPerLocation: number
+  deliveryOrdersPerVenue: number
   locations: number
   averageTicket: number
   plan: PlanTier
@@ -30,18 +31,22 @@ export async function saveNewVersionAction(
   payload: SaveVersionPayload
 ): Promise<SaveVersionResult> {
   try {
-    const economics = calculateEconomics({
-      dailyOrdersPerLocation: payload.dailyOrdersPerLocation,
-      locations: payload.locations,
-      averageTicket: payload.averageTicket,
-      plan: payload.plan,
-      activeAddons: payload.activeAddons,
-      hardware: payload.hardware,
-    })
+    const economics = {
+      ...calculateEconomics({
+        dailyOrdersPerLocation: payload.dailyOrdersPerLocation,
+        locations: payload.locations,
+        averageTicket: payload.averageTicket,
+        plan: payload.plan,
+        activeAddons: payload.activeAddons,
+        hardware: payload.hardware,
+      }),
+      deliveryOrdersPerVenue: payload.deliveryOrdersPerVenue,
+    }
 
     const result = await saveNewConfigVersion(payload.dealId, {
       label: payload.label,
       dailyOrdersPerLocation: payload.dailyOrdersPerLocation,
+      deliveryOrdersPerVenue: payload.deliveryOrdersPerVenue,
       locations: payload.locations,
       averageTicket: payload.averageTicket,
       estimatedGrowthPercent: 0,

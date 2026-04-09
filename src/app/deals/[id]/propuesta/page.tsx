@@ -149,6 +149,9 @@ function buildDefaultSections(deal: Deal, cfg: DealConfiguration): ProposalSecti
       `La solución incluye el plan ${plan.label} con acceso completo a la plataforma Platomico.`,
       addonsText ? `Módulos adicionales contratados: ${addonsText}.` : null,
       hwText ? `Hardware incluido: ${hwText}.` : null,
+      cfg.deliveryOrdersPerVenue && cfg.deliveryOrdersPerVenue > 0
+        ? `Volumen delivery estimado: ${formatNumber(cfg.deliveryOrdersPerVenue * cfg.locations)} pedidos/mes (${formatNumber(cfg.deliveryOrdersPerVenue)} por local).`
+        : null,
       'La implementación contempla formación completa del equipo y soporte técnico dedicado durante el arranque.',
     ]
       .filter(Boolean)

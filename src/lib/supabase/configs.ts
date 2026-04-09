@@ -29,6 +29,7 @@ interface ConfigRow {
 // ---- Mapper row → DealConfiguration ----
 
 function rowToConfig(row: ConfigRow): DealConfiguration {
+  const eco = row.economics as DealEconomics & { deliveryOrdersPerVenue?: number }
   return {
     id: row.id,
     dealId: row.attio_deal_id,
@@ -38,11 +39,12 @@ function rowToConfig(row: ConfigRow): DealConfiguration {
     locations: row.locations,
     averageTicket: Number(row.average_ticket),
     estimatedGrowthPercent: Number(row.estimated_growth_percent),
+    deliveryOrdersPerVenue: eco.deliveryOrdersPerVenue ?? 500,
     plan: row.plan as DealConfiguration['plan'],
     planOverridden: row.plan_overridden,
     activeAddons: row.active_addons as AddonId[],
     hardware: (row.hardware as HardwareLineItem[]) ?? [],
-    economics: row.economics as DealEconomics,
+    economics: eco,
     createdAt: row.created_at,
   }
 }

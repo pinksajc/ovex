@@ -60,19 +60,25 @@ function hardwareStateToLineItems(hw: HardwareState): HardwareLineItem[] {
 
 function serializeSimState(
   dailyOrders: number,
+  deliveryOrders: number,
   locations: number,
   avgTicket: number,
   planOverride: PlanTier | null,
   activeAddons: Set<AddonId>,
-  hardware: HardwareState
+  hardware: HardwareState,
+  renEnabled: boolean,
+  renFeePerOrder: number
 ): string {
   return JSON.stringify({
     dailyOrders,
+    deliveryOrders,
     locations,
     avgTicket,
     planOverride,
     addons: [...activeAddons].sort(),
     hardware,
+    renEnabled,
+    renFeePerOrder,
   })
 }
 
@@ -91,6 +97,7 @@ export function Simulator({ deal, initialConfig, loadedConfigId }: SimulatorProp
 
   // ---- State ----
   const [dailyOrders, setDailyOrders] = useState(init?.dailyOrdersPerLocation ?? 4500)
+  const [deliveryOrders, setDeliveryOrders] = useState(init?.deliveryOrdersPerVenue ?? 500)
   const [locations, setLocations] = useState(init?.locations ?? 1)
   const [avgTicket, setAvgTicket] = useState(init?.averageTicket ?? 18)
   const [planOverride, setPlanOverride] = useState<PlanTier | null>(
@@ -102,6 +109,8 @@ export function Simulator({ deal, initialConfig, loadedConfigId }: SimulatorProp
   const [hardware, setHardware] = useState<HardwareState>(() =>
     initHardwareState(init?.locations ?? 1, init?.hardware)
   )
+  const [renEnabled, setRenEnabled] = useState(false)
+  const [renFeePerOrder, setRenFeePerOrder] = useState(0.20)
 
   const router = useRouter()
 
@@ -127,17 +136,20 @@ export function Simulator({ deal, initialConfig, loadedConfigId }: SimulatorProp
   const [savedSnapshot, setSavedSnapshot] = useState<string>(() =>
     serializeSimState(
       init?.dailyOrdersPerLocation ?? 4500,
+      init?.deliveryOrdersPerVenue ?? 500,
       init?.locations ?? 1,
       init?.averageTicket ?? 18,
       init?.planOverridden ? (init.plan ?? null) : null,
       new Set(init?.activeAddons ?? []),
-      initHardwareState(init?.locations ?? 1, init?.hardware)
+      initHardwareState(init?.locations ?? 1, init?.hardware),
+      false,
+      0.20
     )
   )
 
   const hasUnsavedChanges = useMemo(
-    () => serializeSimState(dailyOrders, locations, avgTicket, planOverride, activeAddons, hardware) !== savedSnapshot,
-    [dailyOrders, locations, avgTicket, planOverride, activeAddons, hardware, savedSnapshot]
+    () => serializeSimState(dailyOrders, deliveryOrders, locations, avgTicket, planOverride, activeAddons, hardware, renEnabled, renFeePerOrder) !== savedSnapshot,
+    [dailyOrders, deliveryOrders, locations, avgTicket, planOverride, activeAddons, hardware, renEnabled, renFeePerOrder, savedSnapshot]
   )
 
   useEffect(() => {
@@ -200,6 +212,7 @@ export function Simulator({ deal, initialConfig, loadedConfigId }: SimulatorProp
       const result = await saveConfigAction({
         dealId: deal.id,
         dailyOrdersPerLocation: dailyOrders,
+        deliveryOrdersPerVenue: deliveryOrders,
         locations,
         averageTicket: avgTicket,
         plan: activePlan,
@@ -210,7 +223,7 @@ export function Simulator({ deal, initialConfig, loadedConfigId }: SimulatorProp
       if (result.ok) {
         setSaveState('saved')
         setLastSavePersisted(result.persisted)
-        setSavedSnapshot(serializeSimState(dailyOrders, locations, avgTicket, planOverride, activeAddons, hardware))
+        setSavedSnapshot(serializeSimState(dailyOrders, deliveryOrders, locations, avgTicket, planOverride, activeAddons, hardware, renEnabled, renFeePerOrder))
         router.refresh()
       } else {
         setSaveState('error')
@@ -224,6 +237,7 @@ export function Simulator({ deal, initialConfig, loadedConfigId }: SimulatorProp
       const result = await saveNewVersionAction({
         dealId: deal.id,
         dailyOrdersPerLocation: dailyOrders,
+        deliveryOrdersPerVenue: deliveryOrders,
         locations,
         averageTicket: avgTicket,
         plan: activePlan,
@@ -235,7 +249,7 @@ export function Simulator({ deal, initialConfig, loadedConfigId }: SimulatorProp
         setSaveNewState('saved')
         setLastNewVersion(result.version)
         setLastNewVersionPersisted(result.persisted)
-        setSavedSnapshot(serializeSimState(dailyOrders, locations, avgTicket, planOverride, activeAddons, hardware))
+        setSavedSnapshot(serializeSimState(dailyOrders, deliveryOrders, locations, avgTicket, planOverride, activeAddons, hardware, renEnabled, renFeePerOrder))
         router.refresh()
       } else {
         setSaveNewState('error')
@@ -313,6 +327,31 @@ export function Simulator({ deal, initialConfig, loadedConfigId }: SimulatorProp
           </div>
         </Section>
 
+        {/* —— Volumen Delivery —— */}
+        <Section title="Volumen Delivery">
+          <div>
+            <div className="flex justify-between mb-1.5">
+              <label className="text-xs font-medium text-zinc-600">
+                Pedidos delivery/mes por local
+              </label>
+              <span className="text-xs font-mono font-semibold text-zinc-900">
+                {formatNumber(deliveryOrders)}
+              </span>
+            </div>
+            <input
+              type="range" min={0} max={5000} step={50} value={deliveryOrders}
+              onChange={(e) => setDeliveryOrders(Number(e.target.value))}
+              className="w-full accent-zinc-900"
+            />
+            <div className="flex justify-between text-[10px] text-zinc-400 mt-0.5">
+              <span>0</span><span>5.000</span>
+            </div>
+          </div>
+          <div className="mt-3">
+            <Pill label="Vol. delivery total" value={`${formatNumber(deliveryOrders * locations)} pedidos`} />
+          </div>
+        </Section>
+
         {/* —— Plan —— */}
         <Section title="Plan">
           {planChanged && (
@@ -378,8 +417,10 @@ export function Simulator({ deal, initialConfig, loadedConfigId }: SimulatorProp
           </div>
         </Section>
 
-        {/* —— Add-ons —— */}
+        {/* —— Add-ons + REN —— */}
         <Section title="Add-ons">
+          {/* ADD-ONS subsection */}
+          <p className="text-[10px] font-semibold text-zinc-400 uppercase tracking-widest mb-3">Add-ons</p>
           <div className="grid grid-cols-2 gap-2.5">
             {ADDON_ORDER.map((id) => {
               const addon = ADDONS[id]
@@ -435,6 +476,65 @@ export function Simulator({ deal, initialConfig, loadedConfigId }: SimulatorProp
               )
             })}
           </div>
+
+          {/* REN separator */}
+          <div className="mt-5 mb-4 flex items-center gap-3">
+            <div className="h-px flex-1 bg-zinc-100" />
+            <span className="text-[10px] font-semibold text-zinc-400 uppercase tracking-widest whitespace-nowrap">
+              REN — Logística propia
+            </span>
+            <div className="h-px flex-1 bg-zinc-100" />
+          </div>
+
+          {/* REN card */}
+          <button
+            onClick={() => setRenEnabled((v) => !v)}
+            className={`w-full flex items-start gap-3 p-3.5 rounded-xl border-2 text-left transition-all ${
+              renEnabled
+                ? 'border-zinc-900 bg-zinc-50'
+                : 'border-zinc-200 bg-white hover:border-zinc-300'
+            }`}
+          >
+            <div
+              className={`mt-0.5 w-4 h-4 rounded border-2 shrink-0 flex items-center justify-center ${
+                renEnabled ? 'bg-zinc-900 border-zinc-900' : 'border-zinc-300'
+              }`}
+            >
+              {renEnabled && (
+                <svg className="w-2.5 h-2.5 text-white" viewBox="0 0 10 10" fill="currentColor">
+                  <path d="M1.5 5L4 7.5L8.5 2.5" stroke="white" strokeWidth="1.5" fill="none" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              )}
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-medium text-zinc-900">REN</p>
+              <p className="text-xs text-zinc-500 mt-0.5">Marketplace logístico</p>
+              {renEnabled && (
+                <div className="mt-2" onClick={(e) => e.stopPropagation()}>
+                  <label className="text-xs font-medium text-zinc-600 block mb-1">
+                    Fee por pedido al restaurante (€)
+                  </label>
+                  <div className="flex items-center border border-zinc-200 rounded-lg overflow-hidden focus-within:ring-2 focus-within:ring-zinc-900 w-28 mb-2">
+                    <input
+                      type="number"
+                      min={0.01}
+                      step={0.01}
+                      value={renFeePerOrder}
+                      onChange={(e) => setRenFeePerOrder(Math.max(0.01, Number(e.target.value)))}
+                      className="flex-1 px-2 py-1.5 text-sm font-mono text-zinc-900 outline-none bg-white"
+                    />
+                    <span className="px-2 text-xs text-zinc-400 bg-zinc-50 border-l border-zinc-200 py-1.5">€</span>
+                  </div>
+                  <p className="text-xs font-mono text-zinc-500">
+                    {renFeePerOrder.toFixed(2).replace('.', ',')}€ × {formatNumber(deliveryOrders)} pedidos × {locations} local{locations > 1 ? 'es' : ''} ={' '}
+                    <span className="font-semibold text-emerald-700">
+                      {formatCurrency(renFeePerOrder * deliveryOrders * locations)}/mes
+                    </span>
+                  </p>
+                </div>
+              )}
+            </div>
+          </button>
         </Section>
 
         {/* —— Hardware —— */}
@@ -624,6 +724,9 @@ export function Simulator({ deal, initialConfig, loadedConfigId }: SimulatorProp
         <EconomicsPanel
           economics={economics}
           locations={locations}
+          deliveryOrders={deliveryOrders}
+          renEnabled={renEnabled}
+          renFeePerOrder={renFeePerOrder}
           activeAddons={activeAddons}
           hardware={hardware}
           hasUnsavedChanges={hasUnsavedChanges}
@@ -648,6 +751,9 @@ export function Simulator({ deal, initialConfig, loadedConfigId }: SimulatorProp
 function EconomicsPanel({
   economics,
   locations,
+  deliveryOrders,
+  renEnabled,
+  renFeePerOrder,
   activeAddons,
   hardware,
   hasUnsavedChanges,
@@ -661,6 +767,9 @@ function EconomicsPanel({
 }: {
   economics: DealEconomics
   locations: number
+  deliveryOrders: number
+  renEnabled: boolean
+  renFeePerOrder: number
   activeAddons: Set<AddonId>
   hardware: HardwareState
   hasUnsavedChanges: boolean
@@ -673,6 +782,7 @@ function EconomicsPanel({
   onSaveNew: () => void
 }) {
   const hasDatafono = activeAddons.has('datafono')
+  const renMonthly = renEnabled ? renFeePerOrder * deliveryOrders * locations : 0
   const rentedMonthly = HARDWARE_ORDER.reduce((sum, id) => {
     const s = hardware[id]
     return s.mode === 'rented' ? sum + RENTAL_MONTHLY_PRICE * s.quantity : sum
@@ -732,6 +842,19 @@ function EconomicsPanel({
           <p className="text-xs font-medium text-zinc-500 uppercase tracking-wide mb-3">GMV</p>
           <BreakdownRow label="GMV/mes" value={formatCurrency(economics.totalMonthlyGMV)} />
           <BreakdownRow label="GMV/año" value={formatCurrency(economics.totalMonthlyGMV * 12)} />
+        </div>
+      )}
+
+      {/* REN */}
+      {renEnabled && (
+        <div className="px-5 py-4 border-b border-zinc-100">
+          <p className="text-xs font-medium text-zinc-500 uppercase tracking-wide mb-3">
+            REN — Logística propia
+          </p>
+          <BreakdownRow
+            label={`${renFeePerOrder.toFixed(2).replace('.', ',')}€ × ${formatNumber(deliveryOrders)} ped. × ${locations} local${locations > 1 ? 'es' : ''}`}
+            value={`${formatCurrency(renMonthly)}/mes`}
+          />
         </div>
       )}
 
