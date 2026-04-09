@@ -393,12 +393,17 @@ function s4Purpose(logoUri: string): string {
 function s5Plans(deal: Deal, cfg: DealConfiguration, logoUri: string): string {
   const tiers = ['starter', 'growth', 'pro'] as const
   const hiCol = tiers.indexOf(cfg.plan) + 1
-  const eco = cfg.economics as DealEconomics & { renEnabled?: boolean; renFeePerOrder?: number; renVenues?: number }
+  const eco = cfg.economics as DealEconomics & {
+    renEnabled?: boolean; renFeePerOrder?: number; renVenues?: number
+    kdsVenues?: number; kioskVenues?: number
+  }
   const renEnabled = eco.renEnabled === true
   const renFeePerOrder = eco.renFeePerOrder ?? 0.20
   const renVenues = eco.renVenues ?? 1
   const deliveryPerVenue = cfg.deliveryOrdersPerVenue ?? 0
   const renMonthly = renEnabled ? renFeePerOrder * deliveryPerVenue * renVenues : 0
+  const s5KdsVenues = eco.kdsVenues ?? cfg.locations
+  const s5KioskVenues = eco.kioskVenues ?? cfg.locations
   const hwItems = cfg.hardware.filter(h => h.quantity > 0)
 
   const planRows: string[][] = [
@@ -446,9 +451,15 @@ function s5Plans(deal: Deal, cfg: DealConfiguration, logoUri: string): string {
         const precio = id === 'datafono'
           ? `${addon.feePercent}% GMV`
           : addon.perConsumption ? 'Por consumo'
+          : id === 'kds'
+          ? `19 €/local/mes × ${s5KdsVenues} local${s5KdsVenues > 1 ? 'es' : ''} con KDS`
+          : id === 'kiosk'
+          ? `19 €/local/mes × ${s5KioskVenues} local${s5KioskVenues > 1 ? 'es' : ''} con Kiosk`
           : `${addon.priceMonthly} €${addon.perLocation ? '/local/mes' : '/mes'}`
         const total = id === 'datafono' ? fmt(eco.datafonoFeeMonthly)
           : addon.perConsumption ? '—'
+          : id === 'kds' ? fmt(19 * s5KdsVenues)
+          : id === 'kiosk' ? fmt(19 * s5KioskVenues)
           : fmt((addon.priceMonthly ?? 0) * (addon.perLocation ? cfg.locations : 1))
         return `<div style="display:flex;justify-content:space-between;align-items:center;padding:7px 11px;background:#f8fafc;border:1px solid #e8eef6;border-radius:6px;">
           <div>
@@ -649,6 +660,8 @@ function s11Economics(deal: Deal, cfg: DealConfiguration, sections: ProposalSect
     renFeePerOrder?: number
     renVenues?: number
     discountPercent?: number
+    kdsVenues?: number
+    kioskVenues?: number
   }
   const plan = PLANS[cfg.plan]
   const activeAddons = cfg.activeAddons.map(id => ADDONS[id])
@@ -660,9 +673,18 @@ function s11Economics(deal: Deal, cfg: DealConfiguration, sections: ProposalSect
   const deliveryPerVenue = cfg.deliveryOrdersPerVenue ?? 0
   const renMonthly = renEnabled ? renFeePerOrder * deliveryPerVenue * renVenues : 0
 
+  // KDS/Kiosk per-venue-count adjustment (same logic as EconomicsPanel in simulator)
+  const kdsVenues = eco.kdsVenues ?? cfg.locations
+  const kioskVenues = eco.kioskVenues ?? cfg.locations
+  const kdsActive = cfg.activeAddons.includes('kds')
+  const kioskActive = cfg.activeAddons.includes('kiosk')
+  const kdsAdj = kdsActive ? 19 * (kdsVenues - cfg.locations) : 0
+  const kioskAdj = kioskActive ? 19 * (kioskVenues - cfg.locations) : 0
+  const adjustedSoftwareBase = eco.softwareRevenueMonthly + kdsAdj + kioskAdj
+
   const discountPercent = eco.discountPercent ?? 0
-  const discountAmount = eco.softwareRevenueMonthly * (discountPercent / 100)
-  const adjustedSoftware = eco.softwareRevenueMonthly - discountAmount
+  const discountAmount = adjustedSoftwareBase * (discountPercent / 100)
+  const adjustedSoftware = adjustedSoftwareBase - discountAmount
   const totalMes = adjustedSoftware + renMonthly + eco.hardwareRevenueMonthly
 
   const execSummary = sections.executiveSummary
@@ -694,7 +716,7 @@ function s11Economics(deal: Deal, cfg: DealConfiguration, sections: ProposalSect
           ['Fee variable', `${plan.variableFee}€/ticket`],
           ['Locales', String(cfg.locations)],
           ['Pedidos/mes/local', fmtN(cfg.dailyOrdersPerLocation)],
-          ['Fee software/mes', fmt(eco.softwareRevenueMonthly)],
+          ['Fee software/mes', fmt(adjustedSoftwareBase)],
           ...(discountPercent > 0 ? [['Descuento', `−${discountPercent}% (${fmt(discountAmount)})`]] : []),
           ...(discountPercent > 0 ? [['Neto software', fmt(adjustedSoftware)]] : []),
         ].map(([k,v]) => `
@@ -705,13 +727,18 @@ function s11Economics(deal: Deal, cfg: DealConfiguration, sections: ProposalSect
         ${activeAddons.length > 0 ? `
           <div style="margin-top:9px;padding-top:7px;border-top:1px solid #e8eef6;">
             <div style="font-size:8px;color:#94a3b8;text-transform:uppercase;letter-spacing:1px;margin-bottom:5px;">Add-ons activos</div>
-            ${activeAddons.map(a => `
-              <div style="display:flex;justify-content:space-between;padding:2px 0;">
+            ${activeAddons.map(a => {
+              const addonTotal = a.id === 'datafono'
+                ? `${a.feePercent}% GMV`
+                : a.perConsumption ? 'Por consumo'
+                : a.id === 'kds' ? `${fmt(19 * kdsVenues)}/mes`
+                : a.id === 'kiosk' ? `${fmt(19 * kioskVenues)}/mes`
+                : a.priceMonthly != null ? `${fmt(a.priceMonthly * cfg.locations)}/mes` : '—'
+              return `<div style="display:flex;justify-content:space-between;padding:2px 0;">
                 <span style="font-size:9.5px;color:#334155;">${a.label}</span>
-                <span style="font-size:9px;color:#1e3a5f;font-family:'Courier New',monospace;">
-                  ${a.id === 'datafono' ? `${a.feePercent}% GMV` : a.perConsumption ? 'Por consumo' : a.priceMonthly != null ? `${fmt(a.priceMonthly * cfg.locations)}/mes` : '—'}
-                </span>
-              </div>`).join('')}
+                <span style="font-size:9px;color:#1e3a5f;font-family:'Courier New',monospace;">${addonTotal}</span>
+              </div>`
+            }).join('')}
           </div>` : ''}
       </div>
 
