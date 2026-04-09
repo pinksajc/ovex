@@ -2,14 +2,14 @@
 // SERVER-SIDE PDF GENERATOR — Propuesta Comercial Platomico
 // server-only
 //
-// 13 páginas:
+// 12 páginas:
 //  1. Portada            2. Índice
 //  3. Sobre Platomico    4. Nuestro propósito
 //  5. Planes y add-ons   6. Detalle de módulos
 //  7. Soporte            8. Proceso de activación
-//  9. Por qué Platomico  10. Próximos pasos
-//  11. Resumen económico 12. Anexo: datos de las partes
-//  13. Página de firma
+//  9. Próximos pasos     10. Resumen económico
+//  11. Anexo: datos de las partes
+//  12. Página de firma
 //
 // Arquitectura de saltos de página:
 //   Cada sección vive en <div class="pg"> con break-after:page.
@@ -308,9 +308,8 @@ function s2Index(logoUri: string): string {
     ['4', 'Detalle de módulos'],
     ['5', 'Soporte y acompañamiento'],
     ['6', 'Proceso de activación'],
-    ['7', 'Por qué Platomico'],
-    ['8', 'Próximos pasos'],
-    ['9', 'Resumen económico'],
+    ['7', 'Próximos pasos'],
+    ['8', 'Resumen económico'],
     ['Anexo A', 'Datos de las partes'],
     ['Anexo B', 'Página de firma'],
   ]
@@ -928,7 +927,6 @@ function buildFullDossier(
     s6Modules(logoUri),
     s7Support(cfg, logoUri),
     s8Activation(logoUri),
-    s9Why(logoUri),
     s10NextSteps(deal, logoUri),
     s11Economics(deal, cfg, sections, logoUri),
     s12Annex(deal, today, logoUri),
