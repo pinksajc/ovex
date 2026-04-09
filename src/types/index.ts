@@ -57,6 +57,8 @@ export interface DealConfiguration {
   renEnabled?: boolean             // REN logistics enabled (default false)
   renFeePerOrder?: number          // REN fee per delivery order in € (default 0.20)
   renVenues?: number               // number of venues with REN (default 1)
+  kdsVenues?: number               // number of venues with KDS (default = locations)
+  kioskVenues?: number             // number of venues with Kiosk (default = locations)
 
   // Add-ons
   activeAddons: AddonId[]

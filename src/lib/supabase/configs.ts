@@ -35,14 +35,17 @@ function rowToConfig(row: ConfigRow): DealConfiguration {
     renEnabled?: boolean
     renFeePerOrder?: number
     renVenues?: number
+    kdsVenues?: number
+    kioskVenues?: number
   }
+  const locs = row.locations
   return {
     id: row.id,
     dealId: row.attio_deal_id,
     version: row.version,
     label: row.label ?? undefined,
     dailyOrdersPerLocation: row.daily_orders_per_location,
-    locations: row.locations,
+    locations: locs,
     averageTicket: Number(row.average_ticket),
     estimatedGrowthPercent: Number(row.estimated_growth_percent),
     deliveryOrdersPerVenue: eco.deliveryOrdersPerVenue ?? 500,
@@ -50,6 +53,8 @@ function rowToConfig(row: ConfigRow): DealConfiguration {
     renEnabled: eco.renEnabled ?? false,
     renFeePerOrder: eco.renFeePerOrder ?? 0.20,
     renVenues: eco.renVenues ?? 1,
+    kdsVenues: eco.kdsVenues ?? locs,
+    kioskVenues: eco.kioskVenues ?? locs,
     plan: row.plan as DealConfiguration['plan'],
     planOverridden: row.plan_overridden,
     activeAddons: row.active_addons as AddonId[],

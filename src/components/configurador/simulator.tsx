@@ -69,6 +69,8 @@ function serializeSimState(
   renEnabled: boolean,
   renFeePerOrder: number,
   renVenues: number,
+  kdsVenues: number,
+  kioskVenues: number,
   discountPercent: number
 ): string {
   return JSON.stringify({
@@ -82,6 +84,8 @@ function serializeSimState(
     renEnabled,
     renFeePerOrder,
     renVenues,
+    kdsVenues,
+    kioskVenues,
     discountPercent,
   })
 }
@@ -116,6 +120,8 @@ export function Simulator({ deal, initialConfig, loadedConfigId }: SimulatorProp
   const [renEnabled, setRenEnabled] = useState(init?.renEnabled ?? false)
   const [renFeePerOrder, setRenFeePerOrder] = useState(init?.renFeePerOrder ?? 0.20)
   const [renVenues, setRenVenues] = useState(init?.renVenues ?? 1)
+  const [kdsVenues, setKdsVenues] = useState(init?.kdsVenues ?? (init?.locations ?? 1))
+  const [kioskVenues, setKioskVenues] = useState(init?.kioskVenues ?? (init?.locations ?? 1))
   const [discountPercent, setDiscountPercent] = useState(init?.discountPercent ?? 0)
 
   const router = useRouter()
@@ -153,13 +159,15 @@ export function Simulator({ deal, initialConfig, loadedConfigId }: SimulatorProp
       init?.renEnabled ?? false,
       init?.renFeePerOrder ?? 0.20,
       init?.renVenues ?? 1,
+      init?.kdsVenues ?? (init?.locations ?? 1),
+      init?.kioskVenues ?? (init?.locations ?? 1),
       init?.discountPercent ?? 0
     )
   )
 
   const hasUnsavedChanges = useMemo(
-    () => serializeSimState(dailyOrders, deliveryOrders, locations, avgTicket, planOverride, activeAddons, hardware, renEnabled, renFeePerOrder, renVenues, discountPercent) !== savedSnapshot,
-    [dailyOrders, deliveryOrders, locations, avgTicket, planOverride, activeAddons, hardware, renEnabled, renFeePerOrder, renVenues, discountPercent, savedSnapshot]
+    () => serializeSimState(dailyOrders, deliveryOrders, locations, avgTicket, planOverride, activeAddons, hardware, renEnabled, renFeePerOrder, renVenues, kdsVenues, kioskVenues, discountPercent) !== savedSnapshot,
+    [dailyOrders, deliveryOrders, locations, avgTicket, planOverride, activeAddons, hardware, renEnabled, renFeePerOrder, renVenues, kdsVenues, kioskVenues, discountPercent, savedSnapshot]
   )
 
   useEffect(() => {
@@ -241,11 +249,13 @@ export function Simulator({ deal, initialConfig, loadedConfigId }: SimulatorProp
         renEnabled,
         renFeePerOrder,
         renVenues,
+        kdsVenues,
+        kioskVenues,
       })
       if (result.ok) {
         setSaveState('saved')
         setLastSavePersisted(result.persisted)
-        setSavedSnapshot(serializeSimState(dailyOrders, deliveryOrders, locations, avgTicket, planOverride, activeAddons, hardware, renEnabled, renFeePerOrder, renVenues, discountPercent))
+        setSavedSnapshot(serializeSimState(dailyOrders, deliveryOrders, locations, avgTicket, planOverride, activeAddons, hardware, renEnabled, renFeePerOrder, renVenues, kdsVenues, kioskVenues, discountPercent))
         router.refresh()
       } else {
         setSaveState('error')
@@ -270,12 +280,14 @@ export function Simulator({ deal, initialConfig, loadedConfigId }: SimulatorProp
         renEnabled,
         renFeePerOrder,
         renVenues,
+        kdsVenues,
+        kioskVenues,
       })
       if (result.ok) {
         setSaveNewState('saved')
         setLastNewVersion(result.version)
         setLastNewVersionPersisted(result.persisted)
-        setSavedSnapshot(serializeSimState(dailyOrders, deliveryOrders, locations, avgTicket, planOverride, activeAddons, hardware, renEnabled, renFeePerOrder, renVenues, discountPercent))
+        setSavedSnapshot(serializeSimState(dailyOrders, deliveryOrders, locations, avgTicket, planOverride, activeAddons, hardware, renEnabled, renFeePerOrder, renVenues, kdsVenues, kioskVenues, discountPercent))
         router.refresh()
       } else {
         setSaveNewState('error')
@@ -469,11 +481,19 @@ export function Simulator({ deal, initialConfig, loadedConfigId }: SimulatorProp
             {ADDON_ORDER.map((id) => {
               const addon = ADDONS[id]
               const active = activeAddons.has(id)
+              const isKds = id === 'kds'
+              const isKiosk = id === 'kiosk'
+              const venueCount = isKds ? kdsVenues : isKiosk ? kioskVenues : null
+              const setVenueCount = isKds ? setKdsVenues : isKiosk ? setKioskVenues : null
+              const venueLabel = isKds ? 'Locales con KDS' : isKiosk ? 'Locales con Kiosk' : null
+
               const price =
                 id === 'datafono'
                   ? `${addon.feePercent}% GMV`
                   : addon.perConsumption
                   ? 'por consumo'
+                  : (isKds || isKiosk) && active && venueCount != null
+                  ? `19€ × ${venueCount} local${venueCount > 1 ? 'es' : ''} con ${isKds ? 'KDS' : 'Kiosk'}`
                   : addon.perLocation
                   ? `${addon.priceMonthly}€ × ${locations} local${locations > 1 ? 'es' : ''}`
                   : `${addon.priceMonthly}€/mes`
@@ -481,6 +501,8 @@ export function Simulator({ deal, initialConfig, loadedConfigId }: SimulatorProp
               const monthlyImpact: number =
                 id === 'datafono'
                   ? economics.datafonoFeeMonthly
+                  : (isKds || isKiosk) && venueCount != null
+                  ? (addon.priceMonthly ?? 19) * venueCount
                   : addon.perLocation && addon.priceMonthly != null
                   ? addon.priceMonthly * locations
                   : addon.priceMonthly ?? 0
@@ -506,7 +528,7 @@ export function Simulator({ deal, initialConfig, loadedConfigId }: SimulatorProp
                       </svg>
                     )}
                   </div>
-                  <div className="min-w-0">
+                  <div className="min-w-0 flex-1">
                     <p className="text-sm font-medium text-zinc-900">{addon.label}</p>
                     <p className="text-xs text-zinc-500 mt-0.5">{addon.description}</p>
                     <p className="text-xs font-mono text-zinc-600 mt-1">{price}</p>
@@ -514,6 +536,24 @@ export function Simulator({ deal, initialConfig, loadedConfigId }: SimulatorProp
                       <p className="text-xs font-mono font-semibold text-emerald-700 mt-0.5">
                         +{formatCurrency(monthlyImpact)}/mes
                       </p>
+                    )}
+                    {active && (isKds || isKiosk) && venueCount != null && setVenueCount && venueLabel && (
+                      <div className="mt-2" onClick={(e) => e.stopPropagation()}>
+                        <label className="text-xs font-medium text-zinc-600 block mb-1">{venueLabel}</label>
+                        <div className="flex items-center border border-zinc-200 rounded-lg overflow-hidden focus-within:ring-2 focus-within:ring-zinc-900 w-24">
+                          <input
+                            type="number"
+                            min={1}
+                            max={999}
+                            step={1}
+                            value={venueCount}
+                            onChange={(e) => setVenueCount(Math.max(1, Number(e.target.value)))}
+                            onClick={(e) => e.stopPropagation()}
+                            className="flex-1 px-2 py-1.5 text-sm font-mono text-zinc-900 outline-none bg-white"
+                          />
+                          <span className="px-2 text-xs text-zinc-400 bg-zinc-50 border-l border-zinc-200 py-1.5">ud.</span>
+                        </div>
+                      </div>
                     )}
                   </div>
                 </button>
@@ -800,6 +840,8 @@ export function Simulator({ deal, initialConfig, loadedConfigId }: SimulatorProp
           renEnabled={renEnabled}
           renFeePerOrder={renFeePerOrder}
           renVenues={renVenues}
+          kdsVenues={kdsVenues}
+          kioskVenues={kioskVenues}
           discountPercent={discountPercent}
           onDiscountChange={setDiscountPercent}
           activeAddons={activeAddons}
@@ -830,6 +872,8 @@ function EconomicsPanel({
   renEnabled,
   renFeePerOrder,
   renVenues,
+  kdsVenues,
+  kioskVenues,
   discountPercent,
   onDiscountChange,
   activeAddons,
@@ -849,6 +893,8 @@ function EconomicsPanel({
   renEnabled: boolean
   renFeePerOrder: number
   renVenues: number
+  kdsVenues: number
+  kioskVenues: number
   discountPercent: number
   onDiscountChange: (v: number) => void
   activeAddons: Set<AddonId>
@@ -864,7 +910,10 @@ function EconomicsPanel({
 }) {
   const hasDatafono = activeAddons.has('datafono')
   const renMonthly = renEnabled ? renFeePerOrder * deliveryOrders * renVenues : 0
-  const softwareFee = economics.softwareRevenueMonthly
+  // Adjust addon fee for KDS/Kiosk venue overrides (calculateEconomics uses locations for all per-location addons)
+  const kdsAdj = activeAddons.has('kds') ? 19 * (kdsVenues - locations) : 0
+  const kioskAdj = activeAddons.has('kiosk') ? 19 * (kioskVenues - locations) : 0
+  const softwareFee = economics.softwareRevenueMonthly + kdsAdj + kioskAdj
   const discountAmount = softwareFee * (discountPercent / 100)
   const adjustedMRR = softwareFee - discountAmount + renMonthly + economics.hardwareRevenueMonthly
   const rentedMonthly = HARDWARE_ORDER.reduce((sum, id) => {

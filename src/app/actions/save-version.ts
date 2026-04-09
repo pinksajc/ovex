@@ -20,6 +20,8 @@ export interface SaveVersionPayload {
   renEnabled: boolean
   renFeePerOrder: number
   renVenues: number
+  kdsVenues: number
+  kioskVenues: number
   label?: string
 }
 
@@ -49,6 +51,8 @@ export async function saveNewVersionAction(
       renEnabled: payload.renEnabled,
       renFeePerOrder: payload.renFeePerOrder,
       renVenues: payload.renVenues,
+      kdsVenues: payload.kdsVenues,
+      kioskVenues: payload.kioskVenues,
     }
 
     const result = await saveNewConfigVersion(payload.dealId, {
@@ -59,6 +63,8 @@ export async function saveNewVersionAction(
       renEnabled: payload.renEnabled,
       renFeePerOrder: payload.renFeePerOrder,
       renVenues: payload.renVenues,
+      kdsVenues: payload.kdsVenues,
+      kioskVenues: payload.kioskVenues,
       locations: payload.locations,
       averageTicket: payload.averageTicket,
       estimatedGrowthPercent: 0,
