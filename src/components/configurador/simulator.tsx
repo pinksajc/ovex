@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useMemo, useTransition, useEffect, useRef } from 'react'
+import { useState, useMemo, useTransition, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { PLANS, ADDONS, ADDON_ORDER, PLAN_ORDER, HARDWARE, HARDWARE_ORDER, HARDWARE_MODE_LABELS, RENTAL_MONTHLY_PRICE, PLAN_FEATURES } from '@/lib/pricing/catalog'
 import { calculateEconomics, suggestPlan } from '@/lib/pricing/engine'
@@ -121,7 +121,6 @@ export function Simulator({ deal, initialConfig, loadedConfigId }: SimulatorProp
   const router = useRouter()
 
   // ---- Auto-set Counter Stand when plan changes ----
-  const prevPlanRef = useRef<PlanTier | null>(null)
 
   // ---- Save state (overwrite active) ----
   const [isPending, startTransition] = useTransition()
@@ -182,19 +181,12 @@ export function Simulator({ deal, initialConfig, loadedConfigId }: SimulatorProp
   const activePlan = planOverride ?? suggestedPlan
   const planChanged = planOverride !== null && planOverride !== suggestedPlan
 
-  // Auto-set Counter Stand to qty=1, mode=included when plan changes
+  // Auto-set Counter Stand to qty=1, mode=included on mount and whenever plan changes
   useEffect(() => {
-    if (prevPlanRef.current === null) {
-      prevPlanRef.current = activePlan
-      return
-    }
-    if (prevPlanRef.current !== activePlan) {
-      prevPlanRef.current = activePlan
-      setHardware((prev) => ({
-        ...prev,
-        counter_stand: { ...prev.counter_stand, quantity: 1, mode: 'included' },
-      }))
-    }
+    setHardware((prev) => ({
+      ...prev,
+      counter_stand: { ...prev.counter_stand, quantity: 1, mode: 'included' },
+    }))
   }, [activePlan])
   const hardwareLineItems = useMemo(() => hardwareStateToLineItems(hardware), [hardware])
 
