@@ -700,49 +700,81 @@ function s11Economics(deal: Deal, cfg: DealConfiguration, sections: ProposalSect
         : '')
     : ''
 
+  // Renders a 3-line neto / IVA / total breakdown for a given net amount
+  const vatRow = (label: string, net: number, suffix = '') => `
+    <div style="padding:5px 0;border-bottom:1px solid #f1f5f9;">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:6px;">
+        <span style="font-size:9px;color:#64748b;flex-shrink:0;padding-top:2px;">${label}</span>
+        <div style="text-align:right;flex-shrink:0;line-height:1.5;">
+          <div style="font-size:9px;color:#64748b;font-family:'Courier New',monospace;">${fmt(net)}${suffix} <span style="font-size:7.5px;color:#94a3b8;">(neto)</span></div>
+          <div style="font-size:9px;color:#94a3b8;font-family:'Courier New',monospace;">+ ${fmt(net * 0.21)}${suffix} <span style="font-size:7.5px;">(IVA 21%)</span></div>
+          <div style="font-size:10px;font-weight:700;color:#1e3a5f;font-family:'Courier New',monospace;">= ${fmtVAT(net)}${suffix}</div>
+        </div>
+      </div>
+    </div>`
+
+  const simpleRow = (label: string, value: string, red = false) => `
+    <div style="display:flex;justify-content:space-between;padding:3px 0;border-bottom:1px solid #f1f5f9;">
+      <span style="font-size:9.5px;color:${red ? '#dc2626' : '#64748b'};">${label}</span>
+      <span style="font-size:9.5px;font-weight:600;color:${red ? '#dc2626' : '#0f172a'};font-family:'Courier New',monospace;">${value}</span>
+    </div>`
+
   const content = `
     ${sectionTitle('Resumen económico', `${deal.company.name} · Plan ${plan.label} · ${cfg.locations} local${cfg.locations > 1 ? 'es' : ''}`)}
 
-    <div style="border:2px solid #1e3a5f;border-radius:12px;padding:22px 28px;background:#f0f5fb;margin-bottom:18px;text-align:center;">
-      <div style="font-size:9px;color:#64748b;text-transform:uppercase;letter-spacing:1.5px;margin-bottom:8px;">Total / mes (IVA 21% incluido)</div>
-      <div style="font-size:42px;font-weight:900;color:#0f172a;font-family:'Courier New',monospace;line-height:1;">${fmtVAT(totalMes)}</div>
-      <div style="font-size:9.5px;color:#64748b;margin-top:6px;">
-        ROS ${fmtVAT(adjustedSoftware)}/mes${renMonthly > 0 ? ` · REN ${fmtVAT(renMonthly)}/mes` : ''}${eco.hardwareRevenueMonthly > 0 ? ` · Hardware ${fmtVAT(eco.hardwareRevenueMonthly)}/mes` : ''}
+    <!-- Hero total box -->
+    <div style="border:2px solid #1e3a5f;border-radius:12px;padding:16px 22px 14px;background:#f0f5fb;margin-bottom:16px;">
+      <div style="font-size:9px;color:#64748b;text-transform:uppercase;letter-spacing:1.5px;margin-bottom:12px;text-align:center;">Total / mes</div>
+      <div style="display:flex;align-items:center;justify-content:center;gap:10px;flex-wrap:wrap;">
+        <div style="text-align:center;">
+          <div style="font-size:24px;font-weight:900;color:#334155;font-family:'Courier New',monospace;line-height:1;">${fmt(totalMes)}</div>
+          <div style="font-size:7.5px;color:#94a3b8;text-transform:uppercase;letter-spacing:1px;margin-top:3px;">neto</div>
+        </div>
+        <div style="font-size:18px;color:#94a3b8;font-weight:300;margin-bottom:10px;">+</div>
+        <div style="text-align:center;">
+          <div style="font-size:24px;font-weight:900;color:#64748b;font-family:'Courier New',monospace;line-height:1;">${fmt(totalMes * 0.21)}</div>
+          <div style="font-size:7.5px;color:#94a3b8;text-transform:uppercase;letter-spacing:1px;margin-top:3px;">IVA 21%</div>
+        </div>
+        <div style="font-size:18px;color:#94a3b8;font-weight:300;margin-bottom:10px;">=</div>
+        <div style="text-align:center;background:#1e3a5f;padding:10px 18px;border-radius:8px;">
+          <div style="font-size:30px;font-weight:900;color:#fff;font-family:'Courier New',monospace;line-height:1;">${fmtVAT(totalMes)}</div>
+          <div style="font-size:7.5px;color:rgba(255,255,255,0.65);text-transform:uppercase;letter-spacing:1px;margin-top:3px;">total/mes</div>
+        </div>
       </div>
-      ${discountPercent > 0 ? `<div style="font-size:8.5px;color:#dc2626;margin-top:3px;">Descuento aplicado: −${discountPercent}% (${fmtVAT(discountAmount)}/mes)</div>` : ''}
+      ${discountPercent > 0 ? `<div style="font-size:8px;color:#dc2626;margin-top:10px;text-align:center;">Descuento aplicado: −${discountPercent}% sobre neto · −${fmt(discountAmount)} neto · −${fmtVAT(discountAmount)} con IVA</div>` : ''}
+      <div style="font-size:8px;color:#94a3b8;margin-top:8px;text-align:center;border-top:1px solid #dde6f0;padding-top:8px;">
+        ROS ${fmt(adjustedSoftware)}/mes neto${renMonthly > 0 ? ` · REN ${fmt(renMonthly)}/mes neto` : ''}${eco.hardwareRevenueMonthly > 0 ? ` · Hardware ${fmt(eco.hardwareRevenueMonthly)}/mes neto` : ''}
+      </div>
     </div>
 
     <div style="display:grid;grid-template-columns:${renEnabled ? '1fr 1fr 1fr' : '1fr 1fr'};gap:12px;margin-bottom:16px;">
-      <!-- Software -->
+      <!-- ROS -->
       <div style="border:1px solid #dde6f0;border-radius:8px;padding:14px;">
         <div style="font-size:9px;font-weight:700;color:#1e3a5f;text-transform:uppercase;letter-spacing:1px;margin-bottom:9px;padding-bottom:7px;border-bottom:1px solid #e8eef6;">ROS</div>
-        ${[
-          ['Plan', plan.label],
-          ['Precio base (IVA incl.)', plan.priceMonthly === 0 ? `Gratis + ${plan.variableFee}€/ticket + IVA` : `${fmtVAT(plan.priceMonthly)}/mes/local`],
-          ['Fee variable (+ IVA)', `${plan.variableFee}€/ticket`],
-          ['Locales', String(cfg.locations)],
-          ['Pedidos/mes/local', fmtN(cfg.dailyOrdersPerLocation)],
-          ['Fee ROS/mes', fmtVAT(adjustedSoftwareBase)],
-          ...(discountPercent > 0 ? [['Descuento', `−${discountPercent}% (${fmtVAT(discountAmount)})`]] : []),
-          ...(discountPercent > 0 ? [['Neto ROS', fmtVAT(adjustedSoftware)]] : []),
-        ].map(([k,v]) => `
-          <div style="display:flex;justify-content:space-between;padding:3px 0;border-bottom:1px solid #f1f5f9;">
-            <span style="font-size:9.5px;color:${k === 'Descuento' ? '#dc2626' : '#64748b'};">${k}</span>
-            <span style="font-size:9.5px;font-weight:600;color:${k === 'Descuento' ? '#dc2626' : '#0f172a'};font-family:'Courier New',monospace;">${v}</span>
-          </div>`).join('')}
+        ${simpleRow('Plan', plan.label)}
+        ${simpleRow('Precio base', plan.priceMonthly === 0 ? `Gratis + ${plan.variableFee}€/ticket` : `${fmt(plan.priceMonthly)}€/local/mes`)}
+        ${simpleRow('Fee variable', `${plan.variableFee}€/ticket`)}
+        ${simpleRow('Locales', String(cfg.locations))}
+        ${simpleRow('Pedidos/mes/local', fmtN(cfg.dailyOrdersPerLocation))}
+        ${discountPercent > 0
+          ? vatRow('Fee ROS bruto/mes', adjustedSoftwareBase, '/mes') +
+            simpleRow('Descuento', `−${discountPercent}% neto (−${fmt(discountAmount)})`, true) +
+            vatRow('Fee ROS neto/mes', adjustedSoftware, '/mes')
+          : vatRow('Fee ROS/mes', adjustedSoftwareBase, '/mes')}
         ${activeAddons.length > 0 ? `
           <div style="margin-top:9px;padding-top:7px;border-top:1px solid #e8eef6;">
             <div style="font-size:8px;color:#94a3b8;text-transform:uppercase;letter-spacing:1px;margin-bottom:5px;">Add-ons activos</div>
             ${activeAddons.map(a => {
-              const addonTotal = a.id === 'datafono'
+              const addonNet = a.id === 'kds' ? 19 * kdsVenues
+                : a.id === 'kiosk' ? 19 * kioskVenues
+                : a.priceMonthly != null ? a.priceMonthly * cfg.locations : null
+              const addonLabel = a.id === 'datafono'
                 ? `${a.feePercent}% GMV`
                 : a.perConsumption ? 'Por consumo'
-                : a.id === 'kds' ? `${fmtVAT(19 * kdsVenues)}/mes`
-                : a.id === 'kiosk' ? `${fmtVAT(19 * kioskVenues)}/mes`
-                : a.priceMonthly != null ? `${fmtVAT(a.priceMonthly * cfg.locations)}/mes` : '—'
+                : addonNet != null ? `${fmt(addonNet)}/mes neto · ${fmtVAT(addonNet)}/mes` : '—'
               return `<div style="display:flex;justify-content:space-between;padding:2px 0;">
-                <span style="font-size:9.5px;color:#334155;">${a.label}</span>
-                <span style="font-size:9px;color:#1e3a5f;font-family:'Courier New',monospace;">${addonTotal}</span>
+                <span style="font-size:9px;color:#334155;">${a.label}</span>
+                <span style="font-size:8.5px;color:#1e3a5f;font-family:'Courier New',monospace;">${addonLabel}</span>
               </div>`
             }).join('')}
           </div>` : ''}
@@ -752,16 +784,10 @@ function s11Economics(deal: Deal, cfg: DealConfiguration, sections: ProposalSect
       <!-- REN -->
       <div style="border:1px solid #dde6f0;border-radius:8px;padding:14px;">
         <div style="font-size:9px;font-weight:700;color:#1e3a5f;text-transform:uppercase;letter-spacing:1px;margin-bottom:9px;padding-bottom:7px;border-bottom:1px solid #e8eef6;">REN</div>
-        ${[
-          ['Pedidos delivery/mes/local', fmtN(deliveryPerVenue)],
-          ['Fee por pedido (IVA incl.)', `${(renFeePerOrder * 1.21).toFixed(2).replace('.', ',')}€`],
-          ['Locales con REN', String(renVenues)],
-          ['Coste REN/mes', fmtVAT(renMonthly)],
-        ].map(([k,v]) => `
-          <div style="display:flex;justify-content:space-between;padding:3px 0;border-bottom:1px solid #f1f5f9;">
-            <span style="font-size:9.5px;color:#64748b;">${k}</span>
-            <span style="font-size:9.5px;font-weight:600;color:#0f172a;font-family:'Courier New',monospace;">${v}</span>
-          </div>`).join('')}
+        ${simpleRow('Pedidos delivery/mes/local', fmtN(deliveryPerVenue))}
+        ${simpleRow('Fee por pedido (neto)', `${renFeePerOrder.toFixed(2).replace('.', ',')}€`)}
+        ${simpleRow('Locales con REN', String(renVenues))}
+        ${vatRow('Coste REN/mes', renMonthly, '/mes')}
       </div>` : ''}
 
       <!-- Hardware -->
@@ -771,26 +797,45 @@ function s11Economics(deal: Deal, cfg: DealConfiguration, sections: ProposalSect
           ? hwItems.map(item => {
               const hw = HARDWARE[item.hardwareId]
               const lineTotal = item.unitPrice * item.quantity
-              const price = item.mode === 'included'
-                ? 'Incluido en el plan'
-                : item.mode === 'financed' && item.financeMonths
-                ? `${fmtVAT(lineTotal / item.financeMonths)}/mes`
-                : fmtVAT(lineTotal)
               const modeLabel11 = item.mode === 'included' ? 'Incluido en el plan' : HARDWARE_MODE_LABELS[item.mode]
-              return `<div style="padding:5px 0;border-bottom:1px solid #f1f5f9;">
-                <div style="display:flex;justify-content:space-between;align-items:flex-start;">
-                  <div>
-                    <div style="font-size:10px;font-weight:600;color:#0f172a;">${hw.label}</div>
-                    <div style="font-size:9px;color:#94a3b8;">${item.quantity} ud. · ${modeLabel11}</div>
+              if (item.mode === 'included') {
+                return `<div style="padding:5px 0;border-bottom:1px solid #f1f5f9;">
+                  <div style="display:flex;justify-content:space-between;align-items:center;">
+                    <div>
+                      <div style="font-size:10px;font-weight:600;color:#0f172a;">${hw.label}</div>
+                      <div style="font-size:9px;color:#94a3b8;">${item.quantity} ud. · ${modeLabel11}</div>
+                    </div>
+                    <div style="font-size:10px;font-weight:600;color:#10b981;font-family:'Courier New',monospace;">Incluido</div>
                   </div>
-                  <div style="font-size:10px;font-weight:600;color:${item.mode === 'included' ? '#10b981' : '#1e3a5f'};font-family:'Courier New',monospace;">${price}</div>
+                </div>`
+              }
+              const net = item.mode === 'financed' && item.financeMonths
+                ? lineTotal / item.financeMonths
+                : item.mode === 'rented' ? 19 * item.quantity
+                : lineTotal
+              const suffix = (item.mode === 'financed' || item.mode === 'rented') ? '/mes' : ''
+              return `<div style="padding:5px 0;border-bottom:1px solid #f1f5f9;">
+                <div style="font-size:10px;font-weight:600;color:#0f172a;margin-bottom:3px;">${hw.label} · ${item.quantity} ud. · ${modeLabel11}</div>
+                <div style="display:flex;justify-content:flex-end;">
+                  <div style="text-align:right;line-height:1.5;">
+                    <div style="font-size:9px;color:#64748b;font-family:'Courier New',monospace;">${fmt(net)}${suffix} <span style="font-size:7.5px;color:#94a3b8;">(neto)</span></div>
+                    <div style="font-size:9px;color:#94a3b8;font-family:'Courier New',monospace;">+ ${fmt(net * 0.21)}${suffix} <span style="font-size:7.5px;">(IVA 21%)</span></div>
+                    <div style="font-size:10px;font-weight:700;color:#1e3a5f;font-family:'Courier New',monospace;">= ${fmtVAT(net)}${suffix}</div>
+                  </div>
                 </div>
               </div>`
-            }).join('') + `
-              <div style="display:flex;justify-content:space-between;padding:7px 0 0;">
-                <span style="font-size:9.5px;color:#64748b;">Total hardware</span>
-                <span style="font-size:11px;font-weight:800;color:#1e3a5f;font-family:'Courier New',monospace;">${fmtVAT(eco.hardwareCostTotal)}</span>
-              </div>`
+            }).join('') +
+            (eco.hardwareCostTotal > 0 ? `
+              <div style="padding:7px 0 0;">
+                <div style="display:flex;justify-content:space-between;align-items:baseline;">
+                  <span style="font-size:9px;color:#64748b;">Total hardware</span>
+                  <div style="text-align:right;line-height:1.5;">
+                    <div style="font-size:9px;color:#64748b;font-family:'Courier New',monospace;">${fmt(eco.hardwareCostTotal)} <span style="font-size:7.5px;color:#94a3b8;">(neto)</span></div>
+                    <div style="font-size:9px;color:#94a3b8;font-family:'Courier New',monospace;">+ ${fmt(eco.hardwareCostTotal * 0.21)} <span style="font-size:7.5px;">(IVA)</span></div>
+                    <div style="font-size:11px;font-weight:800;color:#1e3a5f;font-family:'Courier New',monospace;">= ${fmtVAT(eco.hardwareCostTotal)}</div>
+                  </div>
+                </div>
+              </div>` : '')
           : `<div style="font-size:10px;color:#94a3b8;font-style:italic;padding:7px 0;">Sin hardware configurado</div>`}
       </div>
     </div>
