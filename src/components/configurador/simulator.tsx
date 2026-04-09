@@ -67,7 +67,8 @@ function serializeSimState(
   activeAddons: Set<AddonId>,
   hardware: HardwareState,
   renEnabled: boolean,
-  renFeePerOrder: number
+  renFeePerOrder: number,
+  discountPercent: number
 ): string {
   return JSON.stringify({
     dailyOrders,
@@ -79,6 +80,7 @@ function serializeSimState(
     hardware,
     renEnabled,
     renFeePerOrder,
+    discountPercent,
   })
 }
 
@@ -109,8 +111,9 @@ export function Simulator({ deal, initialConfig, loadedConfigId }: SimulatorProp
   const [hardware, setHardware] = useState<HardwareState>(() =>
     initHardwareState(init?.locations ?? 1, init?.hardware)
   )
-  const [renEnabled, setRenEnabled] = useState(false)
-  const [renFeePerOrder, setRenFeePerOrder] = useState(0.20)
+  const [renEnabled, setRenEnabled] = useState(init?.renEnabled ?? false)
+  const [renFeePerOrder, setRenFeePerOrder] = useState(init?.renFeePerOrder ?? 0.20)
+  const [discountPercent, setDiscountPercent] = useState(init?.discountPercent ?? 0)
 
   const router = useRouter()
 
@@ -142,14 +145,15 @@ export function Simulator({ deal, initialConfig, loadedConfigId }: SimulatorProp
       init?.planOverridden ? (init.plan ?? null) : null,
       new Set(init?.activeAddons ?? []),
       initHardwareState(init?.locations ?? 1, init?.hardware),
-      false,
-      0.20
+      init?.renEnabled ?? false,
+      init?.renFeePerOrder ?? 0.20,
+      init?.discountPercent ?? 0
     )
   )
 
   const hasUnsavedChanges = useMemo(
-    () => serializeSimState(dailyOrders, deliveryOrders, locations, avgTicket, planOverride, activeAddons, hardware, renEnabled, renFeePerOrder) !== savedSnapshot,
-    [dailyOrders, deliveryOrders, locations, avgTicket, planOverride, activeAddons, hardware, renEnabled, renFeePerOrder, savedSnapshot]
+    () => serializeSimState(dailyOrders, deliveryOrders, locations, avgTicket, planOverride, activeAddons, hardware, renEnabled, renFeePerOrder, discountPercent) !== savedSnapshot,
+    [dailyOrders, deliveryOrders, locations, avgTicket, planOverride, activeAddons, hardware, renEnabled, renFeePerOrder, discountPercent, savedSnapshot]
   )
 
   useEffect(() => {
@@ -219,11 +223,14 @@ export function Simulator({ deal, initialConfig, loadedConfigId }: SimulatorProp
         planOverridden: planOverride !== null,
         activeAddons: Array.from(activeAddons),
         hardware: hardwareLineItems,
+        discountPercent,
+        renEnabled,
+        renFeePerOrder,
       })
       if (result.ok) {
         setSaveState('saved')
         setLastSavePersisted(result.persisted)
-        setSavedSnapshot(serializeSimState(dailyOrders, deliveryOrders, locations, avgTicket, planOverride, activeAddons, hardware, renEnabled, renFeePerOrder))
+        setSavedSnapshot(serializeSimState(dailyOrders, deliveryOrders, locations, avgTicket, planOverride, activeAddons, hardware, renEnabled, renFeePerOrder, discountPercent))
         router.refresh()
       } else {
         setSaveState('error')
@@ -244,12 +251,15 @@ export function Simulator({ deal, initialConfig, loadedConfigId }: SimulatorProp
         planOverridden: planOverride !== null,
         activeAddons: Array.from(activeAddons),
         hardware: hardwareLineItems,
+        discountPercent,
+        renEnabled,
+        renFeePerOrder,
       })
       if (result.ok) {
         setSaveNewState('saved')
         setLastNewVersion(result.version)
         setLastNewVersionPersisted(result.persisted)
-        setSavedSnapshot(serializeSimState(dailyOrders, deliveryOrders, locations, avgTicket, planOverride, activeAddons, hardware, renEnabled, renFeePerOrder))
+        setSavedSnapshot(serializeSimState(dailyOrders, deliveryOrders, locations, avgTicket, planOverride, activeAddons, hardware, renEnabled, renFeePerOrder, discountPercent))
         router.refresh()
       } else {
         setSaveNewState('error')
@@ -727,6 +737,8 @@ export function Simulator({ deal, initialConfig, loadedConfigId }: SimulatorProp
           deliveryOrders={deliveryOrders}
           renEnabled={renEnabled}
           renFeePerOrder={renFeePerOrder}
+          discountPercent={discountPercent}
+          onDiscountChange={setDiscountPercent}
           activeAddons={activeAddons}
           hardware={hardware}
           hasUnsavedChanges={hasUnsavedChanges}
@@ -754,6 +766,8 @@ function EconomicsPanel({
   deliveryOrders,
   renEnabled,
   renFeePerOrder,
+  discountPercent,
+  onDiscountChange,
   activeAddons,
   hardware,
   hasUnsavedChanges,
@@ -770,6 +784,8 @@ function EconomicsPanel({
   deliveryOrders: number
   renEnabled: boolean
   renFeePerOrder: number
+  discountPercent: number
+  onDiscountChange: (v: number) => void
   activeAddons: Set<AddonId>
   hardware: HardwareState
   hasUnsavedChanges: boolean
@@ -783,6 +799,9 @@ function EconomicsPanel({
 }) {
   const hasDatafono = activeAddons.has('datafono')
   const renMonthly = renEnabled ? renFeePerOrder * deliveryOrders * locations : 0
+  const softwareFee = economics.softwareRevenueMonthly
+  const discountAmount = softwareFee * (discountPercent / 100)
+  const adjustedMRR = softwareFee - discountAmount + renMonthly + economics.hardwareRevenueMonthly
   const rentedMonthly = HARDWARE_ORDER.reduce((sum, id) => {
     const s = hardware[id]
     return s.mode === 'rented' ? sum + RENTAL_MONTHLY_PRICE * s.quantity : sum
@@ -800,10 +819,10 @@ function EconomicsPanel({
       <div className="px-5 py-5 border-b border-zinc-100">
         <p className="text-xs text-zinc-400 uppercase tracking-widest mb-1">MRR estimado</p>
         <p className="text-3xl font-semibold font-mono text-zinc-900">
-          {formatCurrency(economics.totalMonthlyRevenue)}
+          {formatCurrency(adjustedMRR)}
         </p>
         <p className="text-sm text-zinc-400 mt-0.5 font-mono">
-          {formatCurrency(economics.annualRevenue)}/año
+          {formatCurrency(adjustedMRR * 12)}/año
         </p>
       </div>
 
@@ -820,11 +839,38 @@ function EconomicsPanel({
           {hasDatafono && economics.datafonoFeeMonthly > 0 && (
             <BreakdownRow label="Datáfono (0.8% GMV)" value={formatCurrency(economics.datafonoFeeMonthly)} />
           )}
+          {/* Discount input */}
+          <div className="pt-2 border-t border-zinc-100">
+            <div className="flex items-center justify-between gap-2">
+              <label className="text-xs text-zinc-600">Descuento software</label>
+              <div className="flex items-center border border-zinc-200 rounded-lg overflow-hidden focus-within:ring-2 focus-within:ring-zinc-900 w-24">
+                <input
+                  type="number"
+                  min={0}
+                  max={100}
+                  step={1}
+                  value={discountPercent}
+                  onChange={(e) => onDiscountChange(Math.min(100, Math.max(0, Number(e.target.value))))}
+                  className="flex-1 px-2 py-1 text-xs font-mono text-zinc-900 outline-none bg-white w-0"
+                />
+                <span className="px-2 text-xs text-zinc-400 bg-zinc-50 border-l border-zinc-200 py-1">%</span>
+              </div>
+            </div>
+            {discountAmount > 0 && (
+              <div className="flex justify-between items-baseline mt-1">
+                <span className="text-xs text-red-500">Descuento</span>
+                <span className="text-xs font-mono text-red-500">−{formatCurrency(discountAmount)}/mes</span>
+              </div>
+            )}
+          </div>
+          {renMonthly > 0 && (
+            <BreakdownRow label="REN" value={`+${formatCurrency(renMonthly)}/mes`} />
+          )}
           {economics.hardwareRevenueMonthly > 0 && (
             <BreakdownRow label="Hardware (financiado)" value={formatCurrency(economics.hardwareRevenueMonthly)} />
           )}
           <div className="pt-2 border-t border-zinc-100">
-            <BreakdownRow label="Total mensual" value={formatCurrency(economics.totalMonthlyRevenue)} bold />
+            <BreakdownRow label="Total mensual" value={formatCurrency(adjustedMRR)} bold />
           </div>
         </div>
       </div>

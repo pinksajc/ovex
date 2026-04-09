@@ -16,6 +16,9 @@ export interface SaveConfigPayload {
   planOverridden: boolean
   activeAddons: AddonId[]
   hardware: HardwareLineItem[]
+  discountPercent: number
+  renEnabled: boolean
+  renFeePerOrder: number
 }
 
 export interface SaveConfigResult {
@@ -38,6 +41,9 @@ export async function saveConfigAction(
         hardware: payload.hardware,
       }),
       deliveryOrdersPerVenue: payload.deliveryOrdersPerVenue,
+      discountPercent: payload.discountPercent,
+      renEnabled: payload.renEnabled,
+      renFeePerOrder: payload.renFeePerOrder,
     }
 
     const result = await saveActiveConfig(payload.dealId, {
@@ -45,6 +51,9 @@ export async function saveConfigAction(
       version: 1,
       dailyOrdersPerLocation: payload.dailyOrdersPerLocation,
       deliveryOrdersPerVenue: payload.deliveryOrdersPerVenue,
+      discountPercent: payload.discountPercent,
+      renEnabled: payload.renEnabled,
+      renFeePerOrder: payload.renFeePerOrder,
       locations: payload.locations,
       averageTicket: payload.averageTicket,
       estimatedGrowthPercent: 0,

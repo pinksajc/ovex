@@ -52,6 +52,11 @@ export interface DealConfiguration {
   // Delivery volume (separate from main order volume)
   deliveryOrdersPerVenue?: number  // pedidos delivery/mes por local (default 500)
 
+  // Discount & REN — stored in economics jsonb snapshot, no DB column needed
+  discountPercent?: number         // % discount on software revenue (default 0)
+  renEnabled?: boolean             // REN logistics enabled (default false)
+  renFeePerOrder?: number          // REN fee per delivery order in € (default 0.20)
+
   // Add-ons
   activeAddons: AddonId[]
 

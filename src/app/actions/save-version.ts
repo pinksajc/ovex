@@ -16,6 +16,9 @@ export interface SaveVersionPayload {
   planOverridden: boolean
   activeAddons: AddonId[]
   hardware: HardwareLineItem[]
+  discountPercent: number
+  renEnabled: boolean
+  renFeePerOrder: number
   label?: string
 }
 
@@ -41,12 +44,18 @@ export async function saveNewVersionAction(
         hardware: payload.hardware,
       }),
       deliveryOrdersPerVenue: payload.deliveryOrdersPerVenue,
+      discountPercent: payload.discountPercent,
+      renEnabled: payload.renEnabled,
+      renFeePerOrder: payload.renFeePerOrder,
     }
 
     const result = await saveNewConfigVersion(payload.dealId, {
       label: payload.label,
       dailyOrdersPerLocation: payload.dailyOrdersPerLocation,
       deliveryOrdersPerVenue: payload.deliveryOrdersPerVenue,
+      discountPercent: payload.discountPercent,
+      renEnabled: payload.renEnabled,
+      renFeePerOrder: payload.renFeePerOrder,
       locations: payload.locations,
       averageTicket: payload.averageTicket,
       estimatedGrowthPercent: 0,

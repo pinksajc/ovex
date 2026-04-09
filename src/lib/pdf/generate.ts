@@ -20,7 +20,7 @@
 
 import fs from 'fs'
 import path from 'path'
-import type { Deal, DealConfiguration, ProposalSections } from '@/types'
+import type { Deal, DealConfiguration, DealEconomics, ProposalSections } from '@/types'
 import { PLANS, ADDONS, HARDWARE, HARDWARE_MODE_LABELS } from '@/lib/pricing/catalog'
 
 // ── Logo ─────────────────────────────────────────────────────────────────────
@@ -393,7 +393,11 @@ function s4Purpose(logoUri: string): string {
 function s5Plans(deal: Deal, cfg: DealConfiguration, logoUri: string): string {
   const tiers = ['starter', 'growth', 'pro'] as const
   const hiCol = tiers.indexOf(cfg.plan) + 1
-  const eco = cfg.economics
+  const eco = cfg.economics as DealEconomics & { renEnabled?: boolean; renFeePerOrder?: number }
+  const renEnabled = eco.renEnabled === true
+  const renFeePerOrder = eco.renFeePerOrder ?? 0.20
+  const deliveryPerVenue = cfg.deliveryOrdersPerVenue ?? 0
+  const renMonthly = renEnabled ? renFeePerOrder * deliveryPerVenue * cfg.locations : 0
   const hwItems = cfg.hardware.filter(h => h.quantity > 0)
 
   const planRows: string[][] = [
@@ -459,6 +463,18 @@ function s5Plans(deal: Deal, cfg: DealConfiguration, logoUri: string): string {
           <span style="font-size:10px;font-weight:700;color:#1e3a5f;font-family:'Courier New',monospace;">${importe}</span>
         </div>`
       }).join('')}
+    </div>` : ''}
+
+    ${renEnabled ? `
+    <div style="font-size:9px;font-weight:700;color:#1e3a5f;text-transform:uppercase;letter-spacing:1px;margin-top:18px;margin-bottom:6px;padding-top:12px;border-top:1px solid #e8eef6;">REN — Logística propia</div>
+    <div style="display:flex;justify-content:space-between;align-items:center;padding:7px 11px;background:#f0f5fb;border:1px solid #dde6f0;border-radius:6px;">
+      <div>
+        <span style="font-size:10px;font-weight:600;color:#0f172a;">REN · Marketplace logístico</span>
+        <span style="font-size:9px;color:#94a3b8;margin-left:7px;">
+          ${renFeePerOrder.toFixed(2).replace('.', ',')}€/pedido × ${fmtN(deliveryPerVenue)} pedidos × ${cfg.locations} local${cfg.locations > 1 ? 'es' : ''}
+        </span>
+      </div>
+      <span style="font-size:10px;font-weight:700;color:#1e3a5f;font-family:'Courier New',monospace;">${fmt(renMonthly)}/mes</span>
     </div>` : ''}
 
     <div style="margin-top:12px;background:#f8fafc;border:1px solid #e8eef6;border-radius:7px;padding:10px 14px;font-size:9.5px;color:#64748b;line-height:1.6;">
@@ -609,15 +625,31 @@ function s10NextSteps(deal: Deal, logoUri: string): string {
 
 // ── Section 11: RESUMEN ECONÓMICO ─────────────────────────────────────────────
 function s11Economics(deal: Deal, cfg: DealConfiguration, sections: ProposalSections, logoUri: string): string {
-  const eco  = cfg.economics
+  const eco = cfg.economics as DealEconomics & {
+    renEnabled?: boolean
+    renFeePerOrder?: number
+    discountPercent?: number
+  }
   const plan = PLANS[cfg.plan]
   const activeAddons = cfg.activeAddons.map(id => ADDONS[id])
   const hwItems = cfg.hardware.filter(h => h.quantity > 0)
-  const paybackColor = eco.paybackMonths == null ? '#64748b'
-    : eco.paybackMonths <= 12 ? '#16a34a'
-    : eco.paybackMonths <= 24 ? '#d97706' : '#dc2626'
 
-  const totalMes = eco.softwareRevenueMonthly + eco.hardwareRevenueMonthly
+  const renEnabled = eco.renEnabled === true
+  const renFeePerOrder = eco.renFeePerOrder ?? 0.20
+  const deliveryPerVenue = cfg.deliveryOrdersPerVenue ?? 0
+  const renMonthly = renEnabled ? renFeePerOrder * deliveryPerVenue * cfg.locations : 0
+
+  const discountPercent = eco.discountPercent ?? 0
+  const discountAmount = eco.softwareRevenueMonthly * (discountPercent / 100)
+  const adjustedSoftware = eco.softwareRevenueMonthly - discountAmount
+  const totalMes = adjustedSoftware + renMonthly + eco.hardwareRevenueMonthly
+
+  const execSummary = sections.executiveSummary
+    ? sections.executiveSummary +
+      (renEnabled && deliveryPerVenue > 0
+        ? ` Incluye logística propia a través de REN con ${fmtN(deliveryPerVenue * cfg.locations)} pedidos de delivery mensuales.`
+        : '')
+    : ''
 
   const content = `
     ${sectionTitle('Resumen económico', `${deal.company.name} · Plan ${plan.label} · ${cfg.locations} local${cfg.locations > 1 ? 'es' : ''}`)}
@@ -626,11 +658,12 @@ function s11Economics(deal: Deal, cfg: DealConfiguration, sections: ProposalSect
       <div style="font-size:9px;color:#64748b;text-transform:uppercase;letter-spacing:1.5px;margin-bottom:8px;">Total / mes</div>
       <div style="font-size:42px;font-weight:900;color:#0f172a;font-family:'Courier New',monospace;line-height:1;">${fmt(totalMes)}</div>
       <div style="font-size:9.5px;color:#64748b;margin-top:6px;">
-        Software ${fmt(eco.softwareRevenueMonthly)}/mes${eco.hardwareRevenueMonthly > 0 ? ` · Hardware ${fmt(eco.hardwareRevenueMonthly)}/mes` : ''}
+        Software ${fmt(adjustedSoftware)}/mes${renMonthly > 0 ? ` · REN ${fmt(renMonthly)}/mes` : ''}${eco.hardwareRevenueMonthly > 0 ? ` · Hardware ${fmt(eco.hardwareRevenueMonthly)}/mes` : ''}
       </div>
+      ${discountPercent > 0 ? `<div style="font-size:8.5px;color:#dc2626;margin-top:3px;">Descuento aplicado: −${discountPercent}% (${fmt(discountAmount)}/mes)</div>` : ''}
     </div>
 
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:16px;">
+    <div style="display:grid;grid-template-columns:${renEnabled ? '1fr 1fr 1fr' : '1fr 1fr'};gap:12px;margin-bottom:16px;">
       <!-- Software -->
       <div style="border:1px solid #dde6f0;border-radius:8px;padding:14px;">
         <div style="font-size:9px;font-weight:700;color:#1e3a5f;text-transform:uppercase;letter-spacing:1px;margin-bottom:9px;padding-bottom:7px;border-bottom:1px solid #e8eef6;">Software</div>
@@ -641,10 +674,12 @@ function s11Economics(deal: Deal, cfg: DealConfiguration, sections: ProposalSect
           ['Locales', String(cfg.locations)],
           ['Pedidos/mes/local', fmtN(cfg.dailyOrdersPerLocation)],
           ['Fee software/mes', fmt(eco.softwareRevenueMonthly)],
+          ...(discountPercent > 0 ? [['Descuento', `−${discountPercent}% (${fmt(discountAmount)})`]] : []),
+          ...(discountPercent > 0 ? [['Neto software', fmt(adjustedSoftware)]] : []),
         ].map(([k,v]) => `
           <div style="display:flex;justify-content:space-between;padding:3px 0;border-bottom:1px solid #f1f5f9;">
-            <span style="font-size:9.5px;color:#64748b;">${k}</span>
-            <span style="font-size:9.5px;font-weight:600;color:#0f172a;font-family:'Courier New',monospace;">${v}</span>
+            <span style="font-size:9.5px;color:${k === 'Descuento' ? '#dc2626' : '#64748b'};">${k}</span>
+            <span style="font-size:9.5px;font-weight:600;color:${k === 'Descuento' ? '#dc2626' : '#0f172a'};font-family:'Courier New',monospace;">${v}</span>
           </div>`).join('')}
         ${activeAddons.length > 0 ? `
           <div style="margin-top:9px;padding-top:7px;border-top:1px solid #e8eef6;">
@@ -658,6 +693,22 @@ function s11Economics(deal: Deal, cfg: DealConfiguration, sections: ProposalSect
               </div>`).join('')}
           </div>` : ''}
       </div>
+
+      ${renEnabled ? `
+      <!-- REN -->
+      <div style="border:1px solid #dde6f0;border-radius:8px;padding:14px;">
+        <div style="font-size:9px;font-weight:700;color:#1e3a5f;text-transform:uppercase;letter-spacing:1px;margin-bottom:9px;padding-bottom:7px;border-bottom:1px solid #e8eef6;">REN</div>
+        ${[
+          ['Pedidos delivery/mes', fmtN(deliveryPerVenue * cfg.locations)],
+          ['Fee por pedido', `${renFeePerOrder.toFixed(2).replace('.', ',')}€`],
+          ['Locales', String(cfg.locations)],
+          ['Coste REN/mes', fmt(renMonthly)],
+        ].map(([k,v]) => `
+          <div style="display:flex;justify-content:space-between;padding:3px 0;border-bottom:1px solid #f1f5f9;">
+            <span style="font-size:9.5px;color:#64748b;">${k}</span>
+            <span style="font-size:9.5px;font-weight:600;color:#0f172a;font-family:'Courier New',monospace;">${v}</span>
+          </div>`).join('')}
+      </div>` : ''}
 
       <!-- Hardware -->
       <div style="border:1px solid #dde6f0;border-radius:8px;padding:14px;">
@@ -686,10 +737,10 @@ function s11Economics(deal: Deal, cfg: DealConfiguration, sections: ProposalSect
       </div>
     </div>
 
-    ${sections.executiveSummary ? `
+    ${execSummary ? `
     <div style="background:#f0f5fb;border-left:3px solid #1e3a5f;border-radius:0 6px 6px 0;padding:13px 15px;">
       <div style="font-size:9px;font-weight:700;color:#1e3a5f;text-transform:uppercase;letter-spacing:1px;margin-bottom:5px;">Resumen ejecutivo</div>
-      <div style="font-size:10.5px;color:#334155;line-height:1.6;">${esc(sections.executiveSummary)}</div>
+      <div style="font-size:10.5px;color:#334155;line-height:1.6;">${esc(execSummary)}</div>
     </div>` : ''}`
   return pg(logoUri, content)
 }
