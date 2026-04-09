@@ -19,6 +19,7 @@ export interface SaveConfigPayload {
   discountPercent: number
   renEnabled: boolean
   renFeePerOrder: number
+  renVenues: number
 }
 
 export interface SaveConfigResult {
@@ -44,6 +45,7 @@ export async function saveConfigAction(
       discountPercent: payload.discountPercent,
       renEnabled: payload.renEnabled,
       renFeePerOrder: payload.renFeePerOrder,
+      renVenues: payload.renVenues,
     }
 
     const result = await saveActiveConfig(payload.dealId, {
@@ -54,6 +56,7 @@ export async function saveConfigAction(
       discountPercent: payload.discountPercent,
       renEnabled: payload.renEnabled,
       renFeePerOrder: payload.renFeePerOrder,
+      renVenues: payload.renVenues,
       locations: payload.locations,
       averageTicket: payload.averageTicket,
       estimatedGrowthPercent: 0,

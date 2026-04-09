@@ -34,6 +34,7 @@ function rowToConfig(row: ConfigRow): DealConfiguration {
     discountPercent?: number
     renEnabled?: boolean
     renFeePerOrder?: number
+    renVenues?: number
   }
   return {
     id: row.id,
@@ -48,6 +49,7 @@ function rowToConfig(row: ConfigRow): DealConfiguration {
     discountPercent: eco.discountPercent ?? 0,
     renEnabled: eco.renEnabled ?? false,
     renFeePerOrder: eco.renFeePerOrder ?? 0.20,
+    renVenues: eco.renVenues ?? 1,
     plan: row.plan as DealConfiguration['plan'],
     planOverridden: row.plan_overridden,
     activeAddons: row.active_addons as AddonId[],

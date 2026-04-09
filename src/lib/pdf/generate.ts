@@ -393,11 +393,12 @@ function s4Purpose(logoUri: string): string {
 function s5Plans(deal: Deal, cfg: DealConfiguration, logoUri: string): string {
   const tiers = ['starter', 'growth', 'pro'] as const
   const hiCol = tiers.indexOf(cfg.plan) + 1
-  const eco = cfg.economics as DealEconomics & { renEnabled?: boolean; renFeePerOrder?: number }
+  const eco = cfg.economics as DealEconomics & { renEnabled?: boolean; renFeePerOrder?: number; renVenues?: number }
   const renEnabled = eco.renEnabled === true
   const renFeePerOrder = eco.renFeePerOrder ?? 0.20
+  const renVenues = eco.renVenues ?? 1
   const deliveryPerVenue = cfg.deliveryOrdersPerVenue ?? 0
-  const renMonthly = renEnabled ? renFeePerOrder * deliveryPerVenue * cfg.locations : 0
+  const renMonthly = renEnabled ? renFeePerOrder * deliveryPerVenue * renVenues : 0
   const hwItems = cfg.hardware.filter(h => h.quantity > 0)
 
   const planRows: string[][] = [
@@ -471,7 +472,7 @@ function s5Plans(deal: Deal, cfg: DealConfiguration, logoUri: string): string {
       <div>
         <span style="font-size:10px;font-weight:600;color:#0f172a;">REN · Marketplace logístico</span>
         <span style="font-size:9px;color:#94a3b8;margin-left:7px;">
-          ${renFeePerOrder.toFixed(2).replace('.', ',')}€/pedido × ${fmtN(deliveryPerVenue)} pedidos × ${cfg.locations} local${cfg.locations > 1 ? 'es' : ''}
+          ${renFeePerOrder.toFixed(2).replace('.', ',')}€/pedido × ${fmtN(deliveryPerVenue)} pedidos × ${renVenues} local${renVenues > 1 ? 'es' : ''} con REN
         </span>
       </div>
       <span style="font-size:10px;font-weight:700;color:#1e3a5f;font-family:'Courier New',monospace;">${fmt(renMonthly)}/mes</span>
@@ -628,6 +629,7 @@ function s11Economics(deal: Deal, cfg: DealConfiguration, sections: ProposalSect
   const eco = cfg.economics as DealEconomics & {
     renEnabled?: boolean
     renFeePerOrder?: number
+    renVenues?: number
     discountPercent?: number
   }
   const plan = PLANS[cfg.plan]
@@ -636,8 +638,9 @@ function s11Economics(deal: Deal, cfg: DealConfiguration, sections: ProposalSect
 
   const renEnabled = eco.renEnabled === true
   const renFeePerOrder = eco.renFeePerOrder ?? 0.20
+  const renVenues = eco.renVenues ?? 1
   const deliveryPerVenue = cfg.deliveryOrdersPerVenue ?? 0
-  const renMonthly = renEnabled ? renFeePerOrder * deliveryPerVenue * cfg.locations : 0
+  const renMonthly = renEnabled ? renFeePerOrder * deliveryPerVenue * renVenues : 0
 
   const discountPercent = eco.discountPercent ?? 0
   const discountAmount = eco.softwareRevenueMonthly * (discountPercent / 100)
@@ -647,7 +650,7 @@ function s11Economics(deal: Deal, cfg: DealConfiguration, sections: ProposalSect
   const execSummary = sections.executiveSummary
     ? sections.executiveSummary +
       (renEnabled && deliveryPerVenue > 0
-        ? ` Incluye logística propia a través de REN con ${fmtN(deliveryPerVenue * cfg.locations)} pedidos de delivery mensuales.`
+        ? ` Incluye logística propia a través de REN con ${fmtN(deliveryPerVenue * renVenues)} pedidos de delivery mensuales en ${renVenues} local${renVenues > 1 ? 'es' : ''}.`
         : '')
     : ''
 
@@ -699,9 +702,9 @@ function s11Economics(deal: Deal, cfg: DealConfiguration, sections: ProposalSect
       <div style="border:1px solid #dde6f0;border-radius:8px;padding:14px;">
         <div style="font-size:9px;font-weight:700;color:#1e3a5f;text-transform:uppercase;letter-spacing:1px;margin-bottom:9px;padding-bottom:7px;border-bottom:1px solid #e8eef6;">REN</div>
         ${[
-          ['Pedidos delivery/mes', fmtN(deliveryPerVenue * cfg.locations)],
+          ['Pedidos delivery/mes/local', fmtN(deliveryPerVenue)],
           ['Fee por pedido', `${renFeePerOrder.toFixed(2).replace('.', ',')}€`],
-          ['Locales', String(cfg.locations)],
+          ['Locales con REN', String(renVenues)],
           ['Coste REN/mes', fmt(renMonthly)],
         ].map(([k,v]) => `
           <div style="display:flex;justify-content:space-between;padding:3px 0;border-bottom:1px solid #f1f5f9;">

@@ -68,6 +68,7 @@ function serializeSimState(
   hardware: HardwareState,
   renEnabled: boolean,
   renFeePerOrder: number,
+  renVenues: number,
   discountPercent: number
 ): string {
   return JSON.stringify({
@@ -80,6 +81,7 @@ function serializeSimState(
     hardware,
     renEnabled,
     renFeePerOrder,
+    renVenues,
     discountPercent,
   })
 }
@@ -113,6 +115,7 @@ export function Simulator({ deal, initialConfig, loadedConfigId }: SimulatorProp
   )
   const [renEnabled, setRenEnabled] = useState(init?.renEnabled ?? false)
   const [renFeePerOrder, setRenFeePerOrder] = useState(init?.renFeePerOrder ?? 0.20)
+  const [renVenues, setRenVenues] = useState(init?.renVenues ?? 1)
   const [discountPercent, setDiscountPercent] = useState(init?.discountPercent ?? 0)
 
   const router = useRouter()
@@ -147,13 +150,14 @@ export function Simulator({ deal, initialConfig, loadedConfigId }: SimulatorProp
       initHardwareState(init?.locations ?? 1, init?.hardware),
       init?.renEnabled ?? false,
       init?.renFeePerOrder ?? 0.20,
+      init?.renVenues ?? 1,
       init?.discountPercent ?? 0
     )
   )
 
   const hasUnsavedChanges = useMemo(
-    () => serializeSimState(dailyOrders, deliveryOrders, locations, avgTicket, planOverride, activeAddons, hardware, renEnabled, renFeePerOrder, discountPercent) !== savedSnapshot,
-    [dailyOrders, deliveryOrders, locations, avgTicket, planOverride, activeAddons, hardware, renEnabled, renFeePerOrder, discountPercent, savedSnapshot]
+    () => serializeSimState(dailyOrders, deliveryOrders, locations, avgTicket, planOverride, activeAddons, hardware, renEnabled, renFeePerOrder, renVenues, discountPercent) !== savedSnapshot,
+    [dailyOrders, deliveryOrders, locations, avgTicket, planOverride, activeAddons, hardware, renEnabled, renFeePerOrder, renVenues, discountPercent, savedSnapshot]
   )
 
   useEffect(() => {
@@ -226,11 +230,12 @@ export function Simulator({ deal, initialConfig, loadedConfigId }: SimulatorProp
         discountPercent,
         renEnabled,
         renFeePerOrder,
+        renVenues,
       })
       if (result.ok) {
         setSaveState('saved')
         setLastSavePersisted(result.persisted)
-        setSavedSnapshot(serializeSimState(dailyOrders, deliveryOrders, locations, avgTicket, planOverride, activeAddons, hardware, renEnabled, renFeePerOrder, discountPercent))
+        setSavedSnapshot(serializeSimState(dailyOrders, deliveryOrders, locations, avgTicket, planOverride, activeAddons, hardware, renEnabled, renFeePerOrder, renVenues, discountPercent))
         router.refresh()
       } else {
         setSaveState('error')
@@ -254,12 +259,13 @@ export function Simulator({ deal, initialConfig, loadedConfigId }: SimulatorProp
         discountPercent,
         renEnabled,
         renFeePerOrder,
+        renVenues,
       })
       if (result.ok) {
         setSaveNewState('saved')
         setLastNewVersion(result.version)
         setLastNewVersionPersisted(result.persisted)
-        setSavedSnapshot(serializeSimState(dailyOrders, deliveryOrders, locations, avgTicket, planOverride, activeAddons, hardware, renEnabled, renFeePerOrder, discountPercent))
+        setSavedSnapshot(serializeSimState(dailyOrders, deliveryOrders, locations, avgTicket, planOverride, activeAddons, hardware, renEnabled, renFeePerOrder, renVenues, discountPercent))
         router.refresh()
       } else {
         setSaveNewState('error')
@@ -521,24 +527,47 @@ export function Simulator({ deal, initialConfig, loadedConfigId }: SimulatorProp
               <p className="text-xs text-zinc-500 mt-0.5">Marketplace logístico</p>
               {renEnabled && (
                 <div className="mt-2" onClick={(e) => e.stopPropagation()}>
-                  <label className="text-xs font-medium text-zinc-600 block mb-1">
-                    Fee por pedido al restaurante (€)
-                  </label>
-                  <div className="flex items-center border border-zinc-200 rounded-lg overflow-hidden focus-within:ring-2 focus-within:ring-zinc-900 w-28 mb-2">
-                    <input
-                      type="number"
-                      min={0.01}
-                      step={0.01}
-                      value={renFeePerOrder}
-                      onChange={(e) => setRenFeePerOrder(Math.max(0.01, Number(e.target.value)))}
-                      className="flex-1 px-2 py-1.5 text-sm font-mono text-zinc-900 outline-none bg-white"
-                    />
-                    <span className="px-2 text-xs text-zinc-400 bg-zinc-50 border-l border-zinc-200 py-1.5">€</span>
+                  <div className="flex gap-4 mb-2">
+                    <div>
+                      <label className="text-xs font-medium text-zinc-600 block mb-1">
+                        Fee por pedido al restaurante (€)
+                      </label>
+                      <div className="flex items-center border border-zinc-200 rounded-lg overflow-hidden focus-within:ring-2 focus-within:ring-zinc-900 w-28">
+                        <input
+                          type="number"
+                          min={0.01}
+                          step={0.01}
+                          value={renFeePerOrder}
+                          onChange={(e) => setRenFeePerOrder(Math.max(0.01, Number(e.target.value)))}
+                          onClick={(e) => e.stopPropagation()}
+                          className="flex-1 px-2 py-1.5 text-sm font-mono text-zinc-900 outline-none bg-white"
+                        />
+                        <span className="px-2 text-xs text-zinc-400 bg-zinc-50 border-l border-zinc-200 py-1.5">€</span>
+                      </div>
+                    </div>
+                    <div>
+                      <label className="text-xs font-medium text-zinc-600 block mb-1">
+                        Locales con REN
+                      </label>
+                      <div className="flex items-center border border-zinc-200 rounded-lg overflow-hidden focus-within:ring-2 focus-within:ring-zinc-900 w-24">
+                        <input
+                          type="number"
+                          min={1}
+                          max={locations}
+                          step={1}
+                          value={renVenues}
+                          onChange={(e) => setRenVenues(Math.min(locations, Math.max(1, Number(e.target.value))))}
+                          onClick={(e) => e.stopPropagation()}
+                          className="flex-1 px-2 py-1.5 text-sm font-mono text-zinc-900 outline-none bg-white"
+                        />
+                        <span className="px-2 text-xs text-zinc-400 bg-zinc-50 border-l border-zinc-200 py-1.5 whitespace-nowrap">/ {locations}</span>
+                      </div>
+                    </div>
                   </div>
                   <p className="text-xs font-mono text-zinc-500">
-                    {renFeePerOrder.toFixed(2).replace('.', ',')}€ × {formatNumber(deliveryOrders)} pedidos × {locations} local{locations > 1 ? 'es' : ''} ={' '}
+                    {renFeePerOrder.toFixed(2).replace('.', ',')}€ × {formatNumber(deliveryOrders)} pedidos × {renVenues} local{renVenues > 1 ? 'es' : ''} con REN ={' '}
                     <span className="font-semibold text-emerald-700">
-                      {formatCurrency(renFeePerOrder * deliveryOrders * locations)}/mes
+                      {formatCurrency(renFeePerOrder * deliveryOrders * renVenues)}/mes
                     </span>
                   </p>
                 </div>
@@ -737,6 +766,7 @@ export function Simulator({ deal, initialConfig, loadedConfigId }: SimulatorProp
           deliveryOrders={deliveryOrders}
           renEnabled={renEnabled}
           renFeePerOrder={renFeePerOrder}
+          renVenues={renVenues}
           discountPercent={discountPercent}
           onDiscountChange={setDiscountPercent}
           activeAddons={activeAddons}
@@ -766,6 +796,7 @@ function EconomicsPanel({
   deliveryOrders,
   renEnabled,
   renFeePerOrder,
+  renVenues,
   discountPercent,
   onDiscountChange,
   activeAddons,
@@ -784,6 +815,7 @@ function EconomicsPanel({
   deliveryOrders: number
   renEnabled: boolean
   renFeePerOrder: number
+  renVenues: number
   discountPercent: number
   onDiscountChange: (v: number) => void
   activeAddons: Set<AddonId>
@@ -798,7 +830,7 @@ function EconomicsPanel({
   onSaveNew: () => void
 }) {
   const hasDatafono = activeAddons.has('datafono')
-  const renMonthly = renEnabled ? renFeePerOrder * deliveryOrders * locations : 0
+  const renMonthly = renEnabled ? renFeePerOrder * deliveryOrders * renVenues : 0
   const softwareFee = economics.softwareRevenueMonthly
   const discountAmount = softwareFee * (discountPercent / 100)
   const adjustedMRR = softwareFee - discountAmount + renMonthly + economics.hardwareRevenueMonthly

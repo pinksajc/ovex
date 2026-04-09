@@ -56,6 +56,7 @@ export interface DealConfiguration {
   discountPercent?: number         // % discount on software revenue (default 0)
   renEnabled?: boolean             // REN logistics enabled (default false)
   renFeePerOrder?: number          // REN fee per delivery order in € (default 0.20)
+  renVenues?: number               // number of venues with REN (default 1)
 
   // Add-ons
   activeAddons: AddonId[]
