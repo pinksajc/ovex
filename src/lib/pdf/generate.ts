@@ -336,7 +336,7 @@ function s3About(logoUri: string): string {
     ${sectionTitle('Sobre Platomico', 'El sistema operativo para la hostelería moderna')}
     <div style="font-size:11px;color:#334155;line-height:1.8;margin-bottom:22px;">
       <p style="margin-bottom:11px;">
-        Platomico es el sistema operativo para la hostelería moderna. Conecta pagos, pedidos y cocina
+        ROS es el sistema operativo para la hostelería moderna. Conecta pagos, pedidos y cocina
         para reducir errores, eliminar papel y ganar eficiencia operativa en cada turno.
       </p>
       <p style="margin-bottom:11px;">
@@ -383,7 +383,7 @@ function s4Purpose(logoUri: string): string {
     </div>
 
     <div style="background:#f0f5fb;border-left:3px solid #1e3a5f;border-radius:0 6px 6px 0;padding:13px 15px;font-size:10.5px;color:#334155;line-height:1.6;">
-      Platomico no es un software más. Es el compromiso de que la tecnología trabaje para el restaurante, y no al revés.
+      ROS no es solo software más. Es el compromiso de que la tecnología trabaje para el restaurante, y no al revés.
       Por eso ofrecemos contratos sin permanencia, activación en 24 horas y soporte nativo en español.
     </div>`
   return pg(logoUri, content)
@@ -431,7 +431,7 @@ function s5Plans(deal: Deal, cfg: DealConfiguration, logoUri: string): string {
     ${buildTable(planHeaders, planRows, { hi: hiCol })}
 
     <div style="margin-top:16px;margin-bottom:4px;">
-      <span style="font-size:9px;font-weight:700;color:#1e3a5f;text-transform:uppercase;letter-spacing:1px;">Software incluido en el plan</span>
+      <span style="font-size:9px;font-weight:700;color:#1e3a5f;text-transform:uppercase;letter-spacing:1px;">ROS incluido en el plan</span>
       <span style="font-size:8.5px;color:#94a3b8;margin-left:6px;">· Por localización</span>
     </div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:2px 14px;margin-bottom:4px;">
@@ -701,7 +701,7 @@ function s11Economics(deal: Deal, cfg: DealConfiguration, sections: ProposalSect
       <div style="font-size:9px;color:#64748b;text-transform:uppercase;letter-spacing:1.5px;margin-bottom:8px;">Total / mes</div>
       <div style="font-size:42px;font-weight:900;color:#0f172a;font-family:'Courier New',monospace;line-height:1;">${fmt(totalMes)}</div>
       <div style="font-size:9.5px;color:#64748b;margin-top:6px;">
-        Software ${fmt(adjustedSoftware)}/mes${renMonthly > 0 ? ` · REN ${fmt(renMonthly)}/mes` : ''}${eco.hardwareRevenueMonthly > 0 ? ` · Hardware ${fmt(eco.hardwareRevenueMonthly)}/mes` : ''}
+        ROS ${fmt(adjustedSoftware)}/mes${renMonthly > 0 ? ` · REN ${fmt(renMonthly)}/mes` : ''}${eco.hardwareRevenueMonthly > 0 ? ` · Hardware ${fmt(eco.hardwareRevenueMonthly)}/mes` : ''}
       </div>
       ${discountPercent > 0 ? `<div style="font-size:8.5px;color:#dc2626;margin-top:3px;">Descuento aplicado: −${discountPercent}% (${fmt(discountAmount)}/mes)</div>` : ''}
     </div>
@@ -709,16 +709,16 @@ function s11Economics(deal: Deal, cfg: DealConfiguration, sections: ProposalSect
     <div style="display:grid;grid-template-columns:${renEnabled ? '1fr 1fr 1fr' : '1fr 1fr'};gap:12px;margin-bottom:16px;">
       <!-- Software -->
       <div style="border:1px solid #dde6f0;border-radius:8px;padding:14px;">
-        <div style="font-size:9px;font-weight:700;color:#1e3a5f;text-transform:uppercase;letter-spacing:1px;margin-bottom:9px;padding-bottom:7px;border-bottom:1px solid #e8eef6;">Software</div>
+        <div style="font-size:9px;font-weight:700;color:#1e3a5f;text-transform:uppercase;letter-spacing:1px;margin-bottom:9px;padding-bottom:7px;border-bottom:1px solid #e8eef6;">ROS</div>
         ${[
           ['Plan', plan.label],
           ['Precio base', plan.priceMonthly === 0 ? `Gratis + ${plan.variableFee}€/ticket` : `${plan.priceMonthly}€/mes/local`],
           ['Fee variable', `${plan.variableFee}€/ticket`],
           ['Locales', String(cfg.locations)],
           ['Pedidos/mes/local', fmtN(cfg.dailyOrdersPerLocation)],
-          ['Fee software/mes', fmt(adjustedSoftwareBase)],
+          ['Fee ROS/mes', fmt(adjustedSoftwareBase)],
           ...(discountPercent > 0 ? [['Descuento', `−${discountPercent}% (${fmt(discountAmount)})`]] : []),
-          ...(discountPercent > 0 ? [['Neto software', fmt(adjustedSoftware)]] : []),
+          ...(discountPercent > 0 ? [['Neto ROS', fmt(adjustedSoftware)]] : []),
         ].map(([k,v]) => `
           <div style="display:flex;justify-content:space-between;padding:3px 0;border-bottom:1px solid #f1f5f9;">
             <span style="font-size:9.5px;color:${k === 'Descuento' ? '#dc2626' : '#64748b'};">${k}</span>

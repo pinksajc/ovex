@@ -956,7 +956,7 @@ function EconomicsPanel({
           {/* Discount input */}
           <div className="pt-2 border-t border-zinc-100">
             <div className="flex items-center justify-between gap-2">
-              <label className="text-xs text-zinc-600">Descuento software</label>
+              <label className="text-xs text-zinc-600">Descuento ROS</label>
               <div className="flex items-center border border-zinc-200 rounded-lg overflow-hidden focus-within:ring-2 focus-within:ring-zinc-900 w-24">
                 <input
                   type="number"
@@ -1069,7 +1069,7 @@ function EconomicsPanel({
           muted={economics.grossMarginMonthly < 0}
         />
         <p className="text-[10px] text-zinc-400 mt-2 leading-relaxed">
-          Software al 80%
+          ROS al 80%
           {economics.hardwareCostTotal > 0 && ', hardware a coste'}
           {economics.hardwareNetInvestment > 0 && ' · incluye amortización 24 meses'}
         </p>
