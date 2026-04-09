@@ -62,15 +62,15 @@ export interface AddonConfig {
 export const ADDONS: Record<AddonId, AddonConfig> = {
   kds: {
     id: 'kds',
-    label: 'KDS',
-    description: 'Kitchen Display System',
+    label: 'KDS — Pantalla de cocina',
+    description: 'Software + tablet 10" incluida',
     priceMonthly: 19,
     perLocation: true,
   },
   kiosk: {
     id: 'kiosk',
-    label: 'Kiosk',
-    description: 'Self-ordering kiosk',
+    label: 'Kiosk autoservicio',
+    description: 'Software + Bouncepad + tablet incluida',
     priceMonthly: 19,
     perLocation: true,
   },
@@ -179,4 +179,38 @@ export const HARDWARE_MODE_LABELS: Record<import('@/types').HardwareMode, string
   sold: 'Vendido',
   financed: 'Financiado',
   rented: 'Alquiler',
+}
+
+// ---- PLAN FEATURES ----
+// Software features included per plan, displayed in simulator and PDF.
+// Listed in cumulative order (Growth = Starter + extras, Pro = Growth + extras).
+
+export const PLAN_FEATURES: Record<PlanTier, string[]> = {
+  starter: [
+    'Register',
+    'KDS',
+    'Analytics Basic',
+    'Soporte email L-V 9-18h',
+  ],
+  growth: [
+    'Register',
+    'KDS',
+    'Analytics Basic',
+    'Web y pedidos online',
+    'Kiosk',
+    'Soporte email L-V 9-23h',
+  ],
+  pro: [
+    'Register',
+    'KDS',
+    'Analytics Basic',
+    'Web y pedidos online',
+    'Kiosk',
+    'Fidelización (Loyalty)',
+    'Analytics Premium',
+    'Customer Success Manager',
+    'SLA garantizado',
+    'Teléfono + WhatsApp 24/7',
+    'CSM dedicado',
+  ],
 }

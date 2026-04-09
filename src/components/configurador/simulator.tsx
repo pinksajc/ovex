@@ -1,8 +1,8 @@
 'use client'
 
-import { useState, useMemo, useTransition, useEffect } from 'react'
+import { useState, useMemo, useTransition, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
-import { PLANS, ADDONS, ADDON_ORDER, PLAN_ORDER, HARDWARE, HARDWARE_ORDER, HARDWARE_MODE_LABELS, RENTAL_MONTHLY_PRICE } from '@/lib/pricing/catalog'
+import { PLANS, ADDONS, ADDON_ORDER, PLAN_ORDER, HARDWARE, HARDWARE_ORDER, HARDWARE_MODE_LABELS, RENTAL_MONTHLY_PRICE, PLAN_FEATURES } from '@/lib/pricing/catalog'
 import { calculateEconomics, suggestPlan } from '@/lib/pricing/engine'
 import { formatCurrency, formatNumber } from '@/lib/format'
 import { saveConfigAction } from '@/app/actions/save-config'
@@ -29,7 +29,7 @@ function initHardwareState(locations: number, saved?: HardwareLineItem[]): Hardw
     ipad: { quantity: locations, mode: 'sold', financeMonths: 12 },
     tablet_lenovo_m11: { quantity: 0, mode: 'sold', financeMonths: 12 },
     bouncepad_kiosk: { quantity: 0, mode: 'sold', financeMonths: 12 },
-    counter_stand: { quantity: locations, mode: 'sold', financeMonths: 12 },
+    counter_stand: { quantity: 1, mode: 'included', financeMonths: 12 },
   }
   if (!saved || saved.length === 0) return defaults
   const state = { ...defaults }
@@ -120,6 +120,9 @@ export function Simulator({ deal, initialConfig, loadedConfigId }: SimulatorProp
 
   const router = useRouter()
 
+  // ---- Auto-set Counter Stand when plan changes ----
+  const prevPlanRef = useRef<PlanTier | null>(null)
+
   // ---- Save state (overwrite active) ----
   const [isPending, startTransition] = useTransition()
   const [saveState, setSaveState] = useState<SaveState>('idle')
@@ -178,6 +181,21 @@ export function Simulator({ deal, initialConfig, loadedConfigId }: SimulatorProp
   const suggestedPlan = suggestPlan(dailyOrders)
   const activePlan = planOverride ?? suggestedPlan
   const planChanged = planOverride !== null && planOverride !== suggestedPlan
+
+  // Auto-set Counter Stand to qty=1, mode=included when plan changes
+  useEffect(() => {
+    if (prevPlanRef.current === null) {
+      prevPlanRef.current = activePlan
+      return
+    }
+    if (prevPlanRef.current !== activePlan) {
+      prevPlanRef.current = activePlan
+      setHardware((prev) => ({
+        ...prev,
+        counter_stand: { ...prev.counter_stand, quantity: 1, mode: 'included' },
+      }))
+    }
+  }, [activePlan])
   const hardwareLineItems = useMemo(() => hardwareStateToLineItems(hardware), [hardware])
 
   const economics: DealEconomics = useMemo(
@@ -431,6 +449,24 @@ export function Simulator({ deal, initialConfig, loadedConfigId }: SimulatorProp
               <span className="font-semibold text-zinc-800">{formatCurrency(economics.planFeeMonthly)}/mes</span>
             </p>
           </div>
+
+          {/* —— Incluido en el plan —— */}
+          <div className="mt-4 border-t border-zinc-100 pt-3">
+            <p className="text-[10px] font-semibold text-zinc-400 uppercase tracking-widest mb-2">
+              Incluido en el plan
+              <span className="ml-2 font-normal text-zinc-400 normal-case tracking-normal">· Por localización</span>
+            </p>
+            <ul className="grid grid-cols-2 gap-x-4 gap-y-1">
+              {PLAN_FEATURES[activePlan].map(feature => (
+                <li key={feature} className="flex items-center gap-2 text-xs text-zinc-700">
+                  <svg className="w-3.5 h-3.5 text-emerald-500 shrink-0" viewBox="0 0 14 14" fill="none">
+                    <path d="M2.5 7L5.5 10L11.5 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                  </svg>
+                  {feature}
+                </li>
+              ))}
+            </ul>
+          </div>
         </Section>
 
         {/* —— Add-ons + REN —— */}
@@ -600,6 +636,8 @@ export function Simulator({ deal, initialConfig, loadedConfigId }: SimulatorProp
                       <p className="text-xs font-mono text-zinc-400 mt-0.5">
                         {state.mode === 'rented'
                           ? `${formatCurrency(RENTAL_MONTHLY_PRICE)}/mes`
+                          : state.mode === 'included'
+                          ? 'Incluido en el plan'
                           : `${formatCurrency(item.unitPrice)}/ud.`}
                       </p>
                     </div>
@@ -674,21 +712,24 @@ export function Simulator({ deal, initialConfig, loadedConfigId }: SimulatorProp
                       <span className="text-xs text-zinc-400">
                         {state.mode === 'rented'
                           ? `${state.quantity} × ${formatCurrency(RENTAL_MONTHLY_PRICE)}/mes · mensualidad`
+                          : state.mode === 'included'
+                          ? `${state.quantity} ud. · Incluido en el plan`
                           : <>
                               {state.quantity} × {formatCurrency(item.unitPrice)}
-                              {state.mode === 'included' && ' · asumido por Platomico'}
                               {state.mode === 'sold' && ' · cliente paga upfront'}
                               {state.mode === 'financed' && ` · ${state.financeMonths} meses`}
                             </>
                         }
                       </span>
                       <span className={`text-xs font-mono font-semibold ${
-                        state.mode === 'included' ? 'text-red-600' :
+                        state.mode === 'included' ? 'text-emerald-600' :
                         state.mode === 'rented' ? 'text-blue-600' :
                         state.mode === 'financed' ? 'text-amber-600' :
                         'text-zinc-700'
                       }`}>
-                        {state.mode === 'financed'
+                        {state.mode === 'included'
+                          ? 'Incluido'
+                          : state.mode === 'financed'
                           ? `${formatCurrency(lineTotal / state.financeMonths)}/mes`
                           : state.mode === 'rented'
                           ? `${formatCurrency(lineTotal)}/mes`

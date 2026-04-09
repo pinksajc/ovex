@@ -21,7 +21,7 @@
 import fs from 'fs'
 import path from 'path'
 import type { Deal, DealConfiguration, DealEconomics, ProposalSections } from '@/types'
-import { PLANS, ADDONS, HARDWARE, HARDWARE_MODE_LABELS } from '@/lib/pricing/catalog'
+import { PLANS, ADDONS, HARDWARE, HARDWARE_MODE_LABELS, PLAN_FEATURES } from '@/lib/pricing/catalog'
 
 // ── Logo ─────────────────────────────────────────────────────────────────────
 // Leer una sola vez del disco; embebemos inline como data URI en cada página.
@@ -425,6 +425,19 @@ function s5Plans(deal: Deal, cfg: DealConfiguration, logoUri: string): string {
     <div style="font-size:9px;font-weight:700;color:#1e3a5f;text-transform:uppercase;letter-spacing:1px;margin-bottom:4px;">Comparativa de planes</div>
     ${buildTable(planHeaders, planRows, { hi: hiCol })}
 
+    <div style="margin-top:16px;margin-bottom:4px;">
+      <span style="font-size:9px;font-weight:700;color:#1e3a5f;text-transform:uppercase;letter-spacing:1px;">Software incluido en el plan</span>
+      <span style="font-size:8.5px;color:#94a3b8;margin-left:6px;">· Por localización</span>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:2px 14px;margin-bottom:4px;">
+      ${PLAN_FEATURES[cfg.plan].map(f => `
+        <div style="display:flex;align-items:center;gap:5px;padding:2px 0;">
+          <span style="color:#10b981;font-size:12px;line-height:1;font-weight:700;">✓</span>
+          <span style="font-size:9.5px;color:#334155;">${f}</span>
+        </div>
+      `).join('')}
+    </div>
+
     ${activeAddons.length > 0 || hwItems.length > 0 ? `
     <div style="font-size:9px;font-weight:700;color:#1e3a5f;text-transform:uppercase;letter-spacing:1px;margin-top:20px;margin-bottom:8px;">Add-ons y hardware incluidos en esta propuesta</div>
     <div style="display:flex;flex-direction:column;gap:5px;">
@@ -455,13 +468,18 @@ function s5Plans(deal: Deal, cfg: DealConfiguration, logoUri: string): string {
           ? `${fmt(19 * item.quantity)}/mes`
           : item.mode === 'financed' && item.financeMonths
           ? `${fmt(lineTotal / item.financeMonths)}/mes`
-          : item.mode === 'included' ? 'Incluido' : fmt(lineTotal)
+          : item.mode === 'included'
+          ? 'Incluido en el plan'
+          : fmt(lineTotal)
+        const modeLabel = item.mode === 'rented' ? 'Mensualidad'
+          : item.mode === 'included' ? 'Incluido en el plan'
+          : HARDWARE_MODE_LABELS[item.mode]
         return `<div style="display:flex;justify-content:space-between;align-items:center;padding:7px 11px;background:#f8fafc;border:1px solid #e8eef6;border-radius:6px;">
           <div>
             <span style="font-size:10px;font-weight:600;color:#0f172a;">${hw.label}</span>
-            <span style="font-size:9px;color:#94a3b8;margin-left:7px;">${item.quantity} ud. · ${item.mode === 'rented' ? 'Mensualidad' : HARDWARE_MODE_LABELS[item.mode]}</span>
+            <span style="font-size:9px;color:#94a3b8;margin-left:7px;">${item.quantity} ud. · ${modeLabel}</span>
           </div>
-          <span style="font-size:10px;font-weight:700;color:#1e3a5f;font-family:'Courier New',monospace;">${importe}</span>
+          <span style="font-size:10px;font-weight:700;color:${item.mode === 'included' ? '#10b981' : '#1e3a5f'};font-family:'Courier New',monospace;">${importe}</span>
         </div>`
       }).join('')}
     </div>` : ''}
@@ -720,15 +738,19 @@ function s11Economics(deal: Deal, cfg: DealConfiguration, sections: ProposalSect
           ? hwItems.map(item => {
               const hw = HARDWARE[item.hardwareId]
               const lineTotal = item.unitPrice * item.quantity
-              const price = item.mode === 'financed' && item.financeMonths
-                ? `${fmt(lineTotal / item.financeMonths)}/mes` : fmt(lineTotal)
+              const price = item.mode === 'included'
+                ? 'Incluido en el plan'
+                : item.mode === 'financed' && item.financeMonths
+                ? `${fmt(lineTotal / item.financeMonths)}/mes`
+                : fmt(lineTotal)
+              const modeLabel11 = item.mode === 'included' ? 'Incluido en el plan' : HARDWARE_MODE_LABELS[item.mode]
               return `<div style="padding:5px 0;border-bottom:1px solid #f1f5f9;">
                 <div style="display:flex;justify-content:space-between;align-items:flex-start;">
                   <div>
                     <div style="font-size:10px;font-weight:600;color:#0f172a;">${hw.label}</div>
-                    <div style="font-size:9px;color:#94a3b8;">${item.quantity} ud. · ${HARDWARE_MODE_LABELS[item.mode]}</div>
+                    <div style="font-size:9px;color:#94a3b8;">${item.quantity} ud. · ${modeLabel11}</div>
                   </div>
-                  <div style="font-size:10px;font-weight:600;color:#1e3a5f;font-family:'Courier New',monospace;">${price}</div>
+                  <div style="font-size:10px;font-weight:600;color:${item.mode === 'included' ? '#10b981' : '#1e3a5f'};font-family:'Courier New',monospace;">${price}</div>
                 </div>
               </div>`
             }).join('') + `
