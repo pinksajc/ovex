@@ -136,6 +136,13 @@ function fmt(n: number): string {
     minimumFractionDigits: 0, maximumFractionDigits: 0,
   })
 }
+// IVA-inclusive formatter (×1.21) for all client-facing monetary amounts in PDF
+function fmtVAT(n: number): string {
+  return (n * 1.21).toLocaleString('es-ES', {
+    style: 'currency', currency: 'EUR',
+    minimumFractionDigits: 2, maximumFractionDigits: 2,
+  })
+}
 function fmtN(n: number): string { return n.toLocaleString('es-ES') }
 function chk(v: boolean | string): string {
   if (typeof v === 'string') return `<span style="font-size:10px;color:#1e3a5f;">${v}</span>`
@@ -406,14 +413,14 @@ function s5Plans(deal: Deal, cfg: DealConfiguration, logoUri: string): string {
   const hwItems = cfg.hardware.filter(h => h.quantity > 0)
 
   const planRows: string[][] = [
-    ['Volumen tickets/mes/local', 'Hasta 500',      '501 – 1.000',       'Más de 1.000'],
-    ['Precio base',               'Gratis',          '15 €/local/mes',    '35 €/local/mes'],
-    ['Fee variable',              '0,08 €/ticket',   '0,05 €/ticket',     '0,03 €/ticket'],
-    ['Soporte',                   'Email',           'Email + Chat',      'Tel · Chat · Email'],
-    ['Tiempo respuesta',          '48 h',            '24 h',              '4 h'],
-    ['Onboarding',                'Self-service',    'Sesión remota',     'Presencial/remoto'],
-    ['Account Manager',           '—',               '—',                 'Dedicado'],
-    ['SLA uptime',                '99,0 %',          '99,5 %',            '99,9 %'],
+    ['Volumen tickets/mes/local', 'Hasta 500',                   '501 – 1.000',                    'Más de 1.000'],
+    ['Precio base (IVA incl.)',   'Gratis',                      `${fmtVAT(15)}/local/mes`,         `${fmtVAT(35)}/local/mes`],
+    ['Fee variable (+ IVA)',      '0,08 €/ticket',               '0,05 €/ticket',                  '0,03 €/ticket'],
+    ['Soporte',                   'Email',                       'Email + Chat',                   'Tel · Chat · Email'],
+    ['Tiempo respuesta',          '48 h',                        '24 h',                           '4 h'],
+    ['Onboarding',                'Self-service',                'Sesión remota',                  'Presencial/remoto'],
+    ['Account Manager',           '—',                           '—',                              'Dedicado'],
+    ['SLA uptime',                '99,0 %',                      '99,5 %',                         '99,9 %'],
   ]
 
   const planHeaders = ['Característica', ...tiers.map((t, i) => {
@@ -451,15 +458,15 @@ function s5Plans(deal: Deal, cfg: DealConfiguration, logoUri: string): string {
           ? `${addon.feePercent}% GMV`
           : addon.perConsumption ? 'Por consumo'
           : id === 'kds'
-          ? `19 €/local/mes × ${s5KdsVenues} local${s5KdsVenues > 1 ? 'es' : ''} con KDS`
+          ? `${fmtVAT(19)}/local/mes × ${s5KdsVenues} local${s5KdsVenues > 1 ? 'es' : ''} con KDS`
           : id === 'kiosk'
-          ? `19 €/local/mes × ${s5KioskVenues} local${s5KioskVenues > 1 ? 'es' : ''} con Kiosk`
-          : `${addon.priceMonthly} €${addon.perLocation ? '/local/mes' : '/mes'}`
-        const total = id === 'datafono' ? fmt(eco.datafonoFeeMonthly)
+          ? `${fmtVAT(19)}/local/mes × ${s5KioskVenues} local${s5KioskVenues > 1 ? 'es' : ''} con Kiosk`
+          : `${fmtVAT(addon.priceMonthly ?? 0)}${addon.perLocation ? '/local/mes' : '/mes'}`
+        const total = id === 'datafono' ? fmtVAT(eco.datafonoFeeMonthly)
           : addon.perConsumption ? '—'
-          : id === 'kds' ? fmt(19 * s5KdsVenues)
-          : id === 'kiosk' ? fmt(19 * s5KioskVenues)
-          : fmt((addon.priceMonthly ?? 0) * (addon.perLocation ? cfg.locations : 1))
+          : id === 'kds' ? fmtVAT(19 * s5KdsVenues)
+          : id === 'kiosk' ? fmtVAT(19 * s5KioskVenues)
+          : fmtVAT((addon.priceMonthly ?? 0) * (addon.perLocation ? cfg.locations : 1))
         return `<div style="display:flex;justify-content:space-between;align-items:center;padding:7px 11px;background:#f8fafc;border:1px solid #e8eef6;border-radius:6px;">
           <div>
             <span style="font-size:10px;font-weight:600;color:#0f172a;">${addon.label}</span>
@@ -475,12 +482,12 @@ function s5Plans(deal: Deal, cfg: DealConfiguration, logoUri: string): string {
         const hw = HARDWARE[item.hardwareId]
         const lineTotal = item.unitPrice * item.quantity
         const importe = item.mode === 'rented'
-          ? `${fmt(19 * item.quantity)}/mes`
+          ? `${fmtVAT(19 * item.quantity)}/mes`
           : item.mode === 'financed' && item.financeMonths
-          ? `${fmt(lineTotal / item.financeMonths)}/mes`
+          ? `${fmtVAT(lineTotal / item.financeMonths)}/mes`
           : item.mode === 'included'
           ? 'Incluido en el plan'
-          : fmt(lineTotal)
+          : fmtVAT(lineTotal)
         const modeLabel = item.mode === 'rented' ? 'Mensualidad'
           : item.mode === 'included' ? 'Incluido en el plan'
           : HARDWARE_MODE_LABELS[item.mode]
@@ -500,14 +507,14 @@ function s5Plans(deal: Deal, cfg: DealConfiguration, logoUri: string): string {
       <div>
         <span style="font-size:10px;font-weight:600;color:#0f172a;">REN · Marketplace logístico</span>
         <span style="font-size:9px;color:#94a3b8;margin-left:7px;">
-          ${renFeePerOrder.toFixed(2).replace('.', ',')}€/pedido × ${fmtN(deliveryPerVenue)} pedidos × ${renVenues} local${renVenues > 1 ? 'es' : ''} con REN
+          ${(renFeePerOrder * 1.21).toFixed(2).replace('.', ',')}€/pedido × ${fmtN(deliveryPerVenue)} pedidos × ${renVenues} local${renVenues > 1 ? 'es' : ''} con REN
         </span>
       </div>
-      <span style="font-size:10px;font-weight:700;color:#1e3a5f;font-family:'Courier New',monospace;">${fmt(renMonthly)}/mes</span>
+      <span style="font-size:10px;font-weight:700;color:#1e3a5f;font-family:'Courier New',monospace;">${fmtVAT(renMonthly)}/mes</span>
     </div>` : ''}
 
     <div style="margin-top:12px;background:#f8fafc;border:1px solid #e8eef6;border-radius:7px;padding:10px 14px;font-size:9.5px;color:#64748b;line-height:1.6;">
-      Sin permanencia mínima · facturación mes a mes · el plan puede cambiarse en cualquier momento.
+      Sin permanencia mínima · facturación mes a mes · el plan puede cambiarse en cualquier momento. · <strong>Todos los precios incluyen IVA 21%.</strong>
     </div>`
   return pg(logoUri, content)
 }
@@ -697,12 +704,12 @@ function s11Economics(deal: Deal, cfg: DealConfiguration, sections: ProposalSect
     ${sectionTitle('Resumen económico', `${deal.company.name} · Plan ${plan.label} · ${cfg.locations} local${cfg.locations > 1 ? 'es' : ''}`)}
 
     <div style="border:2px solid #1e3a5f;border-radius:12px;padding:22px 28px;background:#f0f5fb;margin-bottom:18px;text-align:center;">
-      <div style="font-size:9px;color:#64748b;text-transform:uppercase;letter-spacing:1.5px;margin-bottom:8px;">Total / mes</div>
-      <div style="font-size:42px;font-weight:900;color:#0f172a;font-family:'Courier New',monospace;line-height:1;">${fmt(totalMes)}</div>
+      <div style="font-size:9px;color:#64748b;text-transform:uppercase;letter-spacing:1.5px;margin-bottom:8px;">Total / mes (IVA 21% incluido)</div>
+      <div style="font-size:42px;font-weight:900;color:#0f172a;font-family:'Courier New',monospace;line-height:1;">${fmtVAT(totalMes)}</div>
       <div style="font-size:9.5px;color:#64748b;margin-top:6px;">
-        ROS ${fmt(adjustedSoftware)}/mes${renMonthly > 0 ? ` · REN ${fmt(renMonthly)}/mes` : ''}${eco.hardwareRevenueMonthly > 0 ? ` · Hardware ${fmt(eco.hardwareRevenueMonthly)}/mes` : ''}
+        ROS ${fmtVAT(adjustedSoftware)}/mes${renMonthly > 0 ? ` · REN ${fmtVAT(renMonthly)}/mes` : ''}${eco.hardwareRevenueMonthly > 0 ? ` · Hardware ${fmtVAT(eco.hardwareRevenueMonthly)}/mes` : ''}
       </div>
-      ${discountPercent > 0 ? `<div style="font-size:8.5px;color:#dc2626;margin-top:3px;">Descuento aplicado: −${discountPercent}% (${fmt(discountAmount)}/mes)</div>` : ''}
+      ${discountPercent > 0 ? `<div style="font-size:8.5px;color:#dc2626;margin-top:3px;">Descuento aplicado: −${discountPercent}% (${fmtVAT(discountAmount)}/mes)</div>` : ''}
     </div>
 
     <div style="display:grid;grid-template-columns:${renEnabled ? '1fr 1fr 1fr' : '1fr 1fr'};gap:12px;margin-bottom:16px;">
@@ -711,13 +718,13 @@ function s11Economics(deal: Deal, cfg: DealConfiguration, sections: ProposalSect
         <div style="font-size:9px;font-weight:700;color:#1e3a5f;text-transform:uppercase;letter-spacing:1px;margin-bottom:9px;padding-bottom:7px;border-bottom:1px solid #e8eef6;">ROS</div>
         ${[
           ['Plan', plan.label],
-          ['Precio base', plan.priceMonthly === 0 ? `Gratis + ${plan.variableFee}€/ticket` : `${plan.priceMonthly}€/mes/local`],
-          ['Fee variable', `${plan.variableFee}€/ticket`],
+          ['Precio base (IVA incl.)', plan.priceMonthly === 0 ? `Gratis + ${plan.variableFee}€/ticket + IVA` : `${fmtVAT(plan.priceMonthly)}/mes/local`],
+          ['Fee variable (+ IVA)', `${plan.variableFee}€/ticket`],
           ['Locales', String(cfg.locations)],
           ['Pedidos/mes/local', fmtN(cfg.dailyOrdersPerLocation)],
-          ['Fee ROS/mes', fmt(adjustedSoftwareBase)],
-          ...(discountPercent > 0 ? [['Descuento', `−${discountPercent}% (${fmt(discountAmount)})`]] : []),
-          ...(discountPercent > 0 ? [['Neto ROS', fmt(adjustedSoftware)]] : []),
+          ['Fee ROS/mes', fmtVAT(adjustedSoftwareBase)],
+          ...(discountPercent > 0 ? [['Descuento', `−${discountPercent}% (${fmtVAT(discountAmount)})`]] : []),
+          ...(discountPercent > 0 ? [['Neto ROS', fmtVAT(adjustedSoftware)]] : []),
         ].map(([k,v]) => `
           <div style="display:flex;justify-content:space-between;padding:3px 0;border-bottom:1px solid #f1f5f9;">
             <span style="font-size:9.5px;color:${k === 'Descuento' ? '#dc2626' : '#64748b'};">${k}</span>
@@ -730,9 +737,9 @@ function s11Economics(deal: Deal, cfg: DealConfiguration, sections: ProposalSect
               const addonTotal = a.id === 'datafono'
                 ? `${a.feePercent}% GMV`
                 : a.perConsumption ? 'Por consumo'
-                : a.id === 'kds' ? `${fmt(19 * kdsVenues)}/mes`
-                : a.id === 'kiosk' ? `${fmt(19 * kioskVenues)}/mes`
-                : a.priceMonthly != null ? `${fmt(a.priceMonthly * cfg.locations)}/mes` : '—'
+                : a.id === 'kds' ? `${fmtVAT(19 * kdsVenues)}/mes`
+                : a.id === 'kiosk' ? `${fmtVAT(19 * kioskVenues)}/mes`
+                : a.priceMonthly != null ? `${fmtVAT(a.priceMonthly * cfg.locations)}/mes` : '—'
               return `<div style="display:flex;justify-content:space-between;padding:2px 0;">
                 <span style="font-size:9.5px;color:#334155;">${a.label}</span>
                 <span style="font-size:9px;color:#1e3a5f;font-family:'Courier New',monospace;">${addonTotal}</span>
@@ -747,9 +754,9 @@ function s11Economics(deal: Deal, cfg: DealConfiguration, sections: ProposalSect
         <div style="font-size:9px;font-weight:700;color:#1e3a5f;text-transform:uppercase;letter-spacing:1px;margin-bottom:9px;padding-bottom:7px;border-bottom:1px solid #e8eef6;">REN</div>
         ${[
           ['Pedidos delivery/mes/local', fmtN(deliveryPerVenue)],
-          ['Fee por pedido', `${renFeePerOrder.toFixed(2).replace('.', ',')}€`],
+          ['Fee por pedido (IVA incl.)', `${(renFeePerOrder * 1.21).toFixed(2).replace('.', ',')}€`],
           ['Locales con REN', String(renVenues)],
-          ['Coste REN/mes', fmt(renMonthly)],
+          ['Coste REN/mes', fmtVAT(renMonthly)],
         ].map(([k,v]) => `
           <div style="display:flex;justify-content:space-between;padding:3px 0;border-bottom:1px solid #f1f5f9;">
             <span style="font-size:9.5px;color:#64748b;">${k}</span>
@@ -767,8 +774,8 @@ function s11Economics(deal: Deal, cfg: DealConfiguration, sections: ProposalSect
               const price = item.mode === 'included'
                 ? 'Incluido en el plan'
                 : item.mode === 'financed' && item.financeMonths
-                ? `${fmt(lineTotal / item.financeMonths)}/mes`
-                : fmt(lineTotal)
+                ? `${fmtVAT(lineTotal / item.financeMonths)}/mes`
+                : fmtVAT(lineTotal)
               const modeLabel11 = item.mode === 'included' ? 'Incluido en el plan' : HARDWARE_MODE_LABELS[item.mode]
               return `<div style="padding:5px 0;border-bottom:1px solid #f1f5f9;">
                 <div style="display:flex;justify-content:space-between;align-items:flex-start;">
@@ -782,14 +789,18 @@ function s11Economics(deal: Deal, cfg: DealConfiguration, sections: ProposalSect
             }).join('') + `
               <div style="display:flex;justify-content:space-between;padding:7px 0 0;">
                 <span style="font-size:9.5px;color:#64748b;">Total hardware</span>
-                <span style="font-size:11px;font-weight:800;color:#1e3a5f;font-family:'Courier New',monospace;">${fmt(eco.hardwareCostTotal)}</span>
+                <span style="font-size:11px;font-weight:800;color:#1e3a5f;font-family:'Courier New',monospace;">${fmtVAT(eco.hardwareCostTotal)}</span>
               </div>`
           : `<div style="font-size:10px;color:#94a3b8;font-style:italic;padding:7px 0;">Sin hardware configurado</div>`}
       </div>
     </div>
 
+    <div style="margin-top:10px;font-size:8.5px;color:#94a3b8;text-align:right;">
+      Precios en euros. IVA 21% incluido en todos los importes.
+    </div>
+
     ${execSummary ? `
-    <div style="background:#f0f5fb;border-left:3px solid #1e3a5f;border-radius:0 6px 6px 0;padding:13px 15px;">
+    <div style="background:#f0f5fb;border-left:3px solid #1e3a5f;border-radius:0 6px 6px 0;padding:13px 15px;margin-top:10px;">
       <div style="font-size:9px;font-weight:700;color:#1e3a5f;text-transform:uppercase;letter-spacing:1px;margin-bottom:5px;">Resumen ejecutivo</div>
       <div style="font-size:10.5px;color:#334155;line-height:1.6;">${esc(execSummary)}</div>
     </div>` : ''}`
@@ -844,7 +855,7 @@ function s12Annex(deal: Deal, today: string, logoUri: string): string {
     </div>
     <div style="margin-top:14px;background:#f8fafc;border:1px solid #e8eef6;border-radius:8px;padding:13px 15px;font-size:9.5px;color:#64748b;line-height:1.6;">
       La presente propuesta tiene validez de <strong>30 días naturales</strong> a partir de la fecha de emisión (${today}).
-      Los precios indicados son en euros, sin IVA. El tipo de IVA aplicable es el vigente en la fecha de facturación.
+      Los precios indicados son en euros e incluyen IVA al 21%.
       La aceptación de esta propuesta implica la celebración de un contrato de prestación de servicios
       bajo las Condiciones Generales publicadas en <strong>platomico.com/legal</strong>.
     </div>`
