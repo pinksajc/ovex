@@ -171,12 +171,9 @@ function pageHeader(logoUri: string): string {
 
 function sectionTitle(title: string, sub?: string): string {
   return `
-    <div style="margin-bottom:16px; padding-bottom:8px; border-bottom:2px solid #1e3a5f;">
-      <div style="font-size:8px; font-weight:700; color:#1e3a5f; text-transform:uppercase; letter-spacing:2px; margin-bottom:3px;">
-        Platomico · Propuesta Comercial
-      </div>
+    <div style="margin-bottom:22px; padding-bottom:10px; border-bottom:2px solid #1e3a5f;">
       <div style="font-size:19px; font-weight:800; color:#0f172a; letter-spacing:-0.5px;">${title}</div>
-      ${sub ? `<div style="font-size:10.5px; color:#64748b; margin-top:2px;">${sub}</div>` : ''}
+      ${sub ? `<div style="font-size:10.5px; color:#64748b; margin-top:3px;">${sub}</div>` : ''}
     </div>`
 }
 
@@ -246,22 +243,22 @@ function pg(logoUri: string, content: string, last = false): string {
 function s1Cover(deal: Deal, cfg: DealConfiguration, today: string, logoUri: string): string {
   const plan = PLANS[cfg.plan]
   const logoTag = logoUri
-    ? `<img src="${logoUri}" style="height:42px;width:auto;display:block;" alt="Platomico"/>`
-    : `<span style="font-size:26px;font-weight:900;color:#0f172a;">Platomico.</span>`
+    ? `<img src="${logoUri}" style="height:24px;width:auto;display:block;" alt="Platomico"/>`
+    : `<span style="font-size:16px;font-weight:800;color:#0f172a;letter-spacing:-0.5px;">Platomico.</span>`
 
   const content = `
     <!-- Logo arriba a la derecha -->
-    <div style="display:flex;justify-content:flex-end;margin-bottom:36px;">
+    <div style="display:flex;justify-content:flex-end;margin-bottom:40px;">
       ${logoTag}
     </div>
 
     <!-- Tagline + título -->
-    <div style="margin-bottom:28px;">
-      <div style="font-size:9px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:3px;margin-bottom:10px;">
-        PLATOMICO · Gestiona tu restaurante desde un único lugar
+    <div style="margin-bottom:32px;">
+      <div style="font-size:9px;font-weight:600;color:#94a3b8;text-transform:uppercase;letter-spacing:3px;margin-bottom:12px;">
+        Gestiona tu restaurante desde un único lugar
       </div>
-      <div style="font-size:40px;font-weight:900;color:#0f172a;letter-spacing:-1.5px;line-height:1.05;margin-bottom:10px;">
-        Propuesta<br>Comercial
+      <div style="font-size:38px;font-weight:900;color:#0f172a;letter-spacing:-1.5px;line-height:1.05;margin-bottom:12px;">
+        Propuesta Comercial
       </div>
       <div style="width:56px;height:4px;background:#1e3a5f;border-radius:2px;"></div>
     </div>
@@ -269,13 +266,14 @@ function s1Cover(deal: Deal, cfg: DealConfiguration, today: string, logoUri: str
     <!-- Preparada para -->
     <div style="background:#f8fafc;border:1px solid #e8eef6;border-radius:12px;padding:22px 26px;margin-bottom:22px;">
       <div style="font-size:8px;color:#94a3b8;text-transform:uppercase;letter-spacing:1.5px;margin-bottom:10px;">Preparada para</div>
-      <div style="font-size:26px;font-weight:800;color:#0f172a;letter-spacing:-0.5px;margin-bottom:4px;">${esc(deal.company.name)}</div>
-      ${deal.company.cif ? `<div style="font-size:12px;color:#64748b;margin-bottom:3px;">CIF: ${esc(deal.company.cif)}</div>` : ''}
-      ${deal.contact.name ? `<div style="font-size:12px;color:#64748b;">Attn.: ${esc(deal.contact.name)}</div>` : ''}
+      <div style="font-size:26px;font-weight:800;color:#0f172a;letter-spacing:-0.5px;margin-bottom:8px;">${esc(deal.company.name)}</div>
+      ${deal.company.cif ? `<div style="font-size:11px;color:#64748b;margin-bottom:3px;">CIF: ${esc(deal.company.cif)}</div>` : ''}
+      ${deal.contact.name ? `<div style="font-size:11px;color:#64748b;margin-bottom:2px;">Attn.: ${esc(deal.contact.name)}${deal.contact.email ? ` · ${esc(deal.contact.email)}` : ''}${deal.contact.phone ? ` · ${esc(deal.contact.phone)}` : ''}</div>` : ''}
+      ${deal.company.address ? `<div style="font-size:11px;color:#94a3b8;">${esc(deal.company.address)}${deal.company.city ? `, ${esc(deal.company.city)}` : ''}</div>` : deal.company.city ? `<div style="font-size:11px;color:#94a3b8;">${esc(deal.company.city)}</div>` : ''}
     </div>
 
     <!-- Meta: fecha / versión / plan -->
-    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:22px;">
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:20px;">
       ${[
         ['Fecha',   `Madrid, ${today}`],
         ['Versión', `V1.0${cfg.version}${cfg.label ? ` · ${cfg.label}` : ''}`],
@@ -287,22 +285,14 @@ function s1Cover(deal: Deal, cfg: DealConfiguration, today: string, logoUri: str
         </div>`).join('')}
     </div>
 
-    <!-- CONFIDENCIAL notice -->
-    <div style="border:1px solid #fde8e8;border-radius:8px;padding:12px 16px;background:#fff9f9;display:flex;align-items:center;gap:10px;">
-      <div style="font-size:18px;flex-shrink:0;">⚠</div>
-      <div>
-        <div style="font-size:9px;font-weight:700;color:#dc2626;text-transform:uppercase;letter-spacing:1px;">Documento confidencial</div>
-        <div style="font-size:9px;color:#94a3b8;margin-top:2px;">
-          Este documento contiene información comercial y técnica de carácter confidencial.
-          Su divulgación a terceros no autorizados está expresamente prohibida.
-        </div>
-      </div>
+    <!-- Validez -->
+    <div style="font-size:9px;color:#94a3b8;line-height:1.5;">
+      Esta propuesta tiene validez de <strong style="color:#64748b;">30 días naturales</strong> desde su fecha de emisión.
     </div>`
 
   return `
 <div style="break-after:page; position:relative; min-height:220mm; font-family:Helvetica,Arial,sans-serif; font-size:11px; color:#0f172a;">
   <div style="position:relative;">${content}</div>
-  <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%) rotate(-38deg);font-size:72px;font-weight:900;letter-spacing:10px;color:rgba(30,58,95,0.04);white-space:nowrap;pointer-events:none;user-select:none;z-index:9999;font-family:Helvetica,sans-serif;">CONFIDENCIAL</div>
 </div>`
 }
 
@@ -322,16 +312,13 @@ function s2Index(logoUri: string): string {
   ]
   const content = `
     ${sectionTitle('Índice')}
-    <div style="margin-top:6px;">
+    <div style="margin-top:4px;">
       ${items.map(([n, t], i) => `
-        <div style="display:flex;align-items:center;padding:10px 0;${i < items.length - 1 ? 'border-bottom:1px solid #f1f5f9;' : ''}">
+        <div style="display:flex;align-items:center;padding:6px 0;${i < items.length - 1 ? 'border-bottom:1px solid #f1f5f9;' : ''}">
           <div style="width:56px;flex-shrink:0;font-size:9px;font-weight:700;color:#1e3a5f;font-family:'Courier New',monospace;">${n}.</div>
           <div style="flex:1;border-bottom:1px dotted #d1dce8;height:1px;margin:0 10px;"></div>
           <div style="font-size:11px;font-weight:500;color:#0f172a;">${t}</div>
         </div>`).join('')}
-    </div>
-    <div style="margin-top:24px;background:#f0f5fb;border-left:3px solid #1e3a5f;border-radius:0 6px 6px 0;padding:11px 14px;font-size:9.5px;color:#334155;line-height:1.6;">
-      Esta propuesta ha sido preparada de forma personalizada y tiene validez de <strong>30 días naturales</strong> desde su fecha de emisión.
     </div>`
   return pg(logoUri, content)
 }
@@ -366,11 +353,11 @@ function s4Purpose(logoUri: string): string {
   const content = `
     ${sectionTitle('Nuestro propósito')}
 
-    <div style="background:#1e3a5f;border-radius:12px;padding:26px 30px;margin-bottom:26px;text-align:center;">
-      <div style="font-size:21px;font-weight:900;color:#fff;letter-spacing:-0.5px;line-height:1.2;margin-bottom:7px;">
-        "No cambies de equipo.<br>Cambia de resultados."
+    <div style="margin-bottom:26px;padding:18px 0 18px;border-top:2px solid #1e3a5f;border-bottom:1px solid #e8eef6;">
+      <div style="font-size:22px;font-weight:900;color:#0f172a;letter-spacing:-0.5px;line-height:1.2;margin-bottom:6px;">
+        "No cambies de equipo. Cambia de resultados."
       </div>
-      <div style="font-size:11px;color:rgba(255,255,255,0.6);">
+      <div style="font-size:11px;color:#64748b;">
         La tecnología que necesitas ya existe. Solo hay que ponerla a trabajar para ti.
       </div>
     </div>
@@ -388,7 +375,7 @@ function s4Purpose(logoUri: string): string {
         </div>`).join('')}
     </div>
 
-    <div style="background:#f0f5fb;border-left:3px solid #1e3a5f;border-radius:0 6px 6px 0;padding:13px 15px;font-size:10.5px;color:#334155;line-height:1.6;">
+    <div style="font-size:10.5px;color:#334155;line-height:1.6;margin-top:6px;">
       ROS no es solo software más. Es el compromiso de que la tecnología trabaje para el restaurante, y no al revés.
       Por eso ofrecemos contratos sin permanencia, activación en 24 horas y soporte nativo en español.
     </div>`
@@ -546,7 +533,7 @@ function s6Modules(logoUri: string): string {
 function s7Support(cfg: DealConfiguration, logoUri: string): string {
   const hiCol = cfg.plan === 'starter' ? 1 : cfg.plan === 'growth' ? 2 : 3
   const rows: string[][] = [
-    ['Canal de soporte',    'Email',                    'Email + Chat',                   'Teléfono · Chat · Email'],
+    ['Canal de soporte',    'Email',                    'Email + WhatsApp',               'Teléfono · WhatsApp · Email'],
     ['Tiempo de respuesta', '48 h hábiles',             '24 h hábiles',                   '4 h hábiles'],
     ['Onboarding',          'Documentación self-service','Sesión guiada remota',           'Onboarding presencial o remoto'],
     ['Account Manager',     '—',                        '—',                              'Dedicado'],
@@ -590,11 +577,11 @@ function s8Activation(logoUri: string): string {
           </div>
         </div>`).join('')}
     </div>
-    <div style="background:#1e3a5f;border-radius:10px;padding:15px 19px;display:flex;align-items:center;gap:13px;">
+    <div style="border:1px solid #dde6f0;border-radius:10px;padding:15px 19px;display:flex;align-items:center;gap:13px;">
       <div style="font-size:26px;">⚡</div>
       <div>
-        <div style="font-size:13px;font-weight:800;color:#fff;margin-bottom:2px;">Activación garantizada en 24 horas</div>
-        <div style="font-size:10px;color:rgba(255,255,255,0.7);line-height:1.5;">
+        <div style="font-size:13px;font-weight:800;color:#0f172a;margin-bottom:2px;">Activación garantizada en 24 horas</div>
+        <div style="font-size:10px;color:#64748b;line-height:1.5;">
           Si el proceso de activación supera las 24 horas hábiles por causas imputables a Platomico, el primer mes de servicio es gratuito.
         </div>
       </div>
@@ -719,135 +706,141 @@ function s11Economics(deal: Deal, cfg: DealConfiguration, sections: ProposalSect
       <span style="font-size:9.5px;font-weight:600;color:${red ? '#dc2626' : '#0f172a'};font-family:'Courier New',monospace;">${value}</span>
     </div>`
 
+  // Fixed monthly net = software (plan+addons-discount) + hw monthly; excludes variable REN
+  const fixedMonthlyNet = adjustedSoftware + eco.hardwareRevenueMonthly
+
+  // Hardware items by mode
+  const hwSold     = hwItems.filter(i => i.mode === 'sold')
+  const hwMonthly  = hwItems.filter(i => i.mode === 'financed' || i.mode === 'rented')
+  const hwIncluded = hwItems.filter(i => i.mode === 'included')
+  const hwUpfrontNet = hwSold.reduce((s, i) => s + i.unitPrice * i.quantity, 0)
+
+  const hwItemRow = (item: typeof hwItems[0], net: number, suffix: string) => `
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;padding:3px 0;border-bottom:1px solid #f1f5f9;gap:4px;">
+      <span style="font-size:9px;color:#334155;flex-shrink:0;">${HARDWARE[item.hardwareId].label} · ${item.quantity} ud.</span>
+      <div style="text-align:right;flex-shrink:0;line-height:1.4;">
+        <div style="font-size:8.5px;color:#64748b;font-family:'Courier New',monospace;">${fmt(net)}${suffix} <span style="font-size:7px;color:#94a3b8;">(neto)</span></div>
+        <div style="font-size:8.5px;color:#94a3b8;font-family:'Courier New',monospace;">+ ${fmt(net * 0.21)}${suffix}</div>
+        <div style="font-size:9.5px;font-weight:700;color:#1e3a5f;font-family:'Courier New',monospace;">= ${fmtVAT(net)}${suffix}</div>
+      </div>
+    </div>`
+
   const content = `
     ${sectionTitle('Resumen económico', `${deal.company.name} · Plan ${plan.label} · ${cfg.locations} local${cfg.locations > 1 ? 'es' : ''}`)}
 
-    <!-- Hero total box -->
-    <div style="border:2px solid #1e3a5f;border-radius:12px;padding:16px 22px 14px;background:#f0f5fb;margin-bottom:16px;">
-      <div style="font-size:9px;color:#64748b;text-transform:uppercase;letter-spacing:1.5px;margin-bottom:12px;text-align:center;">Total / mes</div>
-      <div style="display:flex;align-items:center;justify-content:center;gap:10px;flex-wrap:wrap;">
-        <div style="text-align:center;">
-          <div style="font-size:24px;font-weight:900;color:#334155;font-family:'Courier New',monospace;line-height:1;">${fmt(totalMes)}</div>
-          <div style="font-size:7.5px;color:#94a3b8;text-transform:uppercase;letter-spacing:1px;margin-top:3px;">neto</div>
-        </div>
-        <div style="font-size:18px;color:#94a3b8;font-weight:300;margin-bottom:10px;">+</div>
-        <div style="text-align:center;">
-          <div style="font-size:24px;font-weight:900;color:#64748b;font-family:'Courier New',monospace;line-height:1;">${fmt(totalMes * 0.21)}</div>
-          <div style="font-size:7.5px;color:#94a3b8;text-transform:uppercase;letter-spacing:1px;margin-top:3px;">IVA 21%</div>
-        </div>
-        <div style="font-size:18px;color:#94a3b8;font-weight:300;margin-bottom:10px;">=</div>
-        <div style="text-align:center;background:#1e3a5f;padding:10px 18px;border-radius:8px;">
-          <div style="font-size:30px;font-weight:900;color:#fff;font-family:'Courier New',monospace;line-height:1;">${fmtVAT(totalMes)}</div>
-          <div style="font-size:7.5px;color:rgba(255,255,255,0.65);text-transform:uppercase;letter-spacing:1px;margin-top:3px;">total/mes</div>
-        </div>
-      </div>
-      ${discountPercent > 0 ? `<div style="font-size:8px;color:#dc2626;margin-top:10px;text-align:center;">Descuento aplicado: −${discountPercent}% sobre neto · −${fmt(discountAmount)} neto · −${fmtVAT(discountAmount)} con IVA</div>` : ''}
-      <div style="font-size:8px;color:#94a3b8;margin-top:8px;text-align:center;border-top:1px solid #dde6f0;padding-top:8px;">
-        ROS ${fmt(adjustedSoftware)}/mes neto${renMonthly > 0 ? ` · REN ${fmt(renMonthly)}/mes neto` : ''}${eco.hardwareRevenueMonthly > 0 ? ` · Hardware ${fmt(eco.hardwareRevenueMonthly)}/mes neto` : ''}
-      </div>
-    </div>
-
-    <div style="display:grid;grid-template-columns:${renEnabled ? '1fr 1fr 1fr' : '1fr 1fr'};gap:12px;margin-bottom:16px;">
-      <!-- ROS -->
-      <div style="border:1px solid #dde6f0;border-radius:8px;padding:14px;">
-        <div style="font-size:9px;font-weight:700;color:#1e3a5f;text-transform:uppercase;letter-spacing:1px;margin-bottom:9px;padding-bottom:7px;border-bottom:1px solid #e8eef6;">ROS</div>
+    <div style="display:grid;grid-template-columns:${renEnabled ? '1fr 1fr 1fr' : '1fr 1fr'};gap:10px;margin-bottom:14px;">
+      <!-- ROS (informacional) -->
+      <div style="border:1px solid #dde6f0;border-radius:8px;padding:12px;">
+        <div style="font-size:9px;font-weight:700;color:#1e3a5f;text-transform:uppercase;letter-spacing:1px;margin-bottom:8px;padding-bottom:6px;border-bottom:1px solid #e8eef6;">ROS</div>
         ${simpleRow('Plan', plan.label)}
-        ${simpleRow('Precio base', plan.priceMonthly === 0 ? `Gratis + ${plan.variableFee}€/ticket` : `${fmt(plan.priceMonthly)}€/local/mes`)}
-        ${simpleRow('Fee variable', `${plan.variableFee}€/ticket`)}
-        ${simpleRow('Locales', String(cfg.locations))}
-        ${simpleRow('Pedidos/mes/local', fmtN(cfg.dailyOrdersPerLocation))}
-        ${discountPercent > 0
-          ? vatRow('Fee ROS bruto/mes', adjustedSoftwareBase, '/mes') +
-            simpleRow('Descuento', `−${discountPercent}% neto (−${fmt(discountAmount)})`, true) +
-            vatRow('Fee ROS neto/mes', adjustedSoftware, '/mes')
-          : vatRow('Fee ROS/mes', adjustedSoftwareBase, '/mes')}
+        ${simpleRow('Precio base', plan.priceMonthly === 0
+          ? 'Gratis'
+          : `${fmt(plan.priceMonthly)}€/local/mes × ${cfg.locations} local${cfg.locations > 1 ? 'es' : ''}`)}
+        ${simpleRow('Fee variable', `${plan.variableFee}€/ticket (+ IVA)`)}
+        ${simpleRow('Pedidos estimados/mes', fmtN(cfg.dailyOrdersPerLocation * cfg.locations))}
+        ${discountPercent > 0 ? simpleRow('Descuento', `−${discountPercent}%`, true) : ''}
         ${activeAddons.length > 0 ? `
-          <div style="margin-top:9px;padding-top:7px;border-top:1px solid #e8eef6;">
-            <div style="font-size:8px;color:#94a3b8;text-transform:uppercase;letter-spacing:1px;margin-bottom:5px;">Add-ons activos</div>
+          <div style="margin-top:8px;padding-top:6px;border-top:1px solid #e8eef6;">
+            <div style="font-size:7.5px;color:#94a3b8;text-transform:uppercase;letter-spacing:1px;margin-bottom:4px;">Add-ons</div>
             ${activeAddons.map(a => {
               const addonNet = a.id === 'kds' ? 19 * kdsVenues
                 : a.id === 'kiosk' ? 19 * kioskVenues
-                : a.priceMonthly != null ? a.priceMonthly * cfg.locations : null
-              const addonLabel = a.id === 'datafono'
-                ? `${a.feePercent}% GMV`
+                : a.priceMonthly != null ? a.priceMonthly * (a.perLocation ? cfg.locations : 1) : null
+              const addonVal = a.id === 'datafono' ? `${a.feePercent}% GMV`
                 : a.perConsumption ? 'Por consumo'
                 : addonNet != null ? `${fmt(addonNet)}/mes neto · ${fmtVAT(addonNet)}/mes` : '—'
-              return `<div style="display:flex;justify-content:space-between;padding:2px 0;">
-                <span style="font-size:9px;color:#334155;">${a.label}</span>
-                <span style="font-size:8.5px;color:#1e3a5f;font-family:'Courier New',monospace;">${addonLabel}</span>
+              return `<div style="display:flex;justify-content:space-between;padding:2px 0;gap:4px;">
+                <span style="font-size:8.5px;color:#334155;">${a.label}</span>
+                <span style="font-size:8px;color:#1e3a5f;font-family:'Courier New',monospace;text-align:right;">${addonVal}</span>
               </div>`
             }).join('')}
           </div>` : ''}
       </div>
 
       ${renEnabled ? `
-      <!-- REN -->
-      <div style="border:1px solid #dde6f0;border-radius:8px;padding:14px;">
-        <div style="font-size:9px;font-weight:700;color:#1e3a5f;text-transform:uppercase;letter-spacing:1px;margin-bottom:9px;padding-bottom:7px;border-bottom:1px solid #e8eef6;">REN</div>
-        ${simpleRow('Pedidos delivery/mes/local', fmtN(deliveryPerVenue))}
-        ${simpleRow('Fee por pedido (neto)', `${renFeePerOrder.toFixed(2).replace('.', ',')}€`)}
+      <!-- REN (informacional) -->
+      <div style="border:1px solid #dde6f0;border-radius:8px;padding:12px;">
+        <div style="font-size:9px;font-weight:700;color:#1e3a5f;text-transform:uppercase;letter-spacing:1px;margin-bottom:8px;padding-bottom:6px;border-bottom:1px solid #e8eef6;">REN</div>
+        ${simpleRow('Fee por pedido', `${renFeePerOrder.toFixed(2).replace('.', ',')}€ neto (+ IVA)`)}
+        ${simpleRow('Pedidos/mes/local', fmtN(deliveryPerVenue))}
         ${simpleRow('Locales con REN', String(renVenues))}
-        ${vatRow('Coste REN/mes', renMonthly, '/mes')}
+        ${simpleRow('Pedidos totales/mes', fmtN(deliveryPerVenue * renVenues))}
+        <div style="margin-top:6px;padding-top:6px;border-top:1px solid #e8eef6;font-size:8px;color:#94a3b8;line-height:1.4;">
+          Coste variable · liquidado a mes vencido según pedidos reales
+        </div>
       </div>` : ''}
 
       <!-- Hardware -->
-      <div style="border:1px solid #dde6f0;border-radius:8px;padding:14px;">
-        <div style="font-size:9px;font-weight:700;color:#1e3a5f;text-transform:uppercase;letter-spacing:1px;margin-bottom:9px;padding-bottom:7px;border-bottom:1px solid #e8eef6;">Hardware</div>
-        ${hwItems.length > 0
-          ? hwItems.map(item => {
-              const hw = HARDWARE[item.hardwareId]
+      <div style="border:1px solid #dde6f0;border-radius:8px;padding:12px;">
+        <div style="font-size:9px;font-weight:700;color:#1e3a5f;text-transform:uppercase;letter-spacing:1px;margin-bottom:8px;padding-bottom:6px;border-bottom:1px solid #e8eef6;">Hardware</div>
+        ${hwItems.length === 0
+          ? `<div style="font-size:10px;color:#94a3b8;font-style:italic;">Sin hardware configurado</div>`
+          : `
+          ${hwSold.length > 0 ? `
+            <div style="font-size:8px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:0.8px;margin-bottom:4px;">Pago único (upfront)</div>
+            ${hwSold.map(item => hwItemRow(item, item.unitPrice * item.quantity, '')).join('')}
+            ${hwSold.length > 1 ? `
+              <div style="display:flex;justify-content:space-between;padding:3px 0;margin-top:2px;">
+                <span style="font-size:8.5px;font-weight:700;color:#64748b;">Subtotal upfront</span>
+                <span style="font-size:9px;font-weight:800;color:#1e3a5f;font-family:'Courier New',monospace;">${fmtVAT(hwUpfrontNet)}</span>
+              </div>` : ''}` : ''}
+          ${hwMonthly.length > 0 ? `
+            <div style="font-size:8px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:0.8px;margin-top:${hwSold.length > 0 ? '8' : '0'}px;margin-bottom:4px;">Mensualidad</div>
+            ${hwMonthly.map(item => {
               const lineTotal = item.unitPrice * item.quantity
-              const modeLabel11 = item.mode === 'included' ? 'Incluido en el plan' : HARDWARE_MODE_LABELS[item.mode]
-              if (item.mode === 'included') {
-                return `<div style="padding:5px 0;border-bottom:1px solid #f1f5f9;">
-                  <div style="display:flex;justify-content:space-between;align-items:center;">
-                    <div>
-                      <div style="font-size:10px;font-weight:600;color:#0f172a;">${hw.label}</div>
-                      <div style="font-size:9px;color:#94a3b8;">${item.quantity} ud. · ${modeLabel11}</div>
-                    </div>
-                    <div style="font-size:10px;font-weight:600;color:#10b981;font-family:'Courier New',monospace;">Incluido</div>
-                  </div>
-                </div>`
-              }
-              const net = item.mode === 'financed' && item.financeMonths
-                ? lineTotal / item.financeMonths
-                : item.mode === 'rented' ? 19 * item.quantity
-                : lineTotal
-              const suffix = (item.mode === 'financed' || item.mode === 'rented') ? '/mes' : ''
-              return `<div style="padding:5px 0;border-bottom:1px solid #f1f5f9;">
-                <div style="font-size:10px;font-weight:600;color:#0f172a;margin-bottom:3px;">${hw.label} · ${item.quantity} ud. · ${modeLabel11}</div>
-                <div style="display:flex;justify-content:flex-end;">
-                  <div style="text-align:right;line-height:1.5;">
-                    <div style="font-size:9px;color:#64748b;font-family:'Courier New',monospace;">${fmt(net)}${suffix} <span style="font-size:7.5px;color:#94a3b8;">(neto)</span></div>
-                    <div style="font-size:9px;color:#94a3b8;font-family:'Courier New',monospace;">+ ${fmt(net * 0.21)}${suffix} <span style="font-size:7.5px;">(IVA 21%)</span></div>
-                    <div style="font-size:10px;font-weight:700;color:#1e3a5f;font-family:'Courier New',monospace;">= ${fmtVAT(net)}${suffix}</div>
-                  </div>
-                </div>
-              </div>`
-            }).join('') +
-            (eco.hardwareCostTotal > 0 ? `
-              <div style="padding:7px 0 0;">
-                <div style="display:flex;justify-content:space-between;align-items:baseline;">
-                  <span style="font-size:9px;color:#64748b;">Total hardware</span>
-                  <div style="text-align:right;line-height:1.5;">
-                    <div style="font-size:9px;color:#64748b;font-family:'Courier New',monospace;">${fmt(eco.hardwareCostTotal)} <span style="font-size:7.5px;color:#94a3b8;">(neto)</span></div>
-                    <div style="font-size:9px;color:#94a3b8;font-family:'Courier New',monospace;">+ ${fmt(eco.hardwareCostTotal * 0.21)} <span style="font-size:7.5px;">(IVA)</span></div>
-                    <div style="font-size:11px;font-weight:800;color:#1e3a5f;font-family:'Courier New',monospace;">= ${fmtVAT(eco.hardwareCostTotal)}</div>
-                  </div>
-                </div>
-              </div>` : '')
-          : `<div style="font-size:10px;color:#94a3b8;font-style:italic;padding:7px 0;">Sin hardware configurado</div>`}
+              const net = item.mode === 'financed' && item.financeMonths ? lineTotal / item.financeMonths : 19 * item.quantity
+              return hwItemRow(item, net, '/mes')
+            }).join('')}` : ''}
+          ${hwIncluded.length > 0 ? `
+            <div style="font-size:8px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:0.8px;margin-top:${(hwSold.length > 0 || hwMonthly.length > 0) ? '8' : '0'}px;margin-bottom:4px;">Incluido en el plan</div>
+            ${hwIncluded.map(item => `
+              <div style="display:flex;justify-content:space-between;padding:3px 0;border-bottom:1px solid #f1f5f9;">
+                <span style="font-size:9px;color:#334155;">${HARDWARE[item.hardwareId].label} · ${item.quantity} ud.</span>
+                <span style="font-size:9px;color:#10b981;font-weight:600;">Incluido</span>
+              </div>`).join('')}` : ''}
+        `}
       </div>
     </div>
 
-    <div style="margin-top:10px;font-size:8.5px;color:#94a3b8;text-align:right;">
+    <!-- Total fijo mensual (below columns) -->
+    <div style="border:2px solid #1e3a5f;border-radius:12px;padding:14px 20px;background:#f0f5fb;margin-bottom:10px;">
+      <div style="font-size:8.5px;color:#64748b;text-transform:uppercase;letter-spacing:1.5px;margin-bottom:10px;text-align:center;">Total fijo / mes (add-ons + hardware mensualidad)</div>
+      <div style="display:flex;align-items:center;justify-content:center;gap:10px;flex-wrap:wrap;">
+        <div style="text-align:center;">
+          <div style="font-size:22px;font-weight:900;color:#334155;font-family:'Courier New',monospace;line-height:1;">${fmt(fixedMonthlyNet)}</div>
+          <div style="font-size:7px;color:#94a3b8;text-transform:uppercase;letter-spacing:1px;margin-top:2px;">neto</div>
+        </div>
+        <div style="font-size:16px;color:#94a3b8;font-weight:300;margin-bottom:8px;">+</div>
+        <div style="text-align:center;">
+          <div style="font-size:22px;font-weight:900;color:#64748b;font-family:'Courier New',monospace;line-height:1;">${fmt(fixedMonthlyNet * 0.21)}</div>
+          <div style="font-size:7px;color:#94a3b8;text-transform:uppercase;letter-spacing:1px;margin-top:2px;">IVA 21%</div>
+        </div>
+        <div style="font-size:16px;color:#94a3b8;font-weight:300;margin-bottom:8px;">=</div>
+        <div style="text-align:center;background:#1e3a5f;padding:8px 16px;border-radius:8px;">
+          <div style="font-size:26px;font-weight:900;color:#fff;font-family:'Courier New',monospace;line-height:1;">${fmtVAT(fixedMonthlyNet)}</div>
+          <div style="font-size:7px;color:rgba(255,255,255,0.65);text-transform:uppercase;letter-spacing:1px;margin-top:2px;">total/mes</div>
+        </div>
+      </div>
+      ${discountPercent > 0 ? `<div style="font-size:8px;color:#dc2626;margin-top:8px;text-align:center;">Descuento −${discountPercent}% aplicado sobre neto · ahorro ${fmtVAT(discountAmount)}/mes</div>` : ''}
+    </div>
+
+    <!-- Footer variable -->
+    <div style="border:1px solid #e8eef6;border-radius:8px;padding:10px 14px;background:#f8fafc;font-size:8.5px;color:#334155;line-height:1.6;">
+      <strong>Total fijo/mes:</strong> ${fmtVAT(fixedMonthlyNet)} (IVA incl.)
+      + <strong>variable por pedido:</strong>
+      ROS: ${plan.variableFee.toFixed(2).replace('.', ',')}€/ticket + IVA${renEnabled ? ` · REN: ${renFeePerOrder.toFixed(2).replace('.', ',')}€/pedido + IVA` : ''}
+      — liquidado a mes vencido en factura.${hwUpfrontNet > 0 ? `
+      <br><strong>Pago único hardware:</strong> ${fmtVAT(hwUpfrontNet)} (IVA incl.) — facturado a la activación.` : ''}
+    </div>
+
+    <div style="margin-top:8px;font-size:8px;color:#94a3b8;text-align:right;">
       Precios en euros. IVA 21% incluido en todos los importes.
     </div>
 
     ${execSummary ? `
-    <div style="background:#f0f5fb;border-left:3px solid #1e3a5f;border-radius:0 6px 6px 0;padding:13px 15px;margin-top:10px;">
-      <div style="font-size:9px;font-weight:700;color:#1e3a5f;text-transform:uppercase;letter-spacing:1px;margin-bottom:5px;">Resumen ejecutivo</div>
-      <div style="font-size:10.5px;color:#334155;line-height:1.6;">${esc(execSummary)}</div>
+    <div style="background:#f0f5fb;border-left:3px solid #1e3a5f;border-radius:0 6px 6px 0;padding:12px 14px;margin-top:10px;">
+      <div style="font-size:9px;font-weight:700;color:#1e3a5f;text-transform:uppercase;letter-spacing:1px;margin-bottom:4px;">Resumen ejecutivo</div>
+      <div style="font-size:10px;color:#334155;line-height:1.6;">${esc(execSummary)}</div>
     </div>` : ''}`
   return pg(logoUri, content)
 }
