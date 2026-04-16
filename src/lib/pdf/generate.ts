@@ -487,7 +487,7 @@ function s5Plans(deal: Deal, cfg: DealConfiguration, logoUri: string): string {
         <span style="font-size:10px;font-weight:600;color:#0f172a;">REN · Marketplace logístico</span>
         <span style="font-size:9px;color:#94a3b8;margin-left:7px;">Fee por pedido</span>
       </div>
-      <span style="font-size:10px;font-weight:700;color:#1e3a5f;font-family:'Courier New',monospace;">0,10€/pedido</span>
+      <span style="font-size:10px;font-weight:700;color:#1e3a5f;font-family:'Courier New',monospace;">${renFeePerOrder.toFixed(2).replace('.', ',')}€/pedido</span>
     </div>` : ''}
 
     <div style="margin-top:12px;background:#f8fafc;border:1px solid #e8eef6;border-radius:7px;padding:10px 14px;font-size:9.5px;color:#64748b;line-height:1.6;">
