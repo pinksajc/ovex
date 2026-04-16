@@ -164,7 +164,7 @@ function pageHeader(logoUri: string): string {
     ">
       ${imgOrText}
       <span style="font-size:7.5px; color:#94a3b8; letter-spacing:0.8px; text-transform:uppercase;">
-        Propuesta Comercial · Confidencial
+        Confidencial
       </span>
     </div>`
 }
@@ -700,7 +700,6 @@ function s11Economics(deal: Deal, cfg: DealConfiguration, sections: ProposalSect
           ? 'Gratis'
           : `${fmt(plan.priceMonthly)}/local/mes × ${cfg.locations} local${cfg.locations > 1 ? 'es' : ''}`)}
         ${simpleRow('Fee variable', `${plan.variableFee}€/ticket`)}
-        ${simpleRow('Pedidos estimados/mes', fmtN(cfg.dailyOrdersPerLocation * cfg.locations))}
         ${discountPercent > 0 ? simpleRow('Descuento', `−${discountPercent}%`, true) : ''}
         ${activeAddons.length > 0 ? `
           <div style="margin-top:8px;padding-top:6px;border-top:1px solid #e8eef6;">
