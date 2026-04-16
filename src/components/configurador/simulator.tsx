@@ -780,7 +780,7 @@ export function Simulator({ deal, initialConfig, loadedConfigId }: SimulatorProp
           {(() => {
             const rentedMonthly = HARDWARE_ORDER.reduce((sum, id) => {
               const s = hardware[id]
-              return s.mode === 'rented' ? sum + RENTAL_MONTHLY_PRICE * s.quantity : sum
+              return s.mode === 'rented' ? sum + (HARDWARE[id].rentalMonthlyPrice ?? RENTAL_MONTHLY_PRICE) * s.quantity : sum
             }, 0)
             const purchasedCostTotal = HARDWARE_ORDER.reduce((sum, id) => {
               const s = hardware[id]
@@ -919,7 +919,7 @@ function EconomicsPanel({
   const adjustedMRR = softwareFee - discountAmount + renMonthly + economics.hardwareRevenueMonthly
   const rentedMonthly = HARDWARE_ORDER.reduce((sum, id) => {
     const s = hardware[id]
-    return s.mode === 'rented' ? sum + RENTAL_MONTHLY_PRICE * s.quantity : sum
+    return s.mode === 'rented' ? sum + (HARDWARE[id].rentalMonthlyPrice ?? RENTAL_MONTHLY_PRICE) * s.quantity : sum
   }, 0)
   const purchasedCostTotal = HARDWARE_ORDER.reduce((sum, id) => {
     const s = hardware[id]
