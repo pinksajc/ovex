@@ -878,7 +878,7 @@ function s13Signature(deal: Deal, today: string, logoUri: string): string {
         <div style="font-size:9px;font-weight:700;color:#1e3a5f;text-transform:uppercase;letter-spacing:1px;margin-bottom:3px;">Por Platomico, S.L.</div>
         <div style="font-size:10px;color:#64748b;margin-bottom:18px;">NIF B22741094 · Madrid</div>
         <div style="border-bottom:1.5px solid #1e3a5f;margin-bottom:7px;height:46px;"></div>
-        <div style="font-size:11px;font-weight:700;color:#0f172a;">${esc(deal.owner)}</div>
+        <div style="font-size:11px;font-weight:700;color:#0f172a;">César Castro</div>
         <div style="font-size:9px;color:#64748b;">Platomico, S.L.</div>
         <div style="display:flex;justify-content:space-between;align-items:center;margin-top:14px;">
           <span style="font-size:9px;color:#94a3b8;">Lugar y fecha</span>
