@@ -242,15 +242,9 @@ function pg(logoUri: string, content: string, last = false): string {
 // ── Section 1: PORTADA ────────────────────────────────────────────────────────
 function s1Cover(deal: Deal, cfg: DealConfiguration, today: string, logoUri: string): string {
   const plan = PLANS[cfg.plan]
-  const logoTag = logoUri
-    ? `<img src="${logoUri}" style="height:24px;width:auto;display:block;" alt="Platomico"/>`
-    : `<span style="font-size:16px;font-weight:800;color:#0f172a;letter-spacing:-0.5px;">Platomico.</span>`
 
   const content = `
-    <!-- Logo arriba a la derecha -->
-    <div style="display:flex;justify-content:flex-end;margin-bottom:40px;">
-      ${logoTag}
-    </div>
+    ${pageHeader(logoUri)}
 
     <!-- Tagline + título -->
     <div style="margin-bottom:32px;">
@@ -293,6 +287,7 @@ function s1Cover(deal: Deal, cfg: DealConfiguration, today: string, logoUri: str
   return `
 <div style="break-after:page; position:relative; min-height:220mm; font-family:Helvetica,Arial,sans-serif; font-size:11px; color:#0f172a;">
   <div style="position:relative;">${content}</div>
+  <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%) rotate(-38deg);font-size:72px;font-weight:900;letter-spacing:10px;color:rgba(30,58,95,0.04);white-space:nowrap;pointer-events:none;user-select:none;z-index:9999;font-family:Helvetica,sans-serif;">CONFIDENCIAL</div>
 </div>`
 }
 
@@ -303,8 +298,8 @@ function s2Index(logoUri: string): string {
     ['2', 'Nuestro propósito'],
     ['3', 'Planes y add-ons'],
     ['4', 'Detalle de módulos'],
-    ['5', 'Soporte y acompañamiento'],
-    ['6', 'Proceso de activación'],
+    ['5', 'Proceso de activación'],
+    ['6', 'Soporte y acompañamiento'],
     ['7', 'Próximos pasos'],
     ['8', 'Resumen económico'],
     ['Anexo A', 'Datos de las partes'],
@@ -735,7 +730,7 @@ function s11Economics(deal: Deal, cfg: DealConfiguration, sections: ProposalSect
         ${simpleRow('Plan', plan.label)}
         ${simpleRow('Precio base', plan.priceMonthly === 0
           ? 'Gratis'
-          : `${fmt(plan.priceMonthly)}€/local/mes × ${cfg.locations} local${cfg.locations > 1 ? 'es' : ''}`)}
+          : `${fmt(plan.priceMonthly)}/local/mes × ${cfg.locations} local${cfg.locations > 1 ? 'es' : ''}`)}
         ${simpleRow('Fee variable', `${plan.variableFee}€/ticket (+ IVA)`)}
         ${simpleRow('Pedidos estimados/mes', fmtN(cfg.dailyOrdersPerLocation * cfg.locations))}
         ${discountPercent > 0 ? simpleRow('Descuento', `−${discountPercent}%`, true) : ''}
@@ -748,7 +743,7 @@ function s11Economics(deal: Deal, cfg: DealConfiguration, sections: ProposalSect
                 : a.priceMonthly != null ? a.priceMonthly * (a.perLocation ? cfg.locations : 1) : null
               const addonVal = a.id === 'datafono' ? `${a.feePercent}% GMV`
                 : a.perConsumption ? 'Por consumo'
-                : addonNet != null ? `${fmt(addonNet)}/mes neto · ${fmtVAT(addonNet)}/mes` : '—'
+                : addonNet != null ? `${fmt(addonNet)}/mes` : '—'
               return `<div style="display:flex;justify-content:space-between;padding:2px 0;gap:4px;">
                 <span style="font-size:8.5px;color:#334155;">${a.label}</span>
                 <span style="font-size:8px;color:#1e3a5f;font-family:'Courier New',monospace;text-align:right;">${addonVal}</span>
@@ -789,7 +784,10 @@ function s11Economics(deal: Deal, cfg: DealConfiguration, sections: ProposalSect
             ${hwMonthly.map(item => {
               const lineTotal = item.unitPrice * item.quantity
               const net = item.mode === 'financed' && item.financeMonths ? lineTotal / item.financeMonths : 19 * item.quantity
-              return hwItemRow(item, net, '/mes')
+              return `<div style="display:flex;justify-content:space-between;align-items:center;padding:3px 0;border-bottom:1px solid #f1f5f9;gap:4px;">
+                <span style="font-size:9px;color:#334155;flex-shrink:0;">${HARDWARE[item.hardwareId].label} · ${item.quantity} ud.</span>
+                <span style="font-size:9.5px;font-weight:600;color:#1e3a5f;font-family:'Courier New',monospace;">${fmt(net)}/mes</span>
+              </div>`
             }).join('')}` : ''}
           ${hwIncluded.length > 0 ? `
             <div style="font-size:8px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:0.8px;margin-top:${(hwSold.length > 0 || hwMonthly.length > 0) ? '8' : '0'}px;margin-bottom:4px;">Incluido en el plan</div>
@@ -837,11 +835,7 @@ function s11Economics(deal: Deal, cfg: DealConfiguration, sections: ProposalSect
       Precios en euros. IVA 21% incluido en todos los importes.
     </div>
 
-    ${execSummary ? `
-    <div style="background:#f0f5fb;border-left:3px solid #1e3a5f;border-radius:0 6px 6px 0;padding:12px 14px;margin-top:10px;">
-      <div style="font-size:9px;font-weight:700;color:#1e3a5f;text-transform:uppercase;letter-spacing:1px;margin-bottom:4px;">Resumen ejecutivo</div>
-      <div style="font-size:10px;color:#334155;line-height:1.6;">${esc(execSummary)}</div>
-    </div>` : ''}`
+    `
   return pg(logoUri, content)
 }
 
@@ -974,8 +968,8 @@ function buildFullDossier(
     s4Purpose(logoUri),
     s5Plans(deal, cfg, logoUri),
     s6Modules(logoUri),
-    s7Support(cfg, logoUri),
     s8Activation(logoUri),
+    s7Support(cfg, logoUri),
     s10NextSteps(deal, logoUri),
     s11Economics(deal, cfg, sections, logoUri),
     s12Annex(deal, today, logoUri),
