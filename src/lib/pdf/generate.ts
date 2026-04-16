@@ -21,7 +21,7 @@
 import fs from 'fs'
 import path from 'path'
 import type { Deal, DealConfiguration, DealEconomics, ProposalSections } from '@/types'
-import { PLANS, ADDONS, HARDWARE, HARDWARE_MODE_LABELS, PLAN_FEATURES } from '@/lib/pricing/catalog'
+import { PLANS, ADDONS, HARDWARE, HARDWARE_MODE_LABELS, PLAN_FEATURES, RENTAL_MONTHLY_PRICE } from '@/lib/pricing/catalog'
 
 // ── Logo ─────────────────────────────────────────────────────────────────────
 // Leer una sola vez del disco; embebemos inline como data URI en cada página.
@@ -459,8 +459,9 @@ function s5Plans(deal: Deal, cfg: DealConfiguration, logoUri: string): string {
       ${hwItems.map(item => {
         const hw = HARDWARE[item.hardwareId]
         const lineTotal = item.unitPrice * item.quantity
+        const rentalUnit = hw.rentalMonthlyPrice ?? RENTAL_MONTHLY_PRICE
         const importe = item.mode === 'rented'
-          ? `${fmt(19 * item.quantity)}/mes`
+          ? `${fmt(rentalUnit * item.quantity)}/mes`
           : item.mode === 'financed' && item.financeMonths
           ? `${fmt(lineTotal / item.financeMonths)}/mes`
           : item.mode === 'included'
@@ -746,7 +747,8 @@ function s11Economics(deal: Deal, cfg: DealConfiguration, sections: ProposalSect
             <div style="font-size:8px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:0.8px;margin-top:${hwSold.length > 0 ? '8' : '0'}px;margin-bottom:4px;">Mensualidad</div>
             ${hwMonthly.map(item => {
               const lineTotal = item.unitPrice * item.quantity
-              const net = item.mode === 'financed' && item.financeMonths ? lineTotal / item.financeMonths : 19 * item.quantity
+              const rentalUnitPrice = HARDWARE[item.hardwareId].rentalMonthlyPrice ?? RENTAL_MONTHLY_PRICE
+              const net = item.mode === 'financed' && item.financeMonths ? lineTotal / item.financeMonths : rentalUnitPrice * item.quantity
               return `<div style="display:flex;justify-content:space-between;align-items:center;padding:3px 0;border-bottom:1px solid #f1f5f9;gap:4px;">
                 <span style="font-size:9px;color:#334155;flex-shrink:0;">${HARDWARE[item.hardwareId].label} · ${item.quantity} ud.</span>
                 <span style="font-size:9.5px;font-weight:600;color:#1e3a5f;font-family:'Courier New',monospace;">${fmt(net)}/mes</span>

@@ -127,6 +127,7 @@ export interface HardwareConfig {
   unitCost: number    // € — coste interno Platomico
   unitPrice: number   // € — precio venta cliente
   perLocation: boolean
+  rentalMonthlyPrice?: number  // override for RENTAL_MONTHLY_PRICE when mode=rented
 }
 
 export const HARDWARE: Record<HardwareId, HardwareConfig> = {
@@ -145,6 +146,7 @@ export const HARDWARE: Record<HardwareId, HardwareConfig> = {
     unitCost: 218,
     unitPrice: 218,
     perLocation: true,
+    rentalMonthlyPrice: 9,
   },
   bouncepad_kiosk: {
     id: 'bouncepad_kiosk',
