@@ -2,14 +2,14 @@
 // SERVER-SIDE PDF GENERATOR — Propuesta Comercial Platomico
 // server-only
 //
-// 11 páginas:
+// 12 páginas:
 //  1. Portada            2. Índice
 //  3. Sobre Platomico    4. Nuestro propósito
 //  5. Planes y add-ons   6. Detalle de módulos
-//  7. Soporte            8. Resumen económico
-//  9. Proceso de activación
-//  10. Anexo A: datos de las partes
-//  11. Anexo B: Página de firma
+//  7. Soporte            8. Proceso de activación
+//  9. Próximos pasos     10. Resumen económico
+//  11. Anexo: datos de las partes
+//  12. Página de firma
 //
 // Arquitectura de saltos de página:
 //   Cada sección vive en <div class="pg"> con break-after:page.
@@ -20,8 +20,8 @@
 
 import fs from 'fs'
 import path from 'path'
-import type { Deal, DealConfiguration, ProposalSections } from '@/types'
-import { PLANS, ADDONS, HARDWARE, HARDWARE_MODE_LABELS } from '@/lib/pricing/catalog'
+import type { Deal, DealConfiguration, DealEconomics, ProposalSections } from '@/types'
+import { PLANS, ADDONS, HARDWARE, HARDWARE_MODE_LABELS, PLAN_FEATURES } from '@/lib/pricing/catalog'
 
 // ── Logo ─────────────────────────────────────────────────────────────────────
 // Leer una sola vez del disco; embebemos inline como data URI en cada página.
@@ -136,6 +136,13 @@ function fmt(n: number): string {
     minimumFractionDigits: 0, maximumFractionDigits: 0,
   })
 }
+// IVA-inclusive formatter (×1.21) for all client-facing monetary amounts in PDF
+function fmtVAT(n: number): string {
+  return (n * 1.21).toLocaleString('es-ES', {
+    style: 'currency', currency: 'EUR',
+    minimumFractionDigits: 2, maximumFractionDigits: 2,
+  })
+}
 function fmtN(n: number): string { return n.toLocaleString('es-ES') }
 function chk(v: boolean | string): string {
   if (typeof v === 'string') return `<span style="font-size:10px;color:#1e3a5f;">${v}</span>`
@@ -164,12 +171,9 @@ function pageHeader(logoUri: string): string {
 
 function sectionTitle(title: string, sub?: string): string {
   return `
-    <div style="margin-bottom:16px; padding-bottom:8px; border-bottom:2px solid #1e3a5f;">
-      <div style="font-size:8px; font-weight:700; color:#1e3a5f; text-transform:uppercase; letter-spacing:2px; margin-bottom:3px;">
-        Platomico · Propuesta Comercial
-      </div>
+    <div style="margin-bottom:22px; padding-bottom:10px; border-bottom:2px solid #1e3a5f;">
       <div style="font-size:19px; font-weight:800; color:#0f172a; letter-spacing:-0.5px;">${title}</div>
-      ${sub ? `<div style="font-size:10.5px; color:#64748b; margin-top:2px;">${sub}</div>` : ''}
+      ${sub ? `<div style="font-size:10.5px; color:#64748b; margin-top:3px;">${sub}</div>` : ''}
     </div>`
 }
 
@@ -238,23 +242,17 @@ function pg(logoUri: string, content: string, last = false): string {
 // ── Section 1: PORTADA ────────────────────────────────────────────────────────
 function s1Cover(deal: Deal, cfg: DealConfiguration, today: string, logoUri: string): string {
   const plan = PLANS[cfg.plan]
-  const logoTag = logoUri
-    ? `<img src="${logoUri}" style="height:42px;width:auto;display:block;" alt="Platomico"/>`
-    : `<span style="font-size:26px;font-weight:900;color:#0f172a;">Platomico.</span>`
 
   const content = `
-    <!-- Logo arriba a la derecha -->
-    <div style="display:flex;justify-content:flex-end;margin-bottom:36px;">
-      ${logoTag}
-    </div>
+    ${pageHeader(logoUri)}
 
     <!-- Tagline + título -->
-    <div style="margin-bottom:28px;">
-      <div style="font-size:9px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:3px;margin-bottom:10px;">
-        PLATOMICO · Gestiona tu restaurante desde un único lugar
+    <div style="margin-bottom:32px;">
+      <div style="font-size:9px;font-weight:600;color:#94a3b8;text-transform:uppercase;letter-spacing:3px;margin-bottom:12px;">
+        Gestiona tu restaurante desde un único lugar
       </div>
-      <div style="font-size:40px;font-weight:900;color:#0f172a;letter-spacing:-1.5px;line-height:1.05;margin-bottom:10px;">
-        Propuesta<br>Comercial
+      <div style="font-size:38px;font-weight:900;color:#0f172a;letter-spacing:-1.5px;line-height:1.05;margin-bottom:12px;">
+        Propuesta Comercial
       </div>
       <div style="width:56px;height:4px;background:#1e3a5f;border-radius:2px;"></div>
     </div>
@@ -262,13 +260,14 @@ function s1Cover(deal: Deal, cfg: DealConfiguration, today: string, logoUri: str
     <!-- Preparada para -->
     <div style="background:#f8fafc;border:1px solid #e8eef6;border-radius:12px;padding:22px 26px;margin-bottom:22px;">
       <div style="font-size:8px;color:#94a3b8;text-transform:uppercase;letter-spacing:1.5px;margin-bottom:10px;">Preparada para</div>
-      <div style="font-size:26px;font-weight:800;color:#0f172a;letter-spacing:-0.5px;margin-bottom:4px;">${esc(deal.company.name)}</div>
-      ${deal.company.cif ? `<div style="font-size:12px;color:#64748b;margin-bottom:3px;">CIF: ${esc(deal.company.cif)}</div>` : ''}
-      ${deal.contact.name ? `<div style="font-size:12px;color:#64748b;">Attn.: ${esc(deal.contact.name)}</div>` : ''}
+      <div style="font-size:26px;font-weight:800;color:#0f172a;letter-spacing:-0.5px;margin-bottom:8px;">${esc(deal.company.name)}</div>
+      ${deal.company.cif ? `<div style="font-size:11px;color:#64748b;margin-bottom:3px;">CIF: ${esc(deal.company.cif)}</div>` : ''}
+      ${deal.contact.name ? `<div style="font-size:11px;color:#64748b;margin-bottom:2px;">Attn.: ${esc(deal.contact.name)}${deal.contact.email ? ` · ${esc(deal.contact.email)}` : ''}${deal.contact.phone ? ` · ${esc(deal.contact.phone)}` : ''}</div>` : ''}
+      ${deal.company.address ? `<div style="font-size:11px;color:#94a3b8;">${esc(deal.company.address)}${deal.company.city ? `, ${esc(deal.company.city)}` : ''}</div>` : deal.company.city ? `<div style="font-size:11px;color:#94a3b8;">${esc(deal.company.city)}</div>` : ''}
     </div>
 
     <!-- Meta: fecha / versión / plan -->
-    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:22px;">
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:20px;">
       ${[
         ['Fecha',   `Madrid, ${today}`],
         ['Versión', `V1.0${cfg.version}${cfg.label ? ` · ${cfg.label}` : ''}`],
@@ -280,16 +279,9 @@ function s1Cover(deal: Deal, cfg: DealConfiguration, today: string, logoUri: str
         </div>`).join('')}
     </div>
 
-    <!-- CONFIDENCIAL notice -->
-    <div style="border:1px solid #fde8e8;border-radius:8px;padding:12px 16px;background:#fff9f9;display:flex;align-items:center;gap:10px;">
-      <div style="font-size:18px;flex-shrink:0;">⚠</div>
-      <div>
-        <div style="font-size:9px;font-weight:700;color:#dc2626;text-transform:uppercase;letter-spacing:1px;">Documento confidencial</div>
-        <div style="font-size:9px;color:#94a3b8;margin-top:2px;">
-          Este documento contiene información comercial y técnica de carácter confidencial.
-          Su divulgación a terceros no autorizados está expresamente prohibida.
-        </div>
-      </div>
+    <!-- Validez -->
+    <div style="font-size:9px;color:#94a3b8;line-height:1.5;">
+      Esta propuesta tiene validez de <strong style="color:#64748b;">30 días naturales</strong> desde su fecha de emisión.
     </div>`
 
   return `
@@ -307,25 +299,20 @@ function s2Index(logoUri: string): string {
     ['3', 'Planes y add-ons'],
     ['4', 'Detalle de módulos'],
     ['5', 'Soporte y acompañamiento'],
-    ['6', 'Proceso de activación'],
-    ['7', 'Por qué Platomico'],
-    ['8', 'Próximos pasos'],
-    ['9', 'Resumen económico'],
+    ['6', 'Resumen económico'],
+    ['7', 'Proceso de activación'],
     ['Anexo A', 'Datos de las partes'],
     ['Anexo B', 'Página de firma'],
   ]
   const content = `
     ${sectionTitle('Índice')}
-    <div style="margin-top:6px;">
+    <div style="margin-top:4px;">
       ${items.map(([n, t], i) => `
-        <div style="display:flex;align-items:center;padding:10px 0;${i < items.length - 1 ? 'border-bottom:1px solid #f1f5f9;' : ''}">
+        <div style="display:flex;align-items:center;padding:6px 0;${i < items.length - 1 ? 'border-bottom:1px solid #f1f5f9;' : ''}">
           <div style="width:56px;flex-shrink:0;font-size:9px;font-weight:700;color:#1e3a5f;font-family:'Courier New',monospace;">${n}.</div>
           <div style="flex:1;border-bottom:1px dotted #d1dce8;height:1px;margin:0 10px;"></div>
           <div style="font-size:11px;font-weight:500;color:#0f172a;">${t}</div>
         </div>`).join('')}
-    </div>
-    <div style="margin-top:24px;background:#f0f5fb;border-left:3px solid #1e3a5f;border-radius:0 6px 6px 0;padding:11px 14px;font-size:9.5px;color:#334155;line-height:1.6;">
-      Esta propuesta ha sido preparada de forma personalizada y tiene validez de <strong>30 días naturales</strong> desde su fecha de emisión.
     </div>`
   return pg(logoUri, content)
 }
@@ -336,7 +323,7 @@ function s3About(logoUri: string): string {
     ${sectionTitle('Sobre Platomico', 'El sistema operativo para la hostelería moderna')}
     <div style="font-size:11px;color:#334155;line-height:1.8;margin-bottom:22px;">
       <p style="margin-bottom:11px;">
-        Platomico es el sistema operativo para la hostelería moderna. Conecta pagos, pedidos y cocina
+        ROS es el sistema operativo para la hostelería moderna. Conecta pagos, pedidos y cocina
         para reducir errores, eliminar papel y ganar eficiencia operativa en cada turno.
       </p>
       <p style="margin-bottom:11px;">
@@ -360,11 +347,11 @@ function s4Purpose(logoUri: string): string {
   const content = `
     ${sectionTitle('Nuestro propósito')}
 
-    <div style="background:#1e3a5f;border-radius:12px;padding:26px 30px;margin-bottom:26px;text-align:center;">
-      <div style="font-size:21px;font-weight:900;color:#fff;letter-spacing:-0.5px;line-height:1.2;margin-bottom:7px;">
-        "No cambies de equipo.<br>Cambia de resultados."
+    <div style="margin-bottom:26px;padding:18px 0 18px;border-top:2px solid #1e3a5f;border-bottom:1px solid #e8eef6;">
+      <div style="font-size:22px;font-weight:900;color:#0f172a;letter-spacing:-0.5px;line-height:1.2;margin-bottom:6px;">
+        "No cambies de equipo. Cambia de resultados."
       </div>
-      <div style="font-size:11px;color:rgba(255,255,255,0.6);">
+      <div style="font-size:11px;color:#64748b;">
         La tecnología que necesitas ya existe. Solo hay que ponerla a trabajar para ti.
       </div>
     </div>
@@ -382,8 +369,8 @@ function s4Purpose(logoUri: string): string {
         </div>`).join('')}
     </div>
 
-    <div style="background:#f0f5fb;border-left:3px solid #1e3a5f;border-radius:0 6px 6px 0;padding:13px 15px;font-size:10.5px;color:#334155;line-height:1.6;">
-      Platomico no es un software más. Es el compromiso de que la tecnología trabaje para el restaurante, y no al revés.
+    <div style="font-size:10.5px;color:#334155;line-height:1.6;margin-top:6px;">
+      ROS no es solo software más. Es el compromiso de que la tecnología trabaje para el restaurante, y no al revés.
       Por eso ofrecemos contratos sin permanencia, activación en 24 horas y soporte nativo en español.
     </div>`
   return pg(logoUri, content)
@@ -393,18 +380,28 @@ function s4Purpose(logoUri: string): string {
 function s5Plans(deal: Deal, cfg: DealConfiguration, logoUri: string): string {
   const tiers = ['starter', 'growth', 'pro'] as const
   const hiCol = tiers.indexOf(cfg.plan) + 1
-  const eco = cfg.economics
+  const eco = cfg.economics as DealEconomics & {
+    renEnabled?: boolean; renFeePerOrder?: number; renVenues?: number
+    kdsVenues?: number; kioskVenues?: number
+  }
+  const renEnabled = eco.renEnabled === true
+  const renFeePerOrder = eco.renFeePerOrder ?? 0.20
+  const renVenues = eco.renVenues ?? 1
+  const deliveryPerVenue = cfg.deliveryOrdersPerVenue ?? 0
+  const renMonthly = renEnabled ? renFeePerOrder * deliveryPerVenue * renVenues : 0
+  const s5KdsVenues = eco.kdsVenues ?? cfg.locations
+  const s5KioskVenues = eco.kioskVenues ?? cfg.locations
   const hwItems = cfg.hardware.filter(h => h.quantity > 0)
 
   const planRows: string[][] = [
-    ['Volumen tickets/mes/local', 'Hasta 500',      '501 – 1.000',       'Más de 1.000'],
-    ['Precio base',               'Gratis',          '15 €/local/mes',    '35 €/local/mes'],
-    ['Fee variable',              '0,08 €/ticket',   '0,05 €/ticket',     '0,03 €/ticket'],
-    ['Soporte',                   'Email',           'Email + Chat',      'Tel · Chat · Email'],
-    ['Tiempo respuesta',          '48 h',            '24 h',              '4 h'],
-    ['Onboarding',                'Self-service',    'Sesión remota',     'Presencial/remoto'],
-    ['Account Manager',           '—',               '—',                 'Dedicado'],
-    ['SLA uptime',                '99,0 %',          '99,5 %',            '99,9 %'],
+    ['Volumen tickets/mes/local', 'Hasta 500',                   '501 – 1.000',                    'Más de 1.000'],
+    ['Precio base',               'Gratis',                      `${fmt(15)}/local/mes`,            `${fmt(35)}/local/mes`],
+    ['Fee variable',              '0,08 €/ticket',               '0,05 €/ticket',                  '0,03 €/ticket'],
+    ['Soporte',                   'Email',                       'Email + Chat',                   'Tel · Chat · Email'],
+    ['Tiempo respuesta',          '48 h',                        '24 h',                           '4 h'],
+    ['Onboarding',                'Self-service',                'Sesión remota',                  'Presencial/remoto'],
+    ['Account Manager',           '—',                           '—',                              'Dedicado'],
+    ['SLA uptime',                '99,0 %',                      '99,5 %',                         '99,9 %'],
   ]
 
   const planHeaders = ['Característica', ...tiers.map((t, i) => {
@@ -420,6 +417,19 @@ function s5Plans(deal: Deal, cfg: DealConfiguration, logoUri: string): string {
     <div style="font-size:9px;font-weight:700;color:#1e3a5f;text-transform:uppercase;letter-spacing:1px;margin-bottom:4px;">Comparativa de planes</div>
     ${buildTable(planHeaders, planRows, { hi: hiCol })}
 
+    <div style="margin-top:16px;margin-bottom:4px;">
+      <span style="font-size:9px;font-weight:700;color:#1e3a5f;text-transform:uppercase;letter-spacing:1px;">ROS incluido en el plan</span>
+      <span style="font-size:8.5px;color:#94a3b8;margin-left:6px;">· Por localización</span>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:2px 14px;margin-bottom:4px;">
+      ${PLAN_FEATURES[cfg.plan].map(f => `
+        <div style="display:flex;align-items:center;gap:5px;padding:2px 0;">
+          <span style="color:#10b981;font-size:12px;line-height:1;font-weight:700;">✓</span>
+          <span style="font-size:9.5px;color:#334155;">${f}</span>
+        </div>
+      `).join('')}
+    </div>
+
     ${activeAddons.length > 0 || hwItems.length > 0 ? `
     <div style="font-size:9px;font-weight:700;color:#1e3a5f;text-transform:uppercase;letter-spacing:1px;margin-top:20px;margin-bottom:8px;">Add-ons y hardware incluidos en esta propuesta</div>
     <div style="display:flex;flex-direction:column;gap:5px;">
@@ -428,9 +438,15 @@ function s5Plans(deal: Deal, cfg: DealConfiguration, logoUri: string): string {
         const precio = id === 'datafono'
           ? `${addon.feePercent}% GMV`
           : addon.perConsumption ? 'Por consumo'
-          : `${addon.priceMonthly} €${addon.perLocation ? '/local/mes' : '/mes'}`
+          : id === 'kds'
+          ? `${fmt(19)}/local/mes × ${s5KdsVenues} local${s5KdsVenues > 1 ? 'es' : ''} con KDS`
+          : id === 'kiosk'
+          ? `${fmt(19)}/local/mes × ${s5KioskVenues} local${s5KioskVenues > 1 ? 'es' : ''} con Kiosk`
+          : `${fmt(addon.priceMonthly ?? 0)}${addon.perLocation ? '/local/mes' : '/mes'}`
         const total = id === 'datafono' ? fmt(eco.datafonoFeeMonthly)
           : addon.perConsumption ? '—'
+          : id === 'kds' ? fmt(19 * s5KdsVenues)
+          : id === 'kiosk' ? fmt(19 * s5KioskVenues)
           : fmt((addon.priceMonthly ?? 0) * (addon.perLocation ? cfg.locations : 1))
         return `<div style="display:flex;justify-content:space-between;align-items:center;padding:7px 11px;background:#f8fafc;border:1px solid #e8eef6;border-radius:6px;">
           <div>
@@ -450,15 +466,32 @@ function s5Plans(deal: Deal, cfg: DealConfiguration, logoUri: string): string {
           ? `${fmt(19 * item.quantity)}/mes`
           : item.mode === 'financed' && item.financeMonths
           ? `${fmt(lineTotal / item.financeMonths)}/mes`
-          : item.mode === 'included' ? 'Incluido' : fmt(lineTotal)
+          : item.mode === 'included'
+          ? 'Incluido en el plan'
+          : fmt(lineTotal)
+        const modeLabel = item.mode === 'rented' ? 'Mensualidad'
+          : item.mode === 'included' ? 'Incluido en el plan'
+          : HARDWARE_MODE_LABELS[item.mode]
         return `<div style="display:flex;justify-content:space-between;align-items:center;padding:7px 11px;background:#f8fafc;border:1px solid #e8eef6;border-radius:6px;">
           <div>
             <span style="font-size:10px;font-weight:600;color:#0f172a;">${hw.label}</span>
-            <span style="font-size:9px;color:#94a3b8;margin-left:7px;">${item.quantity} ud. · ${item.mode === 'rented' ? 'Mensualidad' : HARDWARE_MODE_LABELS[item.mode]}</span>
+            <span style="font-size:9px;color:#94a3b8;margin-left:7px;">${item.quantity} ud. · ${modeLabel}</span>
           </div>
-          <span style="font-size:10px;font-weight:700;color:#1e3a5f;font-family:'Courier New',monospace;">${importe}</span>
+          <span style="font-size:10px;font-weight:700;color:${item.mode === 'included' ? '#10b981' : '#1e3a5f'};font-family:'Courier New',monospace;">${importe}</span>
         </div>`
       }).join('')}
+    </div>` : ''}
+
+    ${renEnabled ? `
+    <div style="font-size:9px;font-weight:700;color:#1e3a5f;text-transform:uppercase;letter-spacing:1px;margin-top:18px;margin-bottom:6px;padding-top:12px;border-top:1px solid #e8eef6;">REN — Logística propia</div>
+    <div style="display:flex;justify-content:space-between;align-items:center;padding:7px 11px;background:#f0f5fb;border:1px solid #dde6f0;border-radius:6px;">
+      <div>
+        <span style="font-size:10px;font-weight:600;color:#0f172a;">REN · Marketplace logístico</span>
+        <span style="font-size:9px;color:#94a3b8;margin-left:7px;">
+          ${renFeePerOrder.toFixed(2).replace('.', ',')}€/pedido × ${fmtN(deliveryPerVenue)} pedidos × ${renVenues} local${renVenues > 1 ? 'es' : ''} con REN
+        </span>
+      </div>
+      <span style="font-size:10px;font-weight:700;color:#1e3a5f;font-family:'Courier New',monospace;">${fmt(renMonthly)}/mes</span>
     </div>` : ''}
 
     <div style="margin-top:12px;background:#f8fafc;border:1px solid #e8eef6;border-radius:7px;padding:10px 14px;font-size:9.5px;color:#64748b;line-height:1.6;">
@@ -494,7 +527,7 @@ function s6Modules(logoUri: string): string {
 function s7Support(cfg: DealConfiguration, logoUri: string): string {
   const hiCol = cfg.plan === 'starter' ? 1 : cfg.plan === 'growth' ? 2 : 3
   const rows: string[][] = [
-    ['Canal de soporte',    'Email',                    'Email + Chat',                   'Teléfono · Chat · Email'],
+    ['Canal de soporte',    'Email',                    'Email + WhatsApp',               'Teléfono · WhatsApp · Email'],
     ['Tiempo de respuesta', '48 h hábiles',             '24 h hábiles',                   '4 h hábiles'],
     ['Onboarding',          'Documentación self-service','Sesión guiada remota',           'Onboarding presencial o remoto'],
     ['Account Manager',     '—',                        '—',                              'Dedicado'],
@@ -515,37 +548,25 @@ function s7Support(cfg: DealConfiguration, logoUri: string): string {
 // ── Section 8: ACTIVACIÓN ─────────────────────────────────────────────────────
 function s8Activation(logoUri: string): string {
   const phases = [
-    ['01','Selección y firma',     '< 2 h',        'Revisión final de la propuesta, firma digital del contrato de servicios.'],
-    ['02','Configuración técnica', '4 h',           'Setup de la cuenta, configuración de locales, permisos y parámetros de operación.'],
-    ['03','Migración de datos',    '4 – 8 h',       'Importación de la carta, familias, modificadores y productos existentes.'],
-    ['04','Formación del equipo',  '2 – 4 h',       'Sesión de formación para el personal de sala, barra y cocina.'],
-    ['05','Go Live',               '< 24 h total',  'Activación en producción, primera operación en vivo con soporte on-site o remoto.'],
+    ['01','Selección y firma',     'Revisión final de la propuesta, firma digital del contrato de servicios.'],
+    ['02','Configuración técnica', 'Setup de la cuenta, configuración de locales, permisos y parámetros de operación.'],
+    ['03','Migración de datos',    'Importación de la carta, familias, modificadores y productos existentes.'],
+    ['04','Formación del equipo',  'Sesión de formación para el personal de sala, barra y cocina.'],
+    ['05','Go Live',               'Activación en producción, primera operación en vivo con soporte on-site o remoto.'],
   ]
   const content = `
     ${sectionTitle('Proceso de activación', 'De la firma al primer pedido real en menos de 24 horas')}
-    <div style="display:flex;flex-direction:column;margin-bottom:18px;">
-      ${phases.map(([n,t,time,d], i) => `
+    <div style="display:flex;flex-direction:column;">
+      ${phases.map(([n,t,d], i) => `
         <div style="display:flex;align-items:flex-start;gap:13px;padding:13px 0;${i < phases.length - 1 ? 'border-bottom:1px solid #e8eef6;' : ''}">
           <div style="width:34px;height:34px;background:#1e3a5f;border-radius:50%;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
             <span style="font-size:10px;font-weight:800;color:#fff;">${n}</span>
           </div>
           <div style="flex:1;">
-            <div style="display:flex;align-items:baseline;gap:9px;margin-bottom:2px;">
-              <div style="font-size:12px;font-weight:700;color:#0f172a;">${t}</div>
-              <div style="font-size:8px;font-weight:700;color:#1e3a5f;background:#dde6f0;padding:2px 7px;border-radius:20px;white-space:nowrap;">${time}</div>
-            </div>
+            <div style="font-size:12px;font-weight:700;color:#0f172a;margin-bottom:2px;">${t}</div>
             <div style="font-size:10px;color:#64748b;line-height:1.5;">${d}</div>
           </div>
         </div>`).join('')}
-    </div>
-    <div style="background:#1e3a5f;border-radius:10px;padding:15px 19px;display:flex;align-items:center;gap:13px;">
-      <div style="font-size:26px;">⚡</div>
-      <div>
-        <div style="font-size:13px;font-weight:800;color:#fff;margin-bottom:2px;">Activación garantizada en 24 horas</div>
-        <div style="font-size:10px;color:rgba(255,255,255,0.7);line-height:1.5;">
-          Si el proceso de activación supera las 24 horas hábiles por causas imputables a Platomico, el primer mes de servicio es gratuito.
-        </div>
-      </div>
     </div>`
   return pg(logoUri, content)
 }
@@ -609,88 +630,177 @@ function s10NextSteps(deal: Deal, logoUri: string): string {
 
 // ── Section 11: RESUMEN ECONÓMICO ─────────────────────────────────────────────
 function s11Economics(deal: Deal, cfg: DealConfiguration, sections: ProposalSections, logoUri: string): string {
-  const eco  = cfg.economics
+  const eco = cfg.economics as DealEconomics & {
+    renEnabled?: boolean
+    renFeePerOrder?: number
+    renVenues?: number
+    discountPercent?: number
+    kdsVenues?: number
+    kioskVenues?: number
+  }
   const plan = PLANS[cfg.plan]
   const activeAddons = cfg.activeAddons.map(id => ADDONS[id])
   const hwItems = cfg.hardware.filter(h => h.quantity > 0)
-  const paybackColor = eco.paybackMonths == null ? '#64748b'
-    : eco.paybackMonths <= 12 ? '#16a34a'
-    : eco.paybackMonths <= 24 ? '#d97706' : '#dc2626'
 
-  const totalMes = eco.softwareRevenueMonthly + eco.hardwareRevenueMonthly
+  const renEnabled = eco.renEnabled === true
+  const renFeePerOrder = eco.renFeePerOrder ?? 0.20
+  const renVenues = eco.renVenues ?? 1
+  const deliveryPerVenue = cfg.deliveryOrdersPerVenue ?? 0
+  const renMonthly = renEnabled ? renFeePerOrder * deliveryPerVenue * renVenues : 0
+
+  // KDS/Kiosk per-venue-count adjustment (same logic as EconomicsPanel in simulator)
+  const kdsVenues = eco.kdsVenues ?? cfg.locations
+  const kioskVenues = eco.kioskVenues ?? cfg.locations
+  const kdsActive = cfg.activeAddons.includes('kds')
+  const kioskActive = cfg.activeAddons.includes('kiosk')
+  const kdsAdj = kdsActive ? 19 * (kdsVenues - cfg.locations) : 0
+  const kioskAdj = kioskActive ? 19 * (kioskVenues - cfg.locations) : 0
+  const adjustedSoftwareBase = eco.softwareRevenueMonthly + kdsAdj + kioskAdj
+
+  const discountPercent = eco.discountPercent ?? 0
+  const discountAmount = adjustedSoftwareBase * (discountPercent / 100)
+  const adjustedSoftware = adjustedSoftwareBase - discountAmount
+  const totalMes = adjustedSoftware + renMonthly + eco.hardwareRevenueMonthly
+
+  const execSummary = sections.executiveSummary
+    ? sections.executiveSummary +
+      (renEnabled && deliveryPerVenue > 0
+        ? ` Incluye logística propia a través de REN con ${fmtN(deliveryPerVenue * renVenues)} pedidos de delivery mensuales en ${renVenues} local${renVenues > 1 ? 'es' : ''}.`
+        : '')
+    : ''
+
+  const simpleRow = (label: string, value: string, red = false) => `
+    <div style="display:flex;justify-content:space-between;padding:3px 0;border-bottom:1px solid #f1f5f9;">
+      <span style="font-size:9.5px;color:${red ? '#dc2626' : '#64748b'};">${label}</span>
+      <span style="font-size:9.5px;font-weight:600;color:${red ? '#dc2626' : '#0f172a'};font-family:'Courier New',monospace;">${value}</span>
+    </div>`
+
+  // Fixed monthly net = software (plan+addons-discount) + hw monthly; excludes variable REN
+  const fixedMonthlyNet = adjustedSoftware + eco.hardwareRevenueMonthly
+
+  // Hardware items by mode
+  const hwSold     = hwItems.filter(i => i.mode === 'sold')
+  const hwMonthly  = hwItems.filter(i => i.mode === 'financed' || i.mode === 'rented')
+  const hwIncluded = hwItems.filter(i => i.mode === 'included')
+  const hwUpfrontNet = hwSold.reduce((s, i) => s + i.unitPrice * i.quantity, 0)
+
+  const hwItemRow = (item: typeof hwItems[0], net: number, suffix: string) => `
+    <div style="display:flex;justify-content:space-between;align-items:center;padding:3px 0;border-bottom:1px solid #f1f5f9;gap:4px;">
+      <span style="font-size:9px;color:#334155;flex-shrink:0;">${HARDWARE[item.hardwareId].label} · ${item.quantity} ud.</span>
+      <span style="font-size:9.5px;font-weight:700;color:#1e3a5f;font-family:'Courier New',monospace;">${fmt(net)}${suffix}</span>
+    </div>`
 
   const content = `
     ${sectionTitle('Resumen económico', `${deal.company.name} · Plan ${plan.label} · ${cfg.locations} local${cfg.locations > 1 ? 'es' : ''}`)}
 
-    <div style="border:2px solid #1e3a5f;border-radius:12px;padding:22px 28px;background:#f0f5fb;margin-bottom:18px;text-align:center;">
-      <div style="font-size:9px;color:#64748b;text-transform:uppercase;letter-spacing:1.5px;margin-bottom:8px;">Total / mes</div>
-      <div style="font-size:42px;font-weight:900;color:#0f172a;font-family:'Courier New',monospace;line-height:1;">${fmt(totalMes)}</div>
-      <div style="font-size:9.5px;color:#64748b;margin-top:6px;">
-        Software ${fmt(eco.softwareRevenueMonthly)}/mes${eco.hardwareRevenueMonthly > 0 ? ` · Hardware ${fmt(eco.hardwareRevenueMonthly)}/mes` : ''}
-      </div>
-    </div>
-
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:16px;">
-      <!-- Software -->
-      <div style="border:1px solid #dde6f0;border-radius:8px;padding:14px;">
-        <div style="font-size:9px;font-weight:700;color:#1e3a5f;text-transform:uppercase;letter-spacing:1px;margin-bottom:9px;padding-bottom:7px;border-bottom:1px solid #e8eef6;">Software</div>
-        ${[
-          ['Plan', plan.label],
-          ['Precio base', plan.priceMonthly === 0 ? `Gratis + ${plan.variableFee}€/ticket` : `${plan.priceMonthly}€/mes/local`],
-          ['Fee variable', `${plan.variableFee}€/ticket`],
-          ['Locales', String(cfg.locations)],
-          ['Pedidos/mes/local', fmtN(cfg.dailyOrdersPerLocation)],
-          ['Fee software/mes', fmt(eco.softwareRevenueMonthly)],
-        ].map(([k,v]) => `
-          <div style="display:flex;justify-content:space-between;padding:3px 0;border-bottom:1px solid #f1f5f9;">
-            <span style="font-size:9.5px;color:#64748b;">${k}</span>
-            <span style="font-size:9.5px;font-weight:600;color:#0f172a;font-family:'Courier New',monospace;">${v}</span>
-          </div>`).join('')}
+    <div style="display:grid;grid-template-columns:${renEnabled ? '1fr 1fr 1fr' : '1fr 1fr'};gap:10px;margin-bottom:14px;">
+      <!-- ROS (informacional) -->
+      <div style="border:1px solid #dde6f0;border-radius:8px;padding:12px;">
+        <div style="font-size:9px;font-weight:700;color:#1e3a5f;text-transform:uppercase;letter-spacing:1px;margin-bottom:8px;padding-bottom:6px;border-bottom:1px solid #e8eef6;">ROS</div>
+        ${simpleRow('Plan', plan.label)}
+        ${simpleRow('Precio base', plan.priceMonthly === 0
+          ? 'Gratis'
+          : `${fmt(plan.priceMonthly)}/local/mes × ${cfg.locations} local${cfg.locations > 1 ? 'es' : ''}`)}
+        ${simpleRow('Fee variable', `${plan.variableFee}€/ticket`)}
+        ${simpleRow('Pedidos estimados/mes', fmtN(cfg.dailyOrdersPerLocation * cfg.locations))}
+        ${discountPercent > 0 ? simpleRow('Descuento', `−${discountPercent}%`, true) : ''}
         ${activeAddons.length > 0 ? `
-          <div style="margin-top:9px;padding-top:7px;border-top:1px solid #e8eef6;">
-            <div style="font-size:8px;color:#94a3b8;text-transform:uppercase;letter-spacing:1px;margin-bottom:5px;">Add-ons activos</div>
-            ${activeAddons.map(a => `
-              <div style="display:flex;justify-content:space-between;padding:2px 0;">
-                <span style="font-size:9.5px;color:#334155;">${a.label}</span>
-                <span style="font-size:9px;color:#1e3a5f;font-family:'Courier New',monospace;">
-                  ${a.id === 'datafono' ? `${a.feePercent}% GMV` : a.perConsumption ? 'Por consumo' : a.priceMonthly != null ? `${fmt(a.priceMonthly * cfg.locations)}/mes` : '—'}
-                </span>
-              </div>`).join('')}
+          <div style="margin-top:8px;padding-top:6px;border-top:1px solid #e8eef6;">
+            <div style="font-size:7.5px;color:#94a3b8;text-transform:uppercase;letter-spacing:1px;margin-bottom:4px;">Add-ons</div>
+            ${activeAddons.map(a => {
+              const addonNet = a.id === 'kds' ? 19 * kdsVenues
+                : a.id === 'kiosk' ? 19 * kioskVenues
+                : a.priceMonthly != null ? a.priceMonthly * (a.perLocation ? cfg.locations : 1) : null
+              const addonVal = a.id === 'datafono' ? `${a.feePercent}% GMV`
+                : a.perConsumption ? 'Por consumo'
+                : addonNet != null ? `${fmt(addonNet)}/mes` : '—'
+              return `<div style="display:flex;justify-content:space-between;padding:2px 0;gap:4px;">
+                <span style="font-size:8.5px;color:#334155;">${a.label}</span>
+                <span style="font-size:8px;color:#1e3a5f;font-family:'Courier New',monospace;text-align:right;">${addonVal}</span>
+              </div>`
+            }).join('')}
           </div>` : ''}
       </div>
 
+      ${renEnabled ? `
+      <!-- REN (informacional) -->
+      <div style="border:1px solid #dde6f0;border-radius:8px;padding:12px;">
+        <div style="font-size:9px;font-weight:700;color:#1e3a5f;text-transform:uppercase;letter-spacing:1px;margin-bottom:8px;padding-bottom:6px;border-bottom:1px solid #e8eef6;">REN</div>
+        ${simpleRow('Fee por pedido', `${renFeePerOrder.toFixed(2).replace('.', ',')}€/pedido`)}
+        ${simpleRow('Pedidos/mes/local', fmtN(deliveryPerVenue))}
+        ${simpleRow('Locales con REN', String(renVenues))}
+        <div style="margin-top:6px;padding-top:6px;border-top:1px solid #e8eef6;font-size:8px;color:#94a3b8;line-height:1.4;">
+          Coste variable · liquidado a mes vencido según pedidos reales
+        </div>
+      </div>` : ''}
+
       <!-- Hardware -->
-      <div style="border:1px solid #dde6f0;border-radius:8px;padding:14px;">
-        <div style="font-size:9px;font-weight:700;color:#1e3a5f;text-transform:uppercase;letter-spacing:1px;margin-bottom:9px;padding-bottom:7px;border-bottom:1px solid #e8eef6;">Hardware</div>
-        ${hwItems.length > 0
-          ? hwItems.map(item => {
-              const hw = HARDWARE[item.hardwareId]
+      <div style="border:1px solid #dde6f0;border-radius:8px;padding:12px;">
+        <div style="font-size:9px;font-weight:700;color:#1e3a5f;text-transform:uppercase;letter-spacing:1px;margin-bottom:8px;padding-bottom:6px;border-bottom:1px solid #e8eef6;">Hardware</div>
+        ${hwItems.length === 0
+          ? `<div style="font-size:10px;color:#94a3b8;font-style:italic;">Sin hardware configurado</div>`
+          : `
+          ${hwSold.length > 0 ? `
+            <div style="font-size:8px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:0.8px;margin-bottom:4px;">Pago único (upfront)</div>
+            ${hwSold.map(item => hwItemRow(item, item.unitPrice * item.quantity, '')).join('')}
+            ${hwSold.length > 1 ? `
+              <div style="display:flex;justify-content:space-between;padding:3px 0;margin-top:2px;">
+                <span style="font-size:8.5px;font-weight:700;color:#64748b;">Subtotal upfront</span>
+                <span style="font-size:9px;font-weight:800;color:#1e3a5f;font-family:'Courier New',monospace;">${fmt(hwUpfrontNet)}</span>
+              </div>` : ''}` : ''}
+          ${hwMonthly.length > 0 ? `
+            <div style="font-size:8px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:0.8px;margin-top:${hwSold.length > 0 ? '8' : '0'}px;margin-bottom:4px;">Mensualidad</div>
+            ${hwMonthly.map(item => {
               const lineTotal = item.unitPrice * item.quantity
-              const price = item.mode === 'financed' && item.financeMonths
-                ? `${fmt(lineTotal / item.financeMonths)}/mes` : fmt(lineTotal)
-              return `<div style="padding:5px 0;border-bottom:1px solid #f1f5f9;">
-                <div style="display:flex;justify-content:space-between;align-items:flex-start;">
-                  <div>
-                    <div style="font-size:10px;font-weight:600;color:#0f172a;">${hw.label}</div>
-                    <div style="font-size:9px;color:#94a3b8;">${item.quantity} ud. · ${HARDWARE_MODE_LABELS[item.mode]}</div>
-                  </div>
-                  <div style="font-size:10px;font-weight:600;color:#1e3a5f;font-family:'Courier New',monospace;">${price}</div>
-                </div>
+              const net = item.mode === 'financed' && item.financeMonths ? lineTotal / item.financeMonths : 19 * item.quantity
+              return `<div style="display:flex;justify-content:space-between;align-items:center;padding:3px 0;border-bottom:1px solid #f1f5f9;gap:4px;">
+                <span style="font-size:9px;color:#334155;flex-shrink:0;">${HARDWARE[item.hardwareId].label} · ${item.quantity} ud.</span>
+                <span style="font-size:9.5px;font-weight:600;color:#1e3a5f;font-family:'Courier New',monospace;">${fmt(net)}/mes</span>
               </div>`
-            }).join('') + `
-              <div style="display:flex;justify-content:space-between;padding:7px 0 0;">
-                <span style="font-size:9.5px;color:#64748b;">Total hardware</span>
-                <span style="font-size:11px;font-weight:800;color:#1e3a5f;font-family:'Courier New',monospace;">${fmt(eco.hardwareCostTotal)}</span>
-              </div>`
-          : `<div style="font-size:10px;color:#94a3b8;font-style:italic;padding:7px 0;">Sin hardware configurado</div>`}
+            }).join('')}` : ''}
+          ${hwIncluded.length > 0 ? `
+            <div style="font-size:8px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:0.8px;margin-top:${(hwSold.length > 0 || hwMonthly.length > 0) ? '8' : '0'}px;margin-bottom:4px;">Incluido en el plan</div>
+            ${hwIncluded.map(item => `
+              <div style="display:flex;justify-content:space-between;padding:3px 0;border-bottom:1px solid #f1f5f9;">
+                <span style="font-size:9px;color:#334155;">${HARDWARE[item.hardwareId].label} · ${item.quantity} ud.</span>
+                <span style="font-size:9px;color:#10b981;font-weight:600;">Incluido</span>
+              </div>`).join('')}` : ''}
+        `}
       </div>
     </div>
 
-    ${sections.executiveSummary ? `
-    <div style="background:#f0f5fb;border-left:3px solid #1e3a5f;border-radius:0 6px 6px 0;padding:13px 15px;">
-      <div style="font-size:9px;font-weight:700;color:#1e3a5f;text-transform:uppercase;letter-spacing:1px;margin-bottom:5px;">Resumen ejecutivo</div>
-      <div style="font-size:10.5px;color:#334155;line-height:1.6;">${esc(sections.executiveSummary)}</div>
-    </div>` : ''}`
+    <!-- Total fijo mensual (below columns) -->
+    <div style="border:2px solid #1e3a5f;border-radius:12px;padding:14px 20px;background:#f0f5fb;margin-bottom:10px;">
+      <div style="font-size:8.5px;color:#64748b;text-transform:uppercase;letter-spacing:1.5px;margin-bottom:10px;text-align:center;">Total fijo / mes (add-ons + hardware mensualidad)</div>
+      <div style="display:flex;align-items:center;justify-content:center;gap:10px;flex-wrap:wrap;">
+        <div style="text-align:center;">
+          <div style="font-size:22px;font-weight:900;color:#334155;font-family:'Courier New',monospace;line-height:1;">${fmt(fixedMonthlyNet)}</div>
+          <div style="font-size:7px;color:#94a3b8;text-transform:uppercase;letter-spacing:1px;margin-top:2px;">neto</div>
+        </div>
+        <div style="font-size:16px;color:#94a3b8;font-weight:300;margin-bottom:8px;">+</div>
+        <div style="text-align:center;">
+          <div style="font-size:22px;font-weight:900;color:#64748b;font-family:'Courier New',monospace;line-height:1;">${fmt(fixedMonthlyNet * 0.21)}</div>
+          <div style="font-size:7px;color:#94a3b8;text-transform:uppercase;letter-spacing:1px;margin-top:2px;">IVA 21%</div>
+        </div>
+        <div style="font-size:16px;color:#94a3b8;font-weight:300;margin-bottom:8px;">=</div>
+        <div style="text-align:center;background:#1e3a5f;padding:8px 16px;border-radius:8px;">
+          <div style="font-size:26px;font-weight:900;color:#fff;font-family:'Courier New',monospace;line-height:1;">${fmtVAT(fixedMonthlyNet)}</div>
+          <div style="font-size:7px;color:rgba(255,255,255,0.65);text-transform:uppercase;letter-spacing:1px;margin-top:2px;">total/mes</div>
+        </div>
+      </div>
+      ${discountPercent > 0 ? `<div style="font-size:8px;color:#dc2626;margin-top:8px;text-align:center;">Descuento −${discountPercent}% aplicado sobre neto · ahorro ${fmt(discountAmount)}/mes</div>` : ''}
+    </div>
+
+    <!-- Footer variable -->
+    <div style="border:1px solid #e8eef6;border-radius:8px;padding:10px 14px;background:#f8fafc;font-size:8.5px;color:#334155;line-height:1.6;">
+      <strong>Total fijo/mes:</strong> ${fmt(fixedMonthlyNet)}
+      + <strong>variable por pedido:</strong>
+      ROS: ${plan.variableFee.toFixed(2).replace('.', ',')}€/ticket${renEnabled ? ` · REN: ${renFeePerOrder.toFixed(2).replace('.', ',')}€/pedido` : ''}
+      — liquidado a mes vencido en factura.${hwUpfrontNet > 0 ? `
+      <br><strong>Pago único hardware:</strong> ${fmt(hwUpfrontNet)} — facturado a la activación.` : ''}
+    </div>
+
+    `
   return pg(logoUri, content)
 }
 
@@ -742,7 +852,7 @@ function s12Annex(deal: Deal, today: string, logoUri: string): string {
     </div>
     <div style="margin-top:14px;background:#f8fafc;border:1px solid #e8eef6;border-radius:8px;padding:13px 15px;font-size:9.5px;color:#64748b;line-height:1.6;">
       La presente propuesta tiene validez de <strong>30 días naturales</strong> a partir de la fecha de emisión (${today}).
-      Los precios indicados son en euros, sin IVA. El tipo de IVA aplicable es el vigente en la fecha de facturación.
+      Los precios indicados son en euros e incluyen IVA al 21%.
       La aceptación de esta propuesta implica la celebración de un contrato de prestación de servicios
       bajo las Condiciones Generales publicadas en <strong>platomico.com/legal</strong>.
     </div>`
@@ -824,10 +934,8 @@ function buildFullDossier(
     s5Plans(deal, cfg, logoUri),
     s6Modules(logoUri),
     s7Support(cfg, logoUri),
-    s8Activation(logoUri),
-    s9Why(logoUri),
-    s10NextSteps(deal, logoUri),
     s11Economics(deal, cfg, sections, logoUri),
+    s8Activation(logoUri),
     s12Annex(deal, today, logoUri),
     s13Signature(deal, today, logoUri),
   ].join('\n')
