@@ -59,6 +59,7 @@ export interface DealConfiguration {
   renVenues?: number               // number of venues with REN (default 1)
   kdsVenues?: number               // number of venues with KDS (default = locations)
   kioskVenues?: number             // number of venues with Kiosk (default = locations)
+  billingNotes?: string            // optional billing clause text for Anexo A
 
   // Add-ons
   activeAddons: AddonId[]

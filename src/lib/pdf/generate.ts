@@ -799,7 +799,7 @@ function s11Economics(deal: Deal, cfg: DealConfiguration, sections: ProposalSect
 }
 
 // ── Section 12: ANEXO DATOS ───────────────────────────────────────────────────
-function s12Annex(deal: Deal, today: string, logoUri: string): string {
+function s12Annex(deal: Deal, cfg: DealConfiguration, today: string, logoUri: string): string {
   const content = `
     ${sectionTitle('Anexo A: Datos de las partes')}
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:18px;">
@@ -851,8 +851,12 @@ function s12Annex(deal: Deal, today: string, logoUri: string): string {
       bajo las Condiciones Generales publicadas en <strong>platomico.com/legal</strong>.
     </div>
     <div style="margin-top:10px;background:#f8fafc;border:1px solid #e8eef6;border-radius:8px;padding:13px 15px;font-size:9.5px;color:#64748b;line-height:1.6;">
-      <strong style="color:#334155;">DESPLAZAMIENTOS Y DIETAS.</strong> Los desplazamientos, dietas, pernoctas y demás gastos en los que incurra el prestador del servicio como consecuencia directa de la ejecución del presente contrato fuera de la Comunidad de Madrid serán repercutidos íntegramente al cliente mediante factura independiente acompañada de los justificantes correspondientes, tomando como referencia orientativa los límites establecidos por la normativa fiscal vigente en España. Dichos gastos se facturarán de forma trimestral.
+      <strong style="color:#334155;">DESPLAZAMIENTOS Y DIETAS.</strong> Los desplazamientos, dietas, pernoctas y demás gastos en los que incurra el prestador del servicio como consecuencia directa de la ejecución del presente contrato fuera de la Comunidad de Madrid serán repercutidos íntegramente al cliente mediante factura independiente acompañada de los justificantes correspondientes, tomando como referencia orientativa los límites establecidos por la normativa fiscal vigente en España.
     </div>
+    ${cfg.billingNotes ? `
+    <div style="margin-top:10px;background:#f8fafc;border:1px solid #e8eef6;border-radius:8px;padding:13px 15px;font-size:9.5px;color:#64748b;line-height:1.6;">
+      <strong style="color:#334155;">FACTURACIÓN.</strong> ${esc(cfg.billingNotes)}
+    </div>` : ''}
     <div style="margin-top:10px;background:#f8fafc;border:1px solid #e8eef6;border-radius:8px;padding:13px 15px;font-size:9.5px;color:#64748b;line-height:1.6;">
       <strong style="color:#334155;">PROTECCIÓN DE DATOS.</strong> En cumplimiento del Reglamento (UE) 2016/679 (RGPD) y la Ley Orgánica 3/2018 (LOPDGDD), Platomico, S.L. tratará los datos de carácter personal facilitados por el Cliente exclusivamente para la gestión, prestación y facturación de los servicios contratados. Los datos no serán cedidos a terceros salvo obligación legal. El Cliente podrá ejercer sus derechos de acceso, rectificación, supresión, portabilidad y oposición dirigiéndose a hola@platomico.com. El responsable del tratamiento es Platomico, S.L., NIF B22741094.
     </div>`
@@ -936,7 +940,7 @@ function buildFullDossier(
     s7Support(cfg, logoUri),
     s11Economics(deal, cfg, sections, logoUri),
     s8Activation(logoUri),
-    s12Annex(deal, today, logoUri),
+    s12Annex(deal, cfg, today, logoUri),
     s13Signature(deal, today, logoUri),
   ].join('\n')
 

@@ -37,6 +37,7 @@ function rowToConfig(row: ConfigRow): DealConfiguration {
     renVenues?: number
     kdsVenues?: number
     kioskVenues?: number
+    billingNotes?: string
   }
   const locs = row.locations
   return {
@@ -55,6 +56,7 @@ function rowToConfig(row: ConfigRow): DealConfiguration {
     renVenues: eco.renVenues ?? 1,
     kdsVenues: eco.kdsVenues ?? locs,
     kioskVenues: eco.kioskVenues ?? locs,
+    billingNotes: eco.billingNotes,
     plan: row.plan as DealConfiguration['plan'],
     planOverridden: row.plan_overridden,
     activeAddons: row.active_addons as AddonId[],
