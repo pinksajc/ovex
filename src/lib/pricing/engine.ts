@@ -3,7 +3,7 @@
 // Funciones puras — sin side effects, sin UI
 // =========================================
 
-import { PLANS, ADDONS, RENTAL_MONTHLY_PRICE } from './catalog'
+import { PLANS, ADDONS, HARDWARE, RENTAL_MONTHLY_PRICE } from './catalog'
 import type { PlanTier, AddonId, HardwareLineItem, DealEconomics } from '@/types'
 
 // ---- PLAN SUGGESTION ----
@@ -98,11 +98,12 @@ export function calculateEconomics(input: CalculateInput): DealEconomics {
       case 'included':
         hardwareIncludedCost += itemCost
         break
-      case 'rented':
-        // Fixed RENTAL_MONTHLY_PRICE per unit regardless of catalog price
-        hardwareRevenueMonthly += RENTAL_MONTHLY_PRICE * item.quantity
+      case 'rented': {
+        const rentalUnit = HARDWARE[item.hardwareId]?.rentalMonthlyPrice ?? RENTAL_MONTHLY_PRICE
+        hardwareRevenueMonthly += rentalUnit * item.quantity
         hardwareFinancedCost += itemCost  // Platomico bears upfront hardware cost
         break
+      }
     }
   }
 
