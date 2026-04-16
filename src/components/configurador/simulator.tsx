@@ -650,7 +650,8 @@ export function Simulator({ deal, initialConfig, loadedConfigId }: SimulatorProp
             {HARDWARE_ORDER.map((id) => {
               const item = HARDWARE[id]
               const state = hardware[id]
-              const unitDisplayPrice = state.mode === 'rented' ? RENTAL_MONTHLY_PRICE : item.unitPrice
+              const rentalUnitPrice = item.rentalMonthlyPrice ?? RENTAL_MONTHLY_PRICE
+              const unitDisplayPrice = state.mode === 'rented' ? rentalUnitPrice : item.unitPrice
               const lineTotal = unitDisplayPrice * state.quantity
 
               return (
@@ -667,7 +668,7 @@ export function Simulator({ deal, initialConfig, loadedConfigId }: SimulatorProp
                       <p className="text-xs text-zinc-500 mt-0.5">{item.description}</p>
                       <p className="text-xs font-mono text-zinc-400 mt-0.5">
                         {state.mode === 'rented'
-                          ? `${formatCurrency(RENTAL_MONTHLY_PRICE)}/mes`
+                          ? `${formatCurrency(rentalUnitPrice)}/mes`
                           : state.mode === 'included'
                           ? 'Incluido en el plan'
                           : `${formatCurrency(item.unitPrice)}/ud.`}
@@ -743,7 +744,7 @@ export function Simulator({ deal, initialConfig, loadedConfigId }: SimulatorProp
                     <div className="mt-3 flex items-center justify-between">
                       <span className="text-xs text-zinc-400">
                         {state.mode === 'rented'
-                          ? `${state.quantity} × ${formatCurrency(RENTAL_MONTHLY_PRICE)}/mes · mensualidad`
+                          ? `${state.quantity} × ${formatCurrency(rentalUnitPrice)}/mes · mensualidad`
                           : state.mode === 'included'
                           ? `${state.quantity} ud. · Incluido en el plan`
                           : <>
