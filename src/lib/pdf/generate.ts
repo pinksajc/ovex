@@ -487,11 +487,9 @@ function s5Plans(deal: Deal, cfg: DealConfiguration, logoUri: string): string {
     <div style="display:flex;justify-content:space-between;align-items:center;padding:7px 11px;background:#f0f5fb;border:1px solid #dde6f0;border-radius:6px;">
       <div>
         <span style="font-size:10px;font-weight:600;color:#0f172a;">REN · Marketplace logístico</span>
-        <span style="font-size:9px;color:#94a3b8;margin-left:7px;">
-          ${renFeePerOrder.toFixed(2).replace('.', ',')}€/pedido × ${fmtN(deliveryPerVenue)} pedidos × ${renVenues} local${renVenues > 1 ? 'es' : ''} con REN
-        </span>
+        <span style="font-size:9px;color:#94a3b8;margin-left:7px;">Fee por pedido</span>
       </div>
-      <span style="font-size:10px;font-weight:700;color:#1e3a5f;font-family:'Courier New',monospace;">${fmt(renMonthly)}/mes</span>
+      <span style="font-size:10px;font-weight:700;color:#1e3a5f;font-family:'Courier New',monospace;">0,10€/pedido</span>
     </div>` : ''}
 
     <div style="margin-top:12px;background:#f8fafc;border:1px solid #e8eef6;border-radius:7px;padding:10px 14px;font-size:9.5px;color:#64748b;line-height:1.6;">
