@@ -266,7 +266,7 @@ function s1Cover(deal: Deal, cfg: DealConfiguration, today: string, logoUri: str
     <!-- Meta: fecha / versión / plan -->
     <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:20px;">
       ${[
-        ['Fecha',   'Madrid, 1 de enero de 2026'],
+        ['Fecha',   'Madrid, 1 de abril de 2026'],
         ['Versión', `V1.0${cfg.version}${cfg.label ? ` · ${cfg.label}` : ''}`],
         ['Plan',    plan.label],
       ].map(([k, v], i) => `
@@ -847,7 +847,7 @@ function s12Annex(deal: Deal, cfg: DealConfiguration, today: string, logoUri: st
       </div>
     </div>
     <div style="margin-top:14px;background:#f8fafc;border:1px solid #e8eef6;border-radius:8px;padding:13px 15px;font-size:9.5px;color:#64748b;line-height:1.6;">
-      La presente propuesta tiene validez de <strong>30 días naturales</strong> a partir de la fecha de emisión (Madrid, 1 de enero de 2026).
+      La presente propuesta tiene validez de <strong>30 días naturales</strong> a partir de la fecha de emisión (Madrid, 1 de abril de 2026).
       Los precios indicados son en euros e incluyen IVA al 21%.
       La aceptación de esta propuesta implica la celebración de un contrato de prestación de servicios
       bajo las Condiciones Generales publicadas en <strong>platomico.com/legal</strong>.
