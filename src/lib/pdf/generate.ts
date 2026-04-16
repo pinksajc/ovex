@@ -298,10 +298,9 @@ function s2Index(logoUri: string): string {
     ['2', 'Nuestro propósito'],
     ['3', 'Planes y add-ons'],
     ['4', 'Detalle de módulos'],
-    ['5', 'Proceso de activación'],
-    ['6', 'Soporte y acompañamiento'],
-    ['7', 'Próximos pasos'],
-    ['8', 'Resumen económico'],
+    ['5', 'Soporte y acompañamiento'],
+    ['6', 'Resumen económico'],
+    ['7', 'Proceso de activación'],
     ['Anexo A', 'Datos de las partes'],
     ['Anexo B', 'Página de firma'],
   ]
@@ -549,37 +548,25 @@ function s7Support(cfg: DealConfiguration, logoUri: string): string {
 // ── Section 8: ACTIVACIÓN ─────────────────────────────────────────────────────
 function s8Activation(logoUri: string): string {
   const phases = [
-    ['01','Selección y firma',     '< 2 h',        'Revisión final de la propuesta, firma digital del contrato de servicios.'],
-    ['02','Configuración técnica', '4 h',           'Setup de la cuenta, configuración de locales, permisos y parámetros de operación.'],
-    ['03','Migración de datos',    '4 – 8 h',       'Importación de la carta, familias, modificadores y productos existentes.'],
-    ['04','Formación del equipo',  '2 – 4 h',       'Sesión de formación para el personal de sala, barra y cocina.'],
-    ['05','Go Live',               '< 24 h total',  'Activación en producción, primera operación en vivo con soporte on-site o remoto.'],
+    ['01','Selección y firma',     'Revisión final de la propuesta, firma digital del contrato de servicios.'],
+    ['02','Configuración técnica', 'Setup de la cuenta, configuración de locales, permisos y parámetros de operación.'],
+    ['03','Migración de datos',    'Importación de la carta, familias, modificadores y productos existentes.'],
+    ['04','Formación del equipo',  'Sesión de formación para el personal de sala, barra y cocina.'],
+    ['05','Go Live',               'Activación en producción, primera operación en vivo con soporte on-site o remoto.'],
   ]
   const content = `
     ${sectionTitle('Proceso de activación', 'De la firma al primer pedido real en menos de 24 horas')}
-    <div style="display:flex;flex-direction:column;margin-bottom:18px;">
-      ${phases.map(([n,t,time,d], i) => `
+    <div style="display:flex;flex-direction:column;">
+      ${phases.map(([n,t,d], i) => `
         <div style="display:flex;align-items:flex-start;gap:13px;padding:13px 0;${i < phases.length - 1 ? 'border-bottom:1px solid #e8eef6;' : ''}">
           <div style="width:34px;height:34px;background:#1e3a5f;border-radius:50%;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
             <span style="font-size:10px;font-weight:800;color:#fff;">${n}</span>
           </div>
           <div style="flex:1;">
-            <div style="display:flex;align-items:baseline;gap:9px;margin-bottom:2px;">
-              <div style="font-size:12px;font-weight:700;color:#0f172a;">${t}</div>
-              <div style="font-size:8px;font-weight:700;color:#1e3a5f;background:#dde6f0;padding:2px 7px;border-radius:20px;white-space:nowrap;">${time}</div>
-            </div>
+            <div style="font-size:12px;font-weight:700;color:#0f172a;margin-bottom:2px;">${t}</div>
             <div style="font-size:10px;color:#64748b;line-height:1.5;">${d}</div>
           </div>
         </div>`).join('')}
-    </div>
-    <div style="border:1px solid #dde6f0;border-radius:10px;padding:15px 19px;display:flex;align-items:center;gap:13px;">
-      <div style="font-size:26px;">⚡</div>
-      <div>
-        <div style="font-size:13px;font-weight:800;color:#0f172a;margin-bottom:2px;">Activación garantizada en 24 horas</div>
-        <div style="font-size:10px;color:#64748b;line-height:1.5;">
-          Si el proceso de activación supera las 24 horas hábiles por causas imputables a Platomico, el primer mes de servicio es gratuito.
-        </div>
-      </div>
     </div>`
   return pg(logoUri, content)
 }
@@ -968,10 +955,9 @@ function buildFullDossier(
     s4Purpose(logoUri),
     s5Plans(deal, cfg, logoUri),
     s6Modules(logoUri),
-    s8Activation(logoUri),
     s7Support(cfg, logoUri),
-    s10NextSteps(deal, logoUri),
     s11Economics(deal, cfg, sections, logoUri),
+    s8Activation(logoUri),
     s12Annex(deal, today, logoUri),
     s13Signature(deal, today, logoUri),
   ].join('\n')
