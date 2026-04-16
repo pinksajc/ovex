@@ -855,10 +855,9 @@ function s12Annex(deal: Deal, cfg: DealConfiguration, today: string, logoUri: st
     <div style="margin-top:10px;background:#f8fafc;border:1px solid #e8eef6;border-radius:8px;padding:13px 15px;font-size:9.5px;color:#64748b;line-height:1.6;">
       <strong style="color:#334155;">DESPLAZAMIENTOS Y DIETAS.</strong> Los desplazamientos, dietas, pernoctas y demás gastos en los que incurra el prestador del servicio como consecuencia directa de la ejecución del presente contrato fuera de la Comunidad de Madrid serán repercutidos íntegramente al cliente mediante factura independiente acompañada de los justificantes correspondientes, tomando como referencia orientativa los límites establecidos por la normativa fiscal vigente en España.
     </div>
-    ${cfg.billingNotes ? `
     <div style="margin-top:10px;background:#f8fafc;border:1px solid #e8eef6;border-radius:8px;padding:13px 15px;font-size:9.5px;color:#64748b;line-height:1.6;">
-      <strong style="color:#334155;">FACTURACIÓN.</strong> ${esc(cfg.billingNotes)}
-    </div>` : ''}
+      <strong style="color:#334155;">FACTURACIÓN.</strong> Los servicios contratados en virtud del presente acuerdo se facturarán de forma trimestral, emitiéndose la correspondiente factura al inicio de cada trimestre natural. El cliente se obliga a abonar cada factura en un plazo máximo de treinta (30) días naturales desde su recepción.
+    </div>
     <div style="margin-top:10px;background:#f8fafc;border:1px solid #e8eef6;border-radius:8px;padding:13px 15px;font-size:9.5px;color:#64748b;line-height:1.6;">
       <strong style="color:#334155;">PROTECCIÓN DE DATOS.</strong> En cumplimiento del Reglamento (UE) 2016/679 (RGPD) y la Ley Orgánica 3/2018 (LOPDGDD), Platomico, S.L. tratará los datos de carácter personal facilitados por el Cliente exclusivamente para la gestión, prestación y facturación de los servicios contratados. Los datos no serán cedidos a terceros salvo obligación legal. El Cliente podrá ejercer sus derechos de acceso, rectificación, supresión, portabilidad y oposición dirigiéndose a hola@platomico.com. El responsable del tratamiento es Platomico, S.L., NIF B22741094.
     </div>`
