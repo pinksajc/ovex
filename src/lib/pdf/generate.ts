@@ -163,9 +163,6 @@ function pageHeader(logoUri: string): string {
       padding-bottom:8px; margin-bottom:16px; border-bottom:1px solid #dde6f0;
     ">
       ${imgOrText}
-      <span style="font-size:7.5px; color:#94a3b8; letter-spacing:0.8px; text-transform:uppercase;">
-        Confidencial
-      </span>
     </div>`
 }
 
@@ -412,7 +409,7 @@ function s5Plans(deal: Deal, cfg: DealConfiguration, logoUri: string): string {
   const activeAddons = cfg.activeAddons
 
   const content = `
-    ${sectionTitle('Planes y add-ons', `Plan seleccionado: ${PLANS[cfg.plan].label} · ${cfg.locations} local${cfg.locations > 1 ? 'es' : ''}`)}
+    ${sectionTitle('Planes y add-ons', `Plan seleccionado: ${PLANS[cfg.plan].label}`)}
 
     <div style="font-size:9px;font-weight:700;color:#1e3a5f;text-transform:uppercase;letter-spacing:1px;margin-bottom:4px;">Comparativa de planes</div>
     ${buildTable(planHeaders, planRows, { hi: hiCol })}
@@ -689,7 +686,7 @@ function s11Economics(deal: Deal, cfg: DealConfiguration, sections: ProposalSect
     </div>`
 
   const content = `
-    ${sectionTitle('Resumen económico', `${deal.company.name} · Plan ${plan.label} · ${cfg.locations} local${cfg.locations > 1 ? 'es' : ''}`)}
+    ${sectionTitle('Resumen económico', `${deal.company.name} · Plan ${plan.label}`)}
 
     <div style="display:grid;grid-template-columns:${renEnabled ? '1fr 1fr 1fr' : '1fr 1fr'};gap:10px;margin-bottom:14px;">
       <!-- ROS (informacional) -->
