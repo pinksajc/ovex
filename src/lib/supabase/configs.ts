@@ -52,7 +52,7 @@ function rowToConfig(row: ConfigRow): DealConfiguration {
     deliveryOrdersPerVenue: eco.deliveryOrdersPerVenue ?? 500,
     discountPercent: eco.discountPercent ?? 0,
     renEnabled: eco.renEnabled ?? false,
-    renFeePerOrder: eco.renFeePerOrder ?? 0.20,
+    renFeePerOrder: eco.renFeePerOrder ?? 0.10,
     renVenues: eco.renVenues ?? 1,
     kdsVenues: eco.kdsVenues ?? locs,
     kioskVenues: eco.kioskVenues ?? locs,
@@ -234,6 +234,29 @@ export async function insertVersion(
   const { data, error } = await table().insert(row).select().single()
   if (error) throw new Error(`Supabase insertVersion: ${error.message}`)
   return rowToConfig(data as ConfigRow)
+}
+
+/**
+ * Batch-fetches the active configuration for each deal in a single query.
+ * Returns Map<dealId, DealConfiguration> — one entry per deal that has an active config.
+ * Use this instead of calling getActiveConfigForDeal() per deal in list views.
+ */
+export async function getBatchActiveConfigsForDeals(
+  dealIds: string[]
+): Promise<Map<string, DealConfiguration>> {
+  const result = new Map<string, DealConfiguration>()
+  if (dealIds.length === 0) return result
+
+  const { data, error } = await table()
+    .select('*')
+    .in('attio_deal_id', dealIds)
+    .eq('is_active', true)
+
+  if (error) throw new Error(`Supabase getBatchActiveConfigsForDeals: ${error.message}`)
+  for (const row of (data ?? []) as ConfigRow[]) {
+    result.set(row.attio_deal_id, rowToConfig(row))
+  }
+  return result
 }
 
 /**

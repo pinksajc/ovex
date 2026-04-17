@@ -38,6 +38,7 @@ export async function getLastActivityByDeal(
       .select('deal_id, created_at')
       .in('deal_id', dealIds)
       .order('created_at', { ascending: false })
+      .limit(dealIds.length * 50)
 
     if (!data) return result
 
@@ -104,6 +105,7 @@ export async function getLastProposalViewByDeal(
       .in('deal_id', dealIds)
       .eq('event_type', 'proposal_viewed')
       .order('created_at', { ascending: false })
+      .limit(dealIds.length * 20)
 
     if (!data) return result
     for (const row of data as { deal_id: string; created_at: string }[]) {

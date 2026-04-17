@@ -271,39 +271,36 @@ async function enrichWithCommercialStatus(deals: Deal[]): Promise<Deal[]> {
 
 async function getDealsFromSupabase(): Promise<Deal[]> {
   const { listDeals } = await import('./supabase/deals')
-  const { getConfigsForDeal, getActiveConfigForDeal } = await import('./supabase/configs')
+  const { getBatchActiveConfigsForDeals } = await import('./supabase/configs')
   const { getSupabaseClient } = await import('./supabase/client')
 
   const baseDeals = await listDeals()
   if (baseDeals.length === 0) return []
 
-  // Fetch profiles once for owner name resolution
+  const dealIds = baseDeals.map((d) => d.id)
   const db = getSupabaseClient()
-  type ProfileRow = { id: string; full_name: string | null }
-  const { data: profiles } = await db
-    .from('profiles')
-    .select('id, full_name') as { data: ProfileRow[] | null; error: unknown }
-  const profileMap = new Map((profiles ?? []).map((p) => [p.id, p.full_name ?? 'Sin asignar']))
 
-  const deals = await Promise.all(
-    baseDeals.map(async (deal) => {
-      const [configs, activeConfig] = await Promise.all([
-        getConfigsForDeal(deal.id).catch(() => [] as DealConfiguration[]),
-        getActiveConfigForDeal(deal.id).catch(() => undefined),
-      ])
-      const ownerName = deal.ownerId
-        ? (profileMap.get(deal.ownerId) ?? 'Sin asignar')
-        : 'Sin asignar'
-      return {
-        ...deal,
-        owner: ownerName,
-        configurations: configs,
-        activeConfigId: activeConfig?.id,
-      }
-    })
+  // Two parallel batch queries — replaces 2N per-deal queries
+  type ProfileRow = { id: string; full_name: string | null }
+  const [activeConfigMap, profilesData] = await Promise.all([
+    getBatchActiveConfigsForDeals(dealIds).catch(() => new Map<string, DealConfiguration>()),
+    db.from('profiles').select('id, full_name') as unknown as Promise<{ data: ProfileRow[] | null; error: unknown }>,
+  ])
+
+  const profileMap = new Map(
+    ((profilesData as { data: ProfileRow[] | null }).data ?? []).map((p) => [p.id, p.full_name ?? 'Sin asignar'])
   )
 
-  return deals
+  return baseDeals.map((deal) => {
+    const activeConfig = activeConfigMap.get(deal.id)
+    const ownerName = deal.ownerId ? (profileMap.get(deal.ownerId) ?? 'Sin asignar') : 'Sin asignar'
+    return {
+      ...deal,
+      owner: ownerName,
+      configurations: activeConfig ? [activeConfig] : [],
+      activeConfigId: activeConfig?.id,
+    }
+  })
 }
 
 async function getDealFromSupabase(id: string): Promise<Deal | undefined> {

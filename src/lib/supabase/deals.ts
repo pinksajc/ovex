@@ -76,7 +76,7 @@ function rowToDeal(row: DealRow): Deal {
 
 export async function listDeals(): Promise<Deal[]> {
   const { data, error } = await table()
-    .select('*')
+    .select('id, company_name, company_cif, company_address, contact_first_name, contact_last_name, contact_email, contact_phone, stage, owner_id, created_at, updated_at')
     .order('created_at', { ascending: false })
   if (error) throw new Error(`Supabase listDeals: ${error.message}`)
   return ((data ?? []) as DealRow[]).map(rowToDeal)
