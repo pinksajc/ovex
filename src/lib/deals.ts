@@ -39,19 +39,21 @@ export const getDeals: () => Promise<Deal[]> = unstable_cache(
  * Obtiene un deal por ID.
  * Cacheado 60 s — invalidar con revalidateTag('attio-deals').
  */
-export const getDeal: (id: string) => Promise<Deal | undefined> = unstable_cache(
-  async (id: string) => {
-    const base = isSupabaseConfigured()
-      ? await getDealFromSupabase(id)
-      : await import('./mock-data').then((m) => m.getDealById(id))
+export async function getDeal(id: string): Promise<Deal | undefined> {
+  return unstable_cache(
+    async () => {
+      const base = isSupabaseConfigured()
+        ? await getDealFromSupabase(id)
+        : await import('./mock-data').then((m) => m.getDealById(id))
 
-    if (!base) return undefined
-    const [enriched] = await enrichWithCommercialStatus([base])
-    return enriched
-  },
-  ['deal'],
-  { revalidate: 60, tags: ['attio-deals'] }
-)
+      if (!base) return undefined
+      const [enriched] = await enrichWithCommercialStatus([base])
+      return enriched
+    },
+    ['deal', id],
+    { revalidate: 60, tags: ['attio-deals'] }
+  )()
+}
 
 /**
  * Retorna la configuración activa de un deal.

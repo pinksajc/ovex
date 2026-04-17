@@ -52,9 +52,13 @@ export async function saveConfigAction(
       kioskVenues: payload.kioskVenues,
     }
 
+    // Fetch current active config to reuse its id/version (avoids always writing v1)
+    const { getActiveConfigForDeal } = await import('@/lib/supabase/configs')
+    const existing = await getActiveConfigForDeal(payload.dealId).catch(() => undefined)
+
     const result = await saveActiveConfig(payload.dealId, {
-      id: `${payload.dealId}-v1`,
-      version: 1,
+      id: existing?.id ?? `${payload.dealId}-v1`,
+      version: existing?.version ?? 1,
       dailyOrdersPerLocation: payload.dailyOrdersPerLocation,
       deliveryOrdersPerVenue: payload.deliveryOrdersPerVenue,
       discountPercent: payload.discountPercent,
