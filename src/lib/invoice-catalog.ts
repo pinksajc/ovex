@@ -7,6 +7,8 @@ export interface ServiceItem {
   label: string
   group: 'ROS' | 'ADD-ONS' | 'REN' | 'HARDWARE' | 'OTROS'
   unit: string
+  /** Label shown below the Cantidad input (e.g. "locales", "uds", "pedidos") */
+  qtyUnit?: string
   unitEditable?: boolean   // true → unit label is free-text
   defaultPrice: number
   priceEditable?: boolean  // true → price field highlighted (user must fill)
@@ -21,6 +23,7 @@ export const SERVICES: ServiceItem[] = [
     label: 'ROS Plan Starter',
     group: 'ROS',
     unit: 'local/mes',
+    qtyUnit: 'locales',
     defaultPrice: 0,
     priceEditable: true,
     note: '+ 0,08€/ticket variable',
@@ -30,6 +33,7 @@ export const SERVICES: ServiceItem[] = [
     label: 'ROS Plan Growth',
     group: 'ROS',
     unit: 'local/mes',
+    qtyUnit: 'locales',
     defaultPrice: 15,
     note: '+ 0,05€/ticket variable',
   },
@@ -38,6 +42,7 @@ export const SERVICES: ServiceItem[] = [
     label: 'ROS Plan Pro',
     group: 'ROS',
     unit: 'local/mes',
+    qtyUnit: 'locales',
     defaultPrice: 35,
     note: '+ 0,03€/ticket variable',
   },

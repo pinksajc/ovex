@@ -448,7 +448,8 @@ function RegularLineRow({
     onChange(line.id, { unitPrice: val, amount: line.quantity * val })
   }
 
-  const unitLabel = line.unit || 'uds'
+  // Qty column label: prefer catalog qtyUnit, then derive from unit, fallback 'uds'
+  const qtyLabel = svc?.qtyUnit ?? (line.unit ? line.unit.split('/')[0] : 'uds')
 
   return (
     <div className="px-5 py-3 space-y-2">
@@ -526,25 +527,16 @@ function RegularLineRow({
       {/* Row 2: description (editable) + unit label */}
       {line.serviceId && (
         <div className="grid items-center gap-2 pl-0" style={{ gridTemplateColumns: '1fr 90px 110px 100px 28px' }}>
-          {/* Description (editable) */}
-          {isCustom ? (
-            <input
-              type="text"
-              value={line.description}
-              onChange={(e) => onChange(line.id, { description: e.target.value })}
-              placeholder="Descripción personalizada"
-              className="border border-zinc-200 rounded px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-zinc-300 w-full text-zinc-600"
-            />
-          ) : (
-            <input
-              type="text"
-              value={line.description}
-              onChange={(e) => onChange(line.id, { description: e.target.value })}
-              className="border border-zinc-100 bg-zinc-50 rounded px-2 py-1 text-xs text-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-300 w-full"
-            />
-          )}
+          {/* Description (always editable, always visible) */}
+          <input
+            type="text"
+            value={line.description}
+            onChange={(e) => onChange(line.id, { description: e.target.value })}
+            placeholder={isCustom ? 'Descripción personalizada' : ''}
+            className="border border-zinc-200 rounded px-2 py-1 text-xs text-zinc-700 focus:outline-none focus:ring-1 focus:ring-zinc-300 w-full bg-white"
+          />
 
-          {/* Unit label under qty */}
+          {/* Qty unit label */}
           {isCustom ? (
             <input
               type="text"
@@ -554,7 +546,7 @@ function RegularLineRow({
               className="border border-zinc-200 rounded px-2 py-1 text-[10px] text-center text-zinc-400 focus:outline-none focus:ring-1 focus:ring-zinc-300 w-full"
             />
           ) : (
-            <div className="text-[10px] text-center text-zinc-400 truncate">{unitLabel}</div>
+            <div className="text-[10px] text-center text-zinc-400 truncate">{qtyLabel}</div>
           )}
 
           {/* Note under price if applicable */}
