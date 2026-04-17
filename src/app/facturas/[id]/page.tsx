@@ -75,19 +75,34 @@ export default async function FacturaDetailPage({ params }: { params: Promise<{ 
           <p className="text-sm text-zinc-500">{invoice.clientName}</p>
         </div>
 
-        {/* PDF download */}
-        <a
-          href={`/api/facturas/generate-pdf?id=${invoice.id}`}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="inline-flex items-center gap-1.5 text-xs font-medium border border-zinc-200 text-zinc-700 hover:bg-zinc-50 hover:border-zinc-400 px-3 py-1.5 rounded-lg transition-colors"
-        >
-          <svg className="w-3.5 h-3.5" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5">
-            <path d="M7 1v8M4 6l3 3 3-3" strokeLinecap="round" strokeLinejoin="round" />
-            <path d="M2 11h10" strokeLinecap="round" />
-          </svg>
-          Descargar PDF
-        </a>
+        <div className="flex items-center gap-2 flex-wrap">
+          {/* Edit — only for draft or issued */}
+          {(invoice.status === 'draft' || invoice.status === 'issued') && (
+            <Link
+              href={`/facturas/${invoice.id}/editar`}
+              className="inline-flex items-center gap-1.5 text-xs font-medium border border-zinc-200 text-zinc-700 hover:bg-zinc-50 hover:border-zinc-400 px-3 py-1.5 rounded-lg transition-colors"
+            >
+              <svg className="w-3.5 h-3.5" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5">
+                <path d="M9.5 2.5l2 2L5 11H3v-2L9.5 2.5z" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+              Editar
+            </Link>
+          )}
+
+          {/* PDF download */}
+          <a
+            href={`/api/facturas/generate-pdf?id=${invoice.id}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1.5 text-xs font-medium border border-zinc-200 text-zinc-700 hover:bg-zinc-50 hover:border-zinc-400 px-3 py-1.5 rounded-lg transition-colors"
+          >
+            <svg className="w-3.5 h-3.5" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5">
+              <path d="M7 1v8M4 6l3 3 3-3" strokeLinecap="round" strokeLinejoin="round" />
+              <path d="M2 11h10" strokeLinecap="round" />
+            </svg>
+            Descargar PDF
+          </a>
+        </div>
       </div>
 
       <div className="grid grid-cols-2 gap-5">

@@ -4,7 +4,7 @@
 // =========================================
 
 import { getSupabaseClient } from './client'
-import type { Invoice, CreateInvoiceInput, InvoiceStatus, InvoiceType, InvoiceLineItem } from '@/types'
+import type { Invoice, CreateInvoiceInput, UpdateInvoiceInput, InvoiceStatus, InvoiceType, InvoiceLineItem } from '@/types'
 
 // ---- Row → Invoice ----
 
@@ -130,6 +130,31 @@ export async function createInvoice(input: CreateInvoiceInput): Promise<Invoice>
       due_at: input.dueAt ?? null,
       rectifies_id: input.rectifiesId ?? null,
     })
+    .select()
+    .single()
+
+  if (error) throw error
+  return rowToInvoice(data as InvoiceRow)
+}
+
+export async function updateInvoice(id: string, input: UpdateInvoiceInput): Promise<Invoice> {
+  const db = getSupabaseClient()
+  const { data, error } = await invoicesTable(db)
+    .update({
+      deal_id: input.dealId ?? null,
+      client_name: input.clientName,
+      client_cif: input.clientCif ?? null,
+      client_address: input.clientAddress ?? null,
+      concept: input.concept,
+      line_items: JSON.stringify(input.lineItems),
+      amount_net: input.amountNet,
+      vat_rate: input.vatRate,
+      amount_total: input.amountTotal,
+      issued_at: input.issuedAt ?? null,
+      due_at: input.dueAt ?? null,
+      rectifies_id: input.rectifiesId ?? null,
+    })
+    .eq('id', id)
     .select()
     .single()
 

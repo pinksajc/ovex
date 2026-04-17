@@ -239,7 +239,7 @@ export type InvoiceLineItemType = 'line' | 'discount'
 export type DiscountMode = 'percent' | 'amount'
 
 export interface InvoiceLineItem {
-  /** Local UUID — not persisted, used as React key and for UI state */
+  /** UUID — persisted, used as React key */
   id: string
   type: InvoiceLineItemType
   description: string
@@ -253,6 +253,10 @@ export interface InvoiceLineItem {
   discountMode?: DiscountMode
   /** The % or € value the user entered for a discount */
   discountValue?: number
+  /** Catalog service ID — persisted to restore dropdown on edit */
+  serviceId?: string
+  /** Quantity unit label — persisted for display */
+  unit?: string
 }
 
 export interface Invoice {
@@ -277,6 +281,21 @@ export interface Invoice {
 
 export interface CreateInvoiceInput {
   type: InvoiceType
+  dealId?: string | null
+  clientName: string
+  clientCif?: string | null
+  clientAddress?: string | null
+  concept: string
+  lineItems: InvoiceLineItem[]
+  amountNet: number
+  vatRate: number
+  amountTotal: number
+  issuedAt?: string | null
+  dueAt?: string | null
+  rectifiesId?: string | null
+}
+
+export interface UpdateInvoiceInput {
   dealId?: string | null
   clientName: string
   clientCif?: string | null

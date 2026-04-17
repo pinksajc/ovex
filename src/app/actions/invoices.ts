@@ -2,8 +2,8 @@
 
 import { redirect } from 'next/navigation'
 import { revalidatePath } from 'next/cache'
-import { createInvoice, updateInvoiceStatus } from '@/lib/supabase/invoices'
-import type { CreateInvoiceInput, InvoiceStatus } from '@/types'
+import { createInvoice, updateInvoice, updateInvoiceStatus } from '@/lib/supabase/invoices'
+import type { CreateInvoiceInput, UpdateInvoiceInput, InvoiceStatus } from '@/types'
 
 export async function createInvoiceAction(input: CreateInvoiceInput): Promise<{ error?: string }> {
   try {
@@ -12,6 +12,21 @@ export async function createInvoiceAction(input: CreateInvoiceInput): Promise<{ 
     redirect(`/facturas/${invoice.id}`)
   } catch (err) {
     // redirect() throws internally — rethrow it
+    if (err instanceof Error && err.message === 'NEXT_REDIRECT') throw err
+    return { error: err instanceof Error ? err.message : 'Error desconocido' }
+  }
+}
+
+export async function updateInvoiceAction(
+  id: string,
+  input: UpdateInvoiceInput
+): Promise<{ error?: string }> {
+  try {
+    await updateInvoice(id, input)
+    revalidatePath('/facturas')
+    revalidatePath(`/facturas/${id}`)
+    redirect(`/facturas/${id}`)
+  } catch (err) {
     if (err instanceof Error && err.message === 'NEXT_REDIRECT') throw err
     return { error: err instanceof Error ? err.message : 'Error desconocido' }
   }

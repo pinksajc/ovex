@@ -154,12 +154,17 @@ export function NewInvoiceForm({ deals }: Props) {
         : 'Varios conceptos'
 
     const finalLines: InvoiceLineItem[] = lines.map((l) => {
-      // Strip UI-only fields before persisting
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars
-      const { serviceId, unit, ...rest } = l
-      const item = rest as InvoiceLineItem
-      if (item.type === 'discount') {
-        item.amount = computeDiscountAmount(l, subtotal)
+      const item: InvoiceLineItem = {
+        id: l.id,
+        type: l.type,
+        description: l.description,
+        quantity: l.quantity,
+        unitPrice: l.unitPrice,
+        amount: l.type === 'discount' ? computeDiscountAmount(l, subtotal) : l.amount,
+        discountMode: l.discountMode,
+        discountValue: l.discountValue,
+        serviceId: l.serviceId || undefined,
+        unit: l.unit || undefined,
       }
       return item
     })
