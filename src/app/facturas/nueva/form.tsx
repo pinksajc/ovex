@@ -3,6 +3,7 @@
 import { useState, useTransition, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { createInvoiceAction } from '@/app/actions/invoices'
+import { SERVICES, SERVICE_MAP, SERVICE_GROUPS } from '@/lib/invoice-catalog'
 import type { InvoiceType, InvoiceLineItem, DiscountMode } from '@/types'
 
 // ---- helpers ----
@@ -11,11 +12,20 @@ function newLineId() {
   return Math.random().toString(36).slice(2)
 }
 
-function emptyLine(): InvoiceLineItem {
-  return { id: newLineId(), type: 'line', description: '', quantity: 1, unitPrice: 0, amount: 0 }
+function emptyLine(): InvoiceLineItem & { serviceId: string; unit: string } {
+  return {
+    id: newLineId(),
+    type: 'line',
+    description: '',
+    quantity: 1,
+    unitPrice: 0,
+    amount: 0,
+    serviceId: '',
+    unit: '',
+  }
 }
 
-function emptyDiscount(): InvoiceLineItem {
+function emptyDiscount(): InvoiceLineItem & { serviceId: string; unit: string } {
   return {
     id: newLineId(),
     type: 'discount',
@@ -25,6 +35,8 @@ function emptyDiscount(): InvoiceLineItem {
     amount: 0,
     discountMode: 'percent',
     discountValue: 0,
+    serviceId: '',
+    unit: '',
   }
 }
 
@@ -32,13 +44,17 @@ function fmtNum(n: number) {
   return n.toLocaleString('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 }
 
-function computeDiscountAmount(item: InvoiceLineItem, subtotal: number): number {
+function computeDiscountAmount(item: FormLine, subtotal: number): number {
   if (item.type !== 'discount') return item.amount
   if (item.discountMode === 'percent') {
     return -(subtotal * (item.discountValue ?? 0)) / 100
   }
   return -(item.discountValue ?? 0)
 }
+
+// ---- extended line type (UI only) ----
+
+type FormLine = InvoiceLineItem & { serviceId: string; unit: string }
 
 // ---- types ----
 
@@ -70,24 +86,20 @@ export function NewInvoiceForm({ deals }: Props) {
   const [rectifiesId, setRectifiesId] = useState('')
 
   // Line items
-  const [lines, setLines] = useState<InvoiceLineItem[]>([emptyLine()])
+  const [lines, setLines] = useState<FormLine[]>([emptyLine()])
 
   // ---- computed totals ----
   const regularLines = lines.filter((l) => l.type === 'line')
   const subtotal = regularLines.reduce((s, l) => s + l.amount, 0)
   const discountLines = lines.filter((l) => l.type === 'discount')
-  // recompute discount amounts against current subtotal
-  const discountTotal = discountLines.reduce(
-    (s, l) => s + computeDiscountAmount(l, subtotal),
-    0
-  ) // negative
-  const base = subtotal + discountTotal // base imponible
+  const discountTotal = discountLines.reduce((s, l) => s + computeDiscountAmount(l, subtotal), 0)
+  const base = subtotal + discountTotal
   const vat = parseFloat(vatRate) || 21
   const vatAmount = base * (vat / 100)
   const total = base + vatAmount
 
   // ---- line mutators ----
-  const updateLine = useCallback((id: string, patch: Partial<InvoiceLineItem>) => {
+  const updateLine = useCallback((id: string, patch: Partial<FormLine>) => {
     setLines((prev) =>
       prev.map((l) => {
         if (l.id !== id) return l
@@ -136,18 +148,21 @@ export function NewInvoiceForm({ deals }: Props) {
     if (filledLines.length === 0) return setError('Añade al menos una línea con descripción.')
     if (base <= 0) return setError('La base imponible debe ser mayor que 0.')
 
-    // Derive concept from first regular line (or "Varios conceptos")
     const concept =
       filledLines.length === 1
         ? filledLines[0].description.trim()
         : 'Varios conceptos'
 
-    // Finalise discount amounts so persisted values are accurate
-    const finalLines: InvoiceLineItem[] = lines.map((l) =>
-      l.type === 'discount'
-        ? { ...l, amount: computeDiscountAmount(l, subtotal) }
-        : l
-    )
+    const finalLines: InvoiceLineItem[] = lines.map((l) => {
+      // Strip UI-only fields before persisting
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      const { serviceId, unit, ...rest } = l
+      const item = rest as InvoiceLineItem
+      if (item.type === 'discount') {
+        item.amount = computeDiscountAmount(l, subtotal)
+      }
+      return item
+    })
 
     startTransition(async () => {
       const result = await createInvoiceAction({
@@ -269,18 +284,8 @@ export function NewInvoiceForm({ deals }: Props) {
 
       {/* Line items */}
       <div className="bg-white border border-zinc-200 rounded-xl overflow-hidden">
-        <div className="px-5 py-3 border-b border-zinc-100 flex items-center justify-between">
+        <div className="px-5 py-3 border-b border-zinc-100">
           <h2 className="text-xs font-semibold text-zinc-500 uppercase tracking-widest">Líneas</h2>
-        </div>
-
-        {/* Column headers */}
-        <div className="grid items-center gap-2 px-5 py-2 bg-zinc-50 border-b border-zinc-100 text-[10px] font-semibold text-zinc-400 uppercase tracking-widest"
-          style={{ gridTemplateColumns: '1fr 80px 110px 100px 28px' }}>
-          <span>Descripción</span>
-          <span className="text-right">Cantidad</span>
-          <span className="text-right">Precio unit.</span>
-          <span className="text-right">Importe</span>
-          <span />
         </div>
 
         {/* Lines */}
@@ -398,7 +403,9 @@ export function NewInvoiceForm({ deals }: Props) {
   )
 }
 
-// ---- Sub-components ----
+// =========================================
+// RegularLineRow
+// =========================================
 
 function RegularLineRow({
   line,
@@ -406,57 +413,163 @@ function RegularLineRow({
   onRemove,
   canRemove,
 }: {
-  line: InvoiceLineItem
-  onChange: (id: string, patch: Partial<InvoiceLineItem>) => void
+  line: FormLine
+  onChange: (id: string, patch: Partial<FormLine>) => void
   onRemove: (id: string) => void
   canRemove: boolean
 }) {
+  const svc = line.serviceId ? SERVICE_MAP.get(line.serviceId) : undefined
+  const isCustom = svc?.custom === true
+  const priceEditable = !svc || svc.priceEditable === true
+
+  function handleServiceSelect(serviceId: string) {
+    if (!serviceId) {
+      onChange(line.id, { serviceId: '', description: '', unit: '', unitPrice: 0, amount: 0 })
+      return
+    }
+    const item = SERVICE_MAP.get(serviceId)
+    if (!item) return
+    const qty = line.quantity || 1
+    const price = item.defaultPrice
+    onChange(line.id, {
+      serviceId,
+      description: item.custom ? '' : item.label,
+      unit: item.unit,
+      unitPrice: price,
+      amount: qty * price,
+    })
+  }
+
+  function handleQtyChange(val: number) {
+    onChange(line.id, { quantity: val, amount: val * line.unitPrice })
+  }
+
+  function handlePriceChange(val: number) {
+    onChange(line.id, { unitPrice: val, amount: line.quantity * val })
+  }
+
+  const unitLabel = line.unit || 'uds'
+
   return (
-    <div
-      className="grid items-center gap-2 px-5 py-2.5"
-      style={{ gridTemplateColumns: '1fr 80px 110px 100px 28px' }}
-    >
-      <input
-        type="text"
-        value={line.description}
-        onChange={(e) => onChange(line.id, { description: e.target.value })}
-        placeholder="Descripción del servicio"
-        className="border border-zinc-200 rounded px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-zinc-300 w-full"
-      />
-      <input
-        type="number"
-        min="0"
-        step="any"
-        value={line.quantity}
-        onChange={(e) => onChange(line.id, { quantity: parseFloat(e.target.value) || 0 })}
-        className="border border-zinc-200 rounded px-2 py-1 text-xs font-mono text-right focus:outline-none focus:ring-1 focus:ring-zinc-300 w-full"
-      />
-      <input
-        type="number"
-        min="0"
-        step="0.01"
-        value={line.unitPrice}
-        onChange={(e) => onChange(line.id, { unitPrice: parseFloat(e.target.value) || 0 })}
-        className="border border-zinc-200 rounded px-2 py-1 text-xs font-mono text-right focus:outline-none focus:ring-1 focus:ring-zinc-300 w-full"
-      />
-      <div className="text-xs font-mono text-right text-zinc-700 pr-1">
-        {line.amount.toLocaleString('es-ES', { minimumFractionDigits: 2 })} €
-      </div>
-      {canRemove ? (
-        <button
-          type="button"
-          onClick={() => onRemove(line.id)}
-          className="text-zinc-300 hover:text-red-500 transition-colors text-base leading-none"
-          title="Eliminar línea"
+    <div className="px-5 py-3 space-y-2">
+      {/* Row 1: service selector + qty + price + amount + delete */}
+      <div className="grid items-center gap-2" style={{ gridTemplateColumns: '1fr 90px 110px 100px 28px' }}>
+        {/* Service selector */}
+        <select
+          value={line.serviceId}
+          onChange={(e) => handleServiceSelect(e.target.value)}
+          className="border border-zinc-200 rounded px-2 py-1.5 text-xs bg-white focus:outline-none focus:ring-1 focus:ring-zinc-300 w-full text-zinc-700"
         >
-          ×
-        </button>
-      ) : (
-        <span />
+          <option value="">— Selecciona servicio —</option>
+          {SERVICE_GROUPS.map((group) => {
+            const items = SERVICES.filter((s) => s.group === group)
+            return (
+              <optgroup key={group} label={group}>
+                {items.map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.label}{s.note ? ` (${s.note})` : ''}
+                  </option>
+                ))}
+              </optgroup>
+            )
+          })}
+        </select>
+
+        {/* Cantidad */}
+        <div className="relative">
+          <input
+            type="number"
+            min="0"
+            step="any"
+            value={line.quantity}
+            onChange={(e) => handleQtyChange(parseFloat(e.target.value) || 0)}
+            className="border border-zinc-200 rounded px-2 py-1.5 text-xs font-mono text-right focus:outline-none focus:ring-1 focus:ring-zinc-300 w-full pr-1"
+          />
+        </div>
+
+        {/* Precio unitario */}
+        <div className="relative">
+          <input
+            type="number"
+            min="0"
+            step="0.01"
+            value={line.unitPrice}
+            onChange={(e) => handlePriceChange(parseFloat(e.target.value) || 0)}
+            className={`border rounded px-2 py-1.5 text-xs font-mono text-right focus:outline-none focus:ring-1 w-full ${
+              priceEditable && line.unitPrice === 0 && line.serviceId
+                ? 'border-amber-300 bg-amber-50 focus:ring-amber-300'
+                : 'border-zinc-200 focus:ring-zinc-300'
+            }`}
+          />
+        </div>
+
+        {/* Importe */}
+        <div className="text-xs font-mono text-right text-zinc-700 pr-1">
+          {line.amount.toLocaleString('es-ES', { minimumFractionDigits: 2 })} €
+        </div>
+
+        {/* Delete */}
+        {canRemove ? (
+          <button
+            type="button"
+            onClick={() => onRemove(line.id)}
+            className="text-zinc-300 hover:text-red-500 transition-colors text-base leading-none"
+            title="Eliminar línea"
+          >
+            ×
+          </button>
+        ) : (
+          <span />
+        )}
+      </div>
+
+      {/* Row 2: description (editable) + unit label */}
+      {line.serviceId && (
+        <div className="grid items-center gap-2 pl-0" style={{ gridTemplateColumns: '1fr 90px 110px 100px 28px' }}>
+          {/* Description (editable) */}
+          {isCustom ? (
+            <input
+              type="text"
+              value={line.description}
+              onChange={(e) => onChange(line.id, { description: e.target.value })}
+              placeholder="Descripción personalizada"
+              className="border border-zinc-200 rounded px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-zinc-300 w-full text-zinc-600"
+            />
+          ) : (
+            <input
+              type="text"
+              value={line.description}
+              onChange={(e) => onChange(line.id, { description: e.target.value })}
+              className="border border-zinc-100 bg-zinc-50 rounded px-2 py-1 text-xs text-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-300 w-full"
+            />
+          )}
+
+          {/* Unit label under qty */}
+          {isCustom ? (
+            <input
+              type="text"
+              value={line.unit}
+              onChange={(e) => onChange(line.id, { unit: e.target.value })}
+              placeholder="unidad"
+              className="border border-zinc-200 rounded px-2 py-1 text-[10px] text-center text-zinc-400 focus:outline-none focus:ring-1 focus:ring-zinc-300 w-full"
+            />
+          ) : (
+            <div className="text-[10px] text-center text-zinc-400 truncate">{unitLabel}</div>
+          )}
+
+          {/* Note under price if applicable */}
+          {svc?.note && !isCustom && (
+            <div className="text-[10px] text-amber-600 text-right truncate">{svc.note}</div>
+          )}
+        </div>
       )}
     </div>
   )
 }
+
+// =========================================
+// DiscountLineRow (unchanged)
+// =========================================
 
 function DiscountLineRow({
   line,
@@ -464,9 +577,9 @@ function DiscountLineRow({
   onChange,
   onRemove,
 }: {
-  line: InvoiceLineItem
+  line: FormLine
   subtotal: number
-  onChange: (id: string, patch: Partial<InvoiceLineItem>) => void
+  onChange: (id: string, patch: Partial<FormLine>) => void
   onRemove: (id: string) => void
 }) {
   const discountAmount = computeDiscountAmount(line, subtotal)
@@ -482,7 +595,7 @@ function DiscountLineRow({
   }
 
   return (
-    <div className="grid items-center gap-2 px-5 py-2.5 bg-red-50/30" style={{ gridTemplateColumns: '1fr 80px 110px 100px 28px' }}>
+    <div className="grid items-center gap-2 px-5 py-2.5 bg-red-50/30" style={{ gridTemplateColumns: '1fr 90px 110px 100px 28px' }}>
       {/* Description + mode toggle */}
       <div className="flex items-center gap-2">
         <input
@@ -518,7 +631,7 @@ function DiscountLineRow({
         </div>
       </div>
 
-      {/* Qty (disabled for discounts) */}
+      {/* Qty — unused for discounts */}
       <div />
 
       {/* Discount value */}
