@@ -235,6 +235,26 @@ export type InvoiceType = 'ordinary' | 'rectificativa'
 
 export type InvoiceStatus = 'draft' | 'issued' | 'paid' | 'overdue'
 
+export type InvoiceLineItemType = 'line' | 'discount'
+export type DiscountMode = 'percent' | 'amount'
+
+export interface InvoiceLineItem {
+  /** Local UUID — not persisted, used as React key and for UI state */
+  id: string
+  type: InvoiceLineItemType
+  description: string
+  /** Regular lines: quantity sold. Discount lines: unused (always 1) */
+  quantity: number
+  /** Regular lines: price per unit. Discount lines: unused (see discountValue) */
+  unitPrice: number
+  /** Computed and persisted amount. Negative for discount lines. */
+  amount: number
+  /** Only for type='discount' */
+  discountMode?: DiscountMode
+  /** The % or € value the user entered for a discount */
+  discountValue?: number
+}
+
 export interface Invoice {
   id: string
   number: string
@@ -244,6 +264,7 @@ export interface Invoice {
   clientCif: string | null
   clientAddress: string | null
   concept: string
+  lineItems: InvoiceLineItem[]
   amountNet: number
   vatRate: number
   amountTotal: number
@@ -261,6 +282,7 @@ export interface CreateInvoiceInput {
   clientCif?: string | null
   clientAddress?: string | null
   concept: string
+  lineItems: InvoiceLineItem[]
   amountNet: number
   vatRate: number
   amountTotal: number

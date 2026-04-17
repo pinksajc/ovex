@@ -5,7 +5,7 @@
 
 import fs from 'fs'
 import path from 'path'
-import type { Invoice } from '@/types'
+import type { Invoice, InvoiceLineItem } from '@/types'
 import { renderHtmlToPdf } from './generate'
 
 // ---- Logo ----
@@ -36,11 +36,47 @@ function fmtDate(s: string | null): string {
   return new Date(s).toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' })
 }
 
+// ---- Line items rendering ----
+function renderLineRows(items: InvoiceLineItem[]): string {
+  if (!items || items.length === 0) return ''
+  return items.map((item) => {
+    if (item.type === 'discount') {
+      const modeLabel = item.discountMode === 'percent'
+        ? `${fmt(item.discountValue ?? 0)}%`
+        : `${fmt(item.discountValue ?? 0)} €`
+      return `
+        <tr class="discount-row">
+          <td style="color:#dc2626;">${esc(item.description || 'Descuento')} <span style="color:#fca5a5;font-size:8px;">(${modeLabel})</span></td>
+          <td class="right">—</td>
+          <td class="right">—</td>
+          <td class="right" style="color:#dc2626;font-weight:700;">${fmt(item.amount)} €</td>
+        </tr>`
+    }
+    return `
+      <tr>
+        <td>${esc(item.description)}</td>
+        <td class="right">${fmt(item.quantity)}</td>
+        <td class="right">${fmt(item.unitPrice)} €</td>
+        <td class="right" style="font-weight:600;">${fmt(item.amount)} €</td>
+      </tr>`
+  }).join('')
+}
+
 // ---- Invoice HTML ----
 export async function generateInvoicePdf(invoice: Invoice): Promise<Buffer> {
   const logo = readLogoDataUri()
   const today = new Date().toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' })
-  const vatAmount = invoice.amountNet * (invoice.vatRate / 100)
+
+  const items = invoice.lineItems ?? []
+  const regularItems = items.filter((i) => i.type === 'line')
+  const discountItems = items.filter((i) => i.type === 'discount')
+  const subtotal = regularItems.reduce((s, i) => s + i.amount, 0)
+  const discountTotal = discountItems.reduce((s, i) => s + i.amount, 0)
+  const base = invoice.amountNet  // stored as base imponible
+  const vatAmount = base * (invoice.vatRate / 100)
+
+  // Fall back to single-row if no line items stored (legacy invoices)
+  const hasLineItems = items.length > 0
 
   const invoiceTypeLabel = invoice.type === 'rectificativa' ? 'Factura Rectificativa' : 'Factura'
 
@@ -165,9 +201,13 @@ export async function generateInvoicePdf(invoice: Invoice): Promise<Buffer> {
   table.concept-table tbody tr {
     border-bottom: 1px solid #f1f5f9;
   }
+  table.concept-table tbody tr.discount-row {
+    background: #fff5f5;
+    border-bottom: 1px solid #fee2e2;
+  }
   table.concept-table tbody td {
     font-size: 10px;
-    padding: 10px 10px;
+    padding: 9px 10px;
     color: #334155;
   }
   table.concept-table tbody td.right {
@@ -176,7 +216,7 @@ export async function generateInvoicePdf(invoice: Invoice): Promise<Buffer> {
   }
   .totals-box {
     margin-left: auto;
-    width: 280px;
+    width: 300px;
     border: 1px solid #e2e8f0;
     border-radius: 8px;
     overflow: hidden;
@@ -186,7 +226,7 @@ export async function generateInvoicePdf(invoice: Invoice): Promise<Buffer> {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 8px 14px;
+    padding: 7px 14px;
     font-size: 10px;
     border-bottom: 1px solid #f1f5f9;
   }
@@ -199,6 +239,8 @@ export async function generateInvoicePdf(invoice: Invoice): Promise<Buffer> {
     padding: 12px 14px;
   }
   .totals-row .label { color: #64748b; }
+  .totals-row.discount .label { color: #dc2626; }
+  .totals-row.discount .amount { color: #dc2626; font-weight: 700; }
   .totals-row.total-final .label { color: #cbd5e1; font-size: 9px; font-weight: 400; text-transform: uppercase; letter-spacing: 0.8px; }
   .totals-row .amount { font-family: Courier New, monospace; font-weight: 600; }
   .footer-legal {
@@ -283,33 +325,43 @@ ${invoice.type === 'rectificativa' && invoice.rectifiesId ? `
   </div>
 </div>
 
-<!-- Concept table -->
+<!-- Line items table -->
 <table class="concept-table">
   <thead>
     <tr>
       <th>Descripción</th>
-      <th class="right" style="width:120px;">Importe neto</th>
-      <th class="right" style="width:80px;">IVA %</th>
-      <th class="right" style="width:100px;">Cuota IVA</th>
-      <th class="right" style="width:110px;">Total</th>
+      <th class="right" style="width:70px;">Cantidad</th>
+      <th class="right" style="width:110px;">Precio unit.</th>
+      <th class="right" style="width:110px;">Importe</th>
     </tr>
   </thead>
   <tbody>
-    <tr>
-      <td>${esc(invoice.concept)}</td>
-      <td class="right">${fmt(invoice.amountNet)} €</td>
-      <td class="right">${fmt(invoice.vatRate)}%</td>
-      <td class="right">${fmt(vatAmount)} €</td>
-      <td class="right" style="font-weight:700;">${fmt(invoice.amountTotal)} €</td>
-    </tr>
+    ${hasLineItems
+      ? renderLineRows(items)
+      : `<tr>
+          <td>${esc(invoice.concept)}</td>
+          <td class="right">1</td>
+          <td class="right">${fmt(invoice.amountNet)} €</td>
+          <td class="right" style="font-weight:600;">${fmt(invoice.amountNet)} €</td>
+        </tr>`
+    }
   </tbody>
 </table>
 
-<!-- Totals -->
+<!-- Totals box -->
 <div class="totals-box">
+  ${hasLineItems && discountItems.length > 0 ? `
+  <div class="totals-row">
+    <span class="label">Subtotal</span>
+    <span class="amount">${fmt(subtotal)} €</span>
+  </div>
+  <div class="totals-row discount">
+    <span class="label">Descuentos</span>
+    <span class="amount">${fmt(discountTotal)} €</span>
+  </div>` : ''}
   <div class="totals-row">
     <span class="label">Base imponible</span>
-    <span class="amount">${fmt(invoice.amountNet)} €</span>
+    <span class="amount">${fmt(base)} €</span>
   </div>
   <div class="totals-row">
     <span class="label">IVA (${fmt(invoice.vatRate)}%)</span>

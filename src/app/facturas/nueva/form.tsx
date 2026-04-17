@@ -1,9 +1,46 @@
 'use client'
 
-import { useState, useTransition } from 'react'
+import { useState, useTransition, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { createInvoiceAction } from '@/app/actions/invoices'
-import type { InvoiceType } from '@/types'
+import type { InvoiceType, InvoiceLineItem, DiscountMode } from '@/types'
+
+// ---- helpers ----
+
+function newLineId() {
+  return Math.random().toString(36).slice(2)
+}
+
+function emptyLine(): InvoiceLineItem {
+  return { id: newLineId(), type: 'line', description: '', quantity: 1, unitPrice: 0, amount: 0 }
+}
+
+function emptyDiscount(): InvoiceLineItem {
+  return {
+    id: newLineId(),
+    type: 'discount',
+    description: 'Descuento',
+    quantity: 1,
+    unitPrice: 0,
+    amount: 0,
+    discountMode: 'percent',
+    discountValue: 0,
+  }
+}
+
+function fmtNum(n: number) {
+  return n.toLocaleString('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+}
+
+function computeDiscountAmount(item: InvoiceLineItem, subtotal: number): number {
+  if (item.type !== 'discount') return item.amount
+  if (item.discountMode === 'percent') {
+    return -(subtotal * (item.discountValue ?? 0)) / 100
+  }
+  return -(item.discountValue ?? 0)
+}
+
+// ---- types ----
 
 interface DealOption {
   id: string
@@ -14,29 +51,71 @@ interface Props {
   deals: DealOption[]
 }
 
+// ---- component ----
+
 export function NewInvoiceForm({ deals }: Props) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
   const [error, setError] = useState<string | null>(null)
 
-  // Form state
+  // Header fields
   const [type, setType] = useState<InvoiceType>('ordinary')
   const [dealId, setDealId] = useState('')
   const [clientName, setClientName] = useState('')
   const [clientCif, setClientCif] = useState('')
   const [clientAddress, setClientAddress] = useState('')
-  const [concept, setConcept] = useState('')
-  const [amountNet, setAmountNet] = useState('')
   const [vatRate, setVatRate] = useState('21')
   const [issuedAt, setIssuedAt] = useState(() => new Date().toISOString().split('T')[0])
   const [dueAt, setDueAt] = useState('')
   const [rectifiesId, setRectifiesId] = useState('')
 
-  const net = parseFloat(amountNet) || 0
-  const vat = parseFloat(vatRate) || 21
-  const vatAmount = net * (vat / 100)
-  const total = net + vatAmount
+  // Line items
+  const [lines, setLines] = useState<InvoiceLineItem[]>([emptyLine()])
 
+  // ---- computed totals ----
+  const regularLines = lines.filter((l) => l.type === 'line')
+  const subtotal = regularLines.reduce((s, l) => s + l.amount, 0)
+  const discountLines = lines.filter((l) => l.type === 'discount')
+  // recompute discount amounts against current subtotal
+  const discountTotal = discountLines.reduce(
+    (s, l) => s + computeDiscountAmount(l, subtotal),
+    0
+  ) // negative
+  const base = subtotal + discountTotal // base imponible
+  const vat = parseFloat(vatRate) || 21
+  const vatAmount = base * (vat / 100)
+  const total = base + vatAmount
+
+  // ---- line mutators ----
+  const updateLine = useCallback((id: string, patch: Partial<InvoiceLineItem>) => {
+    setLines((prev) =>
+      prev.map((l) => {
+        if (l.id !== id) return l
+        const merged = { ...l, ...patch }
+        if (merged.type === 'line') {
+          merged.amount = merged.quantity * merged.unitPrice
+        }
+        return merged
+      })
+    )
+  }, [])
+
+  function addLine() {
+    setLines((prev) => [...prev, emptyLine()])
+  }
+
+  function addDiscount() {
+    setLines((prev) => [...prev, emptyDiscount()])
+  }
+
+  function removeLine(id: string) {
+    setLines((prev) => {
+      const next = prev.filter((l) => l.id !== id)
+      return next.length === 0 ? [emptyLine()] : next
+    })
+  }
+
+  // ---- deal autocomplete ----
   function handleDealSelect(id: string) {
     setDealId(id)
     if (!id) return
@@ -47,13 +126,28 @@ export function NewInvoiceForm({ deals }: Props) {
     setClientAddress(deal.company.address ?? '')
   }
 
+  // ---- submit ----
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setError(null)
 
     if (!clientName.trim()) return setError('El nombre del cliente es obligatorio.')
-    if (!concept.trim()) return setError('El concepto es obligatorio.')
-    if (!amountNet || isNaN(net) || net <= 0) return setError('El importe neto debe ser mayor que 0.')
+    const filledLines = lines.filter((l) => l.type === 'line' && l.description.trim())
+    if (filledLines.length === 0) return setError('Añade al menos una línea con descripción.')
+    if (base <= 0) return setError('La base imponible debe ser mayor que 0.')
+
+    // Derive concept from first regular line (or "Varios conceptos")
+    const concept =
+      filledLines.length === 1
+        ? filledLines[0].description.trim()
+        : 'Varios conceptos'
+
+    // Finalise discount amounts so persisted values are accurate
+    const finalLines: InvoiceLineItem[] = lines.map((l) =>
+      l.type === 'discount'
+        ? { ...l, amount: computeDiscountAmount(l, subtotal) }
+        : l
+    )
 
     startTransition(async () => {
       const result = await createInvoiceAction({
@@ -62,8 +156,9 @@ export function NewInvoiceForm({ deals }: Props) {
         clientName: clientName.trim(),
         clientCif: clientCif.trim() || null,
         clientAddress: clientAddress.trim() || null,
-        concept: concept.trim(),
-        amountNet: net,
+        concept,
+        lineItems: finalLines,
+        amountNet: base,
         vatRate: vat,
         amountTotal: total,
         issuedAt: issuedAt || null,
@@ -101,7 +196,6 @@ export function NewInvoiceForm({ deals }: Props) {
             </button>
           ))}
         </div>
-
         {type === 'rectificativa' && (
           <div>
             <label className="block text-xs font-medium text-zinc-700 mb-1">
@@ -121,12 +215,9 @@ export function NewInvoiceForm({ deals }: Props) {
       {/* Cliente */}
       <div className="bg-white border border-zinc-200 rounded-xl p-5 space-y-4">
         <h2 className="text-xs font-semibold text-zinc-500 uppercase tracking-widest">Datos del cliente</h2>
-
         {deals.length > 0 && (
           <div>
-            <label className="block text-xs font-medium text-zinc-700 mb-1">
-              Autocompletar desde deal
-            </label>
+            <label className="block text-xs font-medium text-zinc-700 mb-1">Autocompletar desde deal</label>
             <select
               value={dealId}
               onChange={(e) => handleDealSelect(e.target.value)}
@@ -139,7 +230,6 @@ export function NewInvoiceForm({ deals }: Props) {
             </select>
           </div>
         )}
-
         <div>
           <label className="block text-xs font-medium text-zinc-700 mb-1">
             Nombre / Razón social <span className="text-red-500">*</span>
@@ -153,7 +243,6 @@ export function NewInvoiceForm({ deals }: Props) {
             className="w-full border border-zinc-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-zinc-300"
           />
         </div>
-
         <div className="grid grid-cols-2 gap-3">
           <div>
             <label className="block text-xs font-medium text-zinc-700 mb-1">CIF / NIF</label>
@@ -178,42 +267,72 @@ export function NewInvoiceForm({ deals }: Props) {
         </div>
       </div>
 
-      {/* Concepto e importes */}
-      <div className="bg-white border border-zinc-200 rounded-xl p-5 space-y-4">
-        <h2 className="text-xs font-semibold text-zinc-500 uppercase tracking-widest">Concepto e importes</h2>
-
-        <div>
-          <label className="block text-xs font-medium text-zinc-700 mb-1">
-            Concepto <span className="text-red-500">*</span>
-          </label>
-          <input
-            type="text"
-            required
-            value={concept}
-            onChange={(e) => setConcept(e.target.value)}
-            placeholder="Servicios de software mensual — Enero 2026"
-            className="w-full border border-zinc-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-zinc-300"
-          />
+      {/* Line items */}
+      <div className="bg-white border border-zinc-200 rounded-xl overflow-hidden">
+        <div className="px-5 py-3 border-b border-zinc-100 flex items-center justify-between">
+          <h2 className="text-xs font-semibold text-zinc-500 uppercase tracking-widest">Líneas</h2>
         </div>
 
-        <div className="grid grid-cols-3 gap-3">
-          <div>
-            <label className="block text-xs font-medium text-zinc-700 mb-1">
-              Importe neto (€) <span className="text-red-500">*</span>
-            </label>
-            <input
-              type="number"
-              required
-              min="0.01"
-              step="0.01"
-              value={amountNet}
-              onChange={(e) => setAmountNet(e.target.value)}
-              placeholder="0.00"
-              className="w-full border border-zinc-200 rounded-lg px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-zinc-300"
-            />
-          </div>
-          <div>
-            <label className="block text-xs font-medium text-zinc-700 mb-1">IVA (%)</label>
+        {/* Column headers */}
+        <div className="grid items-center gap-2 px-5 py-2 bg-zinc-50 border-b border-zinc-100 text-[10px] font-semibold text-zinc-400 uppercase tracking-widest"
+          style={{ gridTemplateColumns: '1fr 80px 110px 100px 28px' }}>
+          <span>Descripción</span>
+          <span className="text-right">Cantidad</span>
+          <span className="text-right">Precio unit.</span>
+          <span className="text-right">Importe</span>
+          <span />
+        </div>
+
+        {/* Lines */}
+        <div className="divide-y divide-zinc-50">
+          {lines.map((line) =>
+            line.type === 'line' ? (
+              <RegularLineRow
+                key={line.id}
+                line={line}
+                onChange={updateLine}
+                onRemove={removeLine}
+                canRemove={lines.length > 1}
+              />
+            ) : (
+              <DiscountLineRow
+                key={line.id}
+                line={line}
+                subtotal={subtotal}
+                onChange={updateLine}
+                onRemove={removeLine}
+              />
+            )
+          )}
+        </div>
+
+        {/* Add buttons */}
+        <div className="px-5 py-3 border-t border-zinc-100 flex items-center gap-3">
+          <button
+            type="button"
+            onClick={addLine}
+            className="text-xs text-zinc-500 hover:text-zinc-900 border border-zinc-200 hover:border-zinc-400 px-3 py-1.5 rounded-lg transition-colors"
+          >
+            ＋ Añadir línea
+          </button>
+          <button
+            type="button"
+            onClick={addDiscount}
+            className="text-xs text-red-500 hover:text-red-700 border border-red-200 hover:border-red-400 px-3 py-1.5 rounded-lg transition-colors"
+          >
+            ＋ Añadir descuento
+          </button>
+        </div>
+
+        {/* Totals */}
+        <div className="border-t border-zinc-200 px-5 py-4 space-y-1.5">
+          <TotalsRow label="Subtotal" value={fmtNum(subtotal)} />
+          {discountTotal < 0 && (
+            <TotalsRow label="Descuentos" value={fmtNum(discountTotal)} red />
+          )}
+          <TotalsRow label="Base imponible" value={fmtNum(base)} />
+          <div className="flex items-center gap-2 justify-end">
+            <span className="text-xs text-zinc-500">IVA</span>
             <input
               type="number"
               min="0"
@@ -221,33 +340,16 @@ export function NewInvoiceForm({ deals }: Props) {
               step="0.1"
               value={vatRate}
               onChange={(e) => setVatRate(e.target.value)}
-              className="w-full border border-zinc-200 rounded-lg px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-zinc-300"
+              className="w-16 border border-zinc-200 rounded px-2 py-1 text-xs font-mono text-right focus:outline-none focus:ring-1 focus:ring-zinc-300"
             />
+            <span className="text-xs text-zinc-400">%</span>
+            <span className="text-xs font-mono w-28 text-right text-zinc-700">{fmtNum(vatAmount)} €</span>
           </div>
-          <div>
-            <label className="block text-xs font-medium text-zinc-700 mb-1">Total (€)</label>
-            <div className="w-full border border-zinc-100 bg-zinc-50 rounded-lg px-3 py-2 text-sm font-mono font-semibold text-zinc-900">
-              {total.toLocaleString('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-            </div>
+          <div className="flex items-center justify-between pt-2 border-t border-zinc-200">
+            <span className="text-sm font-semibold text-zinc-900">Total factura</span>
+            <span className="text-lg font-mono font-semibold text-zinc-900">{fmtNum(total)} €</span>
           </div>
         </div>
-
-        {net > 0 && (
-          <div className="bg-zinc-50 rounded-lg px-4 py-3 text-xs text-zinc-600 space-y-1">
-            <div className="flex justify-between">
-              <span>Base imponible</span>
-              <span className="font-mono">{net.toLocaleString('es-ES', { minimumFractionDigits: 2 })} €</span>
-            </div>
-            <div className="flex justify-between">
-              <span>IVA ({vat}%)</span>
-              <span className="font-mono">{vatAmount.toLocaleString('es-ES', { minimumFractionDigits: 2 })} €</span>
-            </div>
-            <div className="flex justify-between font-semibold text-zinc-900 border-t border-zinc-200 pt-1 mt-1">
-              <span>Total factura</span>
-              <span className="font-mono">{total.toLocaleString('es-ES', { minimumFractionDigits: 2 })} €</span>
-            </div>
-          </div>
-        )}
       </div>
 
       {/* Fechas */}
@@ -293,5 +395,166 @@ export function NewInvoiceForm({ deals }: Props) {
         </button>
       </div>
     </form>
+  )
+}
+
+// ---- Sub-components ----
+
+function RegularLineRow({
+  line,
+  onChange,
+  onRemove,
+  canRemove,
+}: {
+  line: InvoiceLineItem
+  onChange: (id: string, patch: Partial<InvoiceLineItem>) => void
+  onRemove: (id: string) => void
+  canRemove: boolean
+}) {
+  return (
+    <div
+      className="grid items-center gap-2 px-5 py-2.5"
+      style={{ gridTemplateColumns: '1fr 80px 110px 100px 28px' }}
+    >
+      <input
+        type="text"
+        value={line.description}
+        onChange={(e) => onChange(line.id, { description: e.target.value })}
+        placeholder="Descripción del servicio"
+        className="border border-zinc-200 rounded px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-zinc-300 w-full"
+      />
+      <input
+        type="number"
+        min="0"
+        step="any"
+        value={line.quantity}
+        onChange={(e) => onChange(line.id, { quantity: parseFloat(e.target.value) || 0 })}
+        className="border border-zinc-200 rounded px-2 py-1 text-xs font-mono text-right focus:outline-none focus:ring-1 focus:ring-zinc-300 w-full"
+      />
+      <input
+        type="number"
+        min="0"
+        step="0.01"
+        value={line.unitPrice}
+        onChange={(e) => onChange(line.id, { unitPrice: parseFloat(e.target.value) || 0 })}
+        className="border border-zinc-200 rounded px-2 py-1 text-xs font-mono text-right focus:outline-none focus:ring-1 focus:ring-zinc-300 w-full"
+      />
+      <div className="text-xs font-mono text-right text-zinc-700 pr-1">
+        {line.amount.toLocaleString('es-ES', { minimumFractionDigits: 2 })} €
+      </div>
+      {canRemove ? (
+        <button
+          type="button"
+          onClick={() => onRemove(line.id)}
+          className="text-zinc-300 hover:text-red-500 transition-colors text-base leading-none"
+          title="Eliminar línea"
+        >
+          ×
+        </button>
+      ) : (
+        <span />
+      )}
+    </div>
+  )
+}
+
+function DiscountLineRow({
+  line,
+  subtotal,
+  onChange,
+  onRemove,
+}: {
+  line: InvoiceLineItem
+  subtotal: number
+  onChange: (id: string, patch: Partial<InvoiceLineItem>) => void
+  onRemove: (id: string) => void
+}) {
+  const discountAmount = computeDiscountAmount(line, subtotal)
+
+  function handleModeChange(mode: DiscountMode) {
+    onChange(line.id, { discountMode: mode, discountValue: 0, amount: 0 })
+  }
+
+  function handleValueChange(val: number) {
+    const amount =
+      line.discountMode === 'percent' ? -(subtotal * val) / 100 : -val
+    onChange(line.id, { discountValue: val, amount })
+  }
+
+  return (
+    <div className="grid items-center gap-2 px-5 py-2.5 bg-red-50/30" style={{ gridTemplateColumns: '1fr 80px 110px 100px 28px' }}>
+      {/* Description + mode toggle */}
+      <div className="flex items-center gap-2">
+        <input
+          type="text"
+          value={line.description}
+          onChange={(e) => onChange(line.id, { description: e.target.value })}
+          placeholder="Descuento"
+          className="border border-red-200 rounded px-2 py-1 text-xs text-red-700 focus:outline-none focus:ring-1 focus:ring-red-300 w-full"
+        />
+        <div className="flex rounded overflow-hidden border border-red-200 shrink-0">
+          <button
+            type="button"
+            onClick={() => handleModeChange('percent')}
+            className={`px-2 py-1 text-[10px] font-medium transition-colors ${
+              line.discountMode === 'percent'
+                ? 'bg-red-100 text-red-700'
+                : 'bg-white text-zinc-400 hover:text-red-500'
+            }`}
+          >
+            %
+          </button>
+          <button
+            type="button"
+            onClick={() => handleModeChange('amount')}
+            className={`px-2 py-1 text-[10px] font-medium border-l border-red-200 transition-colors ${
+              line.discountMode === 'amount'
+                ? 'bg-red-100 text-red-700'
+                : 'bg-white text-zinc-400 hover:text-red-500'
+            }`}
+          >
+            €
+          </button>
+        </div>
+      </div>
+
+      {/* Qty (disabled for discounts) */}
+      <div />
+
+      {/* Discount value */}
+      <input
+        type="number"
+        min="0"
+        step="0.01"
+        value={line.discountValue ?? 0}
+        onChange={(e) => handleValueChange(parseFloat(e.target.value) || 0)}
+        className="border border-red-200 rounded px-2 py-1 text-xs font-mono text-right text-red-600 focus:outline-none focus:ring-1 focus:ring-red-300 w-full"
+      />
+
+      {/* Computed amount */}
+      <div className="text-xs font-mono text-right text-red-600 font-semibold pr-1">
+        {discountAmount.toLocaleString('es-ES', { minimumFractionDigits: 2 })} €
+      </div>
+
+      <button
+        type="button"
+        onClick={() => onRemove(line.id)}
+        className="text-red-300 hover:text-red-600 transition-colors text-base leading-none"
+        title="Eliminar descuento"
+      >
+        ×
+      </button>
+    </div>
+  )
+}
+
+function TotalsRow({ label, value, red }: { label: string; value: string; red?: boolean }) {
+  return (
+    <div className="flex items-center justify-between">
+      <span className={`text-xs ${red ? 'text-red-500' : 'text-zinc-500'}`}>{label}</span>
+      <span className={`text-xs font-mono ${red ? 'text-red-600 font-semibold' : 'text-zinc-700'}`}>
+        {value} €
+      </span>
+    </div>
   )
 }

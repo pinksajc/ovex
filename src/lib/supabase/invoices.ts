@@ -4,7 +4,7 @@
 // =========================================
 
 import { getSupabaseClient } from './client'
-import type { Invoice, CreateInvoiceInput, InvoiceStatus, InvoiceType } from '@/types'
+import type { Invoice, CreateInvoiceInput, InvoiceStatus, InvoiceType, InvoiceLineItem } from '@/types'
 
 // ---- Row → Invoice ----
 
@@ -17,6 +17,7 @@ interface InvoiceRow {
   client_cif: string | null
   client_address: string | null
   concept: string
+  line_items: unknown
   amount_net: number
   vat_rate: number
   amount_total: number
@@ -37,6 +38,7 @@ function rowToInvoice(row: InvoiceRow): Invoice {
     clientCif: row.client_cif,
     clientAddress: row.client_address,
     concept: row.concept,
+    lineItems: Array.isArray(row.line_items) ? (row.line_items as InvoiceLineItem[]) : [],
     amountNet: Number(row.amount_net),
     vatRate: Number(row.vat_rate),
     amountTotal: Number(row.amount_total),
@@ -60,7 +62,6 @@ async function generateInvoiceNumber(type: InvoiceType): Promise<string> {
   const year = new Date().getFullYear()
   const prefix = type === 'rectificativa' ? 'R' : 'F'
 
-  // Count existing invoices of this type for this year
   const { count } = await invoicesTable(db)
     .select('id', { count: 'exact', head: true })
     .like('number', `${prefix}-${year}-%`)
@@ -112,6 +113,7 @@ export async function createInvoice(input: CreateInvoiceInput): Promise<Invoice>
       client_cif: input.clientCif ?? null,
       client_address: input.clientAddress ?? null,
       concept: input.concept,
+      line_items: JSON.stringify(input.lineItems),
       amount_net: input.amountNet,
       vat_rate: input.vatRate,
       amount_total: input.amountTotal,
