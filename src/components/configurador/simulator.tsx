@@ -24,39 +24,77 @@ interface HardwareItemState {
 
 type HardwareState = Record<HardwareId, HardwareItemState>
 
+// Hardware items where 1 unit per location is always included (Platomico bears cost).
+// state.quantity for these IDs = EXTRA units beyond the auto-included ones.
+const AUTO_INCLUDED_HARDWARE: ReadonlySet<HardwareId> = new Set(['bouncepad_kiosk', 'counter_stand'])
+
+// Modes available for extra units (excluded: 'included', which is only for auto-included)
+const EXTRA_MODES: HardwareMode[] = ['sold', 'financed', 'rented']
+
 function initHardwareState(locations: number, saved?: HardwareLineItem[]): HardwareState {
-  void locations // unused when no saved config — all start at zero
+  void locations
   const defaults: HardwareState = {
     ipad: { quantity: 0, mode: 'sold', financeMonths: 12 },
     tablet_lenovo_m11: { quantity: 0, mode: 'sold', financeMonths: 12 },
-    bouncepad_kiosk: { quantity: 0, mode: 'sold', financeMonths: 12 },
-    counter_stand: { quantity: 0, mode: 'sold', financeMonths: 12 },
+    bouncepad_kiosk: { quantity: 0, mode: 'sold', financeMonths: 12 }, // extra qty only
+    counter_stand: { quantity: 0, mode: 'sold', financeMonths: 12 },  // extra qty only
   }
   if (!saved || saved.length === 0) return defaults
   const state = { ...defaults }
-  for (const item of saved) {
-    if (item.hardwareId in state) {
-      state[item.hardwareId] = {
-        quantity: item.quantity,
-        mode: item.mode,
-        financeMonths: item.financeMonths ?? 12,
+  for (const id of HARDWARE_ORDER as HardwareId[]) {
+    if (AUTO_INCLUDED_HARDWARE.has(id)) {
+      // Only restore the non-included (extra) item; the included portion is auto-computed
+      const extra = saved.find((s) => s.hardwareId === id && s.mode !== 'included')
+      if (extra) {
+        state[id] = { quantity: extra.quantity, mode: extra.mode, financeMonths: extra.financeMonths ?? 12 }
+      }
+    } else {
+      const item = saved.find((s) => s.hardwareId === id)
+      if (item) {
+        state[id] = { quantity: item.quantity, mode: item.mode, financeMonths: item.financeMonths ?? 12 }
       }
     }
   }
   return state
 }
 
-function hardwareStateToLineItems(hw: HardwareState): HardwareLineItem[] {
-  return HARDWARE_ORDER
-    .filter((id) => hw[id].quantity > 0)
-    .map((id) => ({
-      hardwareId: id,
-      quantity: hw[id].quantity,
-      mode: hw[id].mode,
-      unitCost: HARDWARE[id].unitCost,
-      unitPrice: HARDWARE[id].unitPrice,
-      financeMonths: hw[id].mode === 'financed' ? hw[id].financeMonths : undefined,
-    }))
+function hardwareStateToLineItems(hw: HardwareState, locations: number): HardwareLineItem[] {
+  const items: HardwareLineItem[] = []
+  for (const id of HARDWARE_ORDER as HardwareId[]) {
+    const state = hw[id]
+    if (AUTO_INCLUDED_HARDWARE.has(id)) {
+      // Always emit included portion (locations units, mode=included)
+      items.push({
+        hardwareId: id,
+        quantity: locations,
+        mode: 'included',
+        unitCost: HARDWARE[id].unitCost,
+        unitPrice: HARDWARE[id].unitPrice,
+        financeMonths: undefined,
+      })
+      // Emit extra units if any
+      if (state.quantity > 0) {
+        items.push({
+          hardwareId: id,
+          quantity: state.quantity,
+          mode: state.mode,
+          unitCost: HARDWARE[id].unitCost,
+          unitPrice: HARDWARE[id].unitPrice,
+          financeMonths: state.mode === 'financed' ? state.financeMonths : undefined,
+        })
+      }
+    } else if (state.quantity > 0) {
+      items.push({
+        hardwareId: id,
+        quantity: state.quantity,
+        mode: state.mode,
+        unitCost: HARDWARE[id].unitCost,
+        unitPrice: HARDWARE[id].unitPrice,
+        financeMonths: state.mode === 'financed' ? state.financeMonths : undefined,
+      })
+    }
+  }
+  return items
 }
 
 function serializeSimState(
@@ -190,7 +228,7 @@ export function Simulator({ deal, initialConfig, loadedConfigId }: SimulatorProp
   const activePlan = planOverride ?? suggestedPlan
   const planChanged = planOverride !== null && planOverride !== suggestedPlan
 
-  const hardwareLineItems = useMemo(() => hardwareStateToLineItems(hardware), [hardware])
+  const hardwareLineItems = useMemo(() => hardwareStateToLineItems(hardware, locations), [hardware, locations])
 
   const economics: DealEconomics = useMemo(
     () =>
@@ -472,22 +510,21 @@ export function Simulator({ deal, initialConfig, loadedConfigId }: SimulatorProp
           {/* ADD-ONS subsection */}
           <p className="text-[10px] font-semibold text-zinc-400 uppercase tracking-widest mb-3">Add-ons</p>
           <div className="grid grid-cols-2 gap-2.5">
-            {ADDON_ORDER.map((id) => {
+            {ADDON_ORDER.filter((id) => id !== 'kds').map((id) => {
               const addon = ADDONS[id]
               const active = activeAddons.has(id)
-              const isKds = id === 'kds'
               const isKiosk = id === 'kiosk'
-              const venueCount = isKds ? kdsVenues : isKiosk ? kioskVenues : null
-              const setVenueCount = isKds ? setKdsVenues : isKiosk ? setKioskVenues : null
-              const venueLabel = isKds ? 'Locales con KDS' : isKiosk ? 'Locales con Kiosk' : null
+              const venueCount = isKiosk ? kioskVenues : null
+              const setVenueCount = isKiosk ? setKioskVenues : null
+              const venueLabel = isKiosk ? 'Locales con Kiosk' : null
 
               const price =
                 id === 'datafono'
                   ? `${addon.feePercent}% GMV`
                   : addon.perConsumption
                   ? 'por consumo'
-                  : (isKds || isKiosk) && active && venueCount != null
-                  ? `19€ × ${venueCount} local${venueCount > 1 ? 'es' : ''} con ${isKds ? 'KDS' : 'Kiosk'}`
+                  : isKiosk && active && venueCount != null
+                  ? `${addon.priceMonthly ?? 19}€ × ${venueCount} local${venueCount > 1 ? 'es' : ''} con Kiosk`
                   : addon.perLocation
                   ? `${addon.priceMonthly}€ × ${locations} local${locations > 1 ? 'es' : ''}`
                   : `${addon.priceMonthly}€/mes`
@@ -495,7 +532,7 @@ export function Simulator({ deal, initialConfig, loadedConfigId }: SimulatorProp
               const monthlyImpact: number =
                 id === 'datafono'
                   ? economics.datafonoFeeMonthly
-                  : (isKds || isKiosk) && venueCount != null
+                  : isKiosk && venueCount != null
                   ? (addon.priceMonthly ?? 19) * venueCount
                   : addon.perLocation && addon.priceMonthly != null
                   ? addon.priceMonthly * locations
@@ -531,7 +568,7 @@ export function Simulator({ deal, initialConfig, loadedConfigId }: SimulatorProp
                         +{formatCurrency(monthlyImpact)}/mes
                       </p>
                     )}
-                    {active && (isKds || isKiosk) && venueCount != null && setVenueCount && venueLabel && (
+                    {active && isKiosk && venueCount != null && setVenueCount && venueLabel && (
                       <div className="mt-2" onClick={(e) => e.stopPropagation()}>
                         <label className="text-xs font-medium text-zinc-600 block mb-1">{venueLabel}</label>
                         <div className="flex items-center border border-zinc-200 rounded-lg overflow-hidden focus-within:ring-2 focus-within:ring-zinc-900 w-24">
@@ -645,8 +682,130 @@ export function Simulator({ deal, initialConfig, loadedConfigId }: SimulatorProp
               const item = HARDWARE[id]
               const state = hardware[id]
               const rentalUnitPrice = item.rentalMonthlyPrice ?? RENTAL_MONTHLY_PRICE
-              const unitDisplayPrice = state.mode === 'rented' ? rentalUnitPrice : item.unitPrice
-              const lineTotal = unitDisplayPrice * state.quantity
+              const isAutoIncluded = AUTO_INCLUDED_HARDWARE.has(id)
+
+              if (isAutoIncluded) {
+                // Auto-included: locations units always included + optional extras
+                const extraQty = state.quantity
+                const extraLineTotal = state.mode === 'rented'
+                  ? rentalUnitPrice * extraQty
+                  : item.unitPrice * extraQty
+
+                return (
+                  <div key={id} className="border border-zinc-200 rounded-xl p-4 bg-white">
+                    <div className="flex items-start justify-between gap-4 mb-3">
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium text-zinc-900">{item.label}</p>
+                        <p className="text-xs text-zinc-500 mt-0.5">{item.description}</p>
+                      </div>
+                      <span className="text-xs font-mono text-emerald-600 font-semibold shrink-0 mt-0.5">Incluido</span>
+                    </div>
+
+                    {/* Included row */}
+                    <div className="flex items-center justify-between py-2 px-3 bg-emerald-50 rounded-lg border border-emerald-100 mb-3">
+                      <span className="text-xs text-emerald-700">
+                        {locations} ud. incluida{locations > 1 ? 's' : ''} · 1 por local
+                      </span>
+                      <span className="text-xs font-mono text-emerald-600 font-semibold">Incluido en el plan</span>
+                    </div>
+
+                    {/* Extra units */}
+                    <div>
+                      <p className="text-[10px] font-semibold text-zinc-400 uppercase tracking-widest mb-2">
+                        + Adicionales
+                      </p>
+                      <div className="flex items-center gap-3">
+                        {/* Qty stepper */}
+                        <div className="flex items-center border border-zinc-200 rounded-lg overflow-hidden">
+                          <button
+                            onClick={() => setHardwareQty(id, extraQty - 1)}
+                            disabled={extraQty === 0}
+                            className="w-8 h-8 flex items-center justify-center text-zinc-500 hover:bg-zinc-100 disabled:opacity-30 disabled:cursor-not-allowed text-sm font-medium"
+                          >
+                            −
+                          </button>
+                          <span className="w-8 text-center text-sm font-mono text-zinc-900">{extraQty}</span>
+                          <button
+                            onClick={() => setHardwareQty(id, extraQty + 1)}
+                            className="w-8 h-8 flex items-center justify-center text-zinc-500 hover:bg-zinc-100 text-sm font-medium"
+                          >
+                            +
+                          </button>
+                        </div>
+
+                        {/* Mode selector for extras */}
+                        <select
+                          value={state.mode}
+                          onChange={(e) => setHardwareMode(id, e.target.value as HardwareMode)}
+                          disabled={extraQty === 0}
+                          className="text-xs border border-zinc-200 rounded-lg px-2 py-1.5 text-zinc-700 bg-white disabled:opacity-40 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-zinc-900"
+                        >
+                          {EXTRA_MODES.map((m) => (
+                            <option key={m} value={m}>{HARDWARE_MODE_LABELS[m]}</option>
+                          ))}
+                        </select>
+
+                        {extraQty > 0 && (
+                          <span className="text-xs font-mono text-zinc-500">
+                            {state.mode === 'rented'
+                              ? `${formatCurrency(rentalUnitPrice)}/mes`
+                              : `${formatCurrency(item.unitPrice)}/ud.`}
+                          </span>
+                        )}
+                      </div>
+
+                      {/* Finance months for extras */}
+                      {state.mode === 'financed' && extraQty > 0 && (
+                        <div className="mt-2 flex items-center gap-2">
+                          <span className="text-xs text-zinc-500">Plazo:</span>
+                          <div className="flex items-center border border-zinc-200 rounded-lg overflow-hidden">
+                            <button
+                              onClick={() => setHardwareFinanceMonths(id, state.financeMonths - 1)}
+                              disabled={state.financeMonths <= 1}
+                              className="w-7 h-7 flex items-center justify-center text-zinc-500 hover:bg-zinc-100 disabled:opacity-30 text-sm"
+                            >
+                              −
+                            </button>
+                            <span className="px-2 text-xs font-mono text-zinc-900">{state.financeMonths} meses</span>
+                            <button
+                              onClick={() => setHardwareFinanceMonths(id, state.financeMonths + 1)}
+                              className="w-7 h-7 flex items-center justify-center text-zinc-500 hover:bg-zinc-100 text-sm"
+                            >
+                              +
+                            </button>
+                          </div>
+                          <span className="text-xs font-mono text-zinc-500">
+                            = {formatCurrency((item.unitPrice * extraQty) / state.financeMonths)}/mes
+                          </span>
+                        </div>
+                      )}
+
+                      {/* Extra line total */}
+                      {extraQty > 0 && (
+                        <div className="mt-2 flex items-center justify-between">
+                          <span className="text-xs text-zinc-400">
+                            {extraQty} adicional{extraQty > 1 ? 'es' : ''} ·{' '}
+                            {state.mode === 'sold' ? 'cliente paga upfront' : HARDWARE_MODE_LABELS[state.mode]}
+                          </span>
+                          <span className={`text-xs font-mono font-semibold ${
+                            state.mode === 'rented' ? 'text-blue-600' :
+                            state.mode === 'financed' ? 'text-amber-600' : 'text-zinc-700'
+                          }`}>
+                            {state.mode === 'financed'
+                              ? `${formatCurrency(extraLineTotal / state.financeMonths)}/mes`
+                              : state.mode === 'rented'
+                              ? `${formatCurrency(extraLineTotal)}/mes`
+                              : formatCurrency(extraLineTotal)}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )
+              }
+
+              // Standard hardware item
+              const lineTotal = (state.mode === 'rented' ? rentalUnitPrice : item.unitPrice) * state.quantity
 
               return (
                 <div
@@ -663,15 +822,12 @@ export function Simulator({ deal, initialConfig, loadedConfigId }: SimulatorProp
                       <p className="text-xs font-mono text-zinc-400 mt-0.5">
                         {state.mode === 'rented'
                           ? `${formatCurrency(rentalUnitPrice)}/mes`
-                          : state.mode === 'included'
-                          ? 'Incluido en el plan'
                           : `${formatCurrency(item.unitPrice)}/ud.`}
                       </p>
                     </div>
 
                     {/* Right: qty stepper + mode selector */}
                     <div className="flex items-center gap-3 shrink-0">
-                      {/* Qty stepper */}
                       <div className="flex items-center border border-zinc-200 rounded-lg overflow-hidden">
                         <button
                           onClick={() => setHardwareQty(id, state.quantity - 1)}
@@ -691,7 +847,6 @@ export function Simulator({ deal, initialConfig, loadedConfigId }: SimulatorProp
                         </button>
                       </div>
 
-                      {/* Mode selector */}
                       <select
                         value={state.mode}
                         onChange={(e) => setHardwareMode(id, e.target.value as HardwareMode)}
@@ -705,7 +860,7 @@ export function Simulator({ deal, initialConfig, loadedConfigId }: SimulatorProp
                     </div>
                   </div>
 
-                  {/* Finance months row (only when financed + qty > 0) */}
+                  {/* Finance months row */}
                   {state.mode === 'financed' && state.quantity > 0 && (
                     <div className="mt-3 flex items-center gap-2">
                       <span className="text-xs text-zinc-500">Plazo:</span>
@@ -733,14 +888,12 @@ export function Simulator({ deal, initialConfig, loadedConfigId }: SimulatorProp
                     </div>
                   )}
 
-                  {/* Line total (when qty > 0) */}
+                  {/* Line total */}
                   {state.quantity > 0 && (
                     <div className="mt-3 flex items-center justify-between">
                       <span className="text-xs text-zinc-400">
                         {state.mode === 'rented'
                           ? `${state.quantity} × ${formatCurrency(rentalUnitPrice)}/mes · mensualidad`
-                          : state.mode === 'included'
-                          ? `${state.quantity} ud. · Incluido en el plan`
                           : <>
                               {state.quantity} × {formatCurrency(item.unitPrice)}
                               {state.mode === 'sold' && ' · cliente paga upfront'}
@@ -749,19 +902,15 @@ export function Simulator({ deal, initialConfig, loadedConfigId }: SimulatorProp
                         }
                       </span>
                       <span className={`text-xs font-mono font-semibold ${
-                        state.mode === 'included' ? 'text-emerald-600' :
                         state.mode === 'rented' ? 'text-blue-600' :
                         state.mode === 'financed' ? 'text-amber-600' :
                         'text-zinc-700'
                       }`}>
-                        {state.mode === 'included'
-                          ? 'Incluido'
-                          : state.mode === 'financed'
+                        {state.mode === 'financed'
                           ? `${formatCurrency(lineTotal / state.financeMonths)}/mes`
                           : state.mode === 'rented'
                           ? `${formatCurrency(lineTotal)}/mes`
-                          : formatCurrency(lineTotal)
-                        }
+                          : formatCurrency(lineTotal)}
                       </span>
                     </div>
                   )}
