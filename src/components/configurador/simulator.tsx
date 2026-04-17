@@ -25,11 +25,12 @@ interface HardwareItemState {
 type HardwareState = Record<HardwareId, HardwareItemState>
 
 function initHardwareState(locations: number, saved?: HardwareLineItem[]): HardwareState {
+  void locations // unused when no saved config — all start at zero
   const defaults: HardwareState = {
-    ipad: { quantity: locations, mode: 'sold', financeMonths: 12 },
+    ipad: { quantity: 0, mode: 'sold', financeMonths: 12 },
     tablet_lenovo_m11: { quantity: 0, mode: 'sold', financeMonths: 12 },
     bouncepad_kiosk: { quantity: 0, mode: 'sold', financeMonths: 12 },
-    counter_stand: { quantity: 1, mode: 'included', financeMonths: 12 },
+    counter_stand: { quantity: 0, mode: 'sold', financeMonths: 12 },
   }
   if (!saved || saved.length === 0) return defaults
   const state = { ...defaults }
@@ -189,13 +190,6 @@ export function Simulator({ deal, initialConfig, loadedConfigId }: SimulatorProp
   const activePlan = planOverride ?? suggestedPlan
   const planChanged = planOverride !== null && planOverride !== suggestedPlan
 
-  // Auto-set Counter Stand to qty=1, mode=included on mount and whenever plan changes
-  useEffect(() => {
-    setHardware((prev) => ({
-      ...prev,
-      counter_stand: { ...prev.counter_stand, quantity: 1, mode: 'included' },
-    }))
-  }, [activePlan])
   const hardwareLineItems = useMemo(() => hardwareStateToLineItems(hardware), [hardware])
 
   const economics: DealEconomics = useMemo(
