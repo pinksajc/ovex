@@ -24,12 +24,31 @@ interface HardwareItemState {
 
 type HardwareState = Record<HardwareId, HardwareItemState>
 
-// Hardware items where 1 unit per location is always included (Platomico bears cost).
+// Hardware items that have an auto-included portion based on plan.
 // state.quantity for these IDs = EXTRA units beyond the auto-included ones.
 const AUTO_INCLUDED_HARDWARE: ReadonlySet<HardwareId> = new Set(['bouncepad_kiosk', 'counter_stand'])
 
-// Modes available for extra units (excluded: 'included', which is only for auto-included)
+// In Starter, only 1 unit total is included (user picks which item).
+type StarterIncluded = 'bouncepad_kiosk' | 'counter_stand'
+
+// Modes available for extra units ('included' is only for auto-included rows)
 const EXTRA_MODES: HardwareMode[] = ['sold', 'financed', 'rented']
+
+/**
+ * Returns how many units of `id` are auto-included given the plan and locations.
+ * - starter: 1 total for the chosen item, 0 for the other
+ * - growth/pro: locations units for each
+ */
+function includedQty(
+  id: HardwareId,
+  plan: PlanTier,
+  locations: number,
+  starterIncluded: StarterIncluded
+): number {
+  if (!AUTO_INCLUDED_HARDWARE.has(id)) return 0
+  if (plan === 'starter') return id === starterIncluded ? 1 : 0
+  return locations // growth / pro
+}
 
 function initHardwareState(locations: number, saved?: HardwareLineItem[]): HardwareState {
   void locations
@@ -43,7 +62,6 @@ function initHardwareState(locations: number, saved?: HardwareLineItem[]): Hardw
   const state = { ...defaults }
   for (const id of HARDWARE_ORDER as HardwareId[]) {
     if (AUTO_INCLUDED_HARDWARE.has(id)) {
-      // Only restore the non-included (extra) item; the included portion is auto-computed
       const extra = saved.find((s) => s.hardwareId === id && s.mode !== 'included')
       if (extra) {
         state[id] = { quantity: extra.quantity, mode: extra.mode, financeMonths: extra.financeMonths ?? 12 }
@@ -58,21 +76,35 @@ function initHardwareState(locations: number, saved?: HardwareLineItem[]): Hardw
   return state
 }
 
-function hardwareStateToLineItems(hw: HardwareState, locations: number): HardwareLineItem[] {
+function initStarterIncluded(saved?: HardwareLineItem[]): StarterIncluded {
+  // If saved config had a counter_stand included row, that was the starter choice
+  if (saved?.find((s) => s.hardwareId === 'counter_stand' && s.mode === 'included')) {
+    return 'counter_stand'
+  }
+  return 'bouncepad_kiosk'
+}
+
+function hardwareStateToLineItems(
+  hw: HardwareState,
+  locations: number,
+  plan: PlanTier,
+  starterIncluded: StarterIncluded
+): HardwareLineItem[] {
   const items: HardwareLineItem[] = []
   for (const id of HARDWARE_ORDER as HardwareId[]) {
     const state = hw[id]
     if (AUTO_INCLUDED_HARDWARE.has(id)) {
-      // Always emit included portion (locations units, mode=included)
-      items.push({
-        hardwareId: id,
-        quantity: locations,
-        mode: 'included',
-        unitCost: HARDWARE[id].unitCost,
-        unitPrice: HARDWARE[id].unitPrice,
-        financeMonths: undefined,
-      })
-      // Emit extra units if any
+      const qty = includedQty(id, plan, locations, starterIncluded)
+      if (qty > 0) {
+        items.push({
+          hardwareId: id,
+          quantity: qty,
+          mode: 'included',
+          unitCost: HARDWARE[id].unitCost,
+          unitPrice: HARDWARE[id].unitPrice,
+          financeMonths: undefined,
+        })
+      }
       if (state.quantity > 0) {
         items.push({
           hardwareId: id,
@@ -110,7 +142,8 @@ function serializeSimState(
   renVenues: number,
   kdsVenues: number,
   kioskVenues: number,
-  discountPercent: number
+  discountPercent: number,
+  starterIncluded: StarterIncluded
 ): string {
   return JSON.stringify({
     dailyOrders,
@@ -126,6 +159,7 @@ function serializeSimState(
     kdsVenues,
     kioskVenues,
     discountPercent,
+    starterIncluded,
   })
 }
 
@@ -162,10 +196,11 @@ export function Simulator({ deal, initialConfig, loadedConfigId }: SimulatorProp
   const [kdsVenues, setKdsVenues] = useState(init?.kdsVenues ?? (init?.locations ?? 1))
   const [kioskVenues, setKioskVenues] = useState(init?.kioskVenues ?? (init?.locations ?? 1))
   const [discountPercent, setDiscountPercent] = useState(init?.discountPercent ?? 0)
+  const [starterIncluded, setStarterIncluded] = useState<StarterIncluded>(() =>
+    initStarterIncluded(init?.hardware)
+  )
 
   const router = useRouter()
-
-  // ---- Auto-set Counter Stand when plan changes ----
 
   // ---- Save state (overwrite active) ----
   const [isPending, startTransition] = useTransition()
@@ -200,13 +235,14 @@ export function Simulator({ deal, initialConfig, loadedConfigId }: SimulatorProp
       init?.renVenues ?? 1,
       init?.kdsVenues ?? (init?.locations ?? 1),
       init?.kioskVenues ?? (init?.locations ?? 1),
-      init?.discountPercent ?? 0
+      init?.discountPercent ?? 0,
+      initStarterIncluded(init?.hardware)
     )
   )
 
   const hasUnsavedChanges = useMemo(
-    () => serializeSimState(dailyOrders, deliveryOrders, locations, avgTicket, planOverride, activeAddons, hardware, renEnabled, renFeePerOrder, renVenues, kdsVenues, kioskVenues, discountPercent) !== savedSnapshot,
-    [dailyOrders, deliveryOrders, locations, avgTicket, planOverride, activeAddons, hardware, renEnabled, renFeePerOrder, renVenues, kdsVenues, kioskVenues, discountPercent, savedSnapshot]
+    () => serializeSimState(dailyOrders, deliveryOrders, locations, avgTicket, planOverride, activeAddons, hardware, renEnabled, renFeePerOrder, renVenues, kdsVenues, kioskVenues, discountPercent, starterIncluded) !== savedSnapshot,
+    [dailyOrders, deliveryOrders, locations, avgTicket, planOverride, activeAddons, hardware, renEnabled, renFeePerOrder, renVenues, kdsVenues, kioskVenues, discountPercent, starterIncluded, savedSnapshot]
   )
 
   useEffect(() => {
@@ -228,7 +264,10 @@ export function Simulator({ deal, initialConfig, loadedConfigId }: SimulatorProp
   const activePlan = planOverride ?? suggestedPlan
   const planChanged = planOverride !== null && planOverride !== suggestedPlan
 
-  const hardwareLineItems = useMemo(() => hardwareStateToLineItems(hardware, locations), [hardware, locations])
+  const hardwareLineItems = useMemo(
+    () => hardwareStateToLineItems(hardware, locations, activePlan, starterIncluded),
+    [hardware, locations, activePlan, starterIncluded]
+  )
 
   const economics: DealEconomics = useMemo(
     () =>
@@ -287,7 +326,7 @@ export function Simulator({ deal, initialConfig, loadedConfigId }: SimulatorProp
       if (result.ok) {
         setSaveState('saved')
         setLastSavePersisted(result.persisted)
-        setSavedSnapshot(serializeSimState(dailyOrders, deliveryOrders, locations, avgTicket, planOverride, activeAddons, hardware, renEnabled, renFeePerOrder, renVenues, kdsVenues, kioskVenues, discountPercent))
+        setSavedSnapshot(serializeSimState(dailyOrders, deliveryOrders, locations, avgTicket, planOverride, activeAddons, hardware, renEnabled, renFeePerOrder, renVenues, kdsVenues, kioskVenues, discountPercent, starterIncluded))
         router.refresh()
       } else {
         setSaveState('error')
@@ -319,7 +358,7 @@ export function Simulator({ deal, initialConfig, loadedConfigId }: SimulatorProp
         setSaveNewState('saved')
         setLastNewVersion(result.version)
         setLastNewVersionPersisted(result.persisted)
-        setSavedSnapshot(serializeSimState(dailyOrders, deliveryOrders, locations, avgTicket, planOverride, activeAddons, hardware, renEnabled, renFeePerOrder, renVenues, kdsVenues, kioskVenues, discountPercent))
+        setSavedSnapshot(serializeSimState(dailyOrders, deliveryOrders, locations, avgTicket, planOverride, activeAddons, hardware, renEnabled, renFeePerOrder, renVenues, kdsVenues, kioskVenues, discountPercent, starterIncluded))
         router.refresh()
       } else {
         setSaveNewState('error')
@@ -685,7 +724,9 @@ export function Simulator({ deal, initialConfig, loadedConfigId }: SimulatorProp
               const isAutoIncluded = AUTO_INCLUDED_HARDWARE.has(id)
 
               if (isAutoIncluded) {
-                // Auto-included: locations units always included + optional extras
+                const incQty = includedQty(id as HardwareId, activePlan, locations, starterIncluded)
+                const isStarterSelected = activePlan === 'starter' && id === starterIncluded
+                const isStarterOther = activePlan === 'starter' && id !== starterIncluded
                 const extraQty = state.quantity
                 const extraLineTotal = state.mode === 'rented'
                   ? rentalUnitPrice * extraQty
@@ -698,16 +739,48 @@ export function Simulator({ deal, initialConfig, loadedConfigId }: SimulatorProp
                         <p className="text-sm font-medium text-zinc-900">{item.label}</p>
                         <p className="text-xs text-zinc-500 mt-0.5">{item.description}</p>
                       </div>
-                      <span className="text-xs font-mono text-emerald-600 font-semibold shrink-0 mt-0.5">Incluido</span>
+                      {incQty > 0 && (
+                        <span className="text-xs font-mono text-emerald-600 font-semibold shrink-0 mt-0.5">Incluido</span>
+                      )}
                     </div>
 
-                    {/* Included row */}
-                    <div className="flex items-center justify-between py-2 px-3 bg-emerald-50 rounded-lg border border-emerald-100 mb-3">
-                      <span className="text-xs text-emerald-700">
-                        {locations} ud. incluida{locations > 1 ? 's' : ''} · 1 por local
-                      </span>
-                      <span className="text-xs font-mono text-emerald-600 font-semibold">Incluido en el plan</span>
-                    </div>
+                    {/* Starter: toggle which one is included */}
+                    {activePlan === 'starter' && (
+                      <div className="mb-3">
+                        <button
+                          onClick={() => setStarterIncluded(id as StarterIncluded)}
+                          className={`w-full flex items-center justify-between py-2 px-3 rounded-lg border text-xs transition-all ${
+                            isStarterSelected
+                              ? 'bg-emerald-50 border-emerald-200 text-emerald-700'
+                              : 'bg-zinc-50 border-zinc-200 text-zinc-400 hover:border-zinc-300'
+                          }`}
+                        >
+                          <span>
+                            {isStarterSelected
+                              ? '1 ud. incluida · Plan Starter'
+                              : 'No incluido en Starter'}
+                          </span>
+                          <span className="font-mono font-semibold">
+                            {isStarterSelected ? 'Incluido en el plan' : '0 incluidas'}
+                          </span>
+                        </button>
+                        {isStarterOther && (
+                          <p className="text-[10px] text-zinc-400 mt-1 px-1">
+                            Toca para incluir este en su lugar
+                          </p>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Growth/Pro: auto-included per local */}
+                    {activePlan !== 'starter' && incQty > 0 && (
+                      <div className="flex items-center justify-between py-2 px-3 bg-emerald-50 rounded-lg border border-emerald-100 mb-3">
+                        <span className="text-xs text-emerald-700">
+                          {incQty} ud. incluida{incQty > 1 ? 's' : ''} · 1 por local
+                        </span>
+                        <span className="text-xs font-mono text-emerald-600 font-semibold">Incluido en el plan</span>
+                      </div>
+                    )}
 
                     {/* Extra units */}
                     <div>
@@ -715,7 +788,6 @@ export function Simulator({ deal, initialConfig, loadedConfigId }: SimulatorProp
                         + Adicionales
                       </p>
                       <div className="flex items-center gap-3">
-                        {/* Qty stepper */}
                         <div className="flex items-center border border-zinc-200 rounded-lg overflow-hidden">
                           <button
                             onClick={() => setHardwareQty(id, extraQty - 1)}
@@ -733,7 +805,6 @@ export function Simulator({ deal, initialConfig, loadedConfigId }: SimulatorProp
                           </button>
                         </div>
 
-                        {/* Mode selector for extras */}
                         <select
                           value={state.mode}
                           onChange={(e) => setHardwareMode(id, e.target.value as HardwareMode)}
@@ -754,7 +825,6 @@ export function Simulator({ deal, initialConfig, loadedConfigId }: SimulatorProp
                         )}
                       </div>
 
-                      {/* Finance months for extras */}
                       {state.mode === 'financed' && extraQty > 0 && (
                         <div className="mt-2 flex items-center gap-2">
                           <span className="text-xs text-zinc-500">Plazo:</span>
@@ -780,7 +850,6 @@ export function Simulator({ deal, initialConfig, loadedConfigId }: SimulatorProp
                         </div>
                       )}
 
-                      {/* Extra line total */}
                       {extraQty > 0 && (
                         <div className="mt-2 flex items-center justify-between">
                           <span className="text-xs text-zinc-400">
