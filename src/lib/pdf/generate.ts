@@ -266,7 +266,7 @@ function s1Cover(deal: Deal, cfg: DealConfiguration, today: string, logoUri: str
     <!-- Meta: fecha / versión / plan -->
     <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:20px;">
       ${[
-        ['Fecha',   'Madrid, 1 de abril de 2026'],
+        ['Fecha',   `Madrid, ${today}`],
         ['Versión', `V1.0${cfg.version}${cfg.label ? ` · ${cfg.label}` : ''}`],
         ['Plan',    plan.label],
       ].map(([k, v], i) => `
@@ -382,7 +382,7 @@ function s5Plans(deal: Deal, cfg: DealConfiguration, logoUri: string): string {
     kdsVenues?: number; kioskVenues?: number
   }
   const renEnabled = eco.renEnabled === true
-  const renFeePerOrder = eco.renFeePerOrder ?? 0.20
+  const renFeePerOrder = eco.renFeePerOrder ?? 0.10
   const renVenues = eco.renVenues ?? 1
   const deliveryPerVenue = cfg.deliveryOrdersPerVenue ?? 0
   const renMonthly = renEnabled ? renFeePerOrder * deliveryPerVenue * renVenues : 0
@@ -436,14 +436,14 @@ function s5Plans(deal: Deal, cfg: DealConfiguration, logoUri: string): string {
           ? `${addon.feePercent}% GMV`
           : addon.perConsumption ? 'Por consumo'
           : id === 'kds'
-          ? `${fmt(19)}/local/mes × ${s5KdsVenues} local${s5KdsVenues > 1 ? 'es' : ''} con KDS`
+          ? `${fmt(ADDONS['kds'].priceMonthly ?? 19)}/local/mes × ${s5KdsVenues} local${s5KdsVenues > 1 ? 'es' : ''} con KDS`
           : id === 'kiosk'
-          ? `${fmt(19)}/local/mes × ${s5KioskVenues} local${s5KioskVenues > 1 ? 'es' : ''} con Kiosk`
+          ? `${fmt(ADDONS['kiosk'].priceMonthly ?? 19)}/local/mes × ${s5KioskVenues} local${s5KioskVenues > 1 ? 'es' : ''} con Kiosk`
           : `${fmt(addon.priceMonthly ?? 0)}${addon.perLocation ? '/local/mes' : '/mes'}`
         const total = id === 'datafono' ? fmt(eco.datafonoFeeMonthly)
           : addon.perConsumption ? '—'
-          : id === 'kds' ? fmt(19 * s5KdsVenues)
-          : id === 'kiosk' ? fmt(19 * s5KioskVenues)
+          : id === 'kds' ? fmt((ADDONS['kds'].priceMonthly ?? 19) * s5KdsVenues)
+          : id === 'kiosk' ? fmt((ADDONS['kiosk'].priceMonthly ?? 19) * s5KioskVenues)
           : fmt((addon.priceMonthly ?? 0) * (addon.perLocation ? cfg.locations : 1))
         return `<div style="display:flex;justify-content:space-between;align-items:center;padding:7px 11px;background:#f8fafc;border:1px solid #e8eef6;border-radius:6px;">
           <div>
@@ -639,7 +639,7 @@ function s11Economics(deal: Deal, cfg: DealConfiguration, sections: ProposalSect
   const hwItems = cfg.hardware.filter(h => h.quantity > 0)
 
   const renEnabled = eco.renEnabled === true
-  const renFeePerOrder = eco.renFeePerOrder ?? 0.20
+  const renFeePerOrder = eco.renFeePerOrder ?? 0.10
   const renVenues = eco.renVenues ?? 1
   const deliveryPerVenue = cfg.deliveryOrdersPerVenue ?? 0
   const renMonthly = renEnabled ? renFeePerOrder * deliveryPerVenue * renVenues : 0
@@ -649,8 +649,8 @@ function s11Economics(deal: Deal, cfg: DealConfiguration, sections: ProposalSect
   const kioskVenues = eco.kioskVenues ?? cfg.locations
   const kdsActive = cfg.activeAddons.includes('kds')
   const kioskActive = cfg.activeAddons.includes('kiosk')
-  const kdsAdj = kdsActive ? 19 * (kdsVenues - cfg.locations) : 0
-  const kioskAdj = kioskActive ? 19 * (kioskVenues - cfg.locations) : 0
+  const kdsAdj = kdsActive ? (ADDONS['kds'].priceMonthly ?? 19) * (kdsVenues - cfg.locations) : 0
+  const kioskAdj = kioskActive ? (ADDONS['kiosk'].priceMonthly ?? 19) * (kioskVenues - cfg.locations) : 0
   const adjustedSoftwareBase = eco.softwareRevenueMonthly + kdsAdj + kioskAdj
 
   const discountPercent = eco.discountPercent ?? 0
@@ -703,8 +703,8 @@ function s11Economics(deal: Deal, cfg: DealConfiguration, sections: ProposalSect
           <div style="margin-top:8px;padding-top:6px;border-top:1px solid #e8eef6;">
             <div style="font-size:7.5px;color:#94a3b8;text-transform:uppercase;letter-spacing:1px;margin-bottom:4px;">Add-ons</div>
             ${activeAddons.map(a => {
-              const addonNet = a.id === 'kds' ? 19 * kdsVenues
-                : a.id === 'kiosk' ? 19 * kioskVenues
+              const addonNet = a.id === 'kds' ? (ADDONS['kds'].priceMonthly ?? 19) * kdsVenues
+                : a.id === 'kiosk' ? (ADDONS['kiosk'].priceMonthly ?? 19) * kioskVenues
                 : a.priceMonthly != null ? a.priceMonthly * (a.perLocation ? cfg.locations : 1) : null
               const addonVal = a.id === 'datafono' ? `${a.feePercent}% GMV`
                 : a.perConsumption ? 'Por consumo'
@@ -847,7 +847,7 @@ function s12Annex(deal: Deal, cfg: DealConfiguration, today: string, logoUri: st
       </div>
     </div>
     <div style="margin-top:14px;background:#f8fafc;border:1px solid #e8eef6;border-radius:8px;padding:13px 15px;font-size:9.5px;color:#64748b;line-height:1.6;">
-      La presente propuesta tiene validez de <strong>30 días naturales</strong> a partir de la fecha de emisión (Madrid, 1 de abril de 2026).
+      La presente propuesta tiene validez de <strong>30 días naturales</strong> a partir de la fecha de emisión (Madrid, ${today}).
       Los precios indicados son en euros e incluyen IVA al 21%.
       La aceptación de esta propuesta implica la celebración de un contrato de prestación de servicios
       bajo las Condiciones Generales publicadas en <strong>platomico.com/legal</strong>.
