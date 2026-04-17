@@ -4,7 +4,7 @@ import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { getDeal, getActiveConfig, getProposal } from '@/lib/deals'
 import { logEvent, getProposalViewStats } from '@/lib/supabase/events'
-import { formatCurrency, formatNumber } from '@/lib/format'
+import { formatNumber } from '@/lib/format'
 import { PLANS, ADDONS, HARDWARE } from '@/lib/pricing/catalog'
 import { ProposalEditor } from '@/components/propuesta/proposal-editor'
 import { CopyLinkButton } from '@/components/propuesta/copy-link-button'
@@ -125,7 +125,6 @@ export default async function PropuestaPage({
 
 function buildDefaultSections(deal: Deal, cfg: DealConfiguration): ProposalSections {
   const plan = PLANS[cfg.plan]
-  const eco = cfg.economics
 
   const addonsText =
     cfg.activeAddons.length > 0
@@ -139,11 +138,7 @@ function buildDefaultSections(deal: Deal, cfg: DealConfiguration): ProposalSecti
       .join(', ') || null
 
   return {
-    executiveSummary: [
-      `Platomico propone a ${deal.company.name} una solución completa de gestión de pedidos en hostelería basada en el plan ${plan.label}.`,
-      `Con ${cfg.locations} local${cfg.locations > 1 ? 'es' : ''} y un volumen estimado de ${formatNumber(cfg.dailyOrdersPerLocation)} pedidos mensuales por local, la plataforma digitaliza y optimiza toda la operación.`,
-      `El impacto económico estimado es de ${formatCurrency(eco.totalMonthlyRevenue)}/mes (${formatCurrency(eco.annualRevenue)}/año).`,
-    ].join(' '),
+    executiveSummary: '',
 
     solution: [
       `La solución incluye el plan ${plan.label} con acceso completo a la plataforma Platomico.`,
@@ -157,20 +152,9 @@ function buildDefaultSections(deal: Deal, cfg: DealConfiguration): ProposalSecti
       .filter(Boolean)
       .join(' '),
 
-    economicsSummary: [
-      `Ingresos recurrentes estimados: ${formatCurrency(eco.totalMonthlyRevenue)}/mes · ${formatCurrency(eco.annualRevenue)}/año.`,
-      eco.hardwareCostTotal > 0
-        ? `Inversión en hardware: ${formatCurrency(eco.hardwareCostTotal)}${eco.paybackMonths !== null ? `. Payback estimado: ${eco.paybackMonths} meses.` : '.'}`
-        : 'Sin inversión en hardware adicional.',
-      `Margen bruto estimado: ${eco.grossMarginPercent.toFixed(0)}% (${formatCurrency(eco.grossMarginMonthly)}/mes).`,
-    ].join(' '),
+    economicsSummary: '',
 
-    nextSteps: [
-      '1. Revisión y aprobación de la propuesta.',
-      '2. Firma del contrato de servicios.',
-      '3. Planificación de la instalación y formación del equipo.',
-      '4. Fecha de arranque: a confirmar.',
-    ].join('\n'),
+    nextSteps: '',
   }
 }
 
