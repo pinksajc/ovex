@@ -105,7 +105,8 @@ export function NewInvoiceForm({ deals }: Props) {
         if (l.id !== id) return l
         const merged = { ...l, ...patch }
         if (merged.type === 'line') {
-          merged.amount = merged.quantity * merged.unitPrice
+          const dto = merged.lineDiscountPercent ?? 0
+          merged.amount = merged.quantity * merged.unitPrice * (1 - dto / 100)
         }
         return merged
       })
@@ -166,6 +167,7 @@ export function NewInvoiceForm({ deals }: Props) {
         serviceId: l.serviceId || undefined,
         unit: l.unit || undefined,
         period: l.period || undefined,
+        lineDiscountPercent: l.lineDiscountPercent || undefined,
       }
       return item
     })
@@ -326,13 +328,6 @@ export function NewInvoiceForm({ deals }: Props) {
           >
             ＋ Añadir línea
           </button>
-          <button
-            type="button"
-            onClick={addDiscount}
-            className="text-xs text-red-500 hover:text-red-700 border border-red-200 hover:border-red-400 px-3 py-1.5 rounded-lg transition-colors"
-          >
-            ＋ Añadir descuento
-          </button>
         </div>
 
         {/* Totals */}
@@ -457,10 +452,13 @@ function RegularLineRow({
   // Qty column label: prefer catalog qtyUnit, then derive from unit, fallback 'uds'
   const qtyLabel = svc?.qtyUnit ?? (line.unit ? line.unit.split('/')[0] : 'uds')
 
+  const dto = line.lineDiscountPercent ?? 0
+  const originalAmount = line.quantity * line.unitPrice
+
   return (
     <div className="px-5 py-3 space-y-2">
-      {/* Row 1: service selector + qty + price + amount + delete */}
-      <div className="grid items-center gap-2" style={{ gridTemplateColumns: '1fr 90px 110px 100px 28px' }}>
+      {/* Row 1: service selector + qty + price + dto% + amount + delete */}
+      <div className="grid items-center gap-2" style={{ gridTemplateColumns: '1fr 90px 110px 60px 100px 28px' }}>
         {/* Service selector */}
         <select
           value={line.serviceId}
@@ -509,9 +507,40 @@ function RegularLineRow({
           />
         </div>
 
+        {/* Dto. % */}
+        <div className="relative">
+          <input
+            type="number"
+            min="0"
+            max="100"
+            step="0.1"
+            value={dto || ''}
+            placeholder="0"
+            onChange={(e) => {
+              const val = Math.min(100, Math.max(0, parseFloat(e.target.value) || 0))
+              onChange(line.id, { lineDiscountPercent: val || undefined })
+            }}
+            className="border border-zinc-200 rounded px-2 py-1.5 text-xs font-mono text-right focus:outline-none focus:ring-1 focus:ring-zinc-300 w-full pr-5"
+          />
+          <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[9px] text-zinc-400 pointer-events-none">%</span>
+        </div>
+
         {/* Importe */}
-        <div className="text-xs font-mono text-right text-zinc-700 pr-1">
-          {line.amount.toLocaleString('es-ES', { minimumFractionDigits: 2 })} €
+        <div className="text-right pr-1">
+          {dto > 0 ? (
+            <>
+              <div className="text-[10px] font-mono text-zinc-400 line-through leading-tight">
+                {originalAmount.toLocaleString('es-ES', { minimumFractionDigits: 2 })} €
+              </div>
+              <div className="text-xs font-mono font-semibold text-emerald-600 leading-tight">
+                {line.amount.toLocaleString('es-ES', { minimumFractionDigits: 2 })} €
+              </div>
+            </>
+          ) : (
+            <span className="text-xs font-mono text-zinc-700">
+              {line.amount.toLocaleString('es-ES', { minimumFractionDigits: 2 })} €
+            </span>
+          )}
         </div>
 
         {/* Delete */}
@@ -531,7 +560,7 @@ function RegularLineRow({
 
       {/* Row 2: custom description + unit input only for "Línea personalizada" */}
       {line.serviceId && isCustom && (
-        <div className="grid items-center gap-2" style={{ gridTemplateColumns: '1fr 90px 110px 100px 28px' }}>
+        <div className="grid items-center gap-2" style={{ gridTemplateColumns: '1fr 90px 110px 60px 100px 28px' }}>
           <input
             type="text"
             value={line.description}
@@ -553,7 +582,7 @@ function RegularLineRow({
       )}
 
       {/* Row 3: Período (all regular lines) */}
-      <div className="grid items-center gap-2" style={{ gridTemplateColumns: '1fr 90px 110px 100px 28px' }}>
+      <div className="grid items-center gap-2" style={{ gridTemplateColumns: '1fr 90px 110px 60px 100px 28px' }}>
         <input
           type="text"
           value={line.period ?? ''}

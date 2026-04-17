@@ -91,7 +91,10 @@ export function EditInvoiceForm({ invoice, deals }: Props) {
       prev.map((l) => {
         if (l.id !== id) return l
         const merged = { ...l, ...patch }
-        if (merged.type === 'line') merged.amount = merged.quantity * merged.unitPrice
+        if (merged.type === 'line') {
+          const dto = merged.lineDiscountPercent ?? 0
+          merged.amount = merged.quantity * merged.unitPrice * (1 - dto / 100)
+        }
         return merged
       })
     )
@@ -134,6 +137,7 @@ export function EditInvoiceForm({ invoice, deals }: Props) {
       serviceId: l.serviceId || undefined,
       unit: l.unit || undefined,
       period: l.period || undefined,
+      lineDiscountPercent: l.lineDiscountPercent || undefined,
     }))
 
     startTransition(async () => {
@@ -234,10 +238,6 @@ export function EditInvoiceForm({ invoice, deals }: Props) {
             className="text-xs text-zinc-500 hover:text-zinc-900 border border-zinc-200 hover:border-zinc-400 px-3 py-1.5 rounded-lg transition-colors">
             ＋ Añadir línea
           </button>
-          <button type="button" onClick={addDiscount}
-            className="text-xs text-red-500 hover:text-red-700 border border-red-200 hover:border-red-400 px-3 py-1.5 rounded-lg transition-colors">
-            ＋ Añadir descuento
-          </button>
         </div>
         <div className="border-t border-zinc-200 px-5 py-4 space-y-1.5">
           <TotalsRow label="Subtotal" value={fmtNum(subtotal)} />
@@ -310,9 +310,12 @@ function RegularLineRow({ line, onChange, onRemove, canRemove }: {
     onChange(line.id, { serviceId, description: item.custom ? '' : item.label, unit: item.unit, unitPrice: item.defaultPrice, amount: qty * item.defaultPrice })
   }
 
+  const dto = line.lineDiscountPercent ?? 0
+  const originalAmount = line.quantity * line.unitPrice
+
   return (
     <div className="px-5 py-3 space-y-2">
-      <div className="grid items-center gap-2" style={{ gridTemplateColumns: '1fr 90px 110px 100px 28px' }}>
+      <div className="grid items-center gap-2" style={{ gridTemplateColumns: '1fr 90px 110px 60px 100px 28px' }}>
         <select value={line.serviceId} onChange={(e) => handleServiceSelect(e.target.value)}
           className="border border-zinc-200 rounded px-2 py-1.5 text-xs bg-white focus:outline-none focus:ring-1 focus:ring-zinc-300 w-full text-zinc-700">
           <option value="">— Selecciona servicio —</option>
@@ -326,20 +329,44 @@ function RegularLineRow({ line, onChange, onRemove, canRemove }: {
         </select>
         <input type="number" min="0" step="any" value={line.quantity || ''}
           placeholder={qtyLabel}
-          onChange={(e) => onChange(line.id, { quantity: parseFloat(e.target.value) || 0, amount: (parseFloat(e.target.value) || 0) * line.unitPrice })}
+          onChange={(e) => onChange(line.id, { quantity: parseFloat(e.target.value) || 0 })}
           className="border border-zinc-200 rounded px-2 py-1.5 text-xs font-mono text-right focus:outline-none focus:ring-1 focus:ring-zinc-300 w-full" />
         <input type="number" min="0" step="0.01" value={line.unitPrice}
-          onChange={(e) => { const p = parseFloat(e.target.value) || 0; onChange(line.id, { unitPrice: p, amount: line.quantity * p }) }}
+          onChange={(e) => { const p = parseFloat(e.target.value) || 0; onChange(line.id, { unitPrice: p }) }}
           className={`border rounded px-2 py-1.5 text-xs font-mono text-right focus:outline-none focus:ring-1 w-full ${priceEditable && line.unitPrice === 0 && line.serviceId ? 'border-amber-300 bg-amber-50 focus:ring-amber-300' : 'border-zinc-200 focus:ring-zinc-300'}`} />
-        <div className="text-xs font-mono text-right text-zinc-700 pr-1">
-          {line.amount.toLocaleString('es-ES', { minimumFractionDigits: 2 })} €
+        {/* Dto. % */}
+        <div className="relative">
+          <input type="number" min="0" max="100" step="0.1" value={dto || ''} placeholder="0"
+            onChange={(e) => {
+              const val = Math.min(100, Math.max(0, parseFloat(e.target.value) || 0))
+              onChange(line.id, { lineDiscountPercent: val || undefined })
+            }}
+            className="border border-zinc-200 rounded px-2 py-1.5 text-xs font-mono text-right focus:outline-none focus:ring-1 focus:ring-zinc-300 w-full pr-5" />
+          <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[9px] text-zinc-400 pointer-events-none">%</span>
+        </div>
+        {/* Importe */}
+        <div className="text-right pr-1">
+          {dto > 0 ? (
+            <>
+              <div className="text-[10px] font-mono text-zinc-400 line-through leading-tight">
+                {originalAmount.toLocaleString('es-ES', { minimumFractionDigits: 2 })} €
+              </div>
+              <div className="text-xs font-mono font-semibold text-emerald-600 leading-tight">
+                {line.amount.toLocaleString('es-ES', { minimumFractionDigits: 2 })} €
+              </div>
+            </>
+          ) : (
+            <span className="text-xs font-mono text-zinc-700">
+              {line.amount.toLocaleString('es-ES', { minimumFractionDigits: 2 })} €
+            </span>
+          )}
         </div>
         {canRemove
           ? <button type="button" onClick={() => onRemove(line.id)} className="text-zinc-300 hover:text-red-500 transition-colors text-base leading-none">×</button>
           : <span />}
       </div>
       {line.serviceId && isCustom && (
-        <div className="grid items-center gap-2" style={{ gridTemplateColumns: '1fr 90px 110px 100px 28px' }}>
+        <div className="grid items-center gap-2" style={{ gridTemplateColumns: '1fr 90px 110px 60px 100px 28px' }}>
           <input type="text" value={line.description} onChange={(e) => onChange(line.id, { description: e.target.value })}
             placeholder="Descripción personalizada"
             className="border border-zinc-200 rounded px-2 py-1 text-xs text-zinc-700 focus:outline-none focus:ring-1 focus:ring-zinc-300 w-full bg-white" />
@@ -351,7 +378,7 @@ function RegularLineRow({ line, onChange, onRemove, canRemove }: {
       )}
 
       {/* Período (all regular lines) */}
-      <div className="grid items-center gap-2" style={{ gridTemplateColumns: '1fr 90px 110px 100px 28px' }}>
+      <div className="grid items-center gap-2" style={{ gridTemplateColumns: '1fr 90px 110px 60px 100px 28px' }}>
         <input type="text" value={line.period ?? ''} onChange={(e) => onChange(line.id, { period: e.target.value || undefined })}
           placeholder="Período (ej: Enero - Marzo 2026)"
           className="border border-zinc-100 rounded px-2 py-1 text-[10px] text-zinc-400 placeholder-zinc-300 focus:outline-none focus:ring-1 focus:ring-zinc-200 w-full bg-zinc-50 focus:bg-white" />

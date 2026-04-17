@@ -257,6 +257,10 @@ export interface InvoiceLineItem {
   serviceId?: string
   /** Quantity unit label — persisted for display */
   unit?: string
+  /** Optional billing period, e.g. "Enero - Marzo 2026" */
+  period?: string
+  /** Per-line discount percentage (0–100). Applied before global discounts. */
+  lineDiscountPercent?: number
 }
 
 export interface Invoice {

@@ -52,15 +52,21 @@ function renderLineRows(items: InvoiceLineItem[]): string {
           <td class="right" style="color:#dc2626;font-weight:700;">${fmt(item.amount)} €</td>
         </tr>`
     }
+    const dto = item.lineDiscountPercent ?? 0
+    const originalAmount = item.quantity * item.unitPrice
     return `
       <tr>
         <td>
           ${esc(item.description || '—')}
+          ${dto > 0 ? `<span style="margin-left:6px;font-size:8px;color:#10b981;font-weight:600;">Dto. ${fmt(dto)}%</span>` : ''}
           ${item.period ? `<div style="font-size:8px;color:#94a3b8;margin-top:2px;">${esc(item.period)}</div>` : ''}
         </td>
         <td class="right">${fmt(item.quantity)}</td>
         <td class="right">${fmt(item.unitPrice)} €</td>
-        <td class="right" style="font-weight:600;">${fmt(item.amount)} €</td>
+        <td class="right" style="font-weight:600;">
+          ${dto > 0 ? `<span style="text-decoration:line-through;color:#94a3b8;font-weight:400;font-size:8.5px;">${fmt(originalAmount)} €</span><br/>` : ''}
+          <span${dto > 0 ? ' style="color:#10b981;"' : ''}>${fmt(item.amount)} €</span>
+        </td>
       </tr>`
   }).join('')
 }
