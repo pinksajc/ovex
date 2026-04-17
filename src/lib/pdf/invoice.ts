@@ -54,7 +54,7 @@ function renderLineRows(items: InvoiceLineItem[]): string {
     }
     return `
       <tr>
-        <td>${esc(item.description)}</td>
+        <td>${esc(item.description || '—')}</td>
         <td class="right">${fmt(item.quantity)}</td>
         <td class="right">${fmt(item.unitPrice)} €</td>
         <td class="right" style="font-weight:600;">${fmt(item.amount)} €</td>
@@ -102,7 +102,7 @@ export async function generateInvoicePdf(invoice: Invoice): Promise<Buffer> {
     padding-bottom: 24px;
     border-bottom: 2px solid #1e3a5f;
   }
-  .logo { height: 36px; object-fit: contain; }
+  .logo { height: 22px; object-fit: contain; }
   .invoice-type-badge {
     font-size: 9px;
     font-weight: 700;
@@ -339,7 +339,7 @@ ${invoice.type === 'rectificativa' && invoice.rectifiesId ? `
     ${hasLineItems
       ? renderLineRows(items)
       : `<tr>
-          <td>${esc(invoice.concept)}</td>
+          <td>${esc(invoice.concept || '—')}</td>
           <td class="right">1</td>
           <td class="right">${fmt(invoice.amountNet)} €</td>
           <td class="right" style="font-weight:600;">${fmt(invoice.amountNet)} €</td>

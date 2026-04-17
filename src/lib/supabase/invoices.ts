@@ -28,6 +28,14 @@ interface InvoiceRow {
   created_at: string
 }
 
+function parseLineItems(raw: unknown): InvoiceLineItem[] {
+  if (Array.isArray(raw)) return raw as InvoiceLineItem[]
+  if (typeof raw === 'string') {
+    try { const parsed = JSON.parse(raw); if (Array.isArray(parsed)) return parsed as InvoiceLineItem[] } catch { /* ignore */ }
+  }
+  return []
+}
+
 function rowToInvoice(row: InvoiceRow): Invoice {
   return {
     id: row.id,
@@ -38,7 +46,7 @@ function rowToInvoice(row: InvoiceRow): Invoice {
     clientCif: row.client_cif,
     clientAddress: row.client_address,
     concept: row.concept,
-    lineItems: Array.isArray(row.line_items) ? (row.line_items as InvoiceLineItem[]) : [],
+    lineItems: parseLineItems(row.line_items),
     amountNet: Number(row.amount_net),
     vatRate: Number(row.vat_rate),
     amountTotal: Number(row.amount_total),
