@@ -18,34 +18,12 @@ export interface ServiceItem {
 
 export const SERVICES: ServiceItem[] = [
   // ---- ROS ----
-  {
-    id: 'ros_starter',
-    label: 'ROS Plan Starter',
-    group: 'ROS',
-    unit: 'local/mes',
-    qtyUnit: 'locales',
-    defaultPrice: 0,
-    priceEditable: true,
-    note: '+ 0,08€/ticket variable',
-  },
-  {
-    id: 'ros_growth',
-    label: 'ROS Plan Growth',
-    group: 'ROS',
-    unit: 'local/mes',
-    qtyUnit: 'locales',
-    defaultPrice: 15,
-    note: '+ 0,05€/ticket variable',
-  },
-  {
-    id: 'ros_pro',
-    label: 'ROS Plan Pro',
-    group: 'ROS',
-    unit: 'local/mes',
-    qtyUnit: 'locales',
-    defaultPrice: 35,
-    note: '+ 0,03€/ticket variable',
-  },
+  { id: 'ros_starter_fixed',    label: 'ROS Plan Starter — Fee fijo',    group: 'ROS', unit: 'locales', defaultPrice: 0,    priceEditable: true },
+  { id: 'ros_starter_variable', label: 'ROS Plan Starter — Fee variable', group: 'ROS', unit: 'pedidos', defaultPrice: 0.08 },
+  { id: 'ros_growth_fixed',     label: 'ROS Plan Growth — Fee fijo',     group: 'ROS', unit: 'locales', defaultPrice: 15 },
+  { id: 'ros_growth_variable',  label: 'ROS Plan Growth — Fee variable',  group: 'ROS', unit: 'pedidos', defaultPrice: 0.05 },
+  { id: 'ros_pro_fixed',        label: 'ROS Plan Pro — Fee fijo',        group: 'ROS', unit: 'locales', defaultPrice: 35 },
+  { id: 'ros_pro_variable',     label: 'ROS Plan Pro — Fee variable',    group: 'ROS', unit: 'pedidos', defaultPrice: 0.03 },
 
   // ---- ADD-ONS ----
   { id: 'addon_delivery', label: 'Add-on Delivery', group: 'ADD-ONS', unit: 'local/mes', defaultPrice: 45 },
@@ -71,13 +49,7 @@ export const SERVICES: ServiceItem[] = [
   },
 
   // ---- REN ----
-  {
-    id: 'ren',
-    label: 'REN — Marketplace logístico',
-    group: 'REN',
-    unit: 'pedido',
-    defaultPrice: 0.10,
-  },
+  { id: 'ren', label: 'REN — Fee variable', group: 'REN', unit: 'pedidos', defaultPrice: 0.10 },
 
   // ---- HARDWARE ----
   { id: 'ipad_rental', label: 'iPad 10th Gen — Alquiler', group: 'HARDWARE', unit: 'ud/mes', defaultPrice: 19 },

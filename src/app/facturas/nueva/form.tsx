@@ -477,16 +477,15 @@ function RegularLineRow({
         </select>
 
         {/* Cantidad */}
-        <div className="relative">
-          <input
-            type="number"
-            min="0"
-            step="any"
-            value={line.quantity}
-            onChange={(e) => handleQtyChange(parseFloat(e.target.value) || 0)}
-            className="border border-zinc-200 rounded px-2 py-1.5 text-xs font-mono text-right focus:outline-none focus:ring-1 focus:ring-zinc-300 w-full pr-1"
-          />
-        </div>
+        <input
+          type="number"
+          min="0"
+          step="any"
+          value={line.quantity || ''}
+          placeholder={qtyLabel}
+          onChange={(e) => handleQtyChange(parseFloat(e.target.value) || 0)}
+          className="border border-zinc-200 rounded px-2 py-1.5 text-xs font-mono text-right focus:outline-none focus:ring-1 focus:ring-zinc-300 w-full"
+        />
 
         {/* Precio unitario */}
         <div className="relative">
@@ -524,33 +523,24 @@ function RegularLineRow({
         )}
       </div>
 
-      {/* Row 2: description (editable) + unit label */}
-      {line.serviceId && (
-        <div className="grid items-center gap-2 pl-0" style={{ gridTemplateColumns: '1fr 90px 110px 100px 28px' }}>
-          {/* Description (always editable, always visible) */}
+      {/* Row 2: custom description + unit input only for "Línea personalizada" */}
+      {line.serviceId && isCustom && (
+        <div className="grid items-center gap-2" style={{ gridTemplateColumns: '1fr 90px 110px 100px 28px' }}>
           <input
             type="text"
             value={line.description}
             onChange={(e) => onChange(line.id, { description: e.target.value })}
-            placeholder={isCustom ? 'Descripción personalizada' : ''}
+            placeholder="Descripción personalizada"
             className="border border-zinc-200 rounded px-2 py-1 text-xs text-zinc-700 focus:outline-none focus:ring-1 focus:ring-zinc-300 w-full bg-white"
           />
-
-          {/* Qty unit label */}
-          {isCustom ? (
-            <input
-              type="text"
-              value={line.unit}
-              onChange={(e) => onChange(line.id, { unit: e.target.value })}
-              placeholder="unidad"
-              className="border border-zinc-200 rounded px-2 py-1 text-[10px] text-center text-zinc-400 focus:outline-none focus:ring-1 focus:ring-zinc-300 w-full"
-            />
-          ) : (
-            <div className="text-[10px] text-center text-zinc-400 truncate">{qtyLabel}</div>
-          )}
-
-          {/* Note under price if applicable */}
-          {svc?.note && !isCustom && (
+          <input
+            type="text"
+            value={line.unit}
+            onChange={(e) => onChange(line.id, { unit: e.target.value })}
+            placeholder="unidad"
+            className="border border-zinc-200 rounded px-2 py-1 text-[10px] text-center text-zinc-400 focus:outline-none focus:ring-1 focus:ring-zinc-300 w-full"
+          />
+          {svc?.note && (
             <div className="text-[10px] text-amber-600 text-right truncate">{svc.note}</div>
           )}
         </div>
