@@ -119,7 +119,7 @@ export function Simulator({ deal, initialConfig, loadedConfigId }: SimulatorProp
     initHardwareState(init?.locations ?? 1, init?.hardware)
   )
   const [renEnabled, setRenEnabled] = useState(init?.renEnabled ?? false)
-  const [renFeePerOrder, setRenFeePerOrder] = useState(init?.renFeePerOrder ?? 0.20)
+  const [renFeePerOrder, setRenFeePerOrder] = useState(init?.renFeePerOrder ?? 0.10)
   const [renVenues, setRenVenues] = useState(init?.renVenues ?? 1)
   const [kdsVenues, setKdsVenues] = useState(init?.kdsVenues ?? (init?.locations ?? 1))
   const [kioskVenues, setKioskVenues] = useState(init?.kioskVenues ?? (init?.locations ?? 1))
@@ -158,7 +158,7 @@ export function Simulator({ deal, initialConfig, loadedConfigId }: SimulatorProp
       new Set(init?.activeAddons ?? []),
       initHardwareState(init?.locations ?? 1, init?.hardware),
       init?.renEnabled ?? false,
-      init?.renFeePerOrder ?? 0.20,
+      init?.renFeePerOrder ?? 0.10,
       init?.renVenues ?? 1,
       init?.kdsVenues ?? (init?.locations ?? 1),
       init?.kioskVenues ?? (init?.locations ?? 1),

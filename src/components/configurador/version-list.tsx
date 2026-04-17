@@ -18,7 +18,7 @@ function computeAdjustedMRR(config: DealConfiguration): number {
   const discountPercent = config.discountPercent ?? 0
   const discountAmount = adjustedSoftwareBase * (discountPercent / 100)
   const adjustedSoftware = adjustedSoftwareBase - discountAmount
-  const renFeePerOrder = config.renFeePerOrder ?? 0.20
+  const renFeePerOrder = config.renFeePerOrder ?? 0.10
   const renVenues = config.renVenues ?? 1
   const deliveryPerVenue = config.deliveryOrdersPerVenue ?? 0
   const renMonthly = config.renEnabled ? renFeePerOrder * deliveryPerVenue * renVenues : 0

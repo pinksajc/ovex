@@ -55,7 +55,7 @@ export interface DealConfiguration {
   // Discount & REN — stored in economics jsonb snapshot, no DB column needed
   discountPercent?: number         // % discount on software revenue (default 0)
   renEnabled?: boolean             // REN logistics enabled (default false)
-  renFeePerOrder?: number          // REN fee per delivery order in € (default 0.20)
+  renFeePerOrder?: number          // REN fee per delivery order in € (default 0.10)
   renVenues?: number               // number of venues with REN (default 1)
   kdsVenues?: number               // number of venues with KDS (default = locations)
   kioskVenues?: number             // number of venues with Kiosk (default = locations)
