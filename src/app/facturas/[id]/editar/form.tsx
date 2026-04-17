@@ -133,6 +133,7 @@ export function EditInvoiceForm({ invoice, deals }: Props) {
       discountValue: l.discountValue,
       serviceId: l.serviceId || undefined,
       unit: l.unit || undefined,
+      period: l.period || undefined,
     }))
 
     startTransition(async () => {
@@ -348,6 +349,13 @@ function RegularLineRow({ line, onChange, onRemove, canRemove }: {
           {svc?.note && <div className="text-[10px] text-amber-600 text-right truncate">{svc.note}</div>}
         </div>
       )}
+
+      {/* Período (all regular lines) */}
+      <div className="grid items-center gap-2" style={{ gridTemplateColumns: '1fr 90px 110px 100px 28px' }}>
+        <input type="text" value={line.period ?? ''} onChange={(e) => onChange(line.id, { period: e.target.value || undefined })}
+          placeholder="Período (ej: Enero - Marzo 2026)"
+          className="border border-zinc-100 rounded px-2 py-1 text-[10px] text-zinc-400 placeholder-zinc-300 focus:outline-none focus:ring-1 focus:ring-zinc-200 w-full bg-zinc-50 focus:bg-white" />
+      </div>
     </div>
   )
 }

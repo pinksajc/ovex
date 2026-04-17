@@ -54,7 +54,10 @@ function renderLineRows(items: InvoiceLineItem[]): string {
     }
     return `
       <tr>
-        <td>${esc(item.description || '—')}</td>
+        <td>
+          ${esc(item.description || '—')}
+          ${item.period ? `<div style="font-size:8px;color:#94a3b8;margin-top:2px;">${esc(item.period)}</div>` : ''}
+        </td>
         <td class="right">${fmt(item.quantity)}</td>
         <td class="right">${fmt(item.unitPrice)} €</td>
         <td class="right" style="font-weight:600;">${fmt(item.amount)} €</td>
