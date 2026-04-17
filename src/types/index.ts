@@ -226,3 +226,45 @@ export interface ProposalSummary {
   signedAt: string | null
   declineReason: string | null
 }
+
+// =========================================
+// INVOICES
+// =========================================
+
+export type InvoiceType = 'ordinary' | 'rectificativa'
+
+export type InvoiceStatus = 'draft' | 'issued' | 'paid' | 'overdue'
+
+export interface Invoice {
+  id: string
+  number: string
+  type: InvoiceType
+  dealId: string | null
+  clientName: string
+  clientCif: string | null
+  clientAddress: string | null
+  concept: string
+  amountNet: number
+  vatRate: number
+  amountTotal: number
+  status: InvoiceStatus
+  issuedAt: string | null
+  dueAt: string | null
+  rectifiesId: string | null
+  createdAt: string
+}
+
+export interface CreateInvoiceInput {
+  type: InvoiceType
+  dealId?: string | null
+  clientName: string
+  clientCif?: string | null
+  clientAddress?: string | null
+  concept: string
+  amountNet: number
+  vatRate: number
+  amountTotal: number
+  issuedAt?: string | null
+  dueAt?: string | null
+  rectifiesId?: string | null
+}

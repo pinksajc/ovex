@@ -8,6 +8,7 @@ import type { AuthUser } from '@/lib/auth'
 const NAV = [
   { href: '/deals', label: 'Deals', icon: IconDeals },
   { href: '/pipeline', label: 'Pipeline', icon: IconPipeline },
+  { href: '/facturas', label: 'Facturas', icon: IconInvoice },
 ]
 
 const ADMIN_NAV = [
@@ -40,6 +41,8 @@ export function Sidebar({ user }: { user: AuthUser }) {
           const active =
             href === '/deals'
               ? pathname.startsWith('/deals')
+              : href === '/facturas'
+              ? pathname.startsWith('/facturas')
               : pathname === href
 
           return (
@@ -150,6 +153,21 @@ function IconPipeline({ className }: { className?: string }) {
       <path d="M2 12h12" />
       <path d="M6 12v2" />
       <path d="M10 12v2" />
+    </svg>
+  )
+}
+
+function IconInvoice({ className }: { className?: string }) {
+  return (
+    <svg
+      className={className}
+      viewBox="0 0 16 16"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.5"
+    >
+      <rect x="2" y="1" width="12" height="14" rx="1.5" />
+      <path d="M5 5h6M5 8h6M5 11h3" strokeLinecap="round" />
     </svg>
   )
 }
