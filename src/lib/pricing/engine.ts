@@ -8,7 +8,8 @@ import type { PlanTier, AddonId, HardwareLineItem, DealEconomics } from '@/types
 
 // ---- PLAN SUGGESTION ----
 
-export function suggestPlan(monthlyOrdersPerLocation: number): PlanTier {
+export function suggestPlan(monthlyOrdersPerLocation: number): PlanTier | null {
+  if (monthlyOrdersPerLocation === 0) return null
   if (monthlyOrdersPerLocation <= 500) return 'starter'
   if (monthlyOrdersPerLocation <= 1000) return 'growth'
   return 'pro'
@@ -20,7 +21,7 @@ export interface CalculateInput {
   dailyOrdersPerLocation: number
   locations: number
   averageTicket: number  // € por pedido
-  plan: PlanTier
+  plan: PlanTier | null
   activeAddons: AddonId[]
   hardware: HardwareLineItem[]
 }
@@ -35,8 +36,6 @@ export function calculateEconomics(input: CalculateInput): DealEconomics {
     hardware,
   } = input
 
-  const planConfig = PLANS[plan]
-
   // ---- Volumen ----
   const monthlyVolumePerLocation = dailyOrdersPerLocation  // input is already monthly
   const totalMonthlyVolume = monthlyVolumePerLocation * locations
@@ -46,9 +45,9 @@ export function calculateEconomics(input: CalculateInput): DealEconomics {
   const totalMonthlyGMV = monthlyGMVPerLocation * locations
 
   // ---- Fee del plan ----
-  const planFeePerLocation =
-    planConfig.priceMonthly + planConfig.variableFee * monthlyVolumePerLocation
-  const planFeeMonthly = planFeePerLocation * locations
+  const planFeeMonthly = plan
+    ? (PLANS[plan].priceMonthly + PLANS[plan].variableFee * monthlyVolumePerLocation) * locations
+    : 0
 
   // ---- Add-ons ----
   let addonFeeMonthly = 0

@@ -36,15 +36,17 @@ const EXTRA_MODES: HardwareMode[] = ['sold', 'financed', 'rented']
 
 /**
  * Returns how many units of `id` are auto-included given the plan and locations.
+ * - no plan: 0 (nothing included)
  * - starter: 1 total for the chosen item, 0 for the other
  * - growth/pro: locations units for each
  */
 function includedQty(
   id: HardwareId,
-  plan: PlanTier,
+  plan: PlanTier | null,
   locations: number,
   starterIncluded: StarterIncluded
 ): number {
+  if (!plan) return 0
   if (!AUTO_INCLUDED_HARDWARE.has(id)) return 0
   if (plan === 'starter') return id === starterIncluded ? 1 : 0
   return locations // growth / pro
@@ -87,7 +89,7 @@ function initStarterIncluded(saved?: HardwareLineItem[]): StarterIncluded {
 function hardwareStateToLineItems(
   hw: HardwareState,
   locations: number,
-  plan: PlanTier,
+  plan: PlanTier | null,
   starterIncluded: StarterIncluded
 ): HardwareLineItem[] {
   const items: HardwareLineItem[] = []
@@ -260,9 +262,9 @@ export function Simulator({ deal, initialConfig, loadedConfigId }: SimulatorProp
   }, [saveNewState])
 
   // ---- Derived ----
-  const suggestedPlan = suggestPlan(dailyOrders)
-  const activePlan = planOverride ?? suggestedPlan
-  const planChanged = planOverride !== null && planOverride !== suggestedPlan
+  const suggestedPlan = suggestPlan(dailyOrders) // null when dailyOrders === 0
+  const activePlan = planOverride ?? suggestedPlan // null when no override and no suggestion
+  const planChanged = planOverride !== null && suggestedPlan !== null && planOverride !== suggestedPlan
 
   const hardwareLineItems = useMemo(
     () => hardwareStateToLineItems(hardware, locations, activePlan, starterIncluded),
@@ -312,7 +314,7 @@ export function Simulator({ deal, initialConfig, loadedConfigId }: SimulatorProp
         deliveryOrdersPerVenue: deliveryOrders,
         locations,
         averageTicket: avgTicket,
-        plan: activePlan,
+        plan: activePlan ?? 'starter',
         planOverridden: planOverride !== null,
         activeAddons: Array.from(activeAddons),
         hardware: hardwareLineItems,
@@ -343,7 +345,7 @@ export function Simulator({ deal, initialConfig, loadedConfigId }: SimulatorProp
         deliveryOrdersPerVenue: deliveryOrders,
         locations,
         averageTicket: avgTicket,
-        plan: activePlan,
+        plan: activePlan ?? 'starter',
         planOverridden: planOverride !== null,
         activeAddons: Array.from(activeAddons),
         hardware: hardwareLineItems,
@@ -394,12 +396,12 @@ export function Simulator({ deal, initialConfig, loadedConfigId }: SimulatorProp
                 </span>
               </div>
               <input
-                type="range" min={100} max={10000} step={100} value={dailyOrders}
+                type="range" min={0} max={10000} step={100} value={dailyOrders}
                 onChange={(e) => setDailyOrders(Number(e.target.value))}
                 className="w-full accent-zinc-900"
               />
               <div className="flex justify-between text-[10px] text-zinc-400 mt-0.5">
-                <span>100</span><span>10.000</span>
+                <span>0</span><span>10.000</span>
               </div>
             </div>
 
@@ -468,7 +470,7 @@ export function Simulator({ deal, initialConfig, loadedConfigId }: SimulatorProp
               <p className="text-xs text-amber-700">
                 Sugerido <strong>{PLANS[suggestedPlan].label}</strong> para{' '}
                 {formatNumber(dailyOrders)} pedidos/mes. Plan actual:{' '}
-                <strong>{PLANS[activePlan].label}</strong> (manual)
+                <strong>{PLANS[activePlan!].label}</strong> (manual)
               </p>
               <button
                 onClick={() => setPlanOverride(null)}
@@ -483,12 +485,20 @@ export function Simulator({ deal, initialConfig, loadedConfigId }: SimulatorProp
             {PLAN_ORDER.map((tier) => {
               const plan = PLANS[tier]
               const isActive = activePlan === tier
-              const isSuggested = suggestedPlan === tier
+              const isSuggested = suggestedPlan !== null && suggestedPlan === tier
 
               return (
                 <button
                   key={tier}
-                  onClick={() => setPlanOverride(tier === suggestedPlan ? null : tier)}
+                  onClick={() => {
+                    if (planOverride === tier) {
+                      setPlanOverride(null) // deselect active override
+                    } else if (tier === suggestedPlan) {
+                      setPlanOverride(null) // use suggested = no override
+                    } else {
+                      setPlanOverride(tier)
+                    }
+                  }}
                   className={`relative text-left p-4 rounded-xl border-2 transition-all ${
                     isActive
                       ? 'border-zinc-900 bg-zinc-900 text-white'
@@ -515,17 +525,24 @@ export function Simulator({ deal, initialConfig, loadedConfigId }: SimulatorProp
             })}
           </div>
 
-          <div className="mt-3 bg-zinc-50 rounded-lg px-4 py-3">
-            <p className="text-xs font-mono text-zinc-500">
-              {PLANS[activePlan].priceMonthly > 0 && `${PLANS[activePlan].priceMonthly}€ × ${locations} local${locations > 1 ? 'es' : ''}`}
-              {PLANS[activePlan].priceMonthly > 0 && PLANS[activePlan].variableFee > 0 && ' + '}
-              {PLANS[activePlan].variableFee > 0 && `${PLANS[activePlan].variableFee}€ × ${formatNumber(economics.totalMonthlyVolume)} tickets/mes`}
-              {' = '}
-              <span className="font-semibold text-zinc-800">{formatCurrency(economics.planFeeMonthly)}/mes</span>
-            </p>
-          </div>
+          {activePlan ? (
+            <div className="mt-3 bg-zinc-50 rounded-lg px-4 py-3">
+              <p className="text-xs font-mono text-zinc-500">
+                {PLANS[activePlan].priceMonthly > 0 && `${PLANS[activePlan].priceMonthly}€ × ${locations} local${locations > 1 ? 'es' : ''}`}
+                {PLANS[activePlan].priceMonthly > 0 && PLANS[activePlan].variableFee > 0 && ' + '}
+                {PLANS[activePlan].variableFee > 0 && `${PLANS[activePlan].variableFee}€ × ${formatNumber(economics.totalMonthlyVolume)} tickets/mes`}
+                {' = '}
+                <span className="font-semibold text-zinc-800">{formatCurrency(economics.planFeeMonthly)}/mes</span>
+              </p>
+            </div>
+          ) : (
+            <div className="mt-3 bg-zinc-50 rounded-lg px-4 py-3">
+              <p className="text-xs text-zinc-400">Sin plan seleccionado · Ajusta el volumen o selecciona un plan manualmente</p>
+            </div>
+          )}
 
           {/* —— Incluido en el plan —— */}
+          {activePlan && (
           <div className="mt-4 border-t border-zinc-100 pt-3">
             <p className="text-[10px] font-semibold text-zinc-400 uppercase tracking-widest mb-2">
               Incluido en el plan
@@ -542,6 +559,7 @@ export function Simulator({ deal, initialConfig, loadedConfigId }: SimulatorProp
               ))}
             </ul>
           </div>
+          )}
         </Section>
 
         {/* —— Add-ons + REN —— */}
