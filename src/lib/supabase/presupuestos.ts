@@ -11,7 +11,6 @@
 //   client_name text NOT NULL,
 //   client_cif text,
 //   client_address text,
-//   concept text NOT NULL DEFAULT '',
 //   line_items jsonb NOT NULL DEFAULT '[]',
 //   amount_net numeric(12,2) NOT NULL DEFAULT 0,
 //   vat_rate numeric(5,2) NOT NULL DEFAULT 21,
@@ -25,6 +24,7 @@
 // CREATE INDEX presupuestos_deal_id_idx ON presupuestos(deal_id);
 // CREATE INDEX presupuestos_status_idx ON presupuestos(status);
 // CREATE INDEX presupuestos_created_at_idx ON presupuestos(created_at DESC);
+// NOTE: concept is NOT a DB column — it is derived at runtime from line_items.
 
 import { getSupabaseClient } from './client'
 import type { Presupuesto, CreatePresupuestoInput, UpdatePresupuestoInput, PresupuestoStatus, InvoiceLineItem } from '@/types'
