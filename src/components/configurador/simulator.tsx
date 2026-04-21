@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useMemo, useTransition, useEffect } from 'react'
+import { useState, useMemo, useTransition, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { PLANS, ADDONS, ADDON_ORDER, PLAN_ORDER, HARDWARE, HARDWARE_ORDER, HARDWARE_MODE_LABELS, RENTAL_MONTHLY_PRICE, PLAN_FEATURES } from '@/lib/pricing/catalog'
 import { calculateEconomics, suggestPlan } from '@/lib/pricing/engine'
@@ -265,6 +265,22 @@ export function Simulator({ deal, initialConfig, loadedConfigId }: SimulatorProp
   const suggestedPlan = suggestPlan(dailyOrders) // null when dailyOrders === 0
   const activePlan = planOverride ?? suggestedPlan // null when no override and no suggestion
   const planChanged = planOverride !== null && suggestedPlan !== null && planOverride !== suggestedPlan
+
+  // ---- Auto-reset counter_stand extras on plan change ----
+  const prevPlanRef = useRef<PlanTier | null | undefined>(undefined)
+  useEffect(() => {
+    if (prevPlanRef.current === undefined) {
+      prevPlanRef.current = activePlan
+      return // skip initial mount
+    }
+    if (prevPlanRef.current !== activePlan) {
+      prevPlanRef.current = activePlan
+      setHardware(prev => ({
+        ...prev,
+        counter_stand: { ...prev.counter_stand, quantity: 0, mode: 'sold' as HardwareMode },
+      }))
+    }
+  }, [activePlan])
 
   const hardwareLineItems = useMemo(
     () => hardwareStateToLineItems(hardware, locations, activePlan, starterIncluded),
