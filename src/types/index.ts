@@ -313,3 +313,44 @@ export interface UpdateInvoiceInput {
   dueAt?: string | null
   rectifiesId?: string | null
 }
+
+// =========================================
+// PRESUPUESTOS
+// =========================================
+
+export type PresupuestoStatus = 'draft' | 'sent' | 'accepted' | 'rejected' | 'expired'
+
+export interface Presupuesto {
+  id: string
+  number: string          // PQ-YYYY-NNNN
+  dealId: string | null
+  clientName: string
+  clientCif: string | null
+  clientAddress: string | null
+  concept: string
+  lineItems: InvoiceLineItem[]
+  amountNet: number
+  vatRate: number
+  amountTotal: number
+  status: PresupuestoStatus
+  validUntil: string | null
+  notes: string | null
+  createdAt: string
+  updatedAt: string
+}
+
+export interface CreatePresupuestoInput {
+  dealId: string | null
+  clientName: string
+  clientCif: string | null
+  clientAddress: string | null
+  concept: string
+  lineItems: InvoiceLineItem[]
+  amountNet: number
+  vatRate: number
+  amountTotal: number
+  validUntil: string | null
+  notes: string | null
+}
+
+export type UpdatePresupuestoInput = CreatePresupuestoInput

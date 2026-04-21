@@ -6,7 +6,24 @@ import { ContactEditor } from '@/components/contact-editor'
 import { CompanyEditor } from '@/components/company-editor'
 import { OwnerSelector } from '@/components/owner-selector'
 import { getWorkspaceMembers } from '@/lib/auth'
-import type { DealStage } from '@/types'
+import { getPresupuestosByDeal } from '@/lib/supabase/presupuestos'
+import type { DealStage, PresupuestoStatus } from '@/types'
+
+const PRESUPUESTO_STATUS_LABELS: Record<PresupuestoStatus, string> = {
+  draft: 'Borrador',
+  sent: 'Enviado',
+  accepted: 'Aceptado',
+  rejected: 'Rechazado',
+  expired: 'Expirado',
+}
+
+const PRESUPUESTO_STATUS_COLORS: Record<PresupuestoStatus, string> = {
+  draft: 'bg-zinc-100 text-zinc-600',
+  sent: 'bg-blue-50 text-blue-700',
+  accepted: 'bg-emerald-50 text-emerald-700',
+  rejected: 'bg-red-50 text-red-700',
+  expired: 'bg-amber-50 text-amber-700',
+}
 
 const STAGE_LABELS: Record<DealStage, string> = {
   prospecting: 'Prospecting',
@@ -34,7 +51,11 @@ export default async function DealPage({
   params: Promise<{ id: string }>
 }) {
   const { id } = await params
-  const [deal, members] = await Promise.all([getDeal(id), getWorkspaceMembers()])
+  const [deal, members, presupuestos] = await Promise.all([
+    getDeal(id),
+    getWorkspaceMembers(),
+    getPresupuestosByDeal(id).catch(() => []),
+  ])
 
   if (!deal) notFound()
 
@@ -118,6 +139,40 @@ export default async function DealPage({
             phone={deal.contact.phone}
           />
         </div>
+      </div>
+
+      {/* Presupuestos */}
+      <div className="bg-white border border-zinc-200 rounded-xl p-5 mb-6">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-xs font-medium text-zinc-500 uppercase tracking-wide">Presupuestos</h3>
+          <Link
+            href={`/presupuestos/nuevo?dealId=${deal.id}`}
+            className="text-xs font-medium text-zinc-700 border border-zinc-200 hover:border-zinc-400 hover:bg-zinc-50 px-3 py-1.5 rounded-lg transition-colors"
+          >
+            + Nuevo presupuesto
+          </Link>
+        </div>
+        {presupuestos.length === 0 ? (
+          <p className="text-xs text-zinc-400 italic">No hay presupuestos vinculados a este deal.</p>
+        ) : (
+          <div className="divide-y divide-zinc-50">
+            {presupuestos.map((p) => (
+              <div key={p.id} className="flex items-center justify-between py-2.5">
+                <div className="flex items-center gap-3">
+                  <Link href={`/presupuestos/${p.id}`} className="text-xs font-mono font-semibold text-zinc-800 hover:text-blue-700 transition-colors">
+                    {p.number}
+                  </Link>
+                  <span className={`text-[10px] font-semibold uppercase tracking-wide px-2 py-0.5 rounded-full ${PRESUPUESTO_STATUS_COLORS[p.status]}`}>
+                    {PRESUPUESTO_STATUS_LABELS[p.status]}
+                  </span>
+                </div>
+                <span className="text-xs font-mono text-zinc-600">
+                  {new Intl.NumberFormat('es-ES', { style: 'currency', currency: 'EUR' }).format(p.amountTotal)}
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Configuración activa */}

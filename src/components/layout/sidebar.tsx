@@ -9,6 +9,7 @@ const NAV = [
   { href: '/deals', label: 'Deals', icon: IconDeals },
   { href: '/pipeline', label: 'Pipeline', icon: IconPipeline },
   { href: '/facturas', label: 'Facturas', icon: IconInvoice },
+  { href: '/presupuestos', label: 'Presupuestos', icon: IconQuote },
 ]
 
 const ADMIN_NAV = [
@@ -43,6 +44,8 @@ export function Sidebar({ user }: { user: AuthUser }) {
               ? pathname.startsWith('/deals')
               : href === '/facturas'
               ? pathname.startsWith('/facturas')
+              : href === '/presupuestos'
+              ? pathname.startsWith('/presupuestos')
               : pathname === href
 
           return (
@@ -185,6 +188,22 @@ function IconUsers({ className }: { className?: string }) {
       <path d="M1 13c0-2.76 2.24-5 5-5" />
       <circle cx="12" cy="5" r="2" />
       <path d="M10.5 8.5c.5-.1 1-.15 1.5-.15 1.93 0 3.5 1.57 3.5 3.5" />
+    </svg>
+  )
+}
+
+function IconQuote({ className }: { className?: string }) {
+  return (
+    <svg
+      className={className}
+      viewBox="0 0 16 16"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.5"
+    >
+      <rect x="2" y="1" width="12" height="14" rx="1.5" />
+      <path d="M5 5h6M5 8h4" strokeLinecap="round" />
+      <path d="M5 11h2.5M9.5 11l1 1.5 1-1.5" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
   )
 }
