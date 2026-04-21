@@ -22,6 +22,7 @@
 // Migrations (if table already exists):
 //   ALTER TABLE deals ADD COLUMN IF NOT EXISTS company_cif text;
 //   ALTER TABLE deals ADD COLUMN IF NOT EXISTS company_address text;
+//   ALTER TABLE deals ADD COLUMN IF NOT EXISTS company_city text;
 // =========================================
 
 import { getSupabaseClient } from './client'
@@ -32,7 +33,7 @@ interface DealRow {
   company_name: string
   company_cif: string | null
   company_address: string | null
-  company_city: string | null
+  company_city?: string | null   // optional — column may not exist yet in all envs
   contact_first_name: string | null
   contact_last_name: string | null
   contact_email: string | null
@@ -78,7 +79,7 @@ function rowToDeal(row: DealRow): Deal {
 
 export async function listDeals(): Promise<Deal[]> {
   const { data, error } = await table()
-    .select('id, company_name, company_cif, company_address, company_city, contact_first_name, contact_last_name, contact_email, contact_phone, stage, owner_id, created_at, updated_at')
+    .select('id, company_name, company_cif, company_address, contact_first_name, contact_last_name, contact_email, contact_phone, stage, owner_id, created_at, updated_at')
     .order('created_at', { ascending: false })
   if (error) throw new Error(`Supabase listDeals: ${error.message}`)
   return ((data ?? []) as DealRow[]).map(rowToDeal)
