@@ -122,6 +122,7 @@ export default async function DealPage({
           <CompanyEditor
             dealId={deal.id}
             name={deal.company.name}
+            brandName={deal.company.brandName}
             cif={deal.company.cif}
             address={deal.company.address}
             city={deal.company.city}

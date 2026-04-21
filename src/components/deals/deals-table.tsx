@@ -287,6 +287,9 @@ function DealRow({
           <p className={`font-medium text-sm leading-snug truncate group-hover:text-blue-600 transition-colors ${stale ? 'text-zinc-500' : 'text-zinc-900'}`}>
             {deal.company.name}
           </p>
+          {deal.company.brandName && (
+            <p className="text-xs text-zinc-400 truncate leading-snug">{deal.company.brandName}</p>
+          )}
           <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
             {deal.company.city && (
               <span className="text-xs text-zinc-400 truncate">{deal.company.city}</span>

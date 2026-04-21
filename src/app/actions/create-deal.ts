@@ -14,6 +14,7 @@ export async function createDealAction(formData: FormData): Promise<void> {
     redirect('/deals/new?error=' + encodeURIComponent('El nombre de la empresa es obligatorio.'))
   }
 
+  const brandName        = (formData.get('brandName')        as string | null)?.trim() || undefined
   const companyCif       = (formData.get('companyCif')       as string | null)?.trim() || undefined
   const companyAddress   = (formData.get('companyAddress')   as string | null)?.trim() || undefined
   const companyCity      = (formData.get('companyCity')      as string | null)?.trim() || undefined
@@ -29,6 +30,7 @@ export async function createDealAction(formData: FormData): Promise<void> {
   try {
     const deal = await createDeal({
       companyName,
+      brandName,
       companyCif,
       companyAddress,
       companyCity,

@@ -6,6 +6,7 @@ import { updateCompanyAction } from '@/app/actions/update-company'
 interface CompanyEditorProps {
   dealId: string
   name: string
+  brandName?: string
   cif?: string
   address?: string
   city?: string
@@ -22,23 +23,26 @@ function Row({ label, value, mono }: { label: string; value: string; mono?: bool
   )
 }
 
-export function CompanyEditor({ dealId, name, cif, address, city }: CompanyEditorProps) {
+export function CompanyEditor({ dealId, name, brandName, cif, address, city }: CompanyEditorProps) {
   const [editing, setEditing] = useState(false)
   const [isPending, startTransition] = useTransition()
   const [error, setError] = useState<string | null>(null)
 
-  const [displayName, setDisplayName]       = useState(name)
-  const [displayCif, setDisplayCif]         = useState(cif ?? '')
-  const [displayAddress, setDisplayAddress] = useState(address ?? '')
-  const [displayCity, setDisplayCity]       = useState(city ?? '')
+  const [displayName, setDisplayName]           = useState(name)
+  const [displayBrandName, setDisplayBrandName] = useState(brandName ?? '')
+  const [displayCif, setDisplayCif]             = useState(cif ?? '')
+  const [displayAddress, setDisplayAddress]     = useState(address ?? '')
+  const [displayCity, setDisplayCity]           = useState(city ?? '')
 
-  const [nameVal, setNameVal]       = useState(name)
-  const [cifVal, setCifVal]         = useState(cif ?? '')
-  const [addressVal, setAddressVal] = useState(address ?? '')
-  const [cityVal, setCityVal]       = useState(city ?? '')
+  const [nameVal, setNameVal]           = useState(name)
+  const [brandNameVal, setBrandNameVal] = useState(brandName ?? '')
+  const [cifVal, setCifVal]             = useState(cif ?? '')
+  const [addressVal, setAddressVal]     = useState(address ?? '')
+  const [cityVal, setCityVal]           = useState(city ?? '')
 
   function handleCancel() {
     setNameVal(displayName)
+    setBrandNameVal(displayBrandName)
     setCifVal(displayCif)
     setAddressVal(displayAddress)
     setCityVal(displayCity)
@@ -49,9 +53,10 @@ export function CompanyEditor({ dealId, name, cif, address, city }: CompanyEdito
   function handleSave() {
     setError(null)
     startTransition(async () => {
-      const result = await updateCompanyAction(dealId, nameVal.trim(), cifVal.trim(), addressVal.trim(), cityVal.trim())
+      const result = await updateCompanyAction(dealId, nameVal.trim(), brandNameVal.trim(), cifVal.trim(), addressVal.trim(), cityVal.trim())
       if (result.ok) {
         setDisplayName(nameVal.trim())
+        setDisplayBrandName(brandNameVal.trim())
         setDisplayCif(cifVal.trim())
         setDisplayAddress(addressVal.trim())
         setDisplayCity(cityVal.trim())
@@ -76,6 +81,18 @@ export function CompanyEditor({ dealId, name, cif, address, city }: CompanyEdito
             className="w-full text-sm border border-zinc-300 rounded-md px-2.5 py-1.5 focus:outline-none focus:ring-2 focus:ring-zinc-400 focus:border-transparent"
             placeholder="Empresa S.L."
             autoFocus
+          />
+        </div>
+        <div>
+          <label className="text-[10px] font-medium text-zinc-400 uppercase tracking-wide block mb-1">
+            Marca
+          </label>
+          <input
+            type="text"
+            value={brandNameVal}
+            onChange={(e) => setBrandNameVal(e.target.value)}
+            className="w-full text-sm border border-zinc-300 rounded-md px-2.5 py-1.5 focus:outline-none focus:ring-2 focus:ring-zinc-400 focus:border-transparent"
+            placeholder="Nombre comercial / marca"
           />
         </div>
         <div>
@@ -141,10 +158,11 @@ export function CompanyEditor({ dealId, name, cif, address, city }: CompanyEdito
     <dl className="space-y-2">
       <div className="flex items-start justify-between group">
         <div className="flex-1 space-y-2">
-          <Row label="Nombre" value={displayName} />
-          {displayCif     && <Row label="CIF"       value={displayCif}     mono />}
-          {displayAddress && <Row label="Dirección" value={displayAddress} />}
-          {displayCity    && <Row label="Ciudad"    value={displayCity}    />}
+          <Row label="Nombre"    value={displayName} />
+          {displayBrandName && <Row label="Marca"     value={displayBrandName} />}
+          {displayCif       && <Row label="CIF"       value={displayCif}       mono />}
+          {displayAddress   && <Row label="Dirección" value={displayAddress}   />}
+          {displayCity      && <Row label="Ciudad"    value={displayCity}      />}
         </div>
         <button
           onClick={() => setEditing(true)}

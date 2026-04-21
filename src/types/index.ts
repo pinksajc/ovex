@@ -138,6 +138,7 @@ export interface Deal {
 
   company: {
     name: string
+    brandName?: string
     cif?: string
     address?: string
     city?: string

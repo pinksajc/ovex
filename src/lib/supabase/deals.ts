@@ -23,6 +23,7 @@
 //   ALTER TABLE deals ADD COLUMN IF NOT EXISTS company_cif text;
 //   ALTER TABLE deals ADD COLUMN IF NOT EXISTS company_address text;
 //   ALTER TABLE deals ADD COLUMN IF NOT EXISTS company_city text;
+//   ALTER TABLE deals ADD COLUMN IF NOT EXISTS brand_name text;
 // =========================================
 
 import { getSupabaseClient } from './client'
@@ -34,6 +35,7 @@ interface DealRow {
   company_cif: string | null
   company_address: string | null
   company_city?: string | null   // optional — column may not exist yet in all envs
+  brand_name?: string | null
   contact_first_name: string | null
   contact_last_name: string | null
   contact_email: string | null
@@ -54,6 +56,7 @@ function rowToDeal(row: DealRow): Deal {
     id: row.id,
     company: {
       name: row.company_name,
+      brandName: row.brand_name ?? undefined,
       cif: row.company_cif ?? undefined,
       address: row.company_address ?? undefined,
       city: row.company_city ?? undefined,
@@ -97,6 +100,7 @@ export async function getDealById(id: string): Promise<Deal | undefined> {
 
 export interface CreateDealInput {
   companyName: string
+  brandName?: string
   companyCif?: string
   companyAddress?: string
   companyCity?: string
@@ -110,6 +114,7 @@ export interface CreateDealInput {
 
 export interface UpdateCompanyInput {
   name?: string
+  brandName?: string
   cif?: string
   address?: string
   city?: string
@@ -134,6 +139,7 @@ export async function updateDealCompany(id: string, input: UpdateCompanyInput): 
     updated_at: new Date().toISOString(),
   }
   if (input.name !== undefined && input.name.trim()) patch.company_name = input.name.trim()
+  if (input.brandName !== undefined) patch.brand_name = input.brandName || null
   if (input.cif !== undefined) patch.company_cif = input.cif || null
   if (input.address !== undefined) patch.company_address = input.address || null
   if (input.city !== undefined) patch.company_city = input.city || null
@@ -145,6 +151,7 @@ export async function createDeal(input: CreateDealInput): Promise<Deal> {
   const { data, error } = await table()
     .insert({
       company_name: input.companyName,
+      brand_name: input.brandName || null,
       company_cif: input.companyCif || null,
       company_address: input.companyAddress || null,
       company_city: input.companyCity || null,

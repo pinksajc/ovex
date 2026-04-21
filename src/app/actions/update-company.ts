@@ -6,6 +6,7 @@ import { updateDealCompany } from '@/lib/supabase/deals'
 export async function updateCompanyAction(
   dealId: string,
   name: string,
+  brandName: string,
   cif: string,
   address: string,
   city: string,
@@ -13,7 +14,7 @@ export async function updateCompanyAction(
   if (!dealId) return { ok: false, error: 'dealId requerido' }
   if (!name.trim()) return { ok: false, error: 'El nombre es obligatorio' }
   try {
-    await updateDealCompany(dealId, { name, cif, address, city })
+    await updateDealCompany(dealId, { name, brandName, cif, address, city })
     revalidateTag('attio-deals', 'max')
     revalidatePath(`/deals/${dealId}`)
     revalidatePath('/deals')
