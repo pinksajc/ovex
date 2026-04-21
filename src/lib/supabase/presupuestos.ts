@@ -92,10 +92,10 @@ async function generatePresupuestoNumber(): Promise<string> {
 
   const { count } = await presupuestosTable(db)
     .select('id', { count: 'exact', head: true })
-    .like('number', `P-${year}-%`)
+    .like('number', `O-${year}-%`)
 
   const seq = (count ?? 0) + 1
-  return `P-${year}-${String(seq).padStart(4, '0')}`
+  return `O-${year}-${String(seq).padStart(4, '0')}`
 }
 
 // =========================================

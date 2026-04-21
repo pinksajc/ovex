@@ -20,7 +20,7 @@ const TRANSITIONS: Record<PresupuestoStatus, { label: string; next: PresupuestoS
   ],
 }
 
-export function PresupuestoActions({ presupuestoId, currentStatus }: { presupuestoId: string; currentStatus: PresupuestoStatus }) {
+export function OfertaActions({ presupuestoId, currentStatus }: { presupuestoId: string; currentStatus: PresupuestoStatus }) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
   const [error, setError] = useState<string | null>(null)

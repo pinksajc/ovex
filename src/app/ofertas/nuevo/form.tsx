@@ -2,9 +2,9 @@
 
 import { useState, useTransition, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
-import { updatePresupuestoAction } from '@/app/actions/presupuestos'
+import { createPresupuestoAction } from '@/app/actions/presupuestos'
 import { SERVICES, SERVICE_MAP, SERVICE_GROUPS } from '@/lib/invoice-catalog'
-import type { Presupuesto, InvoiceLineItem, DiscountMode } from '@/types'
+import type { InvoiceLineItem, DiscountMode } from '@/types'
 
 // ---- helpers ----
 
@@ -16,15 +16,6 @@ type FormLine = InvoiceLineItem & { serviceId: string; unit: string }
 
 function emptyLine(): FormLine {
   return { id: newLineId(), type: 'line', description: '', quantity: 1, unitPrice: 0, amount: 0, serviceId: '', unit: '' }
-}
-
-function itemToFormLine(item: InvoiceLineItem): FormLine {
-  return {
-    ...item,
-    id: item.id || newLineId(),
-    serviceId: item.serviceId ?? '',
-    unit: item.unit ?? '',
-  }
 }
 
 function fmtNum(n: number) {
@@ -43,28 +34,29 @@ interface DealOption {
 }
 
 interface Props {
-  presupuesto: Presupuesto
   deals: DealOption[]
+  preselectedDealId?: string
 }
 
-export function EditPresupuestoForm({ presupuesto, deals }: Props) {
+export function NuevaOfertaForm({ deals, preselectedDealId }: Props) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
   const [error, setError] = useState<string | null>(null)
 
-  const [dealId, setDealId] = useState(presupuesto.dealId ?? '')
-  const [clientName, setClientName] = useState(presupuesto.clientName)
-  const [clientCif, setClientCif] = useState(presupuesto.clientCif ?? '')
-  const [clientAddress, setClientAddress] = useState(presupuesto.clientAddress ?? '')
-  const [vatRate, setVatRate] = useState(String(presupuesto.vatRate))
-  const [validUntil, setValidUntil] = useState(presupuesto.validUntil ?? '')
-  const [notes, setNotes] = useState(presupuesto.notes ?? '')
+  const preselected = preselectedDealId ? deals.find((d) => d.id === preselectedDealId) : undefined
 
-  const [lines, setLines] = useState<FormLine[]>(() =>
-    presupuesto.lineItems.length > 0
-      ? presupuesto.lineItems.map(itemToFormLine)
-      : [emptyLine()]
-  )
+  const [dealId, setDealId] = useState(preselected?.id ?? '')
+  const [clientName, setClientName] = useState(preselected?.company.name ?? '')
+  const [clientCif, setClientCif] = useState(preselected?.company.cif ?? '')
+  const [clientAddress, setClientAddress] = useState(preselected?.company.address ?? '')
+  const [vatRate, setVatRate] = useState('21')
+  const [validUntil, setValidUntil] = useState(() => {
+    const d = new Date()
+    d.setDate(d.getDate() + 30)
+    return d.toISOString().split('T')[0]
+  })
+  const [notes, setNotes] = useState('')
+  const [lines, setLines] = useState<FormLine[]>([emptyLine()])
 
   // ---- computed totals ----
   const regularLines = lines.filter((l) => l.type === 'line')
@@ -133,7 +125,7 @@ export function EditPresupuestoForm({ presupuesto, deals }: Props) {
     }))
 
     startTransition(async () => {
-      const result = await updatePresupuestoAction(presupuesto.id, {
+      const result = await createPresupuestoAction({
         dealId: dealId || null,
         clientName: clientName.trim(),
         clientCif: clientCif.trim() || null,
@@ -237,13 +229,13 @@ export function EditPresupuestoForm({ presupuesto, deals }: Props) {
             <span className="text-xs font-mono w-28 text-right text-zinc-700">{fmtNum(vatAmount)} €</span>
           </div>
           <div className="flex items-center justify-between pt-2 border-t border-zinc-200">
-            <span className="text-sm font-semibold text-zinc-900">Total presupuesto</span>
+            <span className="text-sm font-semibold text-zinc-900">Total oferta</span>
             <span className="text-lg font-mono font-semibold text-zinc-900">{fmtNum(total)} €</span>
           </div>
         </div>
       </div>
 
-      {/* Validez + Notas */}
+      {/* Fechas + Notas */}
       <div className="bg-white border border-zinc-200 rounded-xl p-5 space-y-4">
         <h2 className="text-xs font-semibold text-zinc-500 uppercase tracking-widest">Validez y notas</h2>
         <div>
@@ -272,7 +264,7 @@ export function EditPresupuestoForm({ presupuesto, deals }: Props) {
         </button>
         <button type="submit" disabled={isPending}
           className="px-5 py-2 text-sm font-medium bg-zinc-900 text-white hover:bg-zinc-700 rounded-lg transition-colors disabled:opacity-50">
-          {isPending ? 'Guardando...' : 'Guardar cambios'}
+          {isPending ? 'Guardando...' : 'Guardar oferta'}
         </button>
       </div>
     </form>

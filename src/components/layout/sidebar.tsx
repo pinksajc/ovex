@@ -9,7 +9,6 @@ const NAV = [
   { href: '/deals', label: 'Deals', icon: IconDeals },
   { href: '/pipeline', label: 'Pipeline', icon: IconPipeline },
   { href: '/facturas', label: 'Facturas', icon: IconInvoice },
-  { href: '/presupuestos', label: 'Presupuestos', icon: IconQuote },
 ]
 
 const ADMIN_NAV = [
@@ -43,9 +42,7 @@ export function Sidebar({ user }: { user: AuthUser }) {
             href === '/deals'
               ? pathname.startsWith('/deals')
               : href === '/facturas'
-              ? pathname.startsWith('/facturas')
-              : href === '/presupuestos'
-              ? pathname.startsWith('/presupuestos')
+              ? pathname.startsWith('/facturas') || pathname.startsWith('/ofertas')
               : pathname === href
 
           return (

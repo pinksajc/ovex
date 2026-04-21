@@ -141,25 +141,25 @@ export default async function DealPage({
         </div>
       </div>
 
-      {/* Presupuestos */}
+      {/* Ofertas */}
       <div className="bg-white border border-zinc-200 rounded-xl p-5 mb-6">
         <div className="flex items-center justify-between mb-4">
-          <h3 className="text-xs font-medium text-zinc-500 uppercase tracking-wide">Presupuestos</h3>
+          <h3 className="text-xs font-medium text-zinc-500 uppercase tracking-wide">Ofertas</h3>
           <Link
-            href={`/presupuestos/nuevo?dealId=${deal.id}`}
+            href={`/ofertas/nuevo?dealId=${deal.id}`}
             className="text-xs font-medium text-zinc-700 border border-zinc-200 hover:border-zinc-400 hover:bg-zinc-50 px-3 py-1.5 rounded-lg transition-colors"
           >
-            + Nuevo presupuesto
+            + Nueva oferta
           </Link>
         </div>
         {presupuestos.length === 0 ? (
-          <p className="text-xs text-zinc-400 italic">No hay presupuestos vinculados a este deal.</p>
+          <p className="text-xs text-zinc-400 italic">No hay ofertas vinculadas a este deal.</p>
         ) : (
           <div className="divide-y divide-zinc-50">
             {presupuestos.map((p) => (
               <div key={p.id} className="flex items-center justify-between py-2.5">
                 <div className="flex items-center gap-3">
-                  <Link href={`/presupuestos/${p.id}`} className="text-xs font-mono font-semibold text-zinc-800 hover:text-blue-700 transition-colors">
+                  <Link href={`/ofertas/${p.id}`} className="text-xs font-mono font-semibold text-zinc-800 hover:text-blue-700 transition-colors">
                     {p.number}
                   </Link>
                   <span className={`text-[10px] font-semibold uppercase tracking-wide px-2 py-0.5 rounded-full ${PRESUPUESTO_STATUS_COLORS[p.status]}`}>

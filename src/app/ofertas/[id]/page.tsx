@@ -1,7 +1,7 @@
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import { getPresupuesto } from '@/lib/supabase/presupuestos'
-import { PresupuestoActions } from './actions'
+import { OfertaActions } from './actions'
 import type { PresupuestoStatus } from '@/types'
 
 const STATUS_LABELS: Record<PresupuestoStatus, string> = {
@@ -38,7 +38,7 @@ function Row({ label, value }: { label: string; value: React.ReactNode }) {
   )
 }
 
-export default async function PresupuestoDetailPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function OfertaDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
   const presupuesto = await getPresupuesto(id).catch(() => null)
   if (!presupuesto) notFound()
@@ -50,10 +50,10 @@ export default async function PresupuestoDetailPage({ params }: { params: Promis
     <div className="p-8 max-w-3xl mx-auto">
       {/* Back */}
       <Link
-        href="/presupuestos"
+        href="/facturas?tab=ofertas"
         className="inline-flex items-center gap-1 text-xs text-zinc-400 hover:text-zinc-700 mb-6 transition-colors"
       >
-        ← Presupuestos
+        ← Ofertas
       </Link>
 
       {/* Header */}
@@ -71,7 +71,7 @@ export default async function PresupuestoDetailPage({ params }: { params: Promis
         <div className="flex items-center gap-2 flex-wrap">
           {canEdit && (
             <Link
-              href={`/presupuestos/${presupuesto.id}/editar`}
+              href={`/ofertas/${presupuesto.id}/editar`}
               className="inline-flex items-center gap-1.5 text-xs font-medium border border-zinc-200 text-zinc-700 hover:bg-zinc-50 hover:border-zinc-400 px-3 py-1.5 rounded-lg transition-colors"
             >
               <svg className="w-3.5 h-3.5" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5">
@@ -81,7 +81,7 @@ export default async function PresupuestoDetailPage({ params }: { params: Promis
             </Link>
           )}
           <a
-            href={`/api/presupuestos/generate-pdf?id=${presupuesto.id}`}
+            href={`/api/ofertas/generate-pdf?id=${presupuesto.id}`}
             target="_blank"
             rel="noopener noreferrer"
             className="inline-flex items-center gap-1.5 text-xs font-medium border border-zinc-200 text-zinc-700 hover:bg-zinc-50 hover:border-zinc-400 px-3 py-1.5 rounded-lg transition-colors"
@@ -132,7 +132,7 @@ export default async function PresupuestoDetailPage({ params }: { params: Promis
               <Row label="Base imponible" value={<span className="font-mono">{formatEur(presupuesto.amountNet)}</span>} />
               <Row label={`IVA (${presupuesto.vatRate}%)`} value={<span className="font-mono">{formatEur(vatAmount)}</span>} />
               <div className="flex items-start justify-between pt-2.5 border-t border-zinc-200">
-                <span className="text-xs font-semibold text-zinc-700">Total presupuesto</span>
+                <span className="text-xs font-semibold text-zinc-700">Total oferta</span>
                 <span className="text-base font-mono font-semibold text-zinc-900">{formatEur(presupuesto.amountTotal)}</span>
               </div>
             </div>
@@ -140,7 +140,7 @@ export default async function PresupuestoDetailPage({ params }: { params: Promis
 
           <div className="bg-white border border-zinc-200 rounded-xl p-5">
             <h2 className="text-[10px] font-semibold text-zinc-400 uppercase tracking-widest mb-3">Cambiar estado</h2>
-            <PresupuestoActions presupuestoId={presupuesto.id} currentStatus={presupuesto.status} />
+            <OfertaActions presupuestoId={presupuesto.id} currentStatus={presupuesto.status} />
           </div>
 
           {presupuesto.dealId && (

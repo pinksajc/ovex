@@ -308,7 +308,7 @@ export async function generatePresupuestoPdf(presupuesto: Presupuesto): Promise<
     </div>
   </div>
   <div style="text-align:right;">
-    <div class="doc-type-badge">Presupuesto</div>
+    <div class="doc-type-badge">Oferta</div>
     <div class="doc-number">${esc(presupuesto.number)}</div>
   </div>
 </div>
@@ -331,7 +331,7 @@ export async function generatePresupuestoPdf(presupuesto: Presupuesto): Promise<
 
 ${presupuesto.validUntil ? `
 <div class="validity-banner">
-  ✓ Este presupuesto es válido hasta el <strong>${fmtDate(presupuesto.validUntil)}</strong>
+  ✓ Esta oferta es válida hasta el <strong>${fmtDate(presupuesto.validUntil)}</strong>
 </div>` : ''}
 
 <!-- Parties -->
@@ -398,7 +398,7 @@ ${presupuesto.validUntil ? `
     <span class="amount">${fmt(vatAmount)} €</span>
   </div>
   <div class="totals-row total-final">
-    <span class="label">Total presupuesto</span>
+    <span class="label">Total oferta</span>
     <span class="amount" style="font-size:14px;">${fmt(presupuesto.amountTotal)} €</span>
   </div>
 </div>
@@ -412,7 +412,7 @@ ${presupuesto.notes ? `
 
 <!-- Footer -->
 <div class="footer-legal">
-  Este presupuesto no tiene valor de factura. Sujeto a aceptación formal por ambas partes.<br/>
+  Esta oferta no tiene valor de factura. Sujeto a aceptación formal por ambas partes.<br/>
   Platomico, S.L. · NIF B22741094 · hola@platomico.com<br/>
   Documento generado el ${today}
 </div>
