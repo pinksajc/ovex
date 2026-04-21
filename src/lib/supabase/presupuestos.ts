@@ -162,7 +162,6 @@ export async function createPresupuesto(input: CreatePresupuestoInput): Promise<
       status: 'draft',
       valid_until: input.validUntil ?? null,
       notes: input.notes ?? null,
-      updated_at: new Date().toISOString(),
     })
     .select()
     .single()
@@ -185,7 +184,6 @@ export async function updatePresupuesto(id: string, input: UpdatePresupuestoInpu
       amount_total: input.amountTotal,
       valid_until: input.validUntil ?? null,
       notes: input.notes ?? null,
-      updated_at: new Date().toISOString(),
     })
     .eq('id', id)
     .select()
@@ -198,7 +196,7 @@ export async function updatePresupuesto(id: string, input: UpdatePresupuestoInpu
 export async function updatePresupuestoStatus(id: string, status: PresupuestoStatus): Promise<void> {
   const db = getSupabaseClient()
   const { error } = await presupuestosTable(db)
-    .update({ status, updated_at: new Date().toISOString() })
+    .update({ status })
     .eq('id', id)
 
   if (error) throw error
