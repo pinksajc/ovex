@@ -344,7 +344,7 @@ export interface CreatePresupuestoInput {
   clientName: string
   clientCif: string | null
   clientAddress: string | null
-  concept: string
+  concept?: string  // derived from line_items at runtime; not stored as a separate DB column
   lineItems: InvoiceLineItem[]
   amountNet: number
   vatRate: number

@@ -38,7 +38,8 @@ interface PresupuestoRow {
   client_name: string
   client_cif: string | null
   client_address: string | null
-  concept: string
+  // concept column may not exist in older table versions — derived from line_items
+  concept?: string
   line_items: unknown
   amount_net: number
   vat_rate: number
@@ -59,6 +60,10 @@ function parseLineItems(raw: unknown): InvoiceLineItem[] {
 }
 
 function rowToPresupuesto(row: PresupuestoRow): Presupuesto {
+  const lineItems = parseLineItems(row.line_items)
+  const filledLines = lineItems.filter((l) => l.type === 'line' && l.description?.trim())
+  const derivedConcept = row.concept?.trim()
+    || (filledLines.length === 1 ? filledLines[0].description.trim() : filledLines.length > 1 ? 'Varios conceptos' : '')
   return {
     id: row.id,
     number: row.number,
@@ -66,8 +71,8 @@ function rowToPresupuesto(row: PresupuestoRow): Presupuesto {
     clientName: row.client_name,
     clientCif: row.client_cif,
     clientAddress: row.client_address,
-    concept: row.concept,
-    lineItems: parseLineItems(row.line_items),
+    concept: derivedConcept,
+    lineItems,
     amountNet: Number(row.amount_net),
     vatRate: Number(row.vat_rate),
     amountTotal: Number(row.amount_total),
@@ -150,7 +155,6 @@ export async function createPresupuesto(input: CreatePresupuestoInput): Promise<
       client_name: input.clientName,
       client_cif: input.clientCif ?? null,
       client_address: input.clientAddress ?? null,
-      concept: input.concept,
       line_items: JSON.stringify(input.lineItems),
       amount_net: input.amountNet,
       vat_rate: input.vatRate,
@@ -175,7 +179,6 @@ export async function updatePresupuesto(id: string, input: UpdatePresupuestoInpu
       client_name: input.clientName,
       client_cif: input.clientCif ?? null,
       client_address: input.clientAddress ?? null,
-      concept: input.concept,
       line_items: JSON.stringify(input.lineItems),
       amount_net: input.amountNet,
       vat_rate: input.vatRate,
