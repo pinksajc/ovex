@@ -8,6 +8,7 @@ interface CompanyEditorProps {
   name: string
   cif?: string
   address?: string
+  city?: string
 }
 
 function Row({ label, value, mono }: { label: string; value: string; mono?: boolean }) {
@@ -21,23 +22,26 @@ function Row({ label, value, mono }: { label: string; value: string; mono?: bool
   )
 }
 
-export function CompanyEditor({ dealId, name, cif, address }: CompanyEditorProps) {
+export function CompanyEditor({ dealId, name, cif, address, city }: CompanyEditorProps) {
   const [editing, setEditing] = useState(false)
   const [isPending, startTransition] = useTransition()
   const [error, setError] = useState<string | null>(null)
 
-  const [displayName, setDisplayName]     = useState(name)
-  const [displayCif, setDisplayCif]       = useState(cif ?? '')
+  const [displayName, setDisplayName]       = useState(name)
+  const [displayCif, setDisplayCif]         = useState(cif ?? '')
   const [displayAddress, setDisplayAddress] = useState(address ?? '')
+  const [displayCity, setDisplayCity]       = useState(city ?? '')
 
   const [nameVal, setNameVal]       = useState(name)
   const [cifVal, setCifVal]         = useState(cif ?? '')
   const [addressVal, setAddressVal] = useState(address ?? '')
+  const [cityVal, setCityVal]       = useState(city ?? '')
 
   function handleCancel() {
     setNameVal(displayName)
     setCifVal(displayCif)
     setAddressVal(displayAddress)
+    setCityVal(displayCity)
     setError(null)
     setEditing(false)
   }
@@ -45,11 +49,12 @@ export function CompanyEditor({ dealId, name, cif, address }: CompanyEditorProps
   function handleSave() {
     setError(null)
     startTransition(async () => {
-      const result = await updateCompanyAction(dealId, nameVal.trim(), cifVal.trim(), addressVal.trim())
+      const result = await updateCompanyAction(dealId, nameVal.trim(), cifVal.trim(), addressVal.trim(), cityVal.trim())
       if (result.ok) {
         setDisplayName(nameVal.trim())
         setDisplayCif(cifVal.trim())
         setDisplayAddress(addressVal.trim())
+        setDisplayCity(cityVal.trim())
         setEditing(false)
       } else {
         setError(result.error)
@@ -97,6 +102,18 @@ export function CompanyEditor({ dealId, name, cif, address }: CompanyEditorProps
             placeholder="Ej: Calle Mayor 1, Madrid"
           />
         </div>
+        <div>
+          <label className="text-[10px] font-medium text-zinc-400 uppercase tracking-wide block mb-1">
+            Ciudad
+          </label>
+          <input
+            type="text"
+            value={cityVal}
+            onChange={(e) => setCityVal(e.target.value)}
+            className="w-full text-sm border border-zinc-300 rounded-md px-2.5 py-1.5 focus:outline-none focus:ring-2 focus:ring-zinc-400 focus:border-transparent"
+            placeholder="Ej: Madrid"
+          />
+        </div>
 
         {error && <p className="text-[11px] text-red-500 leading-tight">{error}</p>}
 
@@ -127,6 +144,7 @@ export function CompanyEditor({ dealId, name, cif, address }: CompanyEditorProps
           <Row label="Nombre" value={displayName} />
           {displayCif     && <Row label="CIF"       value={displayCif}     mono />}
           {displayAddress && <Row label="Dirección" value={displayAddress} />}
+          {displayCity    && <Row label="Ciudad"    value={displayCity}    />}
         </div>
         <button
           onClick={() => setEditing(true)}

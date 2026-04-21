@@ -32,6 +32,7 @@ interface DealRow {
   company_name: string
   company_cif: string | null
   company_address: string | null
+  company_city: string | null
   contact_first_name: string | null
   contact_last_name: string | null
   contact_email: string | null
@@ -54,6 +55,7 @@ function rowToDeal(row: DealRow): Deal {
       name: row.company_name,
       cif: row.company_cif ?? undefined,
       address: row.company_address ?? undefined,
+      city: row.company_city ?? undefined,
     },
     contact: {
       name: contactName,
@@ -76,7 +78,7 @@ function rowToDeal(row: DealRow): Deal {
 
 export async function listDeals(): Promise<Deal[]> {
   const { data, error } = await table()
-    .select('id, company_name, company_cif, company_address, contact_first_name, contact_last_name, contact_email, contact_phone, stage, owner_id, created_at, updated_at')
+    .select('id, company_name, company_cif, company_address, company_city, contact_first_name, contact_last_name, contact_email, contact_phone, stage, owner_id, created_at, updated_at')
     .order('created_at', { ascending: false })
   if (error) throw new Error(`Supabase listDeals: ${error.message}`)
   return ((data ?? []) as DealRow[]).map(rowToDeal)
@@ -96,6 +98,7 @@ export interface CreateDealInput {
   companyName: string
   companyCif?: string
   companyAddress?: string
+  companyCity?: string
   contactFirstName?: string
   contactLastName?: string
   contactEmail?: string
@@ -108,6 +111,7 @@ export interface UpdateCompanyInput {
   name?: string
   cif?: string
   address?: string
+  city?: string
 }
 
 export async function updateDealStage(id: string, stage: DealStage): Promise<void> {
@@ -131,6 +135,7 @@ export async function updateDealCompany(id: string, input: UpdateCompanyInput): 
   if (input.name !== undefined && input.name.trim()) patch.company_name = input.name.trim()
   if (input.cif !== undefined) patch.company_cif = input.cif || null
   if (input.address !== undefined) patch.company_address = input.address || null
+  if (input.city !== undefined) patch.company_city = input.city || null
   const { error } = await table().update(patch).eq('id', id)
   if (error) throw new Error(`Supabase updateDealCompany: ${error.message}`)
 }
@@ -141,6 +146,7 @@ export async function createDeal(input: CreateDealInput): Promise<Deal> {
       company_name: input.companyName,
       company_cif: input.companyCif || null,
       company_address: input.companyAddress || null,
+      company_city: input.companyCity || null,
       contact_first_name: input.contactFirstName || null,
       contact_last_name: input.contactLastName || null,
       contact_email: input.contactEmail || null,

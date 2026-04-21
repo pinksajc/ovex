@@ -8,11 +8,12 @@ export async function updateCompanyAction(
   name: string,
   cif: string,
   address: string,
+  city: string,
 ): Promise<{ ok: true } | { ok: false; error: string }> {
   if (!dealId) return { ok: false, error: 'dealId requerido' }
   if (!name.trim()) return { ok: false, error: 'El nombre es obligatorio' }
   try {
-    await updateDealCompany(dealId, { name, cif, address })
+    await updateDealCompany(dealId, { name, cif, address, city })
     revalidateTag('attio-deals', 'max')
     revalidatePath(`/deals/${dealId}`)
     revalidatePath('/deals')

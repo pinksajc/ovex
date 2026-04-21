@@ -124,6 +124,7 @@ export default async function DealPage({
             name={deal.company.name}
             cif={deal.company.cif}
             address={deal.company.address}
+            city={deal.company.city}
           />
         </div>
 

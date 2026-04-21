@@ -16,6 +16,7 @@ export async function createDealAction(formData: FormData): Promise<void> {
 
   const companyCif       = (formData.get('companyCif')       as string | null)?.trim() || undefined
   const companyAddress   = (formData.get('companyAddress')   as string | null)?.trim() || undefined
+  const companyCity      = (formData.get('companyCity')      as string | null)?.trim() || undefined
   const contactFirstName = (formData.get('contactFirstName') as string | null)?.trim() || undefined
   const contactLastName  = (formData.get('contactLastName')  as string | null)?.trim() || undefined
   const contactEmail     = (formData.get('contactEmail')     as string | null)?.trim() || undefined
@@ -30,6 +31,7 @@ export async function createDealAction(formData: FormData): Promise<void> {
       companyName,
       companyCif,
       companyAddress,
+      companyCity,
       contactFirstName,
       contactLastName,
       contactEmail,
