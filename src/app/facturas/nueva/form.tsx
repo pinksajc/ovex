@@ -65,21 +65,31 @@ interface DealOption {
 
 interface Props {
   deals: DealOption[]
+  initialDealId?: string
+  initialClientName?: string
+  initialClientCif?: string
+  initialClientAddress?: string
 }
 
 // ---- component ----
 
-export function NewInvoiceForm({ deals }: Props) {
+export function NewInvoiceForm({
+  deals,
+  initialDealId,
+  initialClientName,
+  initialClientCif,
+  initialClientAddress,
+}: Props) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
   const [error, setError] = useState<string | null>(null)
 
   // Header fields
   const [type, setType] = useState<InvoiceType>('ordinary')
-  const [dealId, setDealId] = useState('')
-  const [clientName, setClientName] = useState('')
-  const [clientCif, setClientCif] = useState('')
-  const [clientAddress, setClientAddress] = useState('')
+  const [dealId, setDealId] = useState(initialDealId ?? '')
+  const [clientName, setClientName] = useState(initialClientName ?? '')
+  const [clientCif, setClientCif] = useState(initialClientCif ?? '')
+  const [clientAddress, setClientAddress] = useState(initialClientAddress ?? '')
   const [vatRate, setVatRate] = useState('21')
   const [issuedAt, setIssuedAt] = useState(() => new Date().toISOString().split('T')[0])
   const [dueAt, setDueAt] = useState('')

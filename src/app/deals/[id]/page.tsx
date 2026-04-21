@@ -7,7 +7,8 @@ import { CompanyEditor } from '@/components/company-editor'
 import { OwnerSelector } from '@/components/owner-selector'
 import { getWorkspaceMembers } from '@/lib/auth'
 import { getPresupuestosByDeal } from '@/lib/supabase/presupuestos'
-import type { DealStage, PresupuestoStatus } from '@/types'
+import { getInvoicesByDeal } from '@/lib/supabase/invoices'
+import type { DealStage, PresupuestoStatus, InvoiceStatus } from '@/types'
 
 const PRESUPUESTO_STATUS_LABELS: Record<PresupuestoStatus, string> = {
   draft: 'Borrador',
@@ -23,6 +24,20 @@ const PRESUPUESTO_STATUS_COLORS: Record<PresupuestoStatus, string> = {
   accepted: 'bg-emerald-50 text-emerald-700',
   rejected: 'bg-red-50 text-red-700',
   expired: 'bg-amber-50 text-amber-700',
+}
+
+const INVOICE_STATUS_LABELS: Record<InvoiceStatus, string> = {
+  draft: 'Borrador',
+  issued: 'Emitida',
+  paid: 'Pagada',
+  overdue: 'Vencida',
+}
+
+const INVOICE_STATUS_COLORS: Record<InvoiceStatus, string> = {
+  draft: 'bg-zinc-100 text-zinc-600',
+  issued: 'bg-blue-50 text-blue-700',
+  paid: 'bg-emerald-50 text-emerald-700',
+  overdue: 'bg-red-50 text-red-700',
 }
 
 const STAGE_LABELS: Record<DealStage, string> = {
@@ -51,10 +66,11 @@ export default async function DealPage({
   params: Promise<{ id: string }>
 }) {
   const { id } = await params
-  const [deal, members, presupuestos] = await Promise.all([
+  const [deal, members, presupuestos, facturas] = await Promise.all([
     getDeal(id),
     getWorkspaceMembers(),
     getPresupuestosByDeal(id).catch(() => []),
+    getInvoicesByDeal(id).catch(() => []),
   ])
 
   if (!deal) notFound()
@@ -170,6 +186,45 @@ export default async function DealPage({
                 </div>
                 <span className="text-xs font-mono text-zinc-600">
                   {new Intl.NumberFormat('es-ES', { style: 'currency', currency: 'EUR' }).format(p.amountTotal)}
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Facturas */}
+      <div className="bg-white border border-zinc-200 rounded-xl p-5 mb-6">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-xs font-medium text-zinc-500 uppercase tracking-wide">Facturas</h3>
+          <Link
+            href={`/facturas/nueva?deal_id=${deal.id}`}
+            className="text-xs font-medium text-zinc-700 border border-zinc-200 hover:border-zinc-400 hover:bg-zinc-50 px-3 py-1.5 rounded-lg transition-colors"
+          >
+            + Nueva factura
+          </Link>
+        </div>
+        {facturas.length === 0 ? (
+          <p className="text-xs text-zinc-400 italic">No hay facturas vinculadas a este deal.</p>
+        ) : (
+          <div className="divide-y divide-zinc-50">
+            {facturas.map((f) => (
+              <div key={f.id} className="flex items-center justify-between py-2.5">
+                <div className="flex items-center gap-3">
+                  <Link href={`/facturas/${f.id}`} className="text-xs font-mono font-semibold text-zinc-800 hover:text-blue-700 transition-colors">
+                    {f.number}
+                  </Link>
+                  <span className={`text-[10px] font-semibold uppercase tracking-wide px-2 py-0.5 rounded-full ${INVOICE_STATUS_COLORS[f.status]}`}>
+                    {INVOICE_STATUS_LABELS[f.status]}
+                  </span>
+                  {f.issuedAt && (
+                    <span className="text-[10px] text-zinc-400">
+                      {new Date(f.issuedAt).toLocaleDateString('es-ES', { day: 'numeric', month: 'short', year: 'numeric' })}
+                    </span>
+                  )}
+                </div>
+                <span className="text-xs font-mono text-zinc-600">
+                  {new Intl.NumberFormat('es-ES', { style: 'currency', currency: 'EUR' }).format(f.amountTotal)}
                 </span>
               </div>
             ))}

@@ -92,6 +92,38 @@ export async function getInvoices(): Promise<Invoice[]> {
   return (data as InvoiceRow[]).map(rowToInvoice)
 }
 
+export async function getInvoicesByDeal(dealId: string): Promise<Invoice[]> {
+  const db = getSupabaseClient()
+  const { data, error } = await invoicesTable(db)
+    .select('id, number, status, amount_total, issued_at')
+    .eq('deal_id', dealId)
+    .order('created_at', { ascending: false })
+
+  if (error) throw error
+  // Partial row — only fields needed for the deal detail card
+  return (data as Array<Pick<InvoiceRow, 'id' | 'number' | 'status' | 'amount_total' | 'issued_at'>>).map(
+    (row) => ({
+      id: row.id,
+      number: row.number,
+      type: 'ordinary' as InvoiceType,
+      dealId,
+      clientName: '',
+      clientCif: null,
+      clientAddress: null,
+      concept: '',
+      lineItems: [],
+      amountNet: 0,
+      vatRate: 21,
+      amountTotal: Number(row.amount_total),
+      status: row.status as InvoiceStatus,
+      issuedAt: row.issued_at,
+      dueAt: null,
+      rectifiesId: null,
+      createdAt: row.issued_at ?? '',
+    })
+  )
+}
+
 export async function getInvoice(id: string): Promise<Invoice | null> {
   const db = getSupabaseClient()
   const { data, error } = await invoicesTable(db)
