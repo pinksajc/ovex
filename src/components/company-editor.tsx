@@ -26,13 +26,16 @@ export function CompanyEditor({ dealId, name, cif, address }: CompanyEditorProps
   const [isPending, startTransition] = useTransition()
   const [error, setError] = useState<string | null>(null)
 
-  const [displayCif, setDisplayCif]     = useState(cif ?? '')
+  const [displayName, setDisplayName]     = useState(name)
+  const [displayCif, setDisplayCif]       = useState(cif ?? '')
   const [displayAddress, setDisplayAddress] = useState(address ?? '')
 
+  const [nameVal, setNameVal]       = useState(name)
   const [cifVal, setCifVal]         = useState(cif ?? '')
   const [addressVal, setAddressVal] = useState(address ?? '')
 
   function handleCancel() {
+    setNameVal(displayName)
     setCifVal(displayCif)
     setAddressVal(displayAddress)
     setError(null)
@@ -42,8 +45,9 @@ export function CompanyEditor({ dealId, name, cif, address }: CompanyEditorProps
   function handleSave() {
     setError(null)
     startTransition(async () => {
-      const result = await updateCompanyAction(dealId, cifVal.trim(), addressVal.trim())
+      const result = await updateCompanyAction(dealId, nameVal.trim(), cifVal.trim(), addressVal.trim())
       if (result.ok) {
+        setDisplayName(nameVal.trim())
         setDisplayCif(cifVal.trim())
         setDisplayAddress(addressVal.trim())
         setEditing(false)
@@ -60,7 +64,14 @@ export function CompanyEditor({ dealId, name, cif, address }: CompanyEditorProps
           <label className="text-[10px] font-medium text-zinc-400 uppercase tracking-wide block mb-1">
             Nombre
           </label>
-          <p className="text-sm text-zinc-500 italic">{name}</p>
+          <input
+            type="text"
+            value={nameVal}
+            onChange={(e) => setNameVal(e.target.value)}
+            className="w-full text-sm border border-zinc-300 rounded-md px-2.5 py-1.5 focus:outline-none focus:ring-2 focus:ring-zinc-400 focus:border-transparent"
+            placeholder="Empresa S.L."
+            autoFocus
+          />
         </div>
         <div>
           <label className="text-[10px] font-medium text-zinc-400 uppercase tracking-wide block mb-1">
@@ -72,7 +83,6 @@ export function CompanyEditor({ dealId, name, cif, address }: CompanyEditorProps
             onChange={(e) => setCifVal(e.target.value)}
             className="w-full text-sm font-mono border border-zinc-300 rounded-md px-2.5 py-1.5 focus:outline-none focus:ring-2 focus:ring-zinc-400 focus:border-transparent"
             placeholder="Ej: B12345678"
-            autoFocus
           />
         </div>
         <div>
@@ -114,8 +124,8 @@ export function CompanyEditor({ dealId, name, cif, address }: CompanyEditorProps
     <dl className="space-y-2">
       <div className="flex items-start justify-between group">
         <div className="flex-1 space-y-2">
-          <Row label="Nombre" value={name} />
-          {displayCif    && <Row label="CIF"       value={displayCif}     mono />}
+          <Row label="Nombre" value={displayName} />
+          {displayCif     && <Row label="CIF"       value={displayCif}     mono />}
           {displayAddress && <Row label="Dirección" value={displayAddress} />}
         </div>
         <button

@@ -105,6 +105,7 @@ export interface CreateDealInput {
 }
 
 export interface UpdateCompanyInput {
+  name?: string
   cif?: string
   address?: string
 }
@@ -127,6 +128,7 @@ export async function updateDealCompany(id: string, input: UpdateCompanyInput): 
   const patch: Record<string, string | null> = {
     updated_at: new Date().toISOString(),
   }
+  if (input.name !== undefined && input.name.trim()) patch.company_name = input.name.trim()
   if (input.cif !== undefined) patch.company_cif = input.cif || null
   if (input.address !== undefined) patch.company_address = input.address || null
   const { error } = await table().update(patch).eq('id', id)
