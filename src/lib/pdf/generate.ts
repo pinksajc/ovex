@@ -783,9 +783,17 @@ function s11Economics(deal: Deal, cfg: DealConfiguration, sections: ProposalSect
           <span style="font-size:9px;color:#334155;">REN · ${renFeePerOrder.toFixed(2).replace('.', ',')}€/pedido × ${fmtN(deliveryPerVenue * renVenues)} pedidos</span>
           <span style="font-size:10px;font-weight:700;color:#1e3a5f;font-family:'Courier New',monospace;">${fmt(renTotal)}/mes</span>
         </div>` : ''}
+        <div style="display:flex;justify-content:space-between;align-items:baseline;padding:5px 0;border-bottom:1px solid #dde6f0;">
+          <span style="font-size:9px;color:#334155;">Base imponible</span>
+          <span style="font-size:10px;font-weight:700;color:#1e3a5f;font-family:'Courier New',monospace;">${fmt(varTotal)}</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;align-items:baseline;padding:5px 0;border-bottom:1px solid #dde6f0;">
+          <span style="font-size:9px;color:#334155;">IVA 21%</span>
+          <span style="font-size:10px;font-weight:700;color:#1e3a5f;font-family:'Courier New',monospace;">${fmt(varTotal * 0.21)}</span>
+        </div>
         <div style="display:flex;justify-content:space-between;align-items:baseline;padding:6px 0 2px;">
-          <span style="font-size:9.5px;font-weight:700;color:#334155;">Total estimado</span>
-          <span style="font-size:18px;font-weight:900;color:#1e3a5f;font-family:'Courier New',monospace;">${fmt(varTotal)}/mes</span>
+          <span style="font-size:9.5px;font-weight:700;color:#334155;">Total estimado (IVA incl.)</span>
+          <span style="font-size:18px;font-weight:900;color:#1e3a5f;font-family:'Courier New',monospace;">${fmt(varTotal * 1.21)}/mes</span>
         </div>
       </div>
     </div>

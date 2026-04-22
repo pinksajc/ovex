@@ -418,7 +418,7 @@ export function Simulator({ deal, initialConfig, loadedConfigId }: SimulatorProp
                 </span>
               </div>
               <input
-                type="range" min={0} max={10000} step={100} value={dailyOrders}
+                type="range" min={0} max={10000} step={10} value={dailyOrders}
                 onChange={(e) => setDailyOrders(Number(e.target.value))}
                 className="w-full accent-zinc-900"
               />
