@@ -765,7 +765,25 @@ function s11Economics(deal: Deal, cfg: DealConfiguration, sections: ProposalSect
       </div>
     </div>
 
-    <!-- Total fijo mensual (below columns) -->
+    <!-- Total fijo mensual / Coste variable estimado (below columns) -->
+    ${cfg.calculateVariable ? `
+    <div style="border:2px solid #1e3a5f;border-radius:12px;padding:14px 20px;background:#f0f5fb;margin-bottom:10px;">
+      <div style="font-size:8.5px;color:#64748b;text-transform:uppercase;letter-spacing:1.5px;margin-bottom:10px;text-align:center;">Coste variable estimado</div>
+      <div style="display:flex;align-items:center;justify-content:center;gap:10px;flex-wrap:wrap;">
+        <div style="text-align:center;">
+          <div style="font-size:22px;font-weight:900;color:#334155;font-family:'Courier New',monospace;line-height:1;">${fmt(plan.variableFee * eco.totalMonthlyVolume)}</div>
+          <div style="font-size:7px;color:#94a3b8;text-transform:uppercase;letter-spacing:1px;margin-top:2px;">/mes estimado</div>
+        </div>
+      </div>
+      <div style="font-size:8.5px;color:#64748b;text-align:center;margin-top:8px;">
+        ${plan.variableFee.toFixed(2).replace('.', ',')}€/ticket × ${fmtN(eco.totalMonthlyVolume)} tickets
+      </div>
+    </div>
+    <div style="border:1px solid #e8eef6;border-radius:8px;padding:10px 14px;background:#f8fafc;font-size:8.5px;color:#334155;line-height:1.6;margin-bottom:6px;">
+      Coste estimado basado en volumen configurado. Se factura a mes vencido según pedidos reales.${hwUpfrontNet > 0 ? `
+      <br><strong>Pago único hardware:</strong> ${fmt(hwUpfrontNet)} — facturado a la activación.` : ''}
+    </div>
+    ` : `
     <div style="border:2px solid #1e3a5f;border-radius:12px;padding:14px 20px;background:#f0f5fb;margin-bottom:10px;">
       <div style="font-size:8.5px;color:#64748b;text-transform:uppercase;letter-spacing:1.5px;margin-bottom:10px;text-align:center;">Total fijo / mes (add-ons + hardware mensualidad)</div>
       <div style="display:flex;align-items:center;justify-content:center;gap:10px;flex-wrap:wrap;">
@@ -795,6 +813,7 @@ function s11Economics(deal: Deal, cfg: DealConfiguration, sections: ProposalSect
       — liquidado a mes vencido en factura.${hwUpfrontNet > 0 ? `
       <br><strong>Pago único hardware:</strong> ${fmt(hwUpfrontNet)} — facturado a la activación.` : ''}
     </div>
+    `}
 
     `
   return pg(logoUri, content)
