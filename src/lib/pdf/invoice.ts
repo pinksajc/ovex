@@ -242,22 +242,12 @@ export async function generateInvoicePdf(invoice: Invoice): Promise<Buffer> {
   .totals-row .amount { font-family: Courier New, monospace; font-weight: 600; }
   .footer-bank {
     margin-top: 48px;
-    padding: 14px 18px;
-    border: 1px solid #e2e8f0;
-    border-radius: 8px;
-    background: #f8fafc;
-    font-size: 8.5px;
-    color: #64748b;
-    line-height: 1.8;
-  }
-  .footer-bank strong {
+    padding-top: 16px;
+    border-top: 1px solid #e2e8f0;
     font-size: 8px;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 1px;
     color: #94a3b8;
-    display: block;
-    margin-bottom: 4px;
+    text-align: center;
+    line-height: 1.6;
   }
   .rect-notice {
     background: #fffbeb;
@@ -276,6 +266,13 @@ export async function generateInvoicePdf(invoice: Invoice): Promise<Buffer> {
 <div class="header">
   <div>
     ${logo ? `<img class="logo" src="${logo}" alt="Platomico"/>` : '<span style="font-size:16px;font-weight:700;color:#1e3a5f;">Platomico</span>'}
+    <div style="margin-top:10px;font-size:9px;color:#475569;line-height:1.6;">
+      <strong style="font-size:11px;color:#1e3a5f;display:block;margin-bottom:2px;">Platomico, S.L.</strong>
+      NIF: B22741094<br/>
+      C/ Antonio Machado 9, Rozas de Puerto Real<br/>
+      Madrid 28649<br/>
+      hola@platomico.com
+    </div>
   </div>
   <div style="text-align:right;">
     <div class="invoice-type-badge">${invoiceTypeLabel}</div>
@@ -366,8 +363,8 @@ ${invoice.type === 'rectificativa' && invoice.rectifiesId ? `
 
 <!-- Bank transfer footer -->
 <div class="footer-bank">
-  <strong>Datos para transferencia</strong>
-  Platomico, S.L. &nbsp;·&nbsp; IBAN: ES69 1583 0001 1993 4722 6761 &nbsp;·&nbsp; BIC: REVOESM2
+  Datos para transferencia<br/>
+  Platomico, S.L. · IBAN: ES69 1583 0001 1993 4722 6761 · BIC: REVOESM2
 </div>
 
 </body>
