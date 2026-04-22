@@ -16,8 +16,8 @@ export async function GET(req: Request) {
     const presupuesto = await getPresupuesto(id)
     if (!presupuesto) return NextResponse.json({ error: 'Oferta not found' }, { status: 404 })
 
-    const { generatePresupuestoPdf } = await import('@/lib/pdf/presupuesto')
-    const pdfBuffer = await generatePresupuestoPdf(presupuesto)
+    const { generateSalesDeckPdf } = await import('@/lib/pdf/sales-deck')
+    const pdfBuffer = await generateSalesDeckPdf(presupuesto)
 
     const slug = presupuesto.number.replace(/[^A-Za-z0-9-]/g, '-').toLowerCase()
     const filename = `oferta-${slug}.pdf`
