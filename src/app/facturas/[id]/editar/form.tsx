@@ -138,6 +138,7 @@ export function EditInvoiceForm({ invoice, deals }: Props) {
       unit: l.unit || undefined,
       period: l.period || undefined,
       lineDiscountPercent: l.lineDiscountPercent || undefined,
+      discountName: l.discountName || undefined,
     }))
 
     startTransition(async () => {
@@ -383,6 +384,15 @@ function RegularLineRow({ line, onChange, onRemove, canRemove }: {
           placeholder="Período (ej: Enero - Marzo 2026)"
           className="border border-zinc-100 rounded px-2 py-1 text-[10px] text-zinc-400 placeholder-zinc-300 focus:outline-none focus:ring-1 focus:ring-zinc-200 w-full bg-zinc-50 focus:bg-white" />
       </div>
+
+      {/* Nombre del descuento (only when dto > 0) */}
+      {dto > 0 && (
+        <div className="grid items-center gap-2" style={{ gridTemplateColumns: '1fr 90px 110px 60px 100px 28px' }}>
+          <input type="text" value={line.discountName ?? ''} onChange={(e) => onChange(line.id, { discountName: e.target.value || undefined })}
+            placeholder="Nombre del descuento (ej: CORE PARTNER DISCOUNT)"
+            className="border border-zinc-100 rounded px-2 py-1 text-[10px] text-emerald-600 placeholder-zinc-300 focus:outline-none focus:ring-1 focus:ring-zinc-200 w-full bg-zinc-50 focus:bg-white col-span-4" />
+        </div>
+      )}
     </div>
   )
 }

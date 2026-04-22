@@ -61,6 +61,7 @@ export interface DealConfiguration {
   kioskVenues?: number             // number of venues with Kiosk (default = locations)
   billingNotes?: string            // optional billing clause text for Anexo A
   calculateVariable?: boolean      // show variable fee estimate in proposal PDF
+  discountName?: string            // optional label for the ROS discount (default '')
 
   // Add-ons
   activeAddons: AddonId[]
@@ -263,6 +264,8 @@ export interface InvoiceLineItem {
   period?: string
   /** Per-line discount percentage (0–100). Applied before global discounts. */
   lineDiscountPercent?: number
+  /** Optional name/label for the per-line discount (e.g. "CORE PARTNER DISCOUNT") */
+  discountName?: string
 }
 
 export interface Invoice {

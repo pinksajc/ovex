@@ -23,6 +23,7 @@ export interface SaveVersionPayload {
   kdsVenues: number
   kioskVenues: number
   calculateVariable?: boolean
+  discountName?: string
   label?: string
 }
 
@@ -55,6 +56,7 @@ export async function saveNewVersionAction(
       kdsVenues: payload.kdsVenues,
       kioskVenues: payload.kioskVenues,
       calculateVariable: payload.calculateVariable ?? false,
+      discountName: payload.discountName ?? '',
     }
 
     const result = await saveNewConfigVersion(payload.dealId, {
@@ -68,6 +70,7 @@ export async function saveNewVersionAction(
       kdsVenues: payload.kdsVenues,
       kioskVenues: payload.kioskVenues,
       calculateVariable: payload.calculateVariable ?? false,
+      discountName: payload.discountName ?? '',
       locations: payload.locations,
       averageTicket: payload.averageTicket,
       estimatedGrowthPercent: 0,

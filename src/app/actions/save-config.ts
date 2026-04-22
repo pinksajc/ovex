@@ -28,6 +28,7 @@ export interface SaveConfigPayload {
   kdsVenues: number
   kioskVenues: number
   calculateVariable?: boolean
+  discountName?: string
 }
 
 export interface SaveConfigResult {
@@ -57,6 +58,7 @@ export async function saveConfigAction(
       kdsVenues: payload.kdsVenues,
       kioskVenues: payload.kioskVenues,
       calculateVariable: payload.calculateVariable ?? false,
+      discountName: payload.discountName ?? '',
     }
 
     // Fetch current active config to reuse its id/version (avoids always writing v1)
@@ -75,6 +77,7 @@ export async function saveConfigAction(
       kdsVenues: payload.kdsVenues,
       kioskVenues: payload.kioskVenues,
       calculateVariable: payload.calculateVariable ?? false,
+      discountName: payload.discountName ?? '',
       locations: payload.locations,
       averageTicket: payload.averageTicket,
       estimatedGrowthPercent: 0,

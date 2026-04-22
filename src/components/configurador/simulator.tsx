@@ -146,7 +146,8 @@ function serializeSimState(
   kioskVenues: number,
   discountPercent: number,
   starterIncluded: StarterIncluded,
-  calculateVariable: boolean
+  calculateVariable: boolean,
+  discountName: string
 ): string {
   return JSON.stringify({
     dailyOrders,
@@ -164,6 +165,7 @@ function serializeSimState(
     discountPercent,
     starterIncluded,
     calculateVariable,
+    discountName,
   })
 }
 
@@ -200,6 +202,7 @@ export function Simulator({ deal, initialConfig, loadedConfigId }: SimulatorProp
   const [kdsVenues, setKdsVenues] = useState(init?.kdsVenues ?? (init?.locations ?? 1))
   const [kioskVenues, setKioskVenues] = useState(init?.kioskVenues ?? (init?.locations ?? 1))
   const [discountPercent, setDiscountPercent] = useState(init?.discountPercent ?? 0)
+  const [discountName, setDiscountName] = useState(init?.discountName ?? '')
   const [calculateVariable, setCalculateVariable] = useState(init?.calculateVariable ?? false)
   const [starterIncluded, setStarterIncluded] = useState<StarterIncluded>(() =>
     initStarterIncluded(init?.hardware)
@@ -242,13 +245,14 @@ export function Simulator({ deal, initialConfig, loadedConfigId }: SimulatorProp
       init?.kioskVenues ?? (init?.locations ?? 1),
       init?.discountPercent ?? 0,
       initStarterIncluded(init?.hardware),
-      init?.calculateVariable ?? false
+      init?.calculateVariable ?? false,
+      init?.discountName ?? ''
     )
   )
 
   const hasUnsavedChanges = useMemo(
-    () => serializeSimState(dailyOrders, deliveryOrders, locations, avgTicket, planOverride, activeAddons, hardware, renEnabled, renFeePerOrder, renVenues, kdsVenues, kioskVenues, discountPercent, starterIncluded, calculateVariable) !== savedSnapshot,
-    [dailyOrders, deliveryOrders, locations, avgTicket, planOverride, activeAddons, hardware, renEnabled, renFeePerOrder, renVenues, kdsVenues, kioskVenues, discountPercent, starterIncluded, calculateVariable, savedSnapshot]
+    () => serializeSimState(dailyOrders, deliveryOrders, locations, avgTicket, planOverride, activeAddons, hardware, renEnabled, renFeePerOrder, renVenues, kdsVenues, kioskVenues, discountPercent, starterIncluded, calculateVariable, discountName) !== savedSnapshot,
+    [dailyOrders, deliveryOrders, locations, avgTicket, planOverride, activeAddons, hardware, renEnabled, renFeePerOrder, renVenues, kdsVenues, kioskVenues, discountPercent, starterIncluded, calculateVariable, discountName, savedSnapshot]
   )
 
   useEffect(() => {
@@ -345,11 +349,12 @@ export function Simulator({ deal, initialConfig, loadedConfigId }: SimulatorProp
         kdsVenues,
         kioskVenues,
         calculateVariable,
+        discountName,
       })
       if (result.ok) {
         setSaveState('saved')
         setLastSavePersisted(result.persisted)
-        setSavedSnapshot(serializeSimState(dailyOrders, deliveryOrders, locations, avgTicket, planOverride, activeAddons, hardware, renEnabled, renFeePerOrder, renVenues, kdsVenues, kioskVenues, discountPercent, starterIncluded, calculateVariable))
+        setSavedSnapshot(serializeSimState(dailyOrders, deliveryOrders, locations, avgTicket, planOverride, activeAddons, hardware, renEnabled, renFeePerOrder, renVenues, kdsVenues, kioskVenues, discountPercent, starterIncluded, calculateVariable, discountName))
         router.refresh()
       } else {
         setSaveState('error')
@@ -377,12 +382,13 @@ export function Simulator({ deal, initialConfig, loadedConfigId }: SimulatorProp
         kdsVenues,
         kioskVenues,
         calculateVariable,
+        discountName,
       })
       if (result.ok) {
         setSaveNewState('saved')
         setLastNewVersion(result.version)
         setLastNewVersionPersisted(result.persisted)
-        setSavedSnapshot(serializeSimState(dailyOrders, deliveryOrders, locations, avgTicket, planOverride, activeAddons, hardware, renEnabled, renFeePerOrder, renVenues, kdsVenues, kioskVenues, discountPercent, starterIncluded, calculateVariable))
+        setSavedSnapshot(serializeSimState(dailyOrders, deliveryOrders, locations, avgTicket, planOverride, activeAddons, hardware, renEnabled, renFeePerOrder, renVenues, kdsVenues, kioskVenues, discountPercent, starterIncluded, calculateVariable, discountName))
         router.refresh()
       } else {
         setSaveNewState('error')
@@ -1111,6 +1117,8 @@ export function Simulator({ deal, initialConfig, loadedConfigId }: SimulatorProp
           onCalculateVariableChange={setCalculateVariable}
           activePlan={activePlan}
           totalMonthlyVolume={economics.totalMonthlyVolume}
+          discountName={discountName}
+          onDiscountNameChange={setDiscountName}
         />
       </div>
     </div>
@@ -1147,6 +1155,8 @@ function EconomicsPanel({
   onCalculateVariableChange,
   activePlan,
   totalMonthlyVolume,
+  discountName,
+  onDiscountNameChange,
 }: {
   economics: DealEconomics
   locations: number
@@ -1172,6 +1182,8 @@ function EconomicsPanel({
   onCalculateVariableChange: (v: boolean) => void
   activePlan: PlanTier | null
   totalMonthlyVolume: number
+  discountName: string
+  onDiscountNameChange: (v: string) => void
 }) {
   const hasDatafono = activeAddons.has('datafono')
   const renMonthly = renEnabled ? renFeePerOrder * deliveryOrders * renVenues : 0
@@ -1241,6 +1253,15 @@ function EconomicsPanel({
                 <span className="text-xs font-mono text-red-500">−{formatCurrency(discountAmount)}/mes</span>
               </div>
             )}
+            <div className="mt-2">
+              <input
+                type="text"
+                value={discountName}
+                onChange={(e) => onDiscountNameChange(e.target.value)}
+                placeholder="Nombre del descuento (ej: CORE PARTNER)"
+                className="w-full border border-zinc-200 rounded-lg px-2 py-1 text-xs text-zinc-700 placeholder-zinc-300 focus:outline-none focus:ring-1 focus:ring-zinc-300 bg-white"
+              />
+            </div>
           </div>
           {/* Calculate variable toggle */}
           <div className="pt-2 border-t border-zinc-100">

@@ -639,6 +639,7 @@ function s11Economics(deal: Deal, cfg: DealConfiguration, sections: ProposalSect
     discountPercent?: number
     kdsVenues?: number
     kioskVenues?: number
+    discountName?: string
   }
   const plan = PLANS[cfg.plan]
   const activeAddons = cfg.activeAddons.map(id => ADDONS[id])
@@ -704,7 +705,7 @@ function s11Economics(deal: Deal, cfg: DealConfiguration, sections: ProposalSect
           ? 'Gratis'
           : `${fmt(plan.priceMonthly)}/local/mes × ${cfg.locations} local${cfg.locations > 1 ? 'es' : ''}`)}
         ${simpleRow('Fee variable', `${plan.variableFee}€/ticket`)}
-        ${discountPercent > 0 ? simpleRow('Descuento', `−${discountPercent}%`, true) : ''}
+        ${discountPercent > 0 ? simpleRow(eco.discountName ? `Descuento ${eco.discountName}` : 'Descuento', `−${discountPercent}%`, true) : ''}
         ${activeAddons.length > 0 ? `
           <div style="margin-top:8px;padding-top:6px;border-top:1px solid #e8eef6;">
             <div style="font-size:7.5px;color:#94a3b8;text-transform:uppercase;letter-spacing:1px;margin-bottom:4px;">Add-ons</div>
