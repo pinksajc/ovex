@@ -3,7 +3,7 @@
 // Loads /public/Sales Deck.pdf and:
 //   • Overlays client name on page 1 (portada) via pdf-lib
 //   • Replaces page 15 (propuesta) with a Puppeteer-rendered
-//     dark-navy HTML slide matching the deck's visual style
+//     dark-navy HTML slide matching the deck's exact dimensions
 // =========================================
 
 import fs from 'fs'
@@ -55,8 +55,15 @@ function readLogoDataUri(): string {
   return ''
 }
 
-// ---- Render a single 1456×816 slide as PDF bytes via Puppeteer ----
-async function renderSlideToPdf(html: string): Promise<Buffer> {
+// ---- Render a slide at exact pt dimensions via Puppeteer ----
+// Puppeteer converts CSS px → PDF points at 96dpi→72dpi (× 0.75).
+// To produce a PDF page of ptW × ptH points we render at:
+//   cssW = ptW × (96/72)   cssH = ptH × (96/72)
+async function renderSlideToPdf(
+  html: string,
+  cssW: number,
+  cssH: number
+): Promise<Buffer> {
   const puppeteer = (await import('puppeteer-core')).default
   const chromium  = (await import('@sparticuz/chromium')).default
 
@@ -70,17 +77,17 @@ async function renderSlideToPdf(html: string): Promise<Buffer> {
       '--disable-dev-shm-usage',
       '--no-zygote',
     ],
-    defaultViewport: { width: 1456, height: 816 },
+    defaultViewport: { width: cssW, height: cssH },
     executablePath,
     headless: true,
   })
   try {
     const page = await browser.newPage()
-    await page.setViewport({ width: 1456, height: 816 })
+    await page.setViewport({ width: cssW, height: cssH })
     await page.setContent(html, { waitUntil: 'domcontentloaded' })
     const pdf = await page.pdf({
-      width: '1456px',
-      height: '816px',
+      width: `${cssW}px`,
+      height: `${cssH}px`,
       printBackground: true,
       margin: { top: 0, right: 0, bottom: 0, left: 0 },
     })
@@ -91,7 +98,13 @@ async function renderSlideToPdf(html: string): Promise<Buffer> {
 }
 
 // ---- Build the propuesta slide HTML ----
-function buildPropuestaHtml(oferta: Presupuesto, logoUri: string): string {
+// Uses viewport units (vw/vh) so layout is correct at any matching 16:9 size.
+function buildPropuestaHtml(
+  oferta: Presupuesto,
+  logoUri: string,
+  cssW: number,
+  cssH: number
+): string {
   const lineItems = (oferta.lineItems ?? []).filter(i => i.type === 'line')
   const vatAmount = oferta.amountNet * (oferta.vatRate / 100)
 
@@ -99,22 +112,22 @@ function buildPropuestaHtml(oferta: Presupuesto, logoUri: string): string {
     const bg = idx % 2 === 0
       ? 'rgba(255,255,255,0.04)'
       : 'rgba(255,255,255,0.08)'
-    const desc = item.description.length > 60
-      ? item.description.slice(0, 57) + '…'
+    const desc = item.description.length > 70
+      ? item.description.slice(0, 67) + '…'
       : item.description
     return `
       <tr style="background:${bg};">
-        <td style="padding:8px 12px;font-size:11px;color:#cbd5e1;">${esc(desc)}</td>
-        <td style="padding:8px 12px;font-size:11px;color:#94a3b8;text-align:right;">${item.quantity}</td>
-        <td style="padding:8px 12px;font-size:11px;color:#94a3b8;text-align:right;">${fmt(item.unitPrice)}</td>
-        <td style="padding:8px 12px;font-size:11px;color:#e2e8f0;font-weight:600;text-align:right;">${fmt(item.amount)}</td>
+        <td style="padding:0.7vh 1.2vw;font-size:1.3vh;color:#cbd5e1;">${esc(desc)}</td>
+        <td style="padding:0.7vh 1.2vw;font-size:1.3vh;color:#94a3b8;text-align:right;">${item.quantity}</td>
+        <td style="padding:0.7vh 1.2vw;font-size:1.3vh;color:#94a3b8;text-align:right;">${fmt(item.unitPrice)}</td>
+        <td style="padding:0.7vh 1.2vw;font-size:1.3vh;color:#e2e8f0;font-weight:600;text-align:right;">${fmt(item.amount)}</td>
       </tr>`
   }).join('')
 
   const fallbackRow = lineItems.length === 0 ? `
     <tr style="background:rgba(255,255,255,0.04);">
-      <td style="padding:8px 12px;font-size:11px;color:#cbd5e1;" colspan="3">${esc(oferta.concept || '—')}</td>
-      <td style="padding:8px 12px;font-size:11px;color:#e2e8f0;font-weight:600;text-align:right;">${fmt(oferta.amountNet)}</td>
+      <td style="padding:0.7vh 1.2vw;font-size:1.3vh;color:#cbd5e1;" colspan="3">${esc(oferta.concept || '—')}</td>
+      <td style="padding:0.7vh 1.2vw;font-size:1.3vh;color:#e2e8f0;font-weight:600;text-align:right;">${fmt(oferta.amountNet)}</td>
     </tr>` : ''
 
   const clientAddr = [
@@ -129,98 +142,94 @@ function buildPropuestaHtml(oferta: Presupuesto, logoUri: string): string {
 <style>
   * { margin:0; padding:0; box-sizing:border-box; }
   html, body {
-    width: 1456px;
-    height: 816px;
+    width: ${cssW}px;
+    height: ${cssH}px;
     overflow: hidden;
-    background: #05091a;
     font-family: Helvetica, Arial, sans-serif;
     color: #e2e8f0;
   }
   .slide {
-    width: 1456px;
-    height: 816px;
+    width: ${cssW}px;
+    height: ${cssH}px;
     display: flex;
     flex-direction: column;
     background: linear-gradient(135deg, #05091a 0%, #0a1035 60%, #0d1540 100%);
-    padding: 0;
   }
-  /* Top bar */
   .topbar {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 22px 48px 18px;
+    padding: 2.2vh 3.3vw 1.8vh;
     border-bottom: 1px solid rgba(255,255,255,0.12);
+    flex-shrink: 0;
   }
-  .topbar-logo { height: 20px; object-fit: contain; }
+  .topbar img { height: 2.2vh; object-fit: contain; }
   .topbar-tagline {
-    font-size: 11px;
+    font-size: 1.15vh;
     color: rgba(255,255,255,0.45);
     letter-spacing: 0.05em;
   }
-  /* Main content */
   .content {
     flex: 1;
     display: flex;
     flex-direction: column;
-    padding: 28px 48px 28px;
-    gap: 18px;
+    padding: 2.5vh 3.3vw;
+    gap: 1.8vh;
     overflow: hidden;
+    min-height: 0;
   }
   .slide-title {
-    font-size: 30px;
+    font-size: 3.5vh;
     font-weight: 700;
     color: #ffffff;
     letter-spacing: -0.01em;
     line-height: 1.1;
-    margin-bottom: 4px;
+    flex-shrink: 0;
   }
-  /* Cards row */
   .cards {
     display: grid;
     grid-template-columns: 1fr 1fr;
-    gap: 14px;
+    gap: 1.4vh;
+    flex-shrink: 0;
   }
   .card {
     background: rgba(255,255,255,0.05);
     border: 1px solid rgba(255,255,255,0.1);
-    border-radius: 8px;
-    padding: 14px 16px;
+    border-radius: 0.6vw;
+    padding: 1.4vh 1.2vw;
   }
   .card-label {
-    font-size: 8px;
+    font-size: 0.9vh;
     font-weight: 700;
     letter-spacing: 1.5px;
     text-transform: uppercase;
     color: rgba(255,255,255,0.35);
-    margin-bottom: 6px;
+    margin-bottom: 0.6vh;
   }
   .card-name {
-    font-size: 14px;
+    font-size: 1.6vh;
     font-weight: 700;
     color: #ffffff;
-    margin-bottom: 4px;
+    margin-bottom: 0.4vh;
   }
   .card-detail {
-    font-size: 10px;
+    font-size: 1.15vh;
     color: rgba(255,255,255,0.45);
     line-height: 1.5;
   }
-  /* Table */
   .table-wrap {
     flex: 1;
     overflow: hidden;
+    min-height: 0;
   }
   table {
     width: 100%;
     border-collapse: collapse;
   }
-  thead tr {
-    background: rgba(30,58,95,0.9);
-  }
+  thead tr { background: rgba(30,58,95,0.95); }
   thead th {
-    padding: 8px 12px;
-    font-size: 9px;
+    padding: 0.8vh 1.2vw;
+    font-size: 0.95vh;
     font-weight: 700;
     letter-spacing: 1px;
     text-transform: uppercase;
@@ -228,21 +237,17 @@ function buildPropuestaHtml(oferta: Presupuesto, logoUri: string): string {
     text-align: left;
   }
   thead th.r { text-align: right; }
-  /* Totals */
   .totals {
     display: flex;
     justify-content: flex-end;
-    gap: 0;
-    margin-top: 4px;
+    flex-shrink: 0;
   }
-  .totals-inner {
-    min-width: 300px;
-  }
+  .totals-inner { min-width: 22vw; }
   .tot-row {
     display: flex;
     justify-content: space-between;
-    padding: 5px 12px;
-    font-size: 10px;
+    padding: 0.55vh 1.2vw;
+    font-size: 1.1vh;
     border-bottom: 1px solid rgba(255,255,255,0.07);
   }
   .tot-row .lbl { color: rgba(255,255,255,0.45); }
@@ -250,33 +255,47 @@ function buildPropuestaHtml(oferta: Presupuesto, logoUri: string): string {
   .tot-final {
     display: flex;
     justify-content: space-between;
-    padding: 8px 12px;
+    align-items: center;
+    padding: 0.9vh 1.2vw;
     background: rgba(255,255,255,0.1);
-    border-radius: 0 0 6px 6px;
+    border-radius: 0 0 0.4vw 0.4vw;
     margin-top: 1px;
   }
-  .tot-final .lbl { font-size: 9px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; color: rgba(255,255,255,0.5); }
-  .tot-final .val { font-size: 14px; font-weight: 700; color: #ffffff; }
+  .tot-final .lbl {
+    font-size: 0.95vh;
+    font-weight: 700;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    color: rgba(255,255,255,0.5);
+  }
+  .tot-final .val {
+    font-size: 1.6vh;
+    font-weight: 700;
+    color: #ffffff;
+  }
 </style>
 </head>
 <body>
 <div class="slide">
-  <!-- Top bar -->
   <div class="topbar">
-    ${logoUri ? `<img class="topbar-logo" src="${logoUri}" alt="Platomico"/>` : '<span style="font-size:14px;font-weight:700;color:#fff;">Platomico</span>'}
+    ${logoUri
+      ? `<img src="${logoUri}" alt="Platomico"/>`
+      : '<span style="font-size:1.6vh;font-weight:700;color:#fff;">Platomico</span>'}
     <span class="topbar-tagline">Sistema Operativo de Hostelería Moderna.</span>
   </div>
 
-  <!-- Main content -->
   <div class="content">
     <div class="slide-title">Propuesta Platomico.</div>
 
-    <!-- Emisor + Cliente -->
     <div class="cards">
       <div class="card">
         <div class="card-label">Emisor</div>
         <div class="card-name">Platomico, S.L.</div>
-        <div class="card-detail">NIF: B22741094<br/>C/ Antonio Machado 9, Rozas de Puerto Real<br/>Madrid 28649 · hola@platomico.com</div>
+        <div class="card-detail">
+          NIF: B22741094<br/>
+          C/ Antonio Machado 9, Rozas de Puerto Real<br/>
+          Madrid 28649 · hola@platomico.com
+        </div>
       </div>
       <div class="card">
         <div class="card-label">Cliente</div>
@@ -285,24 +304,20 @@ function buildPropuestaHtml(oferta: Presupuesto, logoUri: string): string {
       </div>
     </div>
 
-    <!-- Line items table -->
     <div class="table-wrap">
       <table>
         <thead>
           <tr>
             <th>Descripción</th>
-            <th class="r" style="width:70px;">Cantidad</th>
-            <th class="r" style="width:130px;">Precio unit.</th>
-            <th class="r" style="width:130px;">Importe</th>
+            <th class="r" style="width:8vw;">Cantidad</th>
+            <th class="r" style="width:13vw;">Precio unit.</th>
+            <th class="r" style="width:13vw;">Importe</th>
           </tr>
         </thead>
-        <tbody>
-          ${itemRows || fallbackRow}
-        </tbody>
+        <tbody>${itemRows || fallbackRow}</tbody>
       </table>
     </div>
 
-    <!-- Totals -->
     <div class="totals">
       <div class="totals-inner">
         <div class="tot-row">
@@ -333,22 +348,33 @@ export async function generateSalesDeckPdf(oferta: Presupuesto): Promise<Buffer>
 
   const helvetica = await doc.embedFont(StandardFonts.Helvetica)
 
-  // ── Page 1: Portada — subtle "Preparado para: [client]" ───────────────────
+  // ── Page 1: Portada — subtle "Preparado para: [client]" ──────────────────
   const page1 = doc.getPage(0)
+  const p1W = page1.getWidth()
   const prepLabel = `Preparado para: ${oferta.clientName}`
-  // Centered, white, lightweight feel — 24pt regular, letter-spacing via char spacing
-  drawCentered(page1, prepLabel, 320, helvetica, 24, rgb(1, 1, 1), 1920)
+  drawCentered(page1, prepLabel, 320, helvetica, 24, rgb(1, 1, 1), p1W)
 
   // ── Page 15: Replace with Puppeteer-rendered slide ────────────────────────
-  const logoUri = readLogoDataUri()
-  const slideHtml = buildPropuestaHtml(oferta, logoUri)
-  const slidePdfBytes = await renderSlideToPdf(slideHtml)
+  // Read original page 15 dimensions (in PDF points) so our rendered slide
+  // matches exactly — avoids the "small extra page" problem.
+  const origPage15 = doc.getPage(14)
+  const ptW = origPage15.getWidth()
+  const ptH = origPage15.getHeight()
 
-  // Load the rendered slide PDF and copy its first (only) page
+  // Puppeteer renders CSS px at 96dpi; PDF uses 72dpi.
+  // To output ptW × ptH points we need ptW × (96/72) CSS pixels.
+  const cssW = Math.round(ptW * (96 / 72))
+  const cssH = Math.round(ptH * (96 / 72))
+
+  const logoUri = readLogoDataUri()
+  const slideHtml = buildPropuestaHtml(oferta, logoUri, cssW, cssH)
+  const slidePdfBytes = await renderSlideToPdf(slideHtml, cssW, cssH)
+
+  // Load the rendered single-page PDF and copy its page into the deck
   const slideDoc = await PDFDocument.load(slidePdfBytes)
   const [copiedPage] = await doc.copyPages(slideDoc, [0])
 
-  // Remove original page 15 (index 14) and insert the rendered page
+  // Remove original page 15 (index 14), insert the new one at the same index
   doc.removePage(14)
   doc.insertPage(14, copiedPage)
 
