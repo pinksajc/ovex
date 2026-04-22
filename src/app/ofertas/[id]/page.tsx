@@ -81,6 +81,18 @@ export default async function OfertaDetailPage({ params }: { params: Promise<{ i
             </Link>
           )}
           <a
+            href={`/api/presupuestos/generate-pdf?id=${presupuesto.id}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1.5 text-xs font-medium border border-zinc-200 text-zinc-700 hover:bg-zinc-50 hover:border-zinc-400 px-3 py-1.5 rounded-lg transition-colors"
+          >
+            <svg className="w-3.5 h-3.5" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5">
+              <path d="M7 1v8M4 6l3 3 3-3" strokeLinecap="round" strokeLinejoin="round" />
+              <path d="M2 11h10" strokeLinecap="round" />
+            </svg>
+            Descargar oferta
+          </a>
+          <a
             href={`/api/ofertas/generate-pdf?id=${presupuesto.id}`}
             target="_blank"
             rel="noopener noreferrer"
@@ -90,7 +102,7 @@ export default async function OfertaDetailPage({ params }: { params: Promise<{ i
               <path d="M7 1v8M4 6l3 3 3-3" strokeLinecap="round" strokeLinejoin="round" />
               <path d="M2 11h10" strokeLinecap="round" />
             </svg>
-            Descargar PDF
+            Descargar Sales Deck
           </a>
         </div>
       </div>
