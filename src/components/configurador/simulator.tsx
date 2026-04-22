@@ -424,12 +424,12 @@ export function Simulator({ deal, initialConfig, loadedConfigId }: SimulatorProp
                 </span>
               </div>
               <input
-                type="range" min={0} max={10000} step={10} value={dailyOrders}
+                type="range" min={0} max={25000} step={10} value={dailyOrders}
                 onChange={(e) => setDailyOrders(Number(e.target.value))}
                 className="w-full accent-zinc-900"
               />
               <div className="flex justify-between text-[10px] text-zinc-400 mt-0.5">
-                <span>0</span><span>10.000</span>
+                <span>0</span><span>25.000</span>
               </div>
             </div>
 
