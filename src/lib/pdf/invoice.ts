@@ -36,20 +36,22 @@ function fmtDate(s: string | null): string {
   return new Date(s).toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' })
 }
 
-// ---- Line items rendering (5 columns) ----
+// ---- Line items rendering (6 columns) ----
 function renderLineRows(items: InvoiceLineItem[]): string {
   if (!items || items.length === 0) return ''
   return items.map((item) => {
     if (item.type === 'discount') {
-      // Global discount rows — span descripción, show amount in importe
+      // Global discount rows — span first 4 cols, show in last col
       return `
         <tr class="discount-row">
-          <td colspan="3" style="color:#dc2626;">${esc(item.description || 'Descuento')}</td>
+          <td colspan="4" style="color:#dc2626;">${esc(item.description || 'Descuento')}</td>
           <td class="right" style="color:#dc2626;">—</td>
           <td class="right" style="color:#dc2626;font-weight:700;">${fmt(item.amount)} €</td>
         </tr>`
     }
     const dto = item.lineDiscountPercent ?? 0
+    const gross = item.quantity * item.unitPrice
+    const net = item.amount
     return `
       <tr>
         <td>
@@ -59,7 +61,8 @@ function renderLineRows(items: InvoiceLineItem[]): string {
         <td class="right">${fmt(item.quantity)}</td>
         <td class="right">${fmt(item.unitPrice)} €</td>
         <td class="right">${dto > 0 ? `${fmt(dto)}%` : '—'}</td>
-        <td class="right" style="font-weight:600;">${fmt(item.amount)} €</td>
+        <td class="right">${fmt(gross)} €</td>
+        <td class="right" style="font-weight:600;">${dto > 0 ? `${fmt(net)} €` : '—'}</td>
       </tr>`
   }).join('')
 }
@@ -72,19 +75,13 @@ export async function generateInvoicePdf(invoice: Invoice): Promise<Buffer> {
   const regularItems = items.filter((i) => i.type === 'line')
   const discountItems = items.filter((i) => i.type === 'discount')
 
-  // Subtotal bruto = sum of regular lines before per-line discounts are factored in
-  const subtotalBruto = regularItems.reduce((s, i) => {
-    const gross = i.quantity * i.unitPrice
-    return s + gross
-  }, 0)
+  // Subtotal = sum of gross (qty × unitPrice) before any discounts
+  const subtotalBruto = regularItems.reduce((s, i) => s + i.quantity * i.unitPrice, 0)
   // Total per-line discounts
-  const lineDiscountTotal = regularItems.reduce((s, i) => {
-    const gross = i.quantity * i.unitPrice
-    return s + (gross - i.amount)
-  }, 0)
-  // Global discount rows
-  const globalDiscountTotal = discountItems.reduce((s, i) => s + i.amount, 0)
-  const totalDiscounts = lineDiscountTotal + Math.abs(globalDiscountTotal)
+  const lineDiscountTotal = regularItems.reduce((s, i) => s + (i.quantity * i.unitPrice - i.amount), 0)
+  // Global discount rows (negative amounts)
+  const globalDiscountTotal = discountItems.reduce((s, i) => s + Math.abs(i.amount), 0)
+  const totalDiscounts = lineDiscountTotal + globalDiscountTotal
 
   const base = invoice.amountNet
   const vatAmount = base * (invoice.vatRate / 100)
@@ -316,10 +313,11 @@ ${invoice.type === 'rectificativa' && invoice.rectifiesId ? `
   <thead>
     <tr>
       <th>Descripción</th>
-      <th class="right" style="width:60px;">Cantidad</th>
-      <th class="right" style="width:100px;">Precio unit.</th>
-      <th class="right" style="width:60px;">Dto. %</th>
-      <th class="right" style="width:100px;">Importe</th>
+      <th class="right" style="width:55px;">Cantidad</th>
+      <th class="right" style="width:90px;">Precio unit.</th>
+      <th class="right" style="width:50px;">Dto. %</th>
+      <th class="right" style="width:90px;">Importe</th>
+      <th class="right" style="width:90px;">Importe c/dto.</th>
     </tr>
   </thead>
   <tbody>
@@ -331,6 +329,7 @@ ${invoice.type === 'rectificativa' && invoice.rectifiesId ? `
           <td class="right">${fmt(invoice.amountNet)} €</td>
           <td class="right">—</td>
           <td class="right" style="font-weight:600;">${fmt(invoice.amountNet)} €</td>
+          <td class="right">—</td>
         </tr>`
     }
   </tbody>
@@ -338,13 +337,14 @@ ${invoice.type === 'rectificativa' && invoice.rectifiesId ? `
 
 <!-- Totals box -->
 <div class="totals-box">
-  ${hasLineItems && hasAnyDiscount ? `
+  ${hasLineItems ? `
   <div class="totals-row">
-    <span class="label">Subtotal bruto</span>
+    <span class="label">Subtotal</span>
     <span class="amount">${fmt(subtotalBruto)} €</span>
-  </div>
+  </div>` : ''}
+  ${hasAnyDiscount ? `
   <div class="totals-row discount">
-    <span class="label">Descuentos</span>
+    <span class="label">Descuento total</span>
     <span class="amount">−${fmt(totalDiscounts)} €</span>
   </div>` : ''}
   <div class="totals-row">
