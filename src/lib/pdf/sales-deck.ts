@@ -1,7 +1,9 @@
 // =========================================
-// SALES DECK PDF OVERLAY — server-only
-// Loads /public/Sales Deck.pdf and overlays dynamic oferta data
-// on page 1 (portada) and page 15 (propuesta).
+// SALES DECK PDF — server-only
+// Loads /public/Sales Deck.pdf and:
+//   • Overlays client name on page 1 (portada) via pdf-lib
+//   • Replaces page 15 (propuesta) with a Puppeteer-rendered
+//     dark-navy HTML slide matching the deck's visual style
 // =========================================
 
 import fs from 'fs'
@@ -17,20 +19,15 @@ function fmt(n: number): string {
   }).format(n) + ' €'
 }
 
-// ---- Draw text helper ----
-function drawText(
-  page: PDFPage,
-  text: string,
-  x: number,
-  y: number,
-  font: PDFFont,
-  size: number,
-  color = rgb(0, 0, 0)
-) {
-  page.drawText(text, { x, y, font, size, color })
+function esc(s: string): string {
+  return s
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
 }
 
-// ---- Draw centered text ----
+// ---- Draw centered text (pdf-lib) ----
 function drawCentered(
   page: PDFPage,
   text: string,
@@ -44,28 +41,288 @@ function drawCentered(
   page.drawText(text, { x: (pageWidth - w) / 2, y, font, size, color })
 }
 
-// ---- Draw a filled rectangle ----
-function drawRect(
-  page: PDFPage,
-  x: number,
-  y: number,
-  width: number,
-  height: number,
-  color = rgb(1, 1, 1)
-) {
-  page.drawRectangle({ x, y, width, height, color, borderWidth: 0 })
+// ---- Read logo as base64 data URI ----
+function readLogoDataUri(): string {
+  for (const { file, mime } of [
+    { file: 'logo_platomico.png', mime: 'image/png' },
+    { file: 'logo_platomico.svg', mime: 'image/svg+xml' },
+  ]) {
+    try {
+      const buf = fs.readFileSync(path.join(process.cwd(), 'public', file))
+      return `data:${mime};base64,${buf.toString('base64')}`
+    } catch { /* continuar */ }
+  }
+  return ''
 }
 
-// ---- Draw horizontal line ----
-function drawLine(
-  page: PDFPage,
-  x1: number,
-  y: number,
-  x2: number,
-  color = rgb(0.85, 0.85, 0.85),
-  thickness = 1
-) {
-  page.drawLine({ start: { x: x1, y }, end: { x: x2, y }, thickness, color })
+// ---- Render a single 1456×816 slide as PDF bytes via Puppeteer ----
+async function renderSlideToPdf(html: string): Promise<Buffer> {
+  const puppeteer = (await import('puppeteer-core')).default
+  const chromium  = (await import('@sparticuz/chromium')).default
+
+  const executablePath =
+    process.env.CHROME_EXECUTABLE_PATH ??
+    (await chromium.executablePath())
+
+  const browser = await puppeteer.launch({
+    args: [
+      ...chromium.args,
+      '--disable-dev-shm-usage',
+      '--no-zygote',
+    ],
+    defaultViewport: { width: 1456, height: 816 },
+    executablePath,
+    headless: true,
+  })
+  try {
+    const page = await browser.newPage()
+    await page.setViewport({ width: 1456, height: 816 })
+    await page.setContent(html, { waitUntil: 'domcontentloaded' })
+    const pdf = await page.pdf({
+      width: '1456px',
+      height: '816px',
+      printBackground: true,
+      margin: { top: 0, right: 0, bottom: 0, left: 0 },
+    })
+    return Buffer.from(pdf)
+  } finally {
+    await browser.close()
+  }
+}
+
+// ---- Build the propuesta slide HTML ----
+function buildPropuestaHtml(oferta: Presupuesto, logoUri: string): string {
+  const lineItems = (oferta.lineItems ?? []).filter(i => i.type === 'line')
+  const vatAmount = oferta.amountNet * (oferta.vatRate / 100)
+
+  const itemRows = lineItems.slice(0, 8).map((item, idx) => {
+    const bg = idx % 2 === 0
+      ? 'rgba(255,255,255,0.04)'
+      : 'rgba(255,255,255,0.08)'
+    const desc = item.description.length > 60
+      ? item.description.slice(0, 57) + '…'
+      : item.description
+    return `
+      <tr style="background:${bg};">
+        <td style="padding:8px 12px;font-size:11px;color:#cbd5e1;">${esc(desc)}</td>
+        <td style="padding:8px 12px;font-size:11px;color:#94a3b8;text-align:right;">${item.quantity}</td>
+        <td style="padding:8px 12px;font-size:11px;color:#94a3b8;text-align:right;">${fmt(item.unitPrice)}</td>
+        <td style="padding:8px 12px;font-size:11px;color:#e2e8f0;font-weight:600;text-align:right;">${fmt(item.amount)}</td>
+      </tr>`
+  }).join('')
+
+  const fallbackRow = lineItems.length === 0 ? `
+    <tr style="background:rgba(255,255,255,0.04);">
+      <td style="padding:8px 12px;font-size:11px;color:#cbd5e1;" colspan="3">${esc(oferta.concept || '—')}</td>
+      <td style="padding:8px 12px;font-size:11px;color:#e2e8f0;font-weight:600;text-align:right;">${fmt(oferta.amountNet)}</td>
+    </tr>` : ''
+
+  const clientAddr = [
+    oferta.clientCif ? `NIF/CIF: ${esc(oferta.clientCif)}` : '',
+    oferta.clientAddress ? esc(oferta.clientAddress) : '',
+  ].filter(Boolean).join('<br/>')
+
+  return `<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8"/>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  html, body {
+    width: 1456px;
+    height: 816px;
+    overflow: hidden;
+    background: #05091a;
+    font-family: Helvetica, Arial, sans-serif;
+    color: #e2e8f0;
+  }
+  .slide {
+    width: 1456px;
+    height: 816px;
+    display: flex;
+    flex-direction: column;
+    background: linear-gradient(135deg, #05091a 0%, #0a1035 60%, #0d1540 100%);
+    padding: 0;
+  }
+  /* Top bar */
+  .topbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 22px 48px 18px;
+    border-bottom: 1px solid rgba(255,255,255,0.12);
+  }
+  .topbar-logo { height: 20px; object-fit: contain; }
+  .topbar-tagline {
+    font-size: 11px;
+    color: rgba(255,255,255,0.45);
+    letter-spacing: 0.05em;
+  }
+  /* Main content */
+  .content {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    padding: 28px 48px 28px;
+    gap: 18px;
+    overflow: hidden;
+  }
+  .slide-title {
+    font-size: 30px;
+    font-weight: 700;
+    color: #ffffff;
+    letter-spacing: -0.01em;
+    line-height: 1.1;
+    margin-bottom: 4px;
+  }
+  /* Cards row */
+  .cards {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 14px;
+  }
+  .card {
+    background: rgba(255,255,255,0.05);
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 8px;
+    padding: 14px 16px;
+  }
+  .card-label {
+    font-size: 8px;
+    font-weight: 700;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    color: rgba(255,255,255,0.35);
+    margin-bottom: 6px;
+  }
+  .card-name {
+    font-size: 14px;
+    font-weight: 700;
+    color: #ffffff;
+    margin-bottom: 4px;
+  }
+  .card-detail {
+    font-size: 10px;
+    color: rgba(255,255,255,0.45);
+    line-height: 1.5;
+  }
+  /* Table */
+  .table-wrap {
+    flex: 1;
+    overflow: hidden;
+  }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+  }
+  thead tr {
+    background: rgba(30,58,95,0.9);
+  }
+  thead th {
+    padding: 8px 12px;
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    color: rgba(255,255,255,0.6);
+    text-align: left;
+  }
+  thead th.r { text-align: right; }
+  /* Totals */
+  .totals {
+    display: flex;
+    justify-content: flex-end;
+    gap: 0;
+    margin-top: 4px;
+  }
+  .totals-inner {
+    min-width: 300px;
+  }
+  .tot-row {
+    display: flex;
+    justify-content: space-between;
+    padding: 5px 12px;
+    font-size: 10px;
+    border-bottom: 1px solid rgba(255,255,255,0.07);
+  }
+  .tot-row .lbl { color: rgba(255,255,255,0.45); }
+  .tot-row .val { color: #e2e8f0; font-weight: 600; }
+  .tot-final {
+    display: flex;
+    justify-content: space-between;
+    padding: 8px 12px;
+    background: rgba(255,255,255,0.1);
+    border-radius: 0 0 6px 6px;
+    margin-top: 1px;
+  }
+  .tot-final .lbl { font-size: 9px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; color: rgba(255,255,255,0.5); }
+  .tot-final .val { font-size: 14px; font-weight: 700; color: #ffffff; }
+</style>
+</head>
+<body>
+<div class="slide">
+  <!-- Top bar -->
+  <div class="topbar">
+    ${logoUri ? `<img class="topbar-logo" src="${logoUri}" alt="Platomico"/>` : '<span style="font-size:14px;font-weight:700;color:#fff;">Platomico</span>'}
+    <span class="topbar-tagline">Sistema Operativo de Hostelería Moderna.</span>
+  </div>
+
+  <!-- Main content -->
+  <div class="content">
+    <div class="slide-title">Propuesta Platomico.</div>
+
+    <!-- Emisor + Cliente -->
+    <div class="cards">
+      <div class="card">
+        <div class="card-label">Emisor</div>
+        <div class="card-name">Platomico, S.L.</div>
+        <div class="card-detail">NIF: B22741094<br/>C/ Antonio Machado 9, Rozas de Puerto Real<br/>Madrid 28649 · hola@platomico.com</div>
+      </div>
+      <div class="card">
+        <div class="card-label">Cliente</div>
+        <div class="card-name">${esc(oferta.clientName)}</div>
+        <div class="card-detail">${clientAddr || '&nbsp;'}</div>
+      </div>
+    </div>
+
+    <!-- Line items table -->
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Descripción</th>
+            <th class="r" style="width:70px;">Cantidad</th>
+            <th class="r" style="width:130px;">Precio unit.</th>
+            <th class="r" style="width:130px;">Importe</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${itemRows || fallbackRow}
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Totals -->
+    <div class="totals">
+      <div class="totals-inner">
+        <div class="tot-row">
+          <span class="lbl">Base imponible</span>
+          <span class="val">${fmt(oferta.amountNet)}</span>
+        </div>
+        <div class="tot-row">
+          <span class="lbl">IVA (${oferta.vatRate}%)</span>
+          <span class="val">${fmt(vatAmount)}</span>
+        </div>
+        <div class="tot-final">
+          <span class="lbl">Total oferta</span>
+          <span class="val">${fmt(oferta.amountTotal)}</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+</body>
+</html>`
 }
 
 // ---- Main export ----
@@ -75,113 +332,25 @@ export async function generateSalesDeckPdf(oferta: Presupuesto): Promise<Buffer>
   const doc = await PDFDocument.load(deckBytes)
 
   const helvetica = await doc.embedFont(StandardFonts.Helvetica)
-  const helveticaBold = await doc.embedFont(StandardFonts.HelveticaBold)
 
-  // ── Page 1: Portada ──────────────────────────────────────────────────────────
-  // 1920×1080. Tagline sits around y=440. Add a subtle "Preparado para:" line
-  // at y=330 in regular weight, 26pt — clearly secondary to the tagline.
+  // ── Page 1: Portada — subtle "Preparado para: [client]" ───────────────────
   const page1 = doc.getPage(0)
   const prepLabel = `Preparado para: ${oferta.clientName}`
-  drawCentered(page1, prepLabel, 330, helvetica, 26, rgb(1, 1, 1))
+  // Centered, white, lightweight feel — 24pt regular, letter-spacing via char spacing
+  drawCentered(page1, prepLabel, 320, helvetica, 24, rgb(1, 1, 1), 1920)
 
-  // ── Page 15: Propuesta ───────────────────────────────────────────────────────
-  const page15 = doc.getPage(14)
-  const W = 1920
-  const margin = 100
+  // ── Page 15: Replace with Puppeteer-rendered slide ────────────────────────
+  const logoUri = readLogoDataUri()
+  const slideHtml = buildPropuestaHtml(oferta, logoUri)
+  const slidePdfBytes = await renderSlideToPdf(slideHtml)
 
-  // White overlay covering the content area (below the dark header band)
-  drawRect(page15, 0, 0, W, 880)
+  // Load the rendered slide PDF and copy its first (only) page
+  const slideDoc = await PDFDocument.load(slidePdfBytes)
+  const [copiedPage] = await doc.copyPages(slideDoc, [0])
 
-  // ── CLIENTE card — full width
-  const boxH = 160
-  const boxY = 840 - boxH
-  const clientBoxW = W - margin * 2
-
-  drawRect(page15, margin, boxY, clientBoxW, boxH, rgb(0.94, 0.97, 0.99))
-  page15.drawRectangle({
-    x: margin, y: boxY, width: clientBoxW, height: boxH,
-    borderColor: rgb(0.82, 0.89, 0.94), borderWidth: 1,
-    color: rgb(0.94, 0.97, 0.99),
-  })
-  drawText(page15, 'CLIENTE', margin + 20, boxY + boxH - 26, helveticaBold, 11, rgb(0.6, 0.7, 0.78))
-  drawText(page15, oferta.clientName, margin + 20, boxY + boxH - 54, helveticaBold, 20, rgb(0.12, 0.23, 0.37))
-
-  let clientDetailY = boxY + boxH - 82
-  if (oferta.clientCif) {
-    drawText(page15, `NIF/CIF: ${oferta.clientCif}`, margin + 20, clientDetailY, helvetica, 14, rgb(0.39, 0.51, 0.6))
-    clientDetailY -= 22
-  }
-  if (oferta.clientAddress) {
-    const addr = oferta.clientAddress.length > 100 ? oferta.clientAddress.slice(0, 97) + '…' : oferta.clientAddress
-    drawText(page15, addr, margin + 20, clientDetailY, helvetica, 14, rgb(0.39, 0.51, 0.6))
-  }
-
-  // ── Line items table
-  const tableTop = boxY - 28
-  const tableLeft = margin
-  const tableRight = W - margin
-  const tableWidth = tableRight - tableLeft
-
-  // Columns: Descripción(fill) | Cantidad(120) | Precio unit.(180) | Importe(180)
-  const cQty = tableRight - 180 - 180 - 120
-  const cPrice = tableRight - 180 - 180
-  const cImporte = tableRight - 180
-
-  // Header row
-  const thH = 38
-  const thY = tableTop - thH
-  drawRect(page15, tableLeft, thY, tableWidth, thH, rgb(0.12, 0.23, 0.37))
-  const thTextY = thY + 12
-  drawText(page15, 'DESCRIPCIÓN', tableLeft + 16, thTextY, helveticaBold, 12, rgb(1, 1, 1))
-  drawText(page15, 'CANTIDAD', cQty + 16, thTextY, helveticaBold, 12, rgb(1, 1, 1))
-  drawText(page15, 'PRECIO UNIT.', cPrice + 16, thTextY, helveticaBold, 12, rgb(1, 1, 1))
-  drawText(page15, 'IMPORTE', cImporte + 16, thTextY, helveticaBold, 12, rgb(1, 1, 1))
-
-  // Data rows
-  const lineItems = (oferta.lineItems ?? []).filter(i => i.type === 'line')
-  const rowH = 34
-  let rowY = thY
-
-  lineItems.slice(0, 10).forEach((item, idx) => {
-    rowY -= rowH
-    if (idx % 2 === 1) drawRect(page15, tableLeft, rowY, tableWidth, rowH, rgb(0.97, 0.98, 0.99))
-    const textY = rowY + 10
-    const desc = item.description.length > 65 ? item.description.slice(0, 62) + '…' : item.description
-    drawText(page15, desc, tableLeft + 16, textY, helvetica, 12, rgb(0.2, 0.29, 0.37))
-    drawText(page15, String(item.quantity), cQty + 16, textY, helvetica, 12, rgb(0.2, 0.29, 0.37))
-    drawText(page15, fmt(item.unitPrice), cPrice + 16, textY, helvetica, 12, rgb(0.2, 0.29, 0.37))
-    drawText(page15, fmt(item.amount), cImporte + 16, textY, helveticaBold, 12, rgb(0.12, 0.23, 0.37))
-    drawLine(page15, tableLeft, rowY, tableRight, rgb(0.93, 0.94, 0.95))
-  })
-
-  // ── Totals block (right-aligned)
-  const totalsW = 400
-  const totalsX = W - margin - totalsW
-  let totY = rowY - 16
-
-  const vatAmount = oferta.amountNet * (oferta.vatRate / 100)
-  const totRows: Array<{ label: string; value: string; highlight?: boolean }> = [
-    { label: 'Base imponible', value: fmt(oferta.amountNet) },
-    { label: `IVA (${oferta.vatRate}%)`, value: fmt(vatAmount) },
-    { label: 'TOTAL OFERTA', value: fmt(oferta.amountTotal), highlight: true },
-  ]
-
-  totRows.forEach(row => {
-    const rH = row.highlight ? 46 : 32
-    totY -= rH
-    if (row.highlight) {
-      drawRect(page15, totalsX, totY, totalsW, rH, rgb(0.12, 0.23, 0.37))
-      drawText(page15, row.label, totalsX + 16, totY + 15, helveticaBold, 13, rgb(0.8, 0.87, 0.93))
-      const vw = helveticaBold.widthOfTextAtSize(row.value, 19)
-      drawText(page15, row.value, totalsX + totalsW - vw - 16, totY + 13, helveticaBold, 19, rgb(1, 1, 1))
-    } else {
-      drawRect(page15, totalsX, totY, totalsW, rH, rgb(0.96, 0.97, 0.98))
-      drawLine(page15, totalsX, totY, totalsX + totalsW, rgb(0.88, 0.9, 0.92))
-      drawText(page15, row.label, totalsX + 16, totY + 10, helvetica, 13, rgb(0.4, 0.51, 0.6))
-      const vw = helvetica.widthOfTextAtSize(row.value, 13)
-      drawText(page15, row.value, totalsX + totalsW - vw - 16, totY + 10, helveticaBold, 13, rgb(0.12, 0.23, 0.37))
-    }
-  })
+  // Remove original page 15 (index 14) and insert the rendered page
+  doc.removePage(14)
+  doc.insertPage(14, copiedPage)
 
   const pdfBytes = await doc.save()
   return Buffer.from(pdfBytes)
