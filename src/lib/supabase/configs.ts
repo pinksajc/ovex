@@ -38,6 +38,7 @@ function rowToConfig(row: ConfigRow): DealConfiguration {
     kdsVenues?: number
     kioskVenues?: number
     billingNotes?: string
+    calculateVariable?: boolean
   }
   const locs = row.locations
   return {
@@ -57,6 +58,7 @@ function rowToConfig(row: ConfigRow): DealConfiguration {
     kdsVenues: eco.kdsVenues ?? locs,
     kioskVenues: eco.kioskVenues ?? locs,
     billingNotes: eco.billingNotes,
+    calculateVariable: eco.calculateVariable ?? false,
     plan: row.plan as DealConfiguration['plan'],
     planOverridden: row.plan_overridden,
     activeAddons: row.active_addons as AddonId[],

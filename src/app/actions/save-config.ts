@@ -22,6 +22,7 @@ export interface SaveConfigPayload {
   renVenues: number
   kdsVenues: number
   kioskVenues: number
+  calculateVariable?: boolean
 }
 
 export interface SaveConfigResult {
@@ -50,6 +51,7 @@ export async function saveConfigAction(
       renVenues: payload.renVenues,
       kdsVenues: payload.kdsVenues,
       kioskVenues: payload.kioskVenues,
+      calculateVariable: payload.calculateVariable ?? false,
     }
 
     // Fetch current active config to reuse its id/version (avoids always writing v1)
@@ -67,6 +69,7 @@ export async function saveConfigAction(
       renVenues: payload.renVenues,
       kdsVenues: payload.kdsVenues,
       kioskVenues: payload.kioskVenues,
+      calculateVariable: payload.calculateVariable ?? false,
       locations: payload.locations,
       averageTicket: payload.averageTicket,
       estimatedGrowthPercent: 0,
