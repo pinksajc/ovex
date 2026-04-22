@@ -36,37 +36,30 @@ function fmtDate(s: string | null): string {
   return new Date(s).toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' })
 }
 
-// ---- Line items rendering ----
+// ---- Line items rendering (5 columns) ----
 function renderLineRows(items: InvoiceLineItem[]): string {
   if (!items || items.length === 0) return ''
   return items.map((item) => {
     if (item.type === 'discount') {
-      const modeLabel = item.discountMode === 'percent'
-        ? `${fmt(item.discountValue ?? 0)}%`
-        : `${fmt(item.discountValue ?? 0)} €`
+      // Global discount rows — span descripción, show amount in importe
       return `
         <tr class="discount-row">
-          <td style="color:#dc2626;">${esc(item.description || 'Descuento')} <span style="color:#fca5a5;font-size:8px;">(${modeLabel})</span></td>
-          <td class="right">—</td>
-          <td class="right">—</td>
+          <td colspan="3" style="color:#dc2626;">${esc(item.description || 'Descuento')}</td>
+          <td class="right" style="color:#dc2626;">—</td>
           <td class="right" style="color:#dc2626;font-weight:700;">${fmt(item.amount)} €</td>
         </tr>`
     }
     const dto = item.lineDiscountPercent ?? 0
-    const originalAmount = item.quantity * item.unitPrice
     return `
       <tr>
         <td>
           ${esc(item.description || '—')}
-          ${dto > 0 ? `<span style="margin-left:6px;font-size:8px;color:#10b981;font-weight:600;">Dto. ${fmt(dto)}%</span>` : ''}
           ${item.period ? `<div style="font-size:8px;color:#94a3b8;margin-top:2px;">${esc(item.period)}</div>` : ''}
         </td>
         <td class="right">${fmt(item.quantity)}</td>
         <td class="right">${fmt(item.unitPrice)} €</td>
-        <td class="right" style="font-weight:600;">
-          ${dto > 0 ? `<span style="text-decoration:line-through;color:#94a3b8;font-weight:400;font-size:8.5px;">${fmt(originalAmount)} €</span><br/>` : ''}
-          <span${dto > 0 ? ' style="color:#10b981;"' : ''}>${fmt(item.amount)} €</span>
-        </td>
+        <td class="right">${dto > 0 ? `${fmt(dto)}%` : '—'}</td>
+        <td class="right" style="font-weight:600;">${fmt(item.amount)} €</td>
       </tr>`
   }).join('')
 }
@@ -74,18 +67,30 @@ function renderLineRows(items: InvoiceLineItem[]): string {
 // ---- Invoice HTML ----
 export async function generateInvoicePdf(invoice: Invoice): Promise<Buffer> {
   const logo = readLogoDataUri()
-  const today = new Date().toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' })
 
   const items = invoice.lineItems ?? []
   const regularItems = items.filter((i) => i.type === 'line')
   const discountItems = items.filter((i) => i.type === 'discount')
-  const subtotal = regularItems.reduce((s, i) => s + i.amount, 0)
-  const discountTotal = discountItems.reduce((s, i) => s + i.amount, 0)
-  const base = invoice.amountNet  // stored as base imponible
+
+  // Subtotal bruto = sum of regular lines before per-line discounts are factored in
+  const subtotalBruto = regularItems.reduce((s, i) => {
+    const gross = i.quantity * i.unitPrice
+    return s + gross
+  }, 0)
+  // Total per-line discounts
+  const lineDiscountTotal = regularItems.reduce((s, i) => {
+    const gross = i.quantity * i.unitPrice
+    return s + (gross - i.amount)
+  }, 0)
+  // Global discount rows
+  const globalDiscountTotal = discountItems.reduce((s, i) => s + i.amount, 0)
+  const totalDiscounts = lineDiscountTotal + Math.abs(globalDiscountTotal)
+
+  const base = invoice.amountNet
   const vatAmount = base * (invoice.vatRate / 100)
 
-  // Fall back to single-row if no line items stored (legacy invoices)
   const hasLineItems = items.length > 0
+  const hasAnyDiscount = totalDiscounts > 0.001 || discountItems.length > 0
 
   const invoiceTypeLabel = invoice.type === 'rectificativa' ? 'Factura Rectificativa' : 'Factura'
 
@@ -126,18 +131,6 @@ export async function generateInvoicePdf(invoice: Invoice): Promise<Buffer> {
     color: #1e3a5f;
     font-family: Courier New, monospace;
   }
-  .issuer-block {
-    font-size: 9px;
-    color: #475569;
-    line-height: 1.6;
-    text-align: left;
-  }
-  .issuer-block strong {
-    font-size: 11px;
-    color: #1e3a5f;
-    display: block;
-    margin-bottom: 2px;
-  }
   .meta-row {
     display: flex;
     gap: 32px;
@@ -158,17 +151,12 @@ export async function generateInvoicePdf(invoice: Invoice): Promise<Buffer> {
     font-weight: 600;
     color: #1e293b;
   }
-  .parties {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 20px;
-    margin-bottom: 32px;
-  }
-  .party-block {
+  .client-block {
     background: #f8fafc;
     border: 1px solid #e2e8f0;
     border-radius: 8px;
     padding: 14px 16px;
+    margin-bottom: 32px;
   }
   .party-title {
     font-size: 8px;
@@ -252,14 +240,24 @@ export async function generateInvoicePdf(invoice: Invoice): Promise<Buffer> {
   .totals-row.discount .amount { color: #dc2626; font-weight: 700; }
   .totals-row.total-final .label { color: #cbd5e1; font-size: 9px; font-weight: 400; text-transform: uppercase; letter-spacing: 0.8px; }
   .totals-row .amount { font-family: Courier New, monospace; font-weight: 600; }
-  .footer-legal {
+  .footer-bank {
     margin-top: 48px;
-    padding-top: 16px;
-    border-top: 1px solid #e2e8f0;
+    padding: 14px 18px;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    background: #f8fafc;
+    font-size: 8.5px;
+    color: #64748b;
+    line-height: 1.8;
+  }
+  .footer-bank strong {
     font-size: 8px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 1px;
     color: #94a3b8;
-    text-align: center;
-    line-height: 1.6;
+    display: block;
+    margin-bottom: 4px;
   }
   .rect-notice {
     background: #fffbeb;
@@ -278,13 +276,6 @@ export async function generateInvoicePdf(invoice: Invoice): Promise<Buffer> {
 <div class="header">
   <div>
     ${logo ? `<img class="logo" src="${logo}" alt="Platomico"/>` : '<span style="font-size:16px;font-weight:700;color:#1e3a5f;">Platomico</span>'}
-    <div class="issuer-block" style="margin-top:10px;">
-      <strong>Platomico, S.L.</strong>
-      NIF: B22741094<br/>
-      C/ Antonio Machado 9, Rozas de Puerto Real<br/>
-      Madrid 28649<br/>
-      hola@platomico.com
-    </div>
   </div>
   <div style="text-align:right;">
     <div class="invoice-type-badge">${invoiceTypeLabel}</div>
@@ -313,24 +304,13 @@ ${invoice.type === 'rectificativa' && invoice.rectifiesId ? `
   ⚠️ Esta es una factura rectificativa. Rectifica la factura con referencia: <strong>${esc(invoice.rectifiesId)}</strong>
 </div>` : ''}
 
-<!-- Parties -->
-<div class="parties">
-  <div class="party-block">
-    <div class="party-title">Emisor</div>
-    <div class="party-name">Platomico, S.L.</div>
-    <div class="party-detail">
-      NIF: B22741094<br/>
-      C/ Antonio Machado 9<br/>
-      Rozas de Puerto Real, Madrid 28649
-    </div>
-  </div>
-  <div class="party-block">
-    <div class="party-title">Destinatario</div>
-    <div class="party-name">${esc(invoice.clientName)}</div>
-    <div class="party-detail">
-      ${invoice.clientCif ? `NIF/CIF: ${esc(invoice.clientCif)}<br/>` : ''}
-      ${invoice.clientAddress ? esc(invoice.clientAddress) : ''}
-    </div>
+<!-- Cliente -->
+<div class="client-block">
+  <div class="party-title">Cliente</div>
+  <div class="party-name">${esc(invoice.clientName)}</div>
+  <div class="party-detail">
+    ${invoice.clientCif ? `NIF/CIF: ${esc(invoice.clientCif)}<br/>` : ''}
+    ${invoice.clientAddress ? esc(invoice.clientAddress) : ''}
   </div>
 </div>
 
@@ -339,9 +319,10 @@ ${invoice.type === 'rectificativa' && invoice.rectifiesId ? `
   <thead>
     <tr>
       <th>Descripción</th>
-      <th class="right" style="width:70px;">Cantidad</th>
-      <th class="right" style="width:110px;">Precio unit.</th>
-      <th class="right" style="width:110px;">Importe</th>
+      <th class="right" style="width:60px;">Cantidad</th>
+      <th class="right" style="width:100px;">Precio unit.</th>
+      <th class="right" style="width:60px;">Dto. %</th>
+      <th class="right" style="width:100px;">Importe</th>
     </tr>
   </thead>
   <tbody>
@@ -351,6 +332,7 @@ ${invoice.type === 'rectificativa' && invoice.rectifiesId ? `
           <td>${esc(invoice.concept || '—')}</td>
           <td class="right">1</td>
           <td class="right">${fmt(invoice.amountNet)} €</td>
+          <td class="right">—</td>
           <td class="right" style="font-weight:600;">${fmt(invoice.amountNet)} €</td>
         </tr>`
     }
@@ -359,14 +341,14 @@ ${invoice.type === 'rectificativa' && invoice.rectifiesId ? `
 
 <!-- Totals box -->
 <div class="totals-box">
-  ${hasLineItems && discountItems.length > 0 ? `
+  ${hasLineItems && hasAnyDiscount ? `
   <div class="totals-row">
-    <span class="label">Subtotal</span>
-    <span class="amount">${fmt(subtotal)} €</span>
+    <span class="label">Subtotal bruto</span>
+    <span class="amount">${fmt(subtotalBruto)} €</span>
   </div>
   <div class="totals-row discount">
     <span class="label">Descuentos</span>
-    <span class="amount">${fmt(discountTotal)} €</span>
+    <span class="amount">−${fmt(totalDiscounts)} €</span>
   </div>` : ''}
   <div class="totals-row">
     <span class="label">Base imponible</span>
@@ -382,11 +364,10 @@ ${invoice.type === 'rectificativa' && invoice.rectifiesId ? `
   </div>
 </div>
 
-<!-- Legal footer -->
-<div class="footer-legal">
-  Esta factura cumple con los requisitos del Real Decreto 1619/2012, de 30 de noviembre, por el que se aprueba el Reglamento por el que se regulan las obligaciones de facturación.<br/>
-  Platomico, S.L. · NIF B22741094 · Registrada en el Registro Mercantil · hola@platomico.com<br/>
-  Documento generado el ${today}
+<!-- Bank transfer footer -->
+<div class="footer-bank">
+  <strong>Datos para transferencia</strong>
+  Platomico, S.L. &nbsp;·&nbsp; IBAN: ES69 1583 0001 1993 4722 6761 &nbsp;·&nbsp; BIC: REVOESM2
 </div>
 
 </body>
