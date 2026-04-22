@@ -4,7 +4,12 @@ import { revalidateTag, revalidatePath } from 'next/cache'
 import { calculateEconomics } from '@/lib/pricing/engine'
 import { saveActiveConfig } from '@/lib/deals'
 import { logEvent } from '@/lib/supabase/events'
-import type { PlanTier, AddonId, HardwareLineItem } from '@/types'
+import type { PlanTier, AddonId, HardwareLineItem, DealConfiguration, DealEconomics } from '@/types'
+
+type SaveActiveConfigPayload = Omit<DealConfiguration, 'dealId'> & {
+  calculateVariable?: boolean
+  economics: DealEconomics & { calculateVariable?: boolean }
+}
 
 export interface SaveConfigPayload {
   dealId: string
@@ -58,7 +63,7 @@ export async function saveConfigAction(
     const { getActiveConfigForDeal } = await import('@/lib/supabase/configs')
     const existing = await getActiveConfigForDeal(payload.dealId).catch(() => undefined)
 
-    const result = await saveActiveConfig(payload.dealId, {
+    const result = await saveActiveConfig(payload.dealId, ({
       id: existing?.id ?? `${payload.dealId}-v1`,
       version: existing?.version ?? 1,
       dailyOrdersPerLocation: payload.dailyOrdersPerLocation,
@@ -79,7 +84,7 @@ export async function saveConfigAction(
       hardware: payload.hardware,
       economics,
       createdAt: new Date().toISOString(),
-    })
+    }) as SaveActiveConfigPayload)
 
     void logEvent('config_saved', payload.dealId)
     revalidateTag('attio-deals', 'max')
