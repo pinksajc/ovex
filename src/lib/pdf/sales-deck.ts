@@ -97,6 +97,12 @@ async function renderSlideToPdf(
   }
 }
 
+// ---- Format date as "DD de MMMM de YYYY" ----
+function fmtDate(s: string | null): string {
+  if (!s) return ''
+  return new Date(s).toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' })
+}
+
 // ---- Build the propuesta slide HTML ----
 // Uses viewport units (vw/vh) so layout is correct at any matching 16:9 size.
 function buildPropuestaHtml(
@@ -117,23 +123,34 @@ function buildPropuestaHtml(
       : item.description
     return `
       <tr style="background:${bg};">
-        <td style="padding:0.7vh 1.2vw;font-size:1.3vh;color:#cbd5e1;">${esc(desc)}</td>
-        <td style="padding:0.7vh 1.2vw;font-size:1.3vh;color:#94a3b8;text-align:right;">${item.quantity}</td>
-        <td style="padding:0.7vh 1.2vw;font-size:1.3vh;color:#94a3b8;text-align:right;">${fmt(item.unitPrice)}</td>
-        <td style="padding:0.7vh 1.2vw;font-size:1.3vh;color:#e2e8f0;font-weight:600;text-align:right;">${fmt(item.amount)}</td>
+        <td style="padding:0.8vh 1.4vw;font-size:1.3vh;color:#cbd5e1;">${esc(desc)}</td>
+        <td style="padding:0.8vh 1.4vw;font-size:1.3vh;color:#94a3b8;text-align:right;">${item.quantity}</td>
+        <td style="padding:0.8vh 1.4vw;font-size:1.3vh;color:#94a3b8;text-align:right;">${fmt(item.unitPrice)}</td>
+        <td style="padding:0.8vh 1.4vw;font-size:1.3vh;color:#e2e8f0;font-weight:600;text-align:right;">${fmt(item.amount)}</td>
       </tr>`
   }).join('')
 
   const fallbackRow = lineItems.length === 0 ? `
     <tr style="background:rgba(255,255,255,0.04);">
-      <td style="padding:0.7vh 1.2vw;font-size:1.3vh;color:#cbd5e1;" colspan="3">${esc(oferta.concept || '—')}</td>
-      <td style="padding:0.7vh 1.2vw;font-size:1.3vh;color:#e2e8f0;font-weight:600;text-align:right;">${fmt(oferta.amountNet)}</td>
+      <td style="padding:0.8vh 1.4vw;font-size:1.3vh;color:#cbd5e1;" colspan="3">${esc(oferta.concept || '—')}</td>
+      <td style="padding:0.8vh 1.4vw;font-size:1.3vh;color:#e2e8f0;font-weight:600;text-align:right;">${fmt(oferta.amountNet)}</td>
     </tr>` : ''
 
   const clientAddr = [
     oferta.clientCif ? `NIF/CIF: ${esc(oferta.clientCif)}` : '',
     oferta.clientAddress ? esc(oferta.clientAddress) : '',
   ].filter(Boolean).join('<br/>')
+
+  const validUntilStr = fmtDate(oferta.validUntil)
+
+  // Top bar left: logo image + "Move Faster." wordmark next to it
+  // logoUri is a data URI — embed directly; fall back to text if unavailable
+  const topbarLeft = logoUri
+    ? `<div style="display:flex;align-items:center;gap:1vw;">
+         <img src="${logoUri}" alt="Platomico" style="height:2.4vh;object-fit:contain;display:block;"/>
+         <span style="font-size:1.2vh;font-weight:700;color:rgba(255,255,255,0.9);letter-spacing:0.02em;">Move Faster.</span>
+       </div>`
+    : `<span style="font-size:1.4vh;font-weight:700;color:#fff;">Platomico · Move Faster.</span>`
 
   return `<!DOCTYPE html>
 <html lang="es">
@@ -155,121 +172,160 @@ function buildPropuestaHtml(
     flex-direction: column;
     background: linear-gradient(135deg, #05091a 0%, #0a1035 60%, #0d1540 100%);
   }
+
+  /* ── Top bar ── */
   .topbar {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 2.2vh 3.3vw 1.8vh;
+    padding: 1.8vh 4vw 1.5vh;
     border-bottom: 1px solid rgba(255,255,255,0.12);
     flex-shrink: 0;
   }
-  .topbar img { height: 2.2vh; object-fit: contain; }
   .topbar-tagline {
-    font-size: 1.15vh;
-    color: rgba(255,255,255,0.45);
-    letter-spacing: 0.05em;
+    font-size: 1.1vh;
+    color: rgba(255,255,255,0.4);
+    letter-spacing: 0.06em;
   }
+
+  /* ── Main content ── */
   .content {
     flex: 1;
     display: flex;
     flex-direction: column;
-    padding: 2.5vh 3.3vw;
-    gap: 1.8vh;
+    padding: 4vh 4vw 2.5vh;
+    gap: 0;
     overflow: hidden;
     min-height: 0;
   }
+
+  /* ── Title ── */
   .slide-title {
-    font-size: 3.5vh;
+    font-size: 4vh;
     font-weight: 700;
     color: #ffffff;
-    letter-spacing: -0.01em;
+    letter-spacing: -0.02em;
     line-height: 1.1;
     flex-shrink: 0;
+    margin-bottom: 3vh;
   }
-  .cards {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 1.4vh;
+
+  /* ── Cliente row: card left + validity right ── */
+  .meta-row {
+    display: flex;
+    align-items: flex-start;
+    gap: 2vw;
     flex-shrink: 0;
+    margin-bottom: 2.5vh;
   }
   .card {
+    width: 40%;
     background: rgba(255,255,255,0.05);
     border: 1px solid rgba(255,255,255,0.1);
-    border-radius: 0.6vw;
-    padding: 1.4vh 1.2vw;
+    border-radius: 0.5vw;
+    padding: 1.6vh 1.6vw;
   }
   .card-label {
-    font-size: 0.9vh;
+    font-size: 0.85vh;
     font-weight: 700;
-    letter-spacing: 1.5px;
+    letter-spacing: 1.8px;
     text-transform: uppercase;
-    color: rgba(255,255,255,0.35);
-    margin-bottom: 0.6vh;
+    color: rgba(255,255,255,0.32);
+    margin-bottom: 0.7vh;
   }
   .card-name {
-    font-size: 1.6vh;
+    font-size: 1.8vh;
     font-weight: 700;
     color: #ffffff;
-    margin-bottom: 0.4vh;
+    margin-bottom: 0.5vh;
   }
   .card-detail {
     font-size: 1.15vh;
-    color: rgba(255,255,255,0.45);
-    line-height: 1.5;
+    color: rgba(255,255,255,0.42);
+    line-height: 1.6;
   }
+  .validity {
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+    padding-bottom: 0.4vh;
+  }
+  .validity-label {
+    font-size: 0.9vh;
+    color: rgba(255,255,255,0.3);
+    text-transform: uppercase;
+    letter-spacing: 1.2px;
+    font-weight: 600;
+    margin-bottom: 0.3vh;
+  }
+  .validity-date {
+    font-size: 1.25vh;
+    color: rgba(255,255,255,0.65);
+    font-weight: 400;
+  }
+
+  /* ── Table ── */
   .table-wrap {
     flex: 1;
     overflow: hidden;
     min-height: 0;
+    margin-bottom: 2vh;
   }
   table {
     width: 100%;
     border-collapse: collapse;
   }
-  thead tr { background: rgba(30,58,95,0.95); }
+  thead tr { background: rgba(20,44,80,0.95); }
   thead th {
-    padding: 0.8vh 1.2vw;
-    font-size: 0.95vh;
+    padding: 1vh 1.4vw;
+    font-size: 0.9vh;
     font-weight: 700;
-    letter-spacing: 1px;
+    letter-spacing: 1.2px;
     text-transform: uppercase;
-    color: rgba(255,255,255,0.6);
+    color: rgba(255,255,255,0.55);
     text-align: left;
   }
   thead th.r { text-align: right; }
+
+  /* ── Totals — pinned to bottom right ── */
   .totals {
     display: flex;
     justify-content: flex-end;
     flex-shrink: 0;
   }
-  .totals-inner { min-width: 22vw; }
+  .totals-inner {
+    width: 26vw;
+    background: rgba(255,255,255,0.03);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 0.5vw;
+    overflow: hidden;
+  }
   .tot-row {
     display: flex;
     justify-content: space-between;
-    padding: 0.55vh 1.2vw;
+    align-items: center;
+    padding: 0.65vh 1.4vw;
     font-size: 1.1vh;
-    border-bottom: 1px solid rgba(255,255,255,0.07);
+    border-bottom: 1px solid rgba(255,255,255,0.06);
   }
-  .tot-row .lbl { color: rgba(255,255,255,0.45); }
+  .tot-row .lbl { color: rgba(255,255,255,0.42); }
   .tot-row .val { color: #e2e8f0; font-weight: 600; }
   .tot-final {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 0.9vh 1.2vw;
-    background: rgba(255,255,255,0.1);
-    border-radius: 0 0 0.4vw 0.4vw;
-    margin-top: 1px;
+    padding: 1.1vh 1.4vw;
+    background: rgba(255,255,255,0.09);
   }
   .tot-final .lbl {
-    font-size: 0.95vh;
+    font-size: 0.9vh;
     font-weight: 700;
-    letter-spacing: 1px;
+    letter-spacing: 1.2px;
     text-transform: uppercase;
-    color: rgba(255,255,255,0.5);
+    color: rgba(255,255,255,0.48);
   }
   .tot-final .val {
-    font-size: 1.6vh;
+    font-size: 1.9vh;
     font-weight: 700;
     color: #ffffff;
   }
@@ -277,47 +333,48 @@ function buildPropuestaHtml(
 </head>
 <body>
 <div class="slide">
+
+  <!-- Top bar -->
   <div class="topbar">
-    ${logoUri
-      ? `<img src="${logoUri}" alt="Platomico"/>`
-      : '<span style="font-size:1.6vh;font-weight:700;color:#fff;">Platomico</span>'}
+    ${topbarLeft}
     <span class="topbar-tagline">Sistema Operativo de Hostelería Moderna.</span>
   </div>
 
+  <!-- Main content -->
   <div class="content">
+
     <div class="slide-title">Propuesta Platomico.</div>
 
-    <div class="cards">
-      <div class="card">
-        <div class="card-label">Emisor</div>
-        <div class="card-name">Platomico, S.L.</div>
-        <div class="card-detail">
-          NIF: B22741094<br/>
-          C/ Antonio Machado 9, Rozas de Puerto Real<br/>
-          Madrid 28649 · hola@platomico.com
-        </div>
-      </div>
+    <!-- Cliente card + validity -->
+    <div class="meta-row">
       <div class="card">
         <div class="card-label">Cliente</div>
         <div class="card-name">${esc(oferta.clientName)}</div>
-        <div class="card-detail">${clientAddr || '&nbsp;'}</div>
+        ${clientAddr ? `<div class="card-detail">${clientAddr}</div>` : ''}
       </div>
+      ${validUntilStr ? `
+      <div class="validity">
+        <div class="validity-label">Válido hasta</div>
+        <div class="validity-date">${validUntilStr}</div>
+      </div>` : ''}
     </div>
 
+    <!-- Line items table -->
     <div class="table-wrap">
       <table>
         <thead>
           <tr>
             <th>Descripción</th>
             <th class="r" style="width:8vw;">Cantidad</th>
-            <th class="r" style="width:13vw;">Precio unit.</th>
-            <th class="r" style="width:13vw;">Importe</th>
+            <th class="r" style="width:14vw;">Precio unit.</th>
+            <th class="r" style="width:14vw;">Importe</th>
           </tr>
         </thead>
         <tbody>${itemRows || fallbackRow}</tbody>
       </table>
     </div>
 
+    <!-- Totals — anchored bottom right -->
     <div class="totals">
       <div class="totals-inner">
         <div class="tot-row">
@@ -334,6 +391,7 @@ function buildPropuestaHtml(
         </div>
       </div>
     </div>
+
   </div>
 </div>
 </body>
