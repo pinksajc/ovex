@@ -472,7 +472,7 @@ export function Simulator({ deal, initialConfig, loadedConfigId }: SimulatorProp
               </span>
             </div>
             <input
-              type="range" min={0} max={5000} step={50} value={deliveryOrders}
+              type="range" min={0} max={5000} step={10} value={deliveryOrders}
               onChange={(e) => setDeliveryOrders(Number(e.target.value))}
               className="w-full accent-zinc-900"
             />
