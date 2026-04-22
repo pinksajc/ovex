@@ -104,7 +104,9 @@ function fmtDate(s: string | null): string {
 }
 
 // ---- Build the propuesta slide HTML ----
-// Uses viewport units (vw/vh) so layout is correct at any matching 16:9 size.
+// Font sizes are in vh units calculated for a 1920×1080pt slide (cssH ≈ 1440px).
+// Formula: desired_pt × (96/72) / cssH × 100  →  vh value
+// e.g. 48pt → 64px CSS → 64/1440 × 100 = 4.44vh
 function buildPropuestaHtml(
   oferta: Presupuesto,
   logoUri: string,
@@ -114,26 +116,27 @@ function buildPropuestaHtml(
   const lineItems = (oferta.lineItems ?? []).filter(i => i.type === 'line')
   const vatAmount = oferta.amountNet * (oferta.vatRate / 100)
 
+  // Scale factor: 1vh in CSS = cssH/100 px; to get N pt in PDF → N*(96/72)/cssH*100 vh
+  // Pre-computed for common targets (assuming ~1440px cssH for 1080pt slide):
+  // 48pt→4.44vh | 20pt→1.85vh | 14pt→1.3vh | 11pt→1.02vh | 16pt→1.48vh
+  // 13pt→1.2vh  | 18pt→1.67vh
+
   const itemRows = lineItems.slice(0, 8).map((item, idx) => {
-    const bg = idx % 2 === 0
-      ? 'rgba(255,255,255,0.04)'
-      : 'rgba(255,255,255,0.08)'
-    const desc = item.description.length > 70
-      ? item.description.slice(0, 67) + '…'
-      : item.description
+    const bg = idx % 2 === 0 ? 'rgba(255,255,255,0.04)' : 'rgba(255,255,255,0.08)'
+    const desc = item.description.length > 70 ? item.description.slice(0, 67) + '…' : item.description
     return `
       <tr style="background:${bg};">
-        <td style="padding:0.8vh 1.4vw;font-size:1.3vh;color:#cbd5e1;">${esc(desc)}</td>
-        <td style="padding:0.8vh 1.4vw;font-size:1.3vh;color:#94a3b8;text-align:right;">${item.quantity}</td>
-        <td style="padding:0.8vh 1.4vw;font-size:1.3vh;color:#94a3b8;text-align:right;">${fmt(item.unitPrice)}</td>
-        <td style="padding:0.8vh 1.4vw;font-size:1.3vh;color:#e2e8f0;font-weight:600;text-align:right;">${fmt(item.amount)}</td>
+        <td style="padding:1.1vh 1.5vw;font-size:1.3vh;color:#cbd5e1;">${esc(desc)}</td>
+        <td style="padding:1.1vh 1.5vw;font-size:1.3vh;color:#94a3b8;text-align:right;">${item.quantity}</td>
+        <td style="padding:1.1vh 1.5vw;font-size:1.3vh;color:#94a3b8;text-align:right;">${fmt(item.unitPrice)}</td>
+        <td style="padding:1.1vh 1.5vw;font-size:1.3vh;color:#e2e8f0;font-weight:600;text-align:right;">${fmt(item.amount)}</td>
       </tr>`
   }).join('')
 
   const fallbackRow = lineItems.length === 0 ? `
     <tr style="background:rgba(255,255,255,0.04);">
-      <td style="padding:0.8vh 1.4vw;font-size:1.3vh;color:#cbd5e1;" colspan="3">${esc(oferta.concept || '—')}</td>
-      <td style="padding:0.8vh 1.4vw;font-size:1.3vh;color:#e2e8f0;font-weight:600;text-align:right;">${fmt(oferta.amountNet)}</td>
+      <td style="padding:1.1vh 1.5vw;font-size:1.3vh;color:#cbd5e1;" colspan="3">${esc(oferta.concept || '—')}</td>
+      <td style="padding:1.1vh 1.5vw;font-size:1.3vh;color:#e2e8f0;font-weight:600;text-align:right;">${fmt(oferta.amountNet)}</td>
     </tr>` : ''
 
   const clientAddr = [
@@ -143,14 +146,10 @@ function buildPropuestaHtml(
 
   const validUntilStr = fmtDate(oferta.validUntil)
 
-  // Top bar left: logo image + "Move Faster." wordmark next to it
-  // logoUri is a data URI — embed directly; fall back to text if unavailable
+  // Top bar left: logo image (base64 data URI) or text fallback
   const topbarLeft = logoUri
-    ? `<div style="display:flex;align-items:center;gap:1vw;">
-         <img src="${logoUri}" alt="Platomico" style="height:2.4vh;object-fit:contain;display:block;"/>
-         <span style="font-size:1.2vh;font-weight:700;color:rgba(255,255,255,0.9);letter-spacing:0.02em;">Move Faster.</span>
-       </div>`
-    : `<span style="font-size:1.4vh;font-weight:700;color:#fff;">Platomico · Move Faster.</span>`
+    ? `<img src="${logoUri}" alt="Move Faster." style="height:2.6vh;object-fit:contain;display:block;"/>`
+    : `<span style="font-size:1.4vh;font-weight:700;color:rgba(255,255,255,0.9);letter-spacing:0.02em;">⊞ Move Faster.</span>`
 
   return `<!DOCTYPE html>
 <html lang="es">
@@ -183,7 +182,7 @@ function buildPropuestaHtml(
     flex-shrink: 0;
   }
   .topbar-tagline {
-    font-size: 1.1vh;
+    font-size: 1.02vh;
     color: rgba(255,255,255,0.4);
     letter-spacing: 0.06em;
   }
@@ -193,83 +192,84 @@ function buildPropuestaHtml(
     flex: 1;
     display: flex;
     flex-direction: column;
-    padding: 4vh 4vw 2.5vh;
-    gap: 0;
+    padding: 4.5vh 4.5vw 3vh;
     overflow: hidden;
     min-height: 0;
   }
 
-  /* ── Title ── */
+  /* ── Title — ~48pt ── */
   .slide-title {
-    font-size: 4vh;
+    font-size: 4.44vh;
     font-weight: 700;
     color: #ffffff;
     letter-spacing: -0.02em;
     line-height: 1.1;
     flex-shrink: 0;
-    margin-bottom: 3vh;
+    margin-bottom: 3.2vh;
   }
 
-  /* ── Cliente row: card left + validity right ── */
+  /* ── Cliente row: card (40%) + validity ── */
   .meta-row {
     display: flex;
     align-items: flex-start;
-    gap: 2vw;
+    gap: 2.5vw;
     flex-shrink: 0;
-    margin-bottom: 2.5vh;
+    margin-bottom: 2.8vh;
   }
   .card {
     width: 40%;
     background: rgba(255,255,255,0.05);
     border: 1px solid rgba(255,255,255,0.1);
     border-radius: 0.5vw;
-    padding: 1.6vh 1.6vw;
+    padding: 1.8vh 1.8vw;
   }
   .card-label {
-    font-size: 0.85vh;
+    font-size: 0.9vh;
     font-weight: 700;
-    letter-spacing: 1.8px;
+    letter-spacing: 2px;
     text-transform: uppercase;
     color: rgba(255,255,255,0.32);
-    margin-bottom: 0.7vh;
+    margin-bottom: 0.8vh;
   }
   .card-name {
-    font-size: 1.8vh;
+    /* ~20pt */
+    font-size: 1.85vh;
     font-weight: 700;
     color: #ffffff;
-    margin-bottom: 0.5vh;
+    margin-bottom: 0.6vh;
   }
   .card-detail {
-    font-size: 1.15vh;
-    color: rgba(255,255,255,0.42);
+    /* ~14pt */
+    font-size: 1.3vh;
+    color: rgba(255,255,255,0.45);
     line-height: 1.6;
   }
   .validity {
     display: flex;
     flex-direction: column;
     justify-content: flex-end;
-    padding-bottom: 0.4vh;
+    padding-bottom: 0.6vh;
   }
   .validity-label {
-    font-size: 0.9vh;
+    /* ~11pt */
+    font-size: 1.02vh;
     color: rgba(255,255,255,0.3);
     text-transform: uppercase;
-    letter-spacing: 1.2px;
-    font-weight: 600;
-    margin-bottom: 0.3vh;
+    letter-spacing: 1.5px;
+    font-weight: 700;
+    margin-bottom: 0.4vh;
   }
   .validity-date {
-    font-size: 1.25vh;
-    color: rgba(255,255,255,0.65);
+    /* ~16pt */
+    font-size: 1.48vh;
+    color: rgba(255,255,255,0.7);
     font-weight: 400;
   }
 
   /* ── Table ── */
   .table-wrap {
-    flex: 1;
-    overflow: hidden;
-    min-height: 0;
-    margin-bottom: 2vh;
+    flex-shrink: 0;
+    margin-bottom: 2.8vh;
   }
   table {
     width: 100%;
@@ -277,26 +277,26 @@ function buildPropuestaHtml(
   }
   thead tr { background: rgba(20,44,80,0.95); }
   thead th {
-    padding: 1vh 1.4vw;
-    font-size: 0.9vh;
+    /* ~13pt */
+    padding: 1.1vh 1.5vw;
+    font-size: 1.2vh;
     font-weight: 700;
-    letter-spacing: 1.2px;
+    letter-spacing: 1px;
     text-transform: uppercase;
     color: rgba(255,255,255,0.55);
     text-align: left;
   }
   thead th.r { text-align: right; }
 
-  /* ── Totals — pinned to bottom right ── */
+  /* ── Totals — flows naturally after table, aligned right ── */
   .totals {
     display: flex;
     justify-content: flex-end;
     flex-shrink: 0;
   }
   .totals-inner {
-    width: 26vw;
-    background: rgba(255,255,255,0.03);
-    border: 1px solid rgba(255,255,255,0.08);
+    width: 30vw;
+    border: 1px solid rgba(255,255,255,0.1);
     border-radius: 0.5vw;
     overflow: hidden;
   }
@@ -304,28 +304,33 @@ function buildPropuestaHtml(
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 0.65vh 1.4vw;
-    font-size: 1.1vh;
-    border-bottom: 1px solid rgba(255,255,255,0.06);
+    padding: 0.9vh 1.5vw;
+    /* ~14pt */
+    font-size: 1.3vh;
+    border-bottom: 1px solid rgba(255,255,255,0.07);
+    background: rgba(255,255,255,0.03);
   }
-  .tot-row .lbl { color: rgba(255,255,255,0.42); }
+  .tot-row .lbl { color: rgba(255,255,255,0.45); }
   .tot-row .val { color: #e2e8f0; font-weight: 600; }
   .tot-final {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 1.1vh 1.4vw;
-    background: rgba(255,255,255,0.09);
+    padding: 1.3vh 1.5vw;
+    /* Dark navy — visually prominent */
+    background: #1a2744;
   }
   .tot-final .lbl {
-    font-size: 0.9vh;
+    /* ~11pt */
+    font-size: 1.02vh;
     font-weight: 700;
-    letter-spacing: 1.2px;
+    letter-spacing: 1.5px;
     text-transform: uppercase;
-    color: rgba(255,255,255,0.48);
+    color: rgba(255,255,255,0.55);
   }
   .tot-final .val {
-    font-size: 1.9vh;
+    /* ~18pt */
+    font-size: 1.67vh;
     font-weight: 700;
     color: #ffffff;
   }
@@ -374,14 +379,14 @@ function buildPropuestaHtml(
       </table>
     </div>
 
-    <!-- Totals — anchored bottom right -->
+    <!-- Totals — flows right after table, not pinned to bottom -->
     <div class="totals">
       <div class="totals-inner">
         <div class="tot-row">
           <span class="lbl">Base imponible</span>
           <span class="val">${fmt(oferta.amountNet)}</span>
         </div>
-        <div class="tot-row">
+        <div class="tot-row" style="border-bottom:none;">
           <span class="lbl">IVA (${oferta.vatRate}%)</span>
           <span class="val">${fmt(vatAmount)}</span>
         </div>
