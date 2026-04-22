@@ -766,24 +766,34 @@ function s11Economics(deal: Deal, cfg: DealConfiguration, sections: ProposalSect
     </div>
 
     <!-- Total fijo mensual / Coste variable estimado (below columns) -->
-    ${cfg.calculateVariable ? `
-    <div style="border:2px solid #1e3a5f;border-radius:12px;padding:14px 20px;background:#f0f5fb;margin-bottom:10px;">
-      <div style="font-size:8.5px;color:#64748b;text-transform:uppercase;letter-spacing:1.5px;margin-bottom:10px;text-align:center;">Coste variable estimado</div>
-      <div style="display:flex;align-items:center;justify-content:center;gap:10px;flex-wrap:wrap;">
-        <div style="text-align:center;">
-          <div style="font-size:22px;font-weight:900;color:#334155;font-family:'Courier New',monospace;line-height:1;">${fmt(plan.variableFee * eco.totalMonthlyVolume)}</div>
-          <div style="font-size:7px;color:#94a3b8;text-transform:uppercase;letter-spacing:1px;margin-top:2px;">/mes estimado</div>
+    ${cfg.calculateVariable ? (() => {
+      const rosTotal = plan.variableFee * eco.totalMonthlyVolume
+      const renTotal = renEnabled && renVenues > 0 ? renFeePerOrder * deliveryPerVenue * renVenues : 0
+      const varTotal = rosTotal + renTotal
+      return `
+    <div style="border:2px solid #1e3a5f;border-radius:12px;padding:16px 20px;background:#f0f5fb;margin-bottom:10px;">
+      <div style="font-size:8.5px;color:#64748b;text-transform:uppercase;letter-spacing:1.5px;margin-bottom:12px;text-align:center;">Coste variable estimado</div>
+      <div style="display:flex;flex-direction:column;gap:8px;">
+        <div style="display:flex;justify-content:space-between;align-items:baseline;padding:5px 0;border-bottom:1px solid #dde6f0;">
+          <span style="font-size:9px;color:#334155;">ROS · ${plan.variableFee.toFixed(2).replace('.', ',')}€/ticket × ${fmtN(eco.totalMonthlyVolume)} pedidos</span>
+          <span style="font-size:10px;font-weight:700;color:#1e3a5f;font-family:'Courier New',monospace;">${fmt(rosTotal)}/mes</span>
         </div>
-      </div>
-      <div style="font-size:8.5px;color:#64748b;text-align:center;margin-top:8px;">
-        ${plan.variableFee.toFixed(2).replace('.', ',')}€/ticket × ${fmtN(eco.totalMonthlyVolume)} tickets
+        ${renEnabled && renVenues > 0 ? `
+        <div style="display:flex;justify-content:space-between;align-items:baseline;padding:5px 0;border-bottom:1px solid #dde6f0;">
+          <span style="font-size:9px;color:#334155;">REN · ${renFeePerOrder.toFixed(2).replace('.', ',')}€/pedido × ${fmtN(deliveryPerVenue * renVenues)} pedidos</span>
+          <span style="font-size:10px;font-weight:700;color:#1e3a5f;font-family:'Courier New',monospace;">${fmt(renTotal)}/mes</span>
+        </div>` : ''}
+        <div style="display:flex;justify-content:space-between;align-items:baseline;padding:6px 0 2px;">
+          <span style="font-size:9.5px;font-weight:700;color:#334155;">Total estimado</span>
+          <span style="font-size:18px;font-weight:900;color:#1e3a5f;font-family:'Courier New',monospace;">${fmt(varTotal)}/mes</span>
+        </div>
       </div>
     </div>
     <div style="border:1px solid #e8eef6;border-radius:8px;padding:10px 14px;background:#f8fafc;font-size:8.5px;color:#334155;line-height:1.6;margin-bottom:6px;">
       Coste estimado basado en volumen configurado. Se factura a mes vencido según pedidos reales.${hwUpfrontNet > 0 ? `
       <br><strong>Pago único hardware:</strong> ${fmt(hwUpfrontNet)} — facturado a la activación.` : ''}
-    </div>
-    ` : `
+    </div>`
+    })() : `
     <div style="border:2px solid #1e3a5f;border-radius:12px;padding:14px 20px;background:#f0f5fb;margin-bottom:10px;">
       <div style="font-size:8.5px;color:#64748b;text-transform:uppercase;letter-spacing:1.5px;margin-bottom:10px;text-align:center;">Total fijo / mes (add-ons + hardware mensualidad)</div>
       <div style="display:flex;align-items:center;justify-content:center;gap:10px;flex-wrap:wrap;">
