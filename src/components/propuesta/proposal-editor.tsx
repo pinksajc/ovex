@@ -286,7 +286,7 @@ export function ProposalEditor({ deal, cfg, today, initialSections }: ProposalEd
                     <div className="text-right shrink-0">
                       <p className="text-sm font-mono font-medium text-zinc-800">
                         {item.mode === 'financed' && item.financeMonths
-                          ? `${formatCurrency(lineTotal / item.financeMonths)}/mes`
+                          ? `${formatCurrency(Math.ceil(lineTotal / item.financeMonths))}/mes`
                           : item.mode === 'included'
                           ? 'Incluido'
                           : formatCurrency(lineTotal)}

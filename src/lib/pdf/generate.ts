@@ -487,7 +487,7 @@ function s5Plans(deal: Deal, cfg: DealConfiguration, logoUri: string): string {
         const importe = item.mode === 'rented'
           ? `${fmt(rentalUnit * item.quantity)}/mes`
           : item.mode === 'financed' && item.financeMonths
-          ? `${fmt(lineTotal / item.financeMonths)}/mes`
+          ? `${fmt(Math.ceil(lineTotal / item.financeMonths))}/mes`
           : item.mode === 'included'
           ? 'Incluido en el plan'
           : fmt(lineTotal)
@@ -788,7 +788,7 @@ function s11Economics(deal: Deal, cfg: DealConfiguration, sections: ProposalSect
             ${hwMonthly.map(item => {
               const lineTotal = item.unitPrice * item.quantity
               const rentalUnitPrice = HARDWARE[item.hardwareId].rentalMonthlyPrice ?? RENTAL_MONTHLY_PRICE
-              const net = item.mode === 'financed' && item.financeMonths ? lineTotal / item.financeMonths : rentalUnitPrice * item.quantity
+              const net = item.mode === 'financed' && item.financeMonths ? Math.ceil(lineTotal / item.financeMonths) : rentalUnitPrice * item.quantity
               return `<div style="display:flex;justify-content:space-between;align-items:center;padding:3px 0;border-bottom:1px solid #f1f5f9;gap:4px;">
                 <span style="font-size:9px;color:#334155;flex-shrink:0;">${HARDWARE[item.hardwareId].label} · ${item.quantity} ud.</span>
                 <span style="font-size:9.5px;font-weight:600;color:#1e3a5f;font-family:'Courier New',monospace;">${fmt(net)}/mes</span>

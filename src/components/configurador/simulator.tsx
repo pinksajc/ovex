@@ -956,7 +956,7 @@ export function Simulator({ deal, initialConfig, loadedConfigId }: SimulatorProp
                             </button>
                           </div>
                           <span className="text-xs font-mono text-zinc-500">
-                            = {formatCurrency((item.unitPrice * extraQty) / state.financeMonths)}/mes
+                            = {formatCurrency(Math.ceil((item.unitPrice * extraQty) / state.financeMonths))}/mes
                           </span>
                         </div>
                       )}
@@ -972,7 +972,7 @@ export function Simulator({ deal, initialConfig, loadedConfigId }: SimulatorProp
                             state.mode === 'financed' ? 'text-amber-600' : 'text-zinc-700'
                           }`}>
                             {state.mode === 'financed'
-                              ? `${formatCurrency(extraLineTotal / state.financeMonths)}/mes`
+                              ? `${formatCurrency(Math.ceil(extraLineTotal / state.financeMonths))}/mes`
                               : state.mode === 'rented'
                               ? `${formatCurrency(extraLineTotal)}/mes`
                               : formatCurrency(extraLineTotal)}
@@ -1063,7 +1063,7 @@ export function Simulator({ deal, initialConfig, loadedConfigId }: SimulatorProp
                         </button>
                       </div>
                       <span className="text-xs font-mono text-zinc-500">
-                        = {formatCurrency((item.unitPrice * state.quantity) / state.financeMonths)}/mes
+                        = {formatCurrency(Math.ceil((item.unitPrice * state.quantity) / state.financeMonths))}/mes
                       </span>
                     </div>
                   )}
@@ -1087,7 +1087,7 @@ export function Simulator({ deal, initialConfig, loadedConfigId }: SimulatorProp
                         'text-zinc-700'
                       }`}>
                         {state.mode === 'financed'
-                          ? `${formatCurrency(lineTotal / state.financeMonths)}/mes`
+                          ? `${formatCurrency(Math.ceil(lineTotal / state.financeMonths))}/mes`
                           : state.mode === 'rented'
                           ? `${formatCurrency(lineTotal)}/mes`
                           : formatCurrency(lineTotal)}

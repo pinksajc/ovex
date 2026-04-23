@@ -90,7 +90,7 @@ export function calculateEconomics(input: CalculateInput): DealEconomics {
         break
       case 'financed': {
         const months = item.financeMonths ?? 12
-        hardwareRevenueMonthly += itemRevenue / months
+        hardwareRevenueMonthly += Math.ceil(itemRevenue / months)
         hardwareFinancedCost += itemCost
         break
       }
