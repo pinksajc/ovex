@@ -146,10 +146,8 @@ function buildPropuestaHtml(
 
   const validUntilStr = fmtDate(oferta.validUntil)
 
-  // Top bar left: logo image (base64 data URI) or text fallback
-  const topbarLeft = logoUri
-    ? `<img src="${logoUri}" alt="Move Faster." style="height:2.6vh;object-fit:contain;display:block;"/>`
-    : `<span style="font-size:1.4vh;font-weight:700;color:rgba(255,255,255,0.9);letter-spacing:0.02em;">⊞ Move Faster.</span>`
+  // Top bar left: client name
+  const topbarLeft = `<span style="font-size:1.4vh;font-weight:700;color:rgba(255,255,255,0.9);letter-spacing:0.02em;">${esc(oferta.clientName)}</span>`
 
   return `<!DOCTYPE html>
 <html lang="es">
