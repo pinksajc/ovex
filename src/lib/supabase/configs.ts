@@ -4,7 +4,7 @@
 // =========================================
 
 import { getSupabaseClient } from './client'
-import type { DealConfiguration, AddonId, HardwareLineItem, DealEconomics } from '@/types'
+import type { DealConfiguration, AddonId, HardwareLineItem, DealEconomics, DeliveryPlanId } from '@/types'
 
 // ---- Tipo de la fila en Supabase ----
 
@@ -40,6 +40,7 @@ function rowToConfig(row: ConfigRow): DealConfiguration {
     billingNotes?: string
     calculateVariable?: boolean
     discountName?: string
+    deliveryPlan?: string
   }
   const locs = row.locations
   return {
@@ -61,6 +62,7 @@ function rowToConfig(row: ConfigRow): DealConfiguration {
     billingNotes: eco.billingNotes,
     calculateVariable: eco.calculateVariable ?? false,
     discountName: eco.discountName ?? '',
+    deliveryPlan: (eco.deliveryPlan ?? 'start') as DeliveryPlanId,
     plan: row.plan as DealConfiguration['plan'],
     planOverridden: row.plan_overridden,
     activeAddons: row.active_addons as AddonId[],

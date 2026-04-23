@@ -4,6 +4,8 @@
 
 export type PlanTier = 'starter' | 'growth' | 'pro'
 
+export type DeliveryPlanId = 'start' | 'go' | 'pro'
+
 export type AddonId =
   | 'kds'
   | 'kiosk'
@@ -62,6 +64,7 @@ export interface DealConfiguration {
   billingNotes?: string            // optional billing clause text for Anexo A
   calculateVariable?: boolean      // show variable fee estimate in proposal PDF
   discountName?: string            // optional label for the ROS discount (default '')
+  deliveryPlan?: DeliveryPlanId    // selected Integración delivery sub-plan (default 'start')
 
   // Add-ons
   activeAddons: AddonId[]

@@ -4,7 +4,7 @@ import { revalidateTag, revalidatePath } from 'next/cache'
 import { calculateEconomics } from '@/lib/pricing/engine'
 import { saveActiveConfig } from '@/lib/deals'
 import { logEvent } from '@/lib/supabase/events'
-import type { PlanTier, AddonId, HardwareLineItem, DealConfiguration, DealEconomics } from '@/types'
+import type { PlanTier, AddonId, HardwareLineItem, DealConfiguration, DealEconomics, DeliveryPlanId } from '@/types'
 
 type SaveActiveConfigPayload = Omit<DealConfiguration, 'dealId'> & {
   calculateVariable?: boolean
@@ -29,6 +29,7 @@ export interface SaveConfigPayload {
   kioskVenues: number
   calculateVariable?: boolean
   discountName?: string
+  deliveryPlan?: DeliveryPlanId
 }
 
 export interface SaveConfigResult {
@@ -59,6 +60,7 @@ export async function saveConfigAction(
       kioskVenues: payload.kioskVenues,
       calculateVariable: payload.calculateVariable ?? false,
       discountName: payload.discountName ?? '',
+      deliveryPlan: payload.deliveryPlan ?? 'start',
     }
 
     // Fetch current active config to reuse its id/version (avoids always writing v1)
@@ -78,6 +80,7 @@ export async function saveConfigAction(
       kioskVenues: payload.kioskVenues,
       calculateVariable: payload.calculateVariable ?? false,
       discountName: payload.discountName ?? '',
+      deliveryPlan: payload.deliveryPlan ?? 'start',
       locations: payload.locations,
       averageTicket: payload.averageTicket,
       estimatedGrowthPercent: 0,

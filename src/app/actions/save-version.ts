@@ -4,7 +4,7 @@ import { revalidateTag, revalidatePath } from 'next/cache'
 import { calculateEconomics } from '@/lib/pricing/engine'
 import { saveNewConfigVersion } from '@/lib/deals'
 import { logEvent } from '@/lib/supabase/events'
-import type { PlanTier, AddonId, HardwareLineItem } from '@/types'
+import type { PlanTier, AddonId, HardwareLineItem, DeliveryPlanId } from '@/types'
 
 export interface SaveVersionPayload {
   dealId: string
@@ -24,6 +24,7 @@ export interface SaveVersionPayload {
   kioskVenues: number
   calculateVariable?: boolean
   discountName?: string
+  deliveryPlan?: DeliveryPlanId
   label?: string
 }
 
@@ -57,6 +58,7 @@ export async function saveNewVersionAction(
       kioskVenues: payload.kioskVenues,
       calculateVariable: payload.calculateVariable ?? false,
       discountName: payload.discountName ?? '',
+      deliveryPlan: payload.deliveryPlan ?? 'start',
     }
 
     const result = await saveNewConfigVersion(payload.dealId, {
@@ -71,6 +73,7 @@ export async function saveNewVersionAction(
       kioskVenues: payload.kioskVenues,
       calculateVariable: payload.calculateVariable ?? false,
       discountName: payload.discountName ?? '',
+      deliveryPlan: payload.deliveryPlan ?? 'start',
       locations: payload.locations,
       averageTicket: payload.averageTicket,
       estimatedGrowthPercent: 0,

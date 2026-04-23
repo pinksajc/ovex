@@ -3,7 +3,7 @@
 // Source: platomico.com/pricing + internal hardware data
 // =========================================
 
-import type { PlanTier, AddonId, HardwareId } from '@/types'
+import type { PlanTier, AddonId, HardwareId, DeliveryPlanId } from '@/types'
 
 // ---- PLANS ----
 
@@ -91,9 +91,9 @@ export const ADDONS: Record<AddonId, AddonConfig> = {
   },
   delivery_integrations: {
     id: 'delivery_integrations',
-    label: 'Delivery',
-    description: 'Glovo, Uber Eats, Just Eat...',
-    priceMonthly: 45,
+    label: 'Integración delivery',
+    description: 'Order Hub · Glovo, Uber Eats, Just Eat...',
+    priceMonthly: 0,   // pricing comes from selected sub-plan (DELIVERY_PLANS)
     perLocation: true,
   },
   datafono: {
@@ -113,6 +113,42 @@ export const ADDON_ORDER: AddonId[] = [
   'delivery_integrations',
   'datafono',
 ]
+
+// ---- DELIVERY SUB-PLANS (Order Hub) ----
+
+export interface DeliveryPlanConfig {
+  id: DeliveryPlanId
+  label: string
+  priceMonthly: number       // € fijo por local/mes
+  includedOrders: number     // pedidos incluidos por local/mes
+  extraOrderFee: number      // € por pedido adicional (variable)
+}
+
+export const DELIVERY_PLANS: Record<DeliveryPlanId, DeliveryPlanConfig> = {
+  start: {
+    id: 'start',
+    label: 'Order Hub Start',
+    priceMonthly: 24,
+    includedOrders: 200,
+    extraOrderFee: 0.30,
+  },
+  go: {
+    id: 'go',
+    label: 'Order Hub Go',
+    priceMonthly: 64,
+    includedOrders: 650,
+    extraOrderFee: 0.25,
+  },
+  pro: {
+    id: 'pro',
+    label: 'Order Hub Pro',
+    priceMonthly: 104,
+    includedOrders: 1250,
+    extraOrderFee: 0.15,
+  },
+}
+
+export const DELIVERY_PLAN_ORDER: DeliveryPlanId[] = ['start', 'go', 'pro']
 
 // ---- HARDWARE ----
 // Precios reales confirmados.

@@ -20,8 +20,8 @@
 
 import fs from 'fs'
 import path from 'path'
-import type { Deal, DealConfiguration, DealEconomics, ProposalSections } from '@/types'
-import { PLANS, ADDONS, HARDWARE, HARDWARE_MODE_LABELS, PLAN_FEATURES, RENTAL_MONTHLY_PRICE } from '@/lib/pricing/catalog'
+import type { Deal, DealConfiguration, DealEconomics, ProposalSections, DeliveryPlanId } from '@/types'
+import { PLANS, ADDONS, HARDWARE, HARDWARE_MODE_LABELS, PLAN_FEATURES, RENTAL_MONTHLY_PRICE, DELIVERY_PLANS } from '@/lib/pricing/catalog'
 
 // ── Logo ─────────────────────────────────────────────────────────────────────
 // Leer una sola vez del disco; embebemos inline como data URI en cada página.
@@ -385,8 +385,10 @@ function s5Plans(deal: Deal, cfg: DealConfiguration, logoUri: string): string {
   const hiCol = tiers.indexOf(cfg.plan) + 1
   const eco = cfg.economics as DealEconomics & {
     renEnabled?: boolean; renFeePerOrder?: number; renVenues?: number
-    kdsVenues?: number; kioskVenues?: number
+    kdsVenues?: number; kioskVenues?: number; deliveryPlan?: string
   }
+  const deliveryPlanId = (eco.deliveryPlan ?? 'start') as DeliveryPlanId
+  const deliveryPlanData = DELIVERY_PLANS[deliveryPlanId]
   const renEnabled = eco.renEnabled === true
   const renFeePerOrder = eco.renFeePerOrder ?? 0.10
   const renVenues = eco.renVenues ?? 1
@@ -438,6 +440,22 @@ function s5Plans(deal: Deal, cfg: DealConfiguration, logoUri: string): string {
     <div style="display:flex;flex-direction:column;gap:5px;">
       ${activeAddons.map(id => {
         const addon = ADDONS[id]
+        if (id === 'delivery_integrations') {
+          const dpFixed = deliveryPlanData.priceMonthly * cfg.locations
+          return `<div style="display:flex;justify-content:space-between;align-items:flex-start;padding:7px 11px;background:#f8fafc;border:1px solid #e8eef6;border-radius:6px;">
+            <div>
+              <span style="font-size:10px;font-weight:600;color:#0f172a;">${addon.label}</span>
+              <span style="font-size:9px;color:#94a3b8;margin-left:7px;">${deliveryPlanData.label}</span>
+              <div style="font-size:8.5px;color:#94a3b8;margin-top:3px;">
+                ${deliveryPlanData.includedOrders} pedidos incl. · Pedidos adic.: ${deliveryPlanData.extraOrderFee.toFixed(2).replace('.', ',')}€/pedido (variable · mes vencido)
+              </div>
+            </div>
+            <div style="text-align:right;flex-shrink:0;margin-left:10px;">
+              <span style="font-size:9px;color:#64748b;">${fmt(deliveryPlanData.priceMonthly)}/local/mes</span><br/>
+              <span style="font-size:10px;font-weight:700;color:#1e3a5f;font-family:'Courier New',monospace;">${fmt(dpFixed)}/mes</span>
+            </div>
+          </div>`
+        }
         const precio = id === 'datafono'
           ? `${addon.feePercent}% GMV`
           : addon.perConsumption ? 'Por consumo'
@@ -640,7 +658,13 @@ function s11Economics(deal: Deal, cfg: DealConfiguration, sections: ProposalSect
     kdsVenues?: number
     kioskVenues?: number
     discountName?: string
+    deliveryPlan?: string
   }
+  const s11DeliveryPlanId = (eco.deliveryPlan ?? 'start') as DeliveryPlanId
+  const s11DeliveryPlan = DELIVERY_PLANS[s11DeliveryPlanId]
+  const s11DeliveryFixed = cfg.activeAddons.includes('delivery_integrations')
+    ? s11DeliveryPlan.priceMonthly * cfg.locations
+    : 0
   const plan = PLANS[cfg.plan]
   const activeAddons = cfg.activeAddons.map(id => ADDONS[id])
   const hwItems = cfg.hardware.filter(h => h.quantity > 0)
@@ -658,7 +682,7 @@ function s11Economics(deal: Deal, cfg: DealConfiguration, sections: ProposalSect
   const kioskActive = cfg.activeAddons.includes('kiosk')
   const kdsAdj = kdsActive ? (ADDONS['kds'].priceMonthly ?? 19) * (kdsVenues - cfg.locations) : 0
   const kioskAdj = kioskActive ? (ADDONS['kiosk'].priceMonthly ?? 19) * (kioskVenues - cfg.locations) : 0
-  const adjustedSoftwareBase = eco.softwareRevenueMonthly + kdsAdj + kioskAdj
+  const adjustedSoftwareBase = eco.softwareRevenueMonthly + kdsAdj + kioskAdj + s11DeliveryFixed
 
   const discountPercent = eco.discountPercent ?? 0
   const discountAmount = adjustedSoftwareBase * (discountPercent / 100)
@@ -710,15 +734,24 @@ function s11Economics(deal: Deal, cfg: DealConfiguration, sections: ProposalSect
           <div style="margin-top:8px;padding-top:6px;border-top:1px solid #e8eef6;">
             <div style="font-size:7.5px;color:#94a3b8;text-transform:uppercase;letter-spacing:1px;margin-bottom:4px;">Add-ons</div>
             ${activeAddons.map(a => {
-              const addonNet = a.id === 'kds' ? (ADDONS['kds'].priceMonthly ?? 19) * kdsVenues
+              const addonNet = a.id === 'delivery_integrations' ? s11DeliveryFixed
+                : a.id === 'kds' ? (ADDONS['kds'].priceMonthly ?? 19) * kdsVenues
                 : a.id === 'kiosk' ? (ADDONS['kiosk'].priceMonthly ?? 19) * kioskVenues
                 : a.priceMonthly != null ? a.priceMonthly * (a.perLocation ? cfg.locations : 1) : null
-              const addonVal = a.id === 'datafono' ? `${a.feePercent}% GMV`
+              const addonVal = a.id === 'delivery_integrations'
+                ? `${fmt(s11DeliveryFixed)}/mes`
+                : a.id === 'datafono' ? `${a.feePercent}% GMV`
                 : a.perConsumption ? 'Por consumo'
                 : addonNet != null ? `${fmt(addonNet)}/mes` : '—'
-              return `<div style="display:flex;justify-content:space-between;padding:2px 0;gap:4px;">
-                <span style="font-size:8.5px;color:#334155;">${a.label}</span>
-                <span style="font-size:8px;color:#1e3a5f;font-family:'Courier New',monospace;text-align:right;">${addonVal}</span>
+              const addonSub = a.id === 'delivery_integrations'
+                ? `<div style="font-size:7.5px;color:#94a3b8;">${s11DeliveryPlan.label} · ${s11DeliveryPlan.extraOrderFee.toFixed(2).replace('.', ',')}€/ped. adic. (variable)</div>`
+                : ''
+              return `<div style="padding:2px 0;">
+                <div style="display:flex;justify-content:space-between;gap:4px;">
+                  <span style="font-size:8.5px;color:#334155;">${a.label}</span>
+                  <span style="font-size:8px;color:#1e3a5f;font-family:'Courier New',monospace;text-align:right;">${addonVal}</span>
+                </div>
+                ${addonSub}
               </div>`
             }).join('')}
           </div>` : ''}
