@@ -397,8 +397,8 @@ export function ProposalEditor({ deal, cfg, today, initialSections }: ProposalEd
           <SectionLabel>Impacto económico</SectionLabel>
 
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-px bg-zinc-100 rounded-xl overflow-hidden mt-4">
-            <EcoMetric label="MRR" value={formatCurrency(eco.totalMonthlyRevenue)} sub="ingresos recurrentes/mes" primary />
-            <EcoMetric label="ARR" value={formatCurrency(eco.annualRevenue)} sub="ingresos recurrentes/año" />
+            <EcoMetric label="MRR" value={formatCurrency(totalWithIva)} sub="ingresos recurrentes/mes" primary />
+            <EcoMetric label="ARR" value={formatCurrency(totalWithIva * 12)} sub="ingresos recurrentes/año" />
             <EcoMetric label="GMV mensual" value={formatCurrency(eco.totalMonthlyGMV)} sub="volumen de negocio gestionado" />
             <EcoMetric
               label="Margen bruto"
