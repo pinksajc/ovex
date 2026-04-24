@@ -2,13 +2,14 @@ import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { getDeal, getActiveConfig } from '@/lib/deals'
 import { formatCurrency } from '@/lib/format'
+import { DELIVERY_PLANS } from '@/lib/pricing/catalog'
 import { ContactEditor } from '@/components/contact-editor'
 import { CompanyEditor } from '@/components/company-editor'
 import { OwnerSelector } from '@/components/owner-selector'
 import { getWorkspaceMembers } from '@/lib/auth'
 import { getPresupuestosByDeal } from '@/lib/supabase/presupuestos'
 import { getInvoicesByDeal } from '@/lib/supabase/invoices'
-import type { DealStage, PresupuestoStatus, InvoiceStatus } from '@/types'
+import type { DealStage, PresupuestoStatus, InvoiceStatus, DeliveryPlanId } from '@/types'
 
 const PRESUPUESTO_STATUS_LABELS: Record<PresupuestoStatus, string> = {
   draft: 'Borrador',
@@ -79,10 +80,16 @@ export default async function DealPage({
 
   // Corrected MRR: softwareRevenue (excl. delivery) + deliveryFee + financed-hardware monthly
   const cfgEco = cfg
-    ? (cfg.economics as typeof cfg.economics & { deliveryFixedFee?: number })
+    ? (cfg.economics as typeof cfg.economics & {
+        deliveryFixedFee?: number
+        deliveryPlanKey?: string
+        deliveryPlan?: string
+      })
     : null
   const cfgDeliveryFee = cfg && cfgEco && cfg.activeAddons.includes('delivery_integrations')
-    ? (cfgEco.deliveryFixedFee ?? 0) * cfg.locations
+    ? DELIVERY_PLANS[
+        ((cfgEco.deliveryPlanKey ?? cfgEco.deliveryPlan ?? 'start') as DeliveryPlanId)
+      ].priceMonthly * cfg.locations
     : 0
   const cfgHardwareMonthly = cfg
     ? cfg.hardware
