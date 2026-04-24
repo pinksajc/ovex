@@ -2,14 +2,14 @@ import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { getDeal, getActiveConfig } from '@/lib/deals'
 import { formatCurrency } from '@/lib/format'
-import { DELIVERY_PLANS } from '@/lib/pricing/catalog'
+import { calculateMonthlyTotals } from '@/lib/pricing/totals'
 import { ContactEditor } from '@/components/contact-editor'
 import { CompanyEditor } from '@/components/company-editor'
 import { OwnerSelector } from '@/components/owner-selector'
 import { getWorkspaceMembers } from '@/lib/auth'
 import { getPresupuestosByDeal } from '@/lib/supabase/presupuestos'
 import { getInvoicesByDeal } from '@/lib/supabase/invoices'
-import type { DealStage, PresupuestoStatus, InvoiceStatus, DeliveryPlanId } from '@/types'
+import type { DealStage, PresupuestoStatus, InvoiceStatus, DeliveryPlanId, AddonId } from '@/types'
 
 const PRESUPUESTO_STATUS_LABELS: Record<PresupuestoStatus, string> = {
   draft: 'Borrador',
@@ -78,19 +78,21 @@ export default async function DealPage({
 
   const cfg = getActiveConfig(deal)
 
-  // Corrected MRR: softwareRevenue (excl. delivery) + deliveryFee + financed-hardware monthly
+  // MRR via canonical calculateMonthlyTotals (same function used by simulator):
+  //   planFee    = Math.ceil(planFeeMonthly)   ← fixes raw-float vs ceil discrepancy
+  //   addonFee   = addonFeeMonthly + KDS/Kiosk venue adj
+  //   deliveryFee= DELIVERY_PLANS[plan].priceMonthly × locations  ← catalog, not stale JSONB float
+  //   hardware   = fresh per-item ceil (Math.ceil(unitPrice/months)×qty) overrides snapshot
   const cfgEco = cfg
     ? (cfg.economics as typeof cfg.economics & {
         deliveryFixedFee?: number
         deliveryPlanKey?: string
         deliveryPlan?: string
+        kdsVenues?: number
+        kioskVenues?: number
       })
     : null
-  const cfgDeliveryFee = cfg && cfgEco && cfg.activeAddons.includes('delivery_integrations')
-    ? DELIVERY_PLANS[
-        ((cfgEco.deliveryPlanKey ?? cfgEco.deliveryPlan ?? 'start') as DeliveryPlanId)
-      ].priceMonthly * cfg.locations
-    : 0
+  // Compute hardware monthly fresh from line items (ceil per unit × qty)
   const cfgHardwareMonthly = cfg
     ? cfg.hardware
         .filter(item => item.mode === 'financed' && Number(item.financeMonths ?? 0) > 0)
@@ -100,8 +102,20 @@ export default async function DealPage({
           0,
         )
     : 0
-  const cfgMrr = cfg
-    ? cfgEco!.softwareRevenueMonthly + cfgDeliveryFee + cfgHardwareMonthly
+  const cfgTotals = cfg && cfgEco
+    ? calculateMonthlyTotals({
+        economics: cfgEco,
+        locations: cfg.locations,
+        activeAddons: cfg.activeAddons as AddonId[],
+        // Read plan from catalog — do NOT pass deliveryFixedFeePerLoc (avoids stale JSONB float)
+        deliveryPlan: (cfgEco.deliveryPlanKey ?? cfgEco.deliveryPlan ?? 'start') as DeliveryPlanId,
+        kdsVenues: cfgEco.kdsVenues,
+        kioskVenues: cfgEco.kioskVenues,
+      })
+    : null
+  // Override hardwareMonthly with fresh computation; everything else from canonical totals
+  const cfgMrr = cfgTotals
+    ? cfgTotals.planFee + cfgTotals.addonFee + cfgTotals.datafonoFee + cfgTotals.deliveryFee + cfgHardwareMonthly
     : 0
   const cfgArr = cfgMrr * 12
   const cfgPaybackMonths =
