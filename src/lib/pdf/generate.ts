@@ -22,6 +22,7 @@ import fs from 'fs'
 import path from 'path'
 import type { Deal, DealConfiguration, DealEconomics, ProposalSections, DeliveryPlanId } from '@/types'
 import { PLANS, ADDONS, HARDWARE, HARDWARE_MODE_LABELS, PLAN_FEATURES, RENTAL_MONTHLY_PRICE, DELIVERY_PLANS } from '@/lib/pricing/catalog'
+import { calculateMonthlyTotals } from '@/lib/pricing/totals'
 
 // ── Logo ─────────────────────────────────────────────────────────────────────
 // Leer una sola vez del disco; embebemos inline como data URI en cada página.
@@ -133,7 +134,7 @@ function esc(s: string): string {
 function fmt(n: number): string {
   return n.toLocaleString('es-ES', {
     style: 'currency', currency: 'EUR',
-    minimumFractionDigits: 0, maximumFractionDigits: 0,
+    minimumFractionDigits: 2, maximumFractionDigits: 2,
   })
 }
 // IVA-inclusive formatter (×1.21) for all client-facing monetary amounts in PDF
@@ -674,13 +675,6 @@ function s11Economics(deal: Deal, cfg: DealConfiguration, sections: ProposalSect
   }
   const s11DeliveryPlanId = (eco.deliveryPlanKey ?? eco.deliveryPlan ?? 'start') as DeliveryPlanId
   const s11DeliveryPlan = DELIVERY_PLANS[s11DeliveryPlanId]
-  // Prefer canonical deliveryFixedFee (per-loc × locations), then deliveryFixedMonthly, then re-derive
-  const deliveryActive = cfg.activeAddons.includes('delivery_integrations')
-  const s11DeliveryFixed = deliveryActive
-    ? (eco.deliveryFixedFee != null
-        ? eco.deliveryFixedFee * cfg.locations
-        : (eco.deliveryFixedMonthly ?? s11DeliveryPlan.priceMonthly * cfg.locations))
-    : 0
   const s11ExtraFeePerOrder = eco.deliveryExtraFeePerOrder ?? s11DeliveryPlan.extraOrderFee
   const plan = PLANS[cfg.plan]
   const activeAddons = cfg.activeAddons.map(id => ADDONS[id])
@@ -692,19 +686,27 @@ function s11Economics(deal: Deal, cfg: DealConfiguration, sections: ProposalSect
   const deliveryPerVenue = cfg.deliveryOrdersPerVenue ?? 0
   const renMonthly = renEnabled ? renFeePerOrder * deliveryPerVenue * renVenues : 0
 
-  // KDS/Kiosk per-venue-count adjustment (same logic as EconomicsPanel in simulator)
+  // KDS/Kiosk venue counts — still needed for per-addon display rows
   const kdsVenues = eco.kdsVenues ?? cfg.locations
   const kioskVenues = eco.kioskVenues ?? cfg.locations
-  const kdsActive = cfg.activeAddons.includes('kds')
-  const kioskActive = cfg.activeAddons.includes('kiosk')
-  const kdsAdj = kdsActive ? (ADDONS['kds'].priceMonthly ?? 19) * (kdsVenues - cfg.locations) : 0
-  const kioskAdj = kioskActive ? (ADDONS['kiosk'].priceMonthly ?? 19) * (kioskVenues - cfg.locations) : 0
-  const adjustedSoftwareBase = eco.softwareRevenueMonthly + kdsAdj + kioskAdj + s11DeliveryFixed
+
+  // Unified monthly totals (planFee ceiled, KDS/Kiosk venue adj, delivery from persisted fee)
+  const totals = calculateMonthlyTotals({
+    economics: eco,
+    locations: cfg.locations,
+    activeAddons: cfg.activeAddons,
+    deliveryPlan: s11DeliveryPlanId,
+    deliveryFixedFeePerLoc: eco.deliveryFixedFee,
+    kdsVenues,
+    kioskVenues,
+  })
 
   const discountPercent = eco.discountPercent ?? 0
-  const discountAmount = adjustedSoftwareBase * (discountPercent / 100)
-  const adjustedSoftware = adjustedSoftwareBase - discountAmount
-  const totalMes = adjustedSoftware + renMonthly + eco.hardwareRevenueMonthly
+  // Discount applies to software only (plan + addons + datafono + delivery), not hardware
+  const softwareBase = totals.planFee + totals.addonFee + totals.datafonoFee + totals.deliveryFee
+  const discountAmount = softwareBase * (discountPercent / 100)
+  // Fixed monthly net = (software − discount) + hardware monthly; excludes variable REN
+  const fixedMonthlyNet = totals.netTotal - discountAmount
 
   const execSummary = sections.executiveSummary
     ? sections.executiveSummary +
@@ -718,9 +720,6 @@ function s11Economics(deal: Deal, cfg: DealConfiguration, sections: ProposalSect
       <span style="font-size:9.5px;color:${red ? '#dc2626' : '#64748b'};">${label}</span>
       <span style="font-size:9.5px;font-weight:600;color:${red ? '#dc2626' : '#0f172a'};font-family:'Courier New',monospace;">${value}</span>
     </div>`
-
-  // Fixed monthly net = software (plan+addons-discount) + hw monthly; excludes variable REN
-  const fixedMonthlyNet = adjustedSoftware + eco.hardwareRevenueMonthly
 
   // Hardware items by mode
   const hwSold     = hwItems.filter(i => i.mode === 'sold')
@@ -748,20 +747,20 @@ function s11Economics(deal: Deal, cfg: DealConfiguration, sections: ProposalSect
         ${simpleRow('Fee variable', `${plan.variableFee}€/ticket`)}
         ${discountPercent > 0 ? simpleRow(eco.discountName ? `Descuento ${eco.discountName}` : 'Descuento', `−${discountPercent}%`, true) : ''}
         ${(() => {
-          // Add-ons total row: sum of all fixed-fee add-ons (engine addonFeeMonthly + venue adj + delivery)
-          const totalAddons = eco.addonFeeMonthly + kdsAdj + kioskAdj + s11DeliveryFixed
+          // Add-ons total row: addonFee (from totals, includes KDS/Kiosk venue adj) + delivery
+          const totalAddons = totals.addonFee + totals.deliveryFee
           return totalAddons > 0 ? simpleRow('Add-ons (total)', `${fmt(totalAddons)}/mes`) : ''
         })()}
         ${activeAddons.length > 0 ? `
           <div style="margin-top:8px;padding-top:6px;border-top:1px solid #e8eef6;">
             <div style="font-size:7.5px;color:#94a3b8;text-transform:uppercase;letter-spacing:1px;margin-bottom:4px;">Detalle add-ons</div>
             ${activeAddons.map(a => {
-              const addonNet = a.id === 'delivery_integrations' ? s11DeliveryFixed
+              const addonNet = a.id === 'delivery_integrations' ? totals.deliveryFee
                 : a.id === 'kds' ? (ADDONS['kds'].priceMonthly ?? 19) * kdsVenues
                 : a.id === 'kiosk' ? (ADDONS['kiosk'].priceMonthly ?? 19) * kioskVenues
                 : a.priceMonthly != null ? a.priceMonthly * (a.perLocation ? cfg.locations : 1) : null
               const addonVal = a.id === 'delivery_integrations'
-                ? `${fmt(s11DeliveryFixed)}/mes`
+                ? `${fmt(totals.deliveryFee)}/mes`
                 : a.id === 'datafono' ? `${a.feePercent}% GMV`
                 : a.perConsumption ? 'Por consumo'
                 : addonNet != null ? `${fmt(addonNet)}/mes` : '—'
@@ -868,9 +867,9 @@ function s11Economics(deal: Deal, cfg: DealConfiguration, sections: ProposalSect
       <div style="font-size:8.5px;color:#64748b;text-transform:uppercase;letter-spacing:1.5px;margin-bottom:10px;text-align:center;">Total fijo / mes (add-ons + hardware mensualidad)</div>
       <!-- Breakdown rows: Plan / Add-ons / Hardware -->
       <div style="display:flex;flex-direction:column;gap:3px;margin-bottom:10px;padding-bottom:10px;border-bottom:1px solid #dde6f0;">
-        ${simpleRow('Plan', `${fmt(eco.planFeeMonthly)}/mes`)}
-        ${(eco.addonFeeMonthly + kdsAdj + kioskAdj + s11DeliveryFixed) > 0
-          ? simpleRow('Add-ons', `${fmt(eco.addonFeeMonthly + kdsAdj + kioskAdj + s11DeliveryFixed)}/mes`)
+        ${simpleRow('Plan', `${fmt(totals.planFee)}/mes`)}
+        ${(totals.addonFee + totals.deliveryFee) > 0
+          ? simpleRow('Add-ons', `${fmt(totals.addonFee + totals.deliveryFee)}/mes`)
           : ''}
         ${eco.hardwareRevenueMonthly > 0 ? simpleRow('Hardware (cuotas)', `${fmt(eco.hardwareRevenueMonthly)}/mes`) : ''}
         ${discountPercent > 0 ? simpleRow(eco.discountName ? `Descuento ${eco.discountName}` : 'Descuento', `−${fmt(discountAmount)}/mes`, true) : ''}
