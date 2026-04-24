@@ -745,7 +745,7 @@ function s11Economics(deal: Deal, cfg: DealConfiguration, sections: ProposalSect
         ${simpleRow('Precio base', plan.priceMonthly === 0
           ? 'Gratis'
           : `${fmt(plan.priceMonthly)}/local/mes × ${cfg.locations} local${cfg.locations > 1 ? 'es' : ''}`)}
-        ${simpleRow('Fee variable', `${plan.variableFee}€/ticket`)}
+        ${cfg.calculateVariable ? simpleRow('Fee variable', `${plan.variableFee}€/ticket`) : ''}
         ${discountPercent > 0 ? simpleRow(eco.discountName ? `Descuento ${eco.discountName}` : 'Descuento', `−${discountPercent}%`, true) : ''}
         ${(() => {
           // Add-ons total row: addonFee (includes KDS/Kiosk venue adj) + delivery
@@ -894,14 +894,10 @@ function s11Economics(deal: Deal, cfg: DealConfiguration, sections: ProposalSect
       ${discountPercent > 0 ? `<div style="font-size:8px;color:#dc2626;margin-top:8px;text-align:center;">Descuento −${discountPercent}% aplicado sobre neto · ahorro ${fmt(discountAmount)}/mes</div>` : ''}
     </div>
 
-    <!-- Footer variable -->
+    ${hwUpfrontNet > 0 ? `
     <div style="border:1px solid #e8eef6;border-radius:8px;padding:10px 14px;background:#f8fafc;font-size:8.5px;color:#334155;line-height:1.6;">
-      <strong>Total fijo/mes:</strong> ${fmt(fixedMonthlyNet)}
-      + <strong>variable por pedido:</strong>
-      ROS: ${plan.variableFee.toFixed(2).replace('.', ',')}€/ticket${renEnabled ? ` · REN: ${renFeePerOrder.toFixed(2).replace('.', ',')}€/pedido` : ''}
-      — liquidado a mes vencido en factura.${hwUpfrontNet > 0 ? `
-      <br><strong>Pago único hardware:</strong> ${fmt(hwUpfrontNet)} — facturado a la activación.` : ''}
-    </div>
+      <strong>Pago único hardware:</strong> ${fmt(hwUpfrontNet)} — facturado a la activación.
+    </div>` : ''}
     `}
 
     `
