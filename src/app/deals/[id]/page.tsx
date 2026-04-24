@@ -89,7 +89,7 @@ export default async function DealPage({
         .filter(item => item.mode === 'financed' && Number(item.financeMonths ?? 0) > 0)
         .reduce(
           (sum, item) =>
-            sum + Math.ceil((Number(item.unitPrice) * Number(item.quantity)) / Number(item.financeMonths)),
+            sum + Math.ceil(Number(item.unitPrice) / Number(item.financeMonths)) * Number(item.quantity),
           0,
         )
     : 0
