@@ -2,6 +2,7 @@
 
 import { revalidateTag, revalidatePath } from 'next/cache'
 import { calculateEconomics } from '@/lib/pricing/engine'
+import { DELIVERY_PLANS } from '@/lib/pricing/catalog'
 import { saveActiveConfig } from '@/lib/deals'
 import { logEvent } from '@/lib/supabase/events'
 import type { PlanTier, AddonId, HardwareLineItem, DealConfiguration, DealEconomics, DeliveryPlanId } from '@/types'
@@ -61,6 +62,10 @@ export async function saveConfigAction(
       calculateVariable: payload.calculateVariable ?? false,
       discountName: payload.discountName ?? '',
       deliveryPlan: payload.deliveryPlan ?? 'start',
+      deliveryPlanKey: payload.deliveryPlan ?? 'start',
+      deliveryFixedFee: DELIVERY_PLANS[payload.deliveryPlan ?? 'start'].priceMonthly,
+      deliveryExtraFeePerOrder: DELIVERY_PLANS[payload.deliveryPlan ?? 'start'].extraOrderFee,
+      deliveryIncludedOrders: DELIVERY_PLANS[payload.deliveryPlan ?? 'start'].includedOrders,
     }
 
     // Fetch current active config to reuse its id/version (avoids always writing v1)
