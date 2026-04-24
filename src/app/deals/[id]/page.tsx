@@ -86,13 +86,21 @@ export default async function DealPage({
     : 0
   const cfgHardwareMonthly = cfg
     ? cfg.hardware
-        .filter(item => item.mode === 'financed' && (item.financeMonths ?? 0) > 0)
-        .reduce((sum, item) => sum + Math.ceil((item.unitPrice * item.quantity) / item.financeMonths!), 0)
+        .filter(item => item.mode === 'financed' && Number(item.financeMonths ?? 0) > 0)
+        .reduce(
+          (sum, item) =>
+            sum + Math.ceil((Number(item.unitPrice) * Number(item.quantity)) / Number(item.financeMonths)),
+          0,
+        )
     : 0
   const cfgMrr = cfg
     ? cfgEco!.softwareRevenueMonthly + cfgDeliveryFee + cfgHardwareMonthly
     : 0
   const cfgArr = cfgMrr * 12
+  const cfgPaybackMonths =
+    cfg && cfg.economics.hardwareNetInvestment > 0 && cfgMrr > 0
+      ? Math.ceil(cfg.economics.hardwareNetInvestment / cfgMrr)
+      : null
 
   return (
     <div className="p-8 max-w-5xl mx-auto">
@@ -276,7 +284,7 @@ export default async function DealPage({
             <Metric label="Locales" value={String(cfg.locations)} />
             <Metric
               label="€/local/mes"
-              value={formatCurrency(cfg.economics.revenuePerLocation)}
+              value={formatCurrency(cfg.locations > 0 ? cfgMrr / cfg.locations : 0)}
             />
             <Metric
               label="Vol. total/mes"
@@ -291,6 +299,13 @@ export default async function DealPage({
               value={`${cfg.economics.grossMarginPercent.toFixed(0)}% ⚠️`}
               muted
             />
+            {cfgPaybackMonths !== null && (
+              <Metric
+                label="Payback"
+                value={`${cfgPaybackMonths} meses`}
+                muted
+              />
+            )}
           </div>
 
           {cfg.economics.hasReviewManualItems && (
