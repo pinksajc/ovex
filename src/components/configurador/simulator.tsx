@@ -4,6 +4,7 @@ import { useState, useMemo, useTransition, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { PLANS, ADDONS, ADDON_ORDER, PLAN_ORDER, HARDWARE, HARDWARE_ORDER, HARDWARE_MODE_LABELS, RENTAL_MONTHLY_PRICE, PLAN_FEATURES, DELIVERY_PLANS, DELIVERY_PLAN_ORDER } from '@/lib/pricing/catalog'
 import { calculateEconomics, suggestPlan } from '@/lib/pricing/engine'
+import { calculateMonthlyTotals } from '@/lib/pricing/totals'
 import { formatCurrency, formatNumber } from '@/lib/format'
 import { saveConfigAction } from '@/app/actions/save-config'
 import { saveNewVersionAction } from '@/app/actions/save-version'
@@ -1255,16 +1256,12 @@ function EconomicsPanel({
 }) {
   const hasDatafono = activeAddons.has('datafono')
   const renMonthly = renEnabled ? renFeePerOrder * deliveryOrders * renVenues : 0
-  // Adjust addon fee for KDS/Kiosk venue overrides (calculateEconomics uses locations for all per-location addons)
-  const kdsAdj = activeAddons.has('kds') ? 19 * (kdsVenues - locations) : 0
-  const kioskAdj = activeAddons.has('kiosk') ? 19 * (kioskVenues - locations) : 0
-  // Delivery fixed fee (catalog priceMonthly=0, computed from sub-plan)
-  const deliveryFixedFee = activeAddons.has('delivery_integrations')
-    ? DELIVERY_PLANS[deliveryPlan].priceMonthly * locations
-    : 0
-  const softwareFee = economics.softwareRevenueMonthly + kdsAdj + kioskAdj + deliveryFixedFee
+  // Unified monthly totals — plan fee ceiled, KDS/Kiosk venue adj, delivery from sub-plan
+  const totals = calculateMonthlyTotals({ economics, locations, activeAddons, deliveryPlan, kdsVenues, kioskVenues })
+  const deliveryFixedFee = totals.deliveryFee
+  const softwareFee = totals.planFee + totals.addonFee + totals.datafonoFee + totals.deliveryFee
   const discountAmount = softwareFee * (discountPercent / 100)
-  const adjustedMRR = softwareFee - discountAmount + renMonthly + economics.hardwareRevenueMonthly
+  const adjustedMRR = softwareFee - discountAmount + renMonthly + totals.hardwareMonthly
   const rentedMonthly = HARDWARE_ORDER.reduce((sum, id) => {
     const s = hardware[id]
     return s.mode === 'rented' ? sum + (HARDWARE[id].rentalMonthlyPrice ?? RENTAL_MONTHLY_PRICE) * s.quantity : sum
@@ -1295,9 +1292,9 @@ function EconomicsPanel({
           Desglose ingresos
         </p>
         <div className="space-y-2">
-          <BreakdownRow label="Plan" value={formatCurrency(economics.planFeeMonthly)} />
-          {economics.addonFeeMonthly > 0 && (
-            <BreakdownRow label="Add-ons" value={formatCurrency(economics.addonFeeMonthly)} />
+          <BreakdownRow label="Plan" value={formatCurrency(totals.planFee)} />
+          {totals.addonFee > 0 && (
+            <BreakdownRow label="Add-ons" value={formatCurrency(totals.addonFee)} />
           )}
           {deliveryFixedFee > 0 && (
             <BreakdownRow label={`${DELIVERY_PLANS[deliveryPlan].label}`} value={formatCurrency(deliveryFixedFee)} />

@@ -2,7 +2,8 @@
 
 import Image from 'next/image'
 import { useState, useTransition, useEffect, useCallback } from 'react'
-import { PLANS, ADDONS, HARDWARE, HARDWARE_MODE_LABELS, DELIVERY_PLANS } from '@/lib/pricing/catalog'
+import { PLANS, ADDONS, HARDWARE, HARDWARE_MODE_LABELS } from '@/lib/pricing/catalog'
+import { calculateMonthlyTotals } from '@/lib/pricing/totals'
 import { formatCurrency, formatNumber } from '@/lib/format'
 import { saveProposalAction } from '@/app/actions/save-proposal'
 import type { Deal, DealConfiguration, ProposalSections, DeliveryPlanId } from '@/types'
@@ -89,12 +90,7 @@ export function ProposalEditor({ deal, cfg, today, initialSections }: ProposalEd
   const plan = PLANS[cfg.plan]
   const hardwareItems = cfg.hardware.filter((h) => h.quantity > 0)
 
-  // Delivery fee: use persisted per-location fee from economics, fallback to catalog
   const deliveryPlanId = (cfg.deliveryPlan ?? 'start') as DeliveryPlanId
-  const deliveryPlanData = DELIVERY_PLANS[deliveryPlanId]
-  const deliveryFixedFee = cfg.activeAddons.includes('delivery_integrations')
-    ? (eco.deliveryFixedFee ?? deliveryPlanData.priceMonthly) * cfg.locations
-    : 0
 
   // REN calculations
   const renEnabled = (cfg.renEnabled === true) && ((cfg.renVenues ?? 0) > 0)
@@ -103,13 +99,21 @@ export function ProposalEditor({ deal, cfg, today, initialSections }: ProposalEd
   const deliveryPerVenue = cfg.deliveryOrdersPerVenue ?? 0
   const renMonthly = renEnabled ? renFeePerOrder * deliveryPerVenue * renVenues : 0
 
-  // Total add-on fees (engine addonFeeMonthly excludes delivery; add it back)
-  const totalAddonFee = eco.addonFeeMonthly + deliveryFixedFee
+  // Unified monthly totals (planFee ceiled, delivery from persisted sub-plan fee)
+  const totals = calculateMonthlyTotals({
+    economics: eco,
+    locations: cfg.locations,
+    activeAddons: cfg.activeAddons,
+    deliveryPlan: deliveryPlanId,
+    deliveryFixedFeePerLoc: eco.deliveryFixedFee,
+  })
+  const deliveryFixedFee = totals.deliveryFee
+  // Add-ons row: engine addonFee + delivery (excludes datafono, shown separately)
+  const totalAddonFee = totals.addonFee + totals.deliveryFee
 
-  // Discount + IVA — totalMonthlyRevenue doesn't include delivery (priceMonthly=0 in catalog),
-  // so we add deliveryFixedFee explicitly
+  // Discount + IVA
   const discountPercent = cfg.discountPercent ?? 0
-  const totalNet = eco.totalMonthlyRevenue + deliveryFixedFee
+  const totalNet = totals.netTotal
   const discountAmount = totalNet * (discountPercent / 100)
   const netAfterDiscount = totalNet - discountAmount
   const ivaAmount = netAfterDiscount * 0.21
@@ -360,7 +364,7 @@ export function ProposalEditor({ deal, cfg, today, initialSections }: ProposalEd
         <div className="px-10 py-8 border-b border-zinc-100">
           <SectionLabel>Resumen económico</SectionLabel>
           <div className="mt-4 space-y-0 divide-y divide-zinc-100 border border-zinc-100 rounded-xl overflow-hidden">
-            <SummaryRow label="Plan" value={`${formatCurrency(eco.planFeeMonthly)}/mes`} />
+            <SummaryRow label="Plan" value={`${formatCurrency(totals.planFee)}/mes`} />
             {totalAddonFee > 0 && (
               <SummaryRow label="Add-ons" value={`${formatCurrency(totalAddonFee)}/mes`} />
             )}
