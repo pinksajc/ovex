@@ -409,7 +409,7 @@ function s5Plans(deal: Deal, cfg: DealConfiguration, logoUri: string): string {
   const planRows: string[][] = [
     ['Volumen tickets/mes/local', 'Hasta 500',                   '501 – 1.000',                    'Más de 1.000'],
     ['Precio base',               'Gratis',                      `${fmt(15)}/local/mes`,            `${fmt(35)}/local/mes`],
-    ['Fee variable',              '0,08 €/ticket',               '0,05 €/ticket',                  '0,03 €/ticket'],
+    ...(cfg.calculateVariable ? [['Fee variable', '0,08 €/ticket', '0,05 €/ticket', '0,03 €/ticket'] as string[]] : []),
     ['Soporte',                   'Email',                       'Email + Chat',                   'Tel · Chat · Email'],
     ['Tiempo respuesta',          '48 h',                        '24 h',                           '4 h'],
     ['Onboarding',                'Self-service',                'Sesión remota',                  'Presencial/remoto'],
