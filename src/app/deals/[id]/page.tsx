@@ -77,6 +77,23 @@ export default async function DealPage({
 
   const cfg = getActiveConfig(deal)
 
+  // Corrected MRR: softwareRevenue (excl. delivery) + deliveryFee + financed-hardware monthly
+  const cfgEco = cfg
+    ? (cfg.economics as typeof cfg.economics & { deliveryFixedFee?: number })
+    : null
+  const cfgDeliveryFee = cfg && cfgEco && cfg.activeAddons.includes('delivery_integrations')
+    ? (cfgEco.deliveryFixedFee ?? 0) * cfg.locations
+    : 0
+  const cfgHardwareMonthly = cfg
+    ? cfg.hardware
+        .filter(item => item.mode === 'financed' && (item.financeMonths ?? 0) > 0)
+        .reduce((sum, item) => sum + Math.ceil((item.unitPrice * item.quantity) / item.financeMonths!), 0)
+    : 0
+  const cfgMrr = cfg
+    ? cfgEco!.softwareRevenueMonthly + cfgDeliveryFee + cfgHardwareMonthly
+    : 0
+  const cfgArr = cfgMrr * 12
+
   return (
     <div className="p-8 max-w-5xl mx-auto">
       {/* Breadcrumb */}
@@ -251,10 +268,10 @@ export default async function DealPage({
           <div className="grid grid-cols-4 gap-4">
             <Metric
               label="MRR"
-              value={formatCurrency(cfg.economics.totalMonthlyRevenue)}
+              value={formatCurrency(cfgMrr)}
               highlight
             />
-            <Metric label="ARR" value={formatCurrency(cfg.economics.annualRevenue)} />
+            <Metric label="ARR" value={formatCurrency(cfgArr)} />
             <Metric label="Plan" value={cfg.plan.charAt(0).toUpperCase() + cfg.plan.slice(1)} />
             <Metric label="Locales" value={String(cfg.locations)} />
             <Metric
