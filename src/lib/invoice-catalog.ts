@@ -14,6 +14,8 @@ export interface ServiceItem {
   priceEditable?: boolean  // true → price field highlighted (user must fill)
   note?: string            // shown next to the service name in dropdown
   custom?: true            // "Línea personalizada" — fully free text
+  /** Delivery sub-plan key — when set, the form auto-fills the period field with plan details */
+  deliveryPlanKey?: 'start' | 'go' | 'pro'
 }
 
 export const SERVICES: ServiceItem[] = [
@@ -26,12 +28,12 @@ export const SERVICES: ServiceItem[] = [
   { id: 'ros_pro_variable',     label: 'ROS Plan Pro — Fee variable',    group: 'ROS', unit: 'pedidos', defaultPrice: 0.03 },
 
   // ---- ADD-ONS ----
-  { id: 'addon_delivery_start', label: 'Integración delivery — Order Hub Start', group: 'ADD-ONS', unit: 'local/mes', defaultPrice: 24 },
-  { id: 'addon_delivery_go',    label: 'Integración delivery — Order Hub Go',    group: 'ADD-ONS', unit: 'local/mes', defaultPrice: 64 },
-  { id: 'addon_delivery_pro',   label: 'Integración delivery — Order Hub Pro',   group: 'ADD-ONS', unit: 'local/mes', defaultPrice: 104 },
-  { id: 'addon_delivery_adic_start', label: 'Integración delivery — Pedidos adicionales Start', group: 'ADD-ONS', unit: 'pedidos', defaultPrice: 0.30 },
-  { id: 'addon_delivery_adic_go',    label: 'Integración delivery — Pedidos adicionales Go',    group: 'ADD-ONS', unit: 'pedidos', defaultPrice: 0.25 },
-  { id: 'addon_delivery_adic_pro',   label: 'Integración delivery — Pedidos adicionales Pro',   group: 'ADD-ONS', unit: 'pedidos', defaultPrice: 0.15 },
+  { id: 'addon_delivery_start', label: 'Integración delivery — Order Hub Start', group: 'ADD-ONS', unit: 'local/mes', defaultPrice: 24,   deliveryPlanKey: 'start' },
+  { id: 'addon_delivery_go',    label: 'Integración delivery — Order Hub Go',    group: 'ADD-ONS', unit: 'local/mes', defaultPrice: 64,   deliveryPlanKey: 'go'    },
+  { id: 'addon_delivery_pro',   label: 'Integración delivery — Order Hub Pro',   group: 'ADD-ONS', unit: 'local/mes', defaultPrice: 104,  deliveryPlanKey: 'pro'   },
+  { id: 'addon_delivery_adic_start', label: 'Integración delivery — Pedidos adicionales Start', group: 'ADD-ONS', unit: 'pedidos', defaultPrice: 0.30, deliveryPlanKey: 'start' },
+  { id: 'addon_delivery_adic_go',    label: 'Integración delivery — Pedidos adicionales Go',    group: 'ADD-ONS', unit: 'pedidos', defaultPrice: 0.25, deliveryPlanKey: 'go'    },
+  { id: 'addon_delivery_adic_pro',   label: 'Integración delivery — Pedidos adicionales Pro',   group: 'ADD-ONS', unit: 'pedidos', defaultPrice: 0.15, deliveryPlanKey: 'pro'   },
   { id: 'addon_stock', label: 'Add-on Stock', group: 'ADD-ONS', unit: 'local/mes', defaultPrice: 9 },
   { id: 'addon_kds', label: 'Add-on KDS', group: 'ADD-ONS', unit: 'local/mes', defaultPrice: 19 },
   { id: 'addon_kiosk', label: 'Add-on Kiosk autoservicio', group: 'ADD-ONS', unit: 'local/mes', defaultPrice: 19 },

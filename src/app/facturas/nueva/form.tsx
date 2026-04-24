@@ -4,6 +4,7 @@ import { useState, useTransition, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { createInvoiceAction } from '@/app/actions/invoices'
 import { SERVICES, SERVICE_MAP, SERVICE_GROUPS } from '@/lib/invoice-catalog'
+import { DELIVERY_PLANS } from '@/lib/pricing/catalog'
 import type { InvoiceType, InvoiceLineItem, DiscountMode } from '@/types'
 
 // ---- helpers ----
@@ -436,19 +437,28 @@ function RegularLineRow({
 
   function handleServiceSelect(serviceId: string) {
     if (!serviceId) {
-      onChange(line.id, { serviceId: '', description: '', unit: '', unitPrice: 0, amount: 0 })
+      onChange(line.id, { serviceId: '', description: '', unit: '', unitPrice: 0, amount: 0, period: undefined })
       return
     }
     const item = SERVICE_MAP.get(serviceId)
     if (!item) return
     const qty = line.quantity || 1
     const price = item.defaultPrice
+
+    // Auto-fill period with sub-plan details for delivery integration items
+    let autoPeriod: string | undefined = line.period
+    if (item.deliveryPlanKey) {
+      const dp = DELIVERY_PLANS[item.deliveryPlanKey]
+      autoPeriod = `${dp.label} · ${dp.includedOrders} ped. incl. · ${dp.extraOrderFee.toFixed(2).replace('.', ',')}€/ped. adic.`
+    }
+
     onChange(line.id, {
       serviceId,
       description: item.custom ? '' : item.label,
       unit: item.unit,
       unitPrice: price,
       amount: qty * price,
+      period: autoPeriod,
     })
   }
 
