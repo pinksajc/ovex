@@ -103,6 +103,9 @@ export function ProposalEditor({ deal, cfg, today, initialSections }: ProposalEd
   const deliveryPerVenue = cfg.deliveryOrdersPerVenue ?? 0
   const renMonthly = renEnabled ? renFeePerOrder * deliveryPerVenue * renVenues : 0
 
+  // Total add-on fees (engine addonFeeMonthly excludes delivery; add it back)
+  const totalAddonFee = eco.addonFeeMonthly + deliveryFixedFee
+
   // Discount + IVA — totalMonthlyRevenue doesn't include delivery (priceMonthly=0 in catalog),
   // so we add deliveryFixedFee explicitly
   const discountPercent = cfg.discountPercent ?? 0
@@ -237,9 +240,10 @@ export function ProposalEditor({ deal, cfg, today, initialSections }: ProposalEd
             <div className="mt-4 space-y-2">
               {cfg.activeAddons.map((id) => {
                 const addon = ADDONS[id]
+                // Delivery: use persisted deliveryFixedTotal (engine priceMonthly is 0)
                 const monthlyFee =
-                  id === 'datafono' ? eco.datafonoFeeMonthly
-                  : id === 'delivery_integrations' ? deliveryFixedFee
+                  id === 'delivery_integrations' ? deliveryFixedFee
+                  : id === 'datafono' ? eco.datafonoFeeMonthly
                   : addon.perLocation && addon.priceMonthly != null
                   ? addon.priceMonthly * cfg.locations
                   : addon.priceMonthly ?? 0
@@ -357,8 +361,8 @@ export function ProposalEditor({ deal, cfg, today, initialSections }: ProposalEd
           <SectionLabel>Resumen económico</SectionLabel>
           <div className="mt-4 space-y-0 divide-y divide-zinc-100 border border-zinc-100 rounded-xl overflow-hidden">
             <SummaryRow label="Plan" value={`${formatCurrency(eco.planFeeMonthly)}/mes`} />
-            {(eco.addonFeeMonthly + deliveryFixedFee) > 0 && (
-              <SummaryRow label="Add-ons" value={`${formatCurrency(eco.addonFeeMonthly + deliveryFixedFee)}/mes`} />
+            {totalAddonFee > 0 && (
+              <SummaryRow label="Add-ons" value={`${formatCurrency(totalAddonFee)}/mes`} />
             )}
             {eco.datafonoFeeMonthly > 0 && (
               <SummaryRow label="Datáfono" value={`${formatCurrency(eco.datafonoFeeMonthly)}/mes`} />

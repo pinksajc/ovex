@@ -2,6 +2,7 @@
 
 import { revalidateTag, revalidatePath } from 'next/cache'
 import { calculateEconomics } from '@/lib/pricing/engine'
+import { DELIVERY_PLANS } from '@/lib/pricing/catalog'
 import { saveNewConfigVersion } from '@/lib/deals'
 import { logEvent } from '@/lib/supabase/events'
 import type { PlanTier, AddonId, HardwareLineItem, DeliveryPlanId } from '@/types'
@@ -58,7 +59,15 @@ export async function saveNewVersionAction(
       kioskVenues: payload.kioskVenues,
       calculateVariable: payload.calculateVariable ?? false,
       discountName: payload.discountName ?? '',
-      deliveryPlan: payload.deliveryPlan ?? 'start',
+      // Delivery sub-plan — canonical persisted fields (read by PDF & preview)
+      deliveryPlan: payload.deliveryPlan ?? 'start',                     // backward compat
+      deliveryPlanKey: payload.deliveryPlan ?? 'start',
+      deliveryFixedFee: DELIVERY_PLANS[payload.deliveryPlan ?? 'start'].priceMonthly,  // per local
+      deliveryFixedMonthly: payload.activeAddons.includes('delivery_integrations')     // backward compat
+        ? DELIVERY_PLANS[payload.deliveryPlan ?? 'start'].priceMonthly * payload.locations
+        : 0,
+      deliveryExtraFeePerOrder: DELIVERY_PLANS[payload.deliveryPlan ?? 'start'].extraOrderFee,
+      deliveryIncludedOrders: DELIVERY_PLANS[payload.deliveryPlan ?? 'start'].includedOrders,
     }
 
     const result = await saveNewConfigVersion(payload.dealId, {

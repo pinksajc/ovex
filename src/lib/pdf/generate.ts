@@ -385,11 +385,17 @@ function s5Plans(deal: Deal, cfg: DealConfiguration, logoUri: string): string {
   const hiCol = tiers.indexOf(cfg.plan) + 1
   const eco = cfg.economics as DealEconomics & {
     renEnabled?: boolean; renFeePerOrder?: number; renVenues?: number
-    kdsVenues?: number; kioskVenues?: number; deliveryPlan?: string
-    deliveryFixedFee?: number; deliveryExtraFeePerOrder?: number; deliveryIncludedOrders?: number
+    kdsVenues?: number; kioskVenues?: number
+    deliveryPlan?: string; deliveryPlanKey?: string
+    deliveryFixedFee?: number; deliveryFixedMonthly?: number
+    deliveryExtraFeePerOrder?: number; deliveryIncludedOrders?: number
   }
-  const deliveryPlanId = (eco.deliveryPlan ?? 'start') as DeliveryPlanId
+  const deliveryPlanId = (eco.deliveryPlanKey ?? eco.deliveryPlan ?? 'start') as DeliveryPlanId
   const deliveryPlanData = DELIVERY_PLANS[deliveryPlanId]
+  // Prefer persisted catalog snapshot; fall back to live catalog lookup
+  const s5ExtraFeePerOrder = eco.deliveryExtraFeePerOrder ?? deliveryPlanData.extraOrderFee
+  const s5IncludedOrders = eco.deliveryIncludedOrders ?? deliveryPlanData.includedOrders
+  const s5FixedFeePerLoc = eco.deliveryFixedFee ?? deliveryPlanData.priceMonthly
   const renEnabled = eco.renEnabled === true
   const renFeePerOrder = eco.renFeePerOrder ?? 0.10
   const renVenues = eco.renVenues ?? 1
@@ -398,10 +404,6 @@ function s5Plans(deal: Deal, cfg: DealConfiguration, logoUri: string): string {
   const s5KdsVenues = eco.kdsVenues ?? cfg.locations
   const s5KioskVenues = eco.kioskVenues ?? cfg.locations
   const hwItems = cfg.hardware.filter(h => h.quantity > 0)
-  // Use persisted delivery fee from economics if available; fallback to catalog derivation
-  const s5DeliveryFixed = cfg.activeAddons.includes('delivery_integrations')
-    ? (eco.deliveryFixedFee ?? deliveryPlanData.priceMonthly) * cfg.locations
-    : 0
 
   const planRows: string[][] = [
     ['Volumen tickets/mes/local', 'Hasta 500',                   '501 – 1.000',                    'Más de 1.000'],
@@ -446,18 +448,18 @@ function s5Plans(deal: Deal, cfg: DealConfiguration, logoUri: string): string {
       ${activeAddons.map(id => {
         const addon = ADDONS[id]
         if (id === 'delivery_integrations') {
-          const dpPerLocation = cfg.locations > 0 ? s5DeliveryFixed / cfg.locations : deliveryPlanData.priceMonthly
+          const dpFixed = s5FixedFeePerLoc * cfg.locations  // use persisted per-loc fee
           return `<div style="display:flex;justify-content:space-between;align-items:flex-start;padding:7px 11px;background:#f8fafc;border:1px solid #e8eef6;border-radius:6px;">
             <div>
               <span style="font-size:10px;font-weight:600;color:#0f172a;">${addon.label}</span>
               <span style="font-size:9px;color:#94a3b8;margin-left:7px;">${deliveryPlanData.label}</span>
               <div style="font-size:8.5px;color:#94a3b8;margin-top:3px;">
-                ${deliveryPlanData.includedOrders} pedidos incl. · Pedidos adic.: ${deliveryPlanData.extraOrderFee.toFixed(2).replace('.', ',')}€/pedido (variable · mes vencido)
+                ${s5IncludedOrders} pedidos incl. · Pedidos adic.: ${s5ExtraFeePerOrder.toFixed(2).replace('.', ',')}€/pedido (variable · mes vencido)
               </div>
             </div>
             <div style="text-align:right;flex-shrink:0;margin-left:10px;">
-              <span style="font-size:9px;color:#64748b;">${fmt(dpPerLocation)}/local/mes</span><br/>
-              <span style="font-size:10px;font-weight:700;color:#1e3a5f;font-family:'Courier New',monospace;">${fmt(s5DeliveryFixed)}/mes</span>
+              <span style="font-size:9px;color:#64748b;">${fmt(s5FixedFeePerLoc)}/local/mes</span><br/>
+              <span style="font-size:10px;font-weight:700;color:#1e3a5f;font-family:'Courier New',monospace;">${fmt(dpFixed)}/mes</span>
             </div>
           </div>`
         }
@@ -664,15 +666,22 @@ function s11Economics(deal: Deal, cfg: DealConfiguration, sections: ProposalSect
     kioskVenues?: number
     discountName?: string
     deliveryPlan?: string
-    deliveryFixedFee?: number
+    deliveryPlanKey?: string
+    deliveryFixedFee?: number       // per local/mes — canonical persisted field
+    deliveryFixedMonthly?: number   // total (fee × locations) — backward compat
     deliveryExtraFeePerOrder?: number
     deliveryIncludedOrders?: number
   }
-  const s11DeliveryPlanId = (eco.deliveryPlan ?? 'start') as DeliveryPlanId
+  const s11DeliveryPlanId = (eco.deliveryPlanKey ?? eco.deliveryPlan ?? 'start') as DeliveryPlanId
   const s11DeliveryPlan = DELIVERY_PLANS[s11DeliveryPlanId]
-  const s11DeliveryFixed = cfg.activeAddons.includes('delivery_integrations')
-    ? (eco.deliveryFixedFee ?? s11DeliveryPlan.priceMonthly) * cfg.locations
+  // Prefer canonical deliveryFixedFee (per-loc × locations), then deliveryFixedMonthly, then re-derive
+  const deliveryActive = cfg.activeAddons.includes('delivery_integrations')
+  const s11DeliveryFixed = deliveryActive
+    ? (eco.deliveryFixedFee != null
+        ? eco.deliveryFixedFee * cfg.locations
+        : (eco.deliveryFixedMonthly ?? s11DeliveryPlan.priceMonthly * cfg.locations))
     : 0
+  const s11ExtraFeePerOrder = eco.deliveryExtraFeePerOrder ?? s11DeliveryPlan.extraOrderFee
   const plan = PLANS[cfg.plan]
   const activeAddons = cfg.activeAddons.map(id => ADDONS[id])
   const hwItems = cfg.hardware.filter(h => h.quantity > 0)
@@ -738,9 +747,14 @@ function s11Economics(deal: Deal, cfg: DealConfiguration, sections: ProposalSect
           : `${fmt(plan.priceMonthly)}/local/mes × ${cfg.locations} local${cfg.locations > 1 ? 'es' : ''}`)}
         ${simpleRow('Fee variable', `${plan.variableFee}€/ticket`)}
         ${discountPercent > 0 ? simpleRow(eco.discountName ? `Descuento ${eco.discountName}` : 'Descuento', `−${discountPercent}%`, true) : ''}
+        ${(() => {
+          // Add-ons total row: sum of all fixed-fee add-ons (engine addonFeeMonthly + venue adj + delivery)
+          const totalAddons = eco.addonFeeMonthly + kdsAdj + kioskAdj + s11DeliveryFixed
+          return totalAddons > 0 ? simpleRow('Add-ons (total)', `${fmt(totalAddons)}/mes`) : ''
+        })()}
         ${activeAddons.length > 0 ? `
           <div style="margin-top:8px;padding-top:6px;border-top:1px solid #e8eef6;">
-            <div style="font-size:7.5px;color:#94a3b8;text-transform:uppercase;letter-spacing:1px;margin-bottom:4px;">Add-ons</div>
+            <div style="font-size:7.5px;color:#94a3b8;text-transform:uppercase;letter-spacing:1px;margin-bottom:4px;">Detalle add-ons</div>
             ${activeAddons.map(a => {
               const addonNet = a.id === 'delivery_integrations' ? s11DeliveryFixed
                 : a.id === 'kds' ? (ADDONS['kds'].priceMonthly ?? 19) * kdsVenues
@@ -752,7 +766,7 @@ function s11Economics(deal: Deal, cfg: DealConfiguration, sections: ProposalSect
                 : a.perConsumption ? 'Por consumo'
                 : addonNet != null ? `${fmt(addonNet)}/mes` : '—'
               const addonSub = a.id === 'delivery_integrations'
-                ? `<div style="font-size:7.5px;color:#94a3b8;">${s11DeliveryPlan.label} · ${s11DeliveryPlan.extraOrderFee.toFixed(2).replace('.', ',')}€/ped. adic. (variable)</div>`
+                ? `<div style="font-size:7.5px;color:#94a3b8;">${s11DeliveryPlan.label} · ${s11ExtraFeePerOrder.toFixed(2).replace('.', ',')}€/ped. adic. (variable)</div>`
                 : ''
               return `<div style="padding:2px 0;">
                 <div style="display:flex;justify-content:space-between;gap:4px;">

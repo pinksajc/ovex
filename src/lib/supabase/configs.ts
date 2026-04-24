@@ -41,6 +41,11 @@ function rowToConfig(row: ConfigRow): DealConfiguration {
     calculateVariable?: boolean
     discountName?: string
     deliveryPlan?: string
+    deliveryPlanKey?: string
+    deliveryFixedFee?: number
+    deliveryFixedMonthly?: number
+    deliveryExtraFeePerOrder?: number
+    deliveryIncludedOrders?: number
   }
   const locs = row.locations
   return {

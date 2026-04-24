@@ -61,9 +61,13 @@ export async function saveConfigAction(
       kioskVenues: payload.kioskVenues,
       calculateVariable: payload.calculateVariable ?? false,
       discountName: payload.discountName ?? '',
-      deliveryPlan: payload.deliveryPlan ?? 'start',
+      // Delivery sub-plan — canonical persisted fields (read by PDF & preview)
+      deliveryPlan: payload.deliveryPlan ?? 'start',                     // backward compat
       deliveryPlanKey: payload.deliveryPlan ?? 'start',
-      deliveryFixedFee: DELIVERY_PLANS[payload.deliveryPlan ?? 'start'].priceMonthly,
+      deliveryFixedFee: DELIVERY_PLANS[payload.deliveryPlan ?? 'start'].priceMonthly,  // per local
+      deliveryFixedMonthly: payload.activeAddons.includes('delivery_integrations')     // backward compat
+        ? DELIVERY_PLANS[payload.deliveryPlan ?? 'start'].priceMonthly * payload.locations
+        : 0,
       deliveryExtraFeePerOrder: DELIVERY_PLANS[payload.deliveryPlan ?? 'start'].extraOrderFee,
       deliveryIncludedOrders: DELIVERY_PLANS[payload.deliveryPlan ?? 'start'].includedOrders,
     }
