@@ -422,21 +422,15 @@ export function Simulator({ deal, initialConfig, loadedConfigId }: SimulatorProp
         <Section title="Volumen & Escala">
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <div className="flex justify-between mb-1.5">
-                <label className="text-xs font-medium text-zinc-600">
-                  Pedidos/mes por local
-                </label>
-                <span className="text-xs font-mono font-semibold text-zinc-900">
-                  {formatNumber(dailyOrders)}
-                </span>
-              </div>
-              <input
-                type="range" min={0} max={25000} step={10} value={dailyOrders}
-                onChange={(e) => setDailyOrders(Number(e.target.value))}
-                className="w-full accent-zinc-900"
-              />
-              <div className="flex justify-between text-[10px] text-zinc-400 mt-0.5">
-                <span>0</span><span>25.000</span>
+              <label className="text-xs font-medium text-zinc-600 block mb-1.5">
+                Pedidos/mes por local
+              </label>
+              <div className="flex items-center border border-zinc-200 rounded-lg overflow-hidden focus-within:ring-2 focus-within:ring-zinc-900 focus-within:border-transparent">
+                <input
+                  type="number" min={0} max={25000} step={10} value={dailyOrders}
+                  onChange={(e) => setDailyOrders(Math.min(25000, Math.max(0, Number(e.target.value))))}
+                  className="flex-1 px-3 py-2 text-sm font-mono text-zinc-900 outline-none bg-white"
+                />
               </div>
             </div>
 
