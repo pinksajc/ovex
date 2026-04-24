@@ -747,11 +747,6 @@ function s11Economics(deal: Deal, cfg: DealConfiguration, sections: ProposalSect
           : `${fmt(plan.priceMonthly)}/local/mes × ${cfg.locations} local${cfg.locations > 1 ? 'es' : ''}`)}
         ${cfg.calculateVariable ? simpleRow('Fee variable', `${plan.variableFee}€/ticket`) : ''}
         ${discountPercent > 0 ? simpleRow(eco.discountName ? `Descuento ${eco.discountName}` : 'Descuento', `−${discountPercent}%`, true) : ''}
-        ${(() => {
-          // Add-ons total row: addonFee (includes KDS/Kiosk venue adj) + delivery
-          const totalAddons = totals.addonFee + totals.deliveryFee
-          return totalAddons > 0 ? simpleRow('Add-ons (total)', `${fmt(totalAddons)}/mes`) : ''
-        })()}
         ${activeAddons.length > 0 ? `
           <div style="margin-top:8px;padding-top:6px;border-top:1px solid #e8eef6;">
             <div style="font-size:7.5px;color:#94a3b8;text-transform:uppercase;letter-spacing:1px;margin-bottom:4px;">Detalle add-ons</div>
