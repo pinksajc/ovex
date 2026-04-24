@@ -822,43 +822,7 @@ function s11Economics(deal: Deal, cfg: DealConfiguration, sections: ProposalSect
       </div>
     </div>
 
-    <!-- Total fijo mensual / Coste variable estimado (below columns) -->
-    ${cfg.calculateVariable ? (() => {
-      const rosTotal = plan.variableFee * eco.totalMonthlyVolume
-      const renTotal = renEnabled && renVenues > 0 ? renFeePerOrder * deliveryPerVenue * renVenues : 0
-      const varTotal = rosTotal + renTotal
-      return `
-    <div style="border:2px solid #1e3a5f;border-radius:12px;padding:16px 20px;background:#f0f5fb;margin-bottom:10px;">
-      <div style="font-size:8.5px;color:#64748b;text-transform:uppercase;letter-spacing:1.5px;margin-bottom:12px;text-align:center;">Coste variable estimado</div>
-      <div style="display:flex;flex-direction:column;gap:8px;">
-        <div style="display:flex;justify-content:space-between;align-items:baseline;padding:5px 0;border-bottom:1px solid #dde6f0;">
-          <span style="font-size:9px;color:#334155;">ROS · ${plan.variableFee.toFixed(2).replace('.', ',')}€/ticket × ${fmtN(eco.totalMonthlyVolume)} pedidos</span>
-          <span style="font-size:10px;font-weight:700;color:#1e3a5f;font-family:'Courier New',monospace;">${fmt(rosTotal)}/mes</span>
-        </div>
-        ${renEnabled && renVenues > 0 ? `
-        <div style="display:flex;justify-content:space-between;align-items:baseline;padding:5px 0;border-bottom:1px solid #dde6f0;">
-          <span style="font-size:9px;color:#334155;">REN · ${renFeePerOrder.toFixed(2).replace('.', ',')}€/pedido × ${fmtN(deliveryPerVenue * renVenues)} pedidos</span>
-          <span style="font-size:10px;font-weight:700;color:#1e3a5f;font-family:'Courier New',monospace;">${fmt(renTotal)}/mes</span>
-        </div>` : ''}
-        <div style="display:flex;justify-content:space-between;align-items:baseline;padding:5px 0;border-bottom:1px solid #dde6f0;">
-          <span style="font-size:9px;color:#334155;">Base imponible</span>
-          <span style="font-size:10px;font-weight:700;color:#1e3a5f;font-family:'Courier New',monospace;">${fmt2(varTotal)}</span>
-        </div>
-        <div style="display:flex;justify-content:space-between;align-items:baseline;padding:5px 0;border-bottom:1px solid #dde6f0;">
-          <span style="font-size:9px;color:#334155;">IVA 21%</span>
-          <span style="font-size:10px;font-weight:700;color:#1e3a5f;font-family:'Courier New',monospace;">${fmt2(varTotal * 0.21)}</span>
-        </div>
-        <div style="display:flex;justify-content:space-between;align-items:baseline;padding:6px 0 2px;">
-          <span style="font-size:9.5px;font-weight:700;color:#334155;">Total estimado (IVA incl.)</span>
-          <span style="font-size:18px;font-weight:900;color:#1e3a5f;font-family:'Courier New',monospace;">${fmt2(varTotal * 1.21)}/mes</span>
-        </div>
-      </div>
-    </div>
-    <div style="border:1px solid #e8eef6;border-radius:8px;padding:10px 14px;background:#f8fafc;font-size:8.5px;color:#334155;line-height:1.6;margin-bottom:6px;">
-      Coste estimado basado en volumen configurado. Se factura a mes vencido según pedidos reales.${hwUpfrontNet > 0 ? `
-      <br><strong>Pago único hardware:</strong> ${fmt(hwUpfrontNet)} — facturado a la activación.` : ''}
-    </div>`
-    })() : `
+    <!-- Total fijo mensual (always shown) -->
     <div style="border:2px solid #1e3a5f;border-radius:12px;padding:14px 20px;background:#f0f5fb;margin-bottom:10px;">
       <div style="font-size:8.5px;color:#64748b;text-transform:uppercase;letter-spacing:1.5px;margin-bottom:10px;text-align:center;">Total fijo / mes (add-ons + hardware mensualidad)</div>
       <!-- Breakdown rows: Plan / Add-ons / Hardware -->
@@ -890,10 +854,31 @@ function s11Economics(deal: Deal, cfg: DealConfiguration, sections: ProposalSect
     </div>
 
     ${hwUpfrontNet > 0 ? `
-    <div style="border:1px solid #e8eef6;border-radius:8px;padding:10px 14px;background:#f8fafc;font-size:8.5px;color:#334155;line-height:1.6;">
+    <div style="border:1px solid #e8eef6;border-radius:8px;padding:10px 14px;background:#f8fafc;font-size:8.5px;color:#334155;line-height:1.6;margin-bottom:10px;">
       <strong>Pago único hardware:</strong> ${fmt(hwUpfrontNet)} — facturado a la activación.
     </div>` : ''}
-    `}
+
+    <!-- Coste variable estimado (only when calculateVariable=true) -->
+    ${cfg.calculateVariable ? (() => {
+      const rosTotal = plan.variableFee * eco.totalMonthlyVolume
+      const renTotal = renEnabled && renVenues > 0 ? renFeePerOrder * deliveryPerVenue * renVenues : 0
+      const varTotal = rosTotal + renTotal
+      return `
+    <div style="border:2px solid #64748b;border-radius:12px;padding:14px 20px;background:#f8fafc;margin-bottom:10px;">
+      <div style="font-size:8.5px;color:#64748b;text-transform:uppercase;letter-spacing:1.5px;margin-bottom:10px;text-align:center;">Coste variable estimado (según volumen)</div>
+      <div style="display:flex;flex-direction:column;gap:3px;margin-bottom:10px;padding-bottom:10px;border-bottom:1px solid #dde6f0;">
+        ${simpleRow(`ROS · ${plan.variableFee.toFixed(2).replace('.', ',')}€/ticket × ${fmtN(eco.totalMonthlyVolume)} pedidos`, `${fmt(rosTotal)}/mes`)}
+        ${renEnabled && renVenues > 0 ? simpleRow(`REN · ${renFeePerOrder.toFixed(2).replace('.', ',')}€/pedido × ${fmtN(deliveryPerVenue * renVenues)} pedidos`, `${fmt(renTotal)}/mes`) : ''}
+      </div>
+      <div style="display:flex;justify-content:space-between;align-items:baseline;padding:4px 0 2px;">
+        <span style="font-size:9px;color:#334155;font-weight:600;">Total estimado variable (IVA incl.)</span>
+        <span style="font-size:16px;font-weight:900;color:#334155;font-family:'Courier New',monospace;">${fmt2(varTotal * 1.21)}/mes</span>
+      </div>
+      <div style="font-size:8px;color:#94a3b8;margin-top:8px;line-height:1.5;">
+        Estimación basada en el volumen configurado. Se factura a mes vencido según pedidos reales del período.
+      </div>
+    </div>`
+    })() : ''}
 
     `
   return pg(logoUri, content)
