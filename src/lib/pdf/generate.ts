@@ -703,9 +703,10 @@ function s11Economics(deal: Deal, cfg: DealConfiguration, sections: ProposalSect
 
   const discountPercent = eco.discountPercent ?? 0
   // Discount applies to software only (plan + addons + datafono + delivery), not hardware
-  const softwareBase = totals.planFee + totals.addonFee + totals.datafonoFee + totals.deliveryFee
+  // Discount applies only to plan + add-ons + datafono — delivery fee is never discounted
+  const softwareBase = totals.planFee + totals.addonFee + totals.datafonoFee
   const discountAmount = softwareBase * (discountPercent / 100)
-  // Fixed monthly net = (software − discount) + hardware monthly; excludes variable REN
+  // Fixed monthly net = (software − discount) + delivery (undiscounted) + hardware monthly; excludes variable REN
   const fixedMonthlyNet = totals.netTotal - discountAmount
 
   const execSummary = sections.executiveSummary

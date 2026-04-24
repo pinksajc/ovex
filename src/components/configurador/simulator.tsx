@@ -1253,9 +1253,10 @@ function EconomicsPanel({
   // Unified monthly totals — plan fee ceiled, KDS/Kiosk venue adj, delivery from sub-plan
   const totals = calculateMonthlyTotals({ economics, locations, activeAddons, deliveryPlan, kdsVenues, kioskVenues })
   const deliveryFixedFee = totals.deliveryFee
-  const softwareFee = totals.planFee + totals.addonFee + totals.datafonoFee + totals.deliveryFee
-  const discountAmount = softwareFee * (discountPercent / 100)
-  const adjustedMRR = softwareFee - discountAmount + renMonthly + totals.hardwareMonthly
+  // Discount applies only to plan + add-ons + datafono — delivery fee is never discounted
+  const discountableBase = totals.planFee + totals.addonFee + totals.datafonoFee
+  const discountAmount = discountableBase * (discountPercent / 100)
+  const adjustedMRR = discountableBase - discountAmount + totals.deliveryFee + renMonthly + totals.hardwareMonthly
   const rentedMonthly = HARDWARE_ORDER.reduce((sum, id) => {
     const s = hardware[id]
     return s.mode === 'rented' ? sum + (HARDWARE[id].rentalMonthlyPrice ?? RENTAL_MONTHLY_PRICE) * s.quantity : sum
