@@ -113,7 +113,7 @@ export function ProposalEditor({ deal, cfg, today, initialSections }: ProposalEd
 
   // Discount + IVA
   const discountPercent = cfg.discountPercent ?? 0
-  const totalNet = totals.netTotal
+  const totalNet = totals.netTotal + renMonthly
   const discountAmount = totalNet * (discountPercent / 100)
   const netAfterDiscount = totalNet - discountAmount
   const ivaAmount = netAfterDiscount * 0.21

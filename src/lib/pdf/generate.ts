@@ -707,9 +707,9 @@ function s11Economics(deal: Deal, cfg: DealConfiguration, sections: ProposalSect
   // Discount base: fixed plan fee + addons (excl. delivery, hardware, variable)
   const softwareBase = planFixedFee + totals.addonFee + totals.datafonoFee
   const discountAmount = softwareBase * (discountPercent / 100)
-  // Fixed subtotal = fixed software + delivery (undiscounted) + hardware monthly
-  const subtotalFixed = softwareBase + totals.deliveryFee + (eco.hardwareRevenueMonthly ?? 0)
-  // Fixed monthly net excludes variable REN and variable plan component
+  // Fixed subtotal = fixed software + delivery (undiscounted) + hardware monthly + REN estimate
+  const subtotalFixed = softwareBase + totals.deliveryFee + (eco.hardwareRevenueMonthly ?? 0) + renMonthly
+  // Fixed monthly net excludes variable plan component only
   const fixedMonthlyNet = subtotalFixed - discountAmount
 
   const execSummary = sections.executiveSummary
@@ -833,6 +833,7 @@ function s11Economics(deal: Deal, cfg: DealConfiguration, sections: ProposalSect
         ${simpleRow('Plan', `${fmt(softwareBase)}/mes`)}
         ${totals.deliveryFee > 0 ? simpleRow('Integración delivery', `${fmt(totals.deliveryFee)}/mes`) : ''}
         ${eco.hardwareRevenueMonthly > 0 ? simpleRow('Hardware (cuotas)', `${fmt(eco.hardwareRevenueMonthly)}/mes`) : ''}
+        ${renMonthly > 0 ? simpleRow('REN — Logística propia', `${fmt(renMonthly)}/mes`) : ''}
       </div>
       <!-- Subtotal → discount → neto → IVA → total -->
       <div style="display:flex;flex-direction:column;gap:3px;margin-bottom:12px;">
