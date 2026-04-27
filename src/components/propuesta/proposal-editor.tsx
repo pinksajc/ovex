@@ -2,8 +2,7 @@
 
 import Image from 'next/image'
 import { useState, useTransition, useEffect, useCallback } from 'react'
-import { PLANS, ADDONS, HARDWARE, HARDWARE_MODE_LABELS } from '@/lib/pricing/catalog'
-import { calculateMonthlyTotals } from '@/lib/pricing/totals'
+import { PLANS, ADDONS, HARDWARE, HARDWARE_MODE_LABELS, DELIVERY_PLANS } from '@/lib/pricing/catalog'
 import { formatCurrency, formatNumber } from '@/lib/format'
 import { saveProposalAction } from '@/app/actions/save-proposal'
 import type { Deal, DealConfiguration, ProposalSections, DeliveryPlanId } from '@/types'
@@ -86,36 +85,35 @@ export function ProposalEditor({ deal, cfg, today, initialSections }: ProposalEd
     deliveryExtraFeePerOrder?: number
     deliveryIncludedOrders?: number
     deliveryPlanKey?: string
+    deliveryPlan?: string
   }
   const plan = PLANS[cfg.plan]
   const hardwareItems = cfg.hardware.filter((h) => h.quantity > 0)
 
-  const deliveryPlanId = (cfg.deliveryPlan ?? 'start') as DeliveryPlanId
-
-  // REN calculations
+  // REN
   const renEnabled = (cfg.renEnabled === true) && ((cfg.renVenues ?? 0) > 0)
   const renFeePerOrder = cfg.renFeePerOrder ?? 0.10
   const renVenues = cfg.renVenues ?? 0
   const deliveryPerVenue = cfg.deliveryOrdersPerVenue ?? 0
   const renMonthly = renEnabled ? renFeePerOrder * deliveryPerVenue * renVenues : 0
 
-  // Unified monthly totals (planFee ceiled, delivery from persisted sub-plan fee)
-  const totals = calculateMonthlyTotals({
-    economics: eco,
-    locations: cfg.locations,
-    activeAddons: cfg.activeAddons,
-    deliveryPlan: deliveryPlanId,
-    deliveryFixedFeePerLoc: eco.deliveryFixedFee,
-    kdsVenues: cfg.kdsVenues,
-    kioskVenues: cfg.kioskVenues,
-  })
-  const deliveryFixedFee = totals.deliveryFee
-  // Add-ons row: engine addonFee + delivery (excludes datafono, shown separately)
-  const totalAddonFee = totals.addonFee + totals.deliveryFee
+  // Delivery fee — read plan key from economics snapshot, fall back to cfg.deliveryPlan
+  const deliveryPlanId = (eco.deliveryPlanKey ?? eco.deliveryPlan ?? cfg.deliveryPlan ?? 'start') as DeliveryPlanId
+  const deliveryFee = cfg.activeAddons.includes('delivery_integrations')
+    ? (DELIVERY_PLANS[deliveryPlanId]?.priceMonthly ?? 0) * cfg.locations
+    : 0
 
-  // Discount + IVA
+  // Hardware monthly — financed items only, ceil per unit × qty
+  const hardwareMonthly = (cfg.hardware ?? [])
+    .filter(item => item.mode === 'financed' && Number(item.financeMonths ?? 0) > 0)
+    .reduce((sum, item) => sum + Math.ceil(Number(item.unitPrice) / Number(item.financeMonths)) * Number(item.quantity), 0)
+
+  // Plan fee = full software revenue (plan + addons + datafono) from economics snapshot
+  const planFee = eco.softwareRevenueMonthly || 0
+
+  // Totals — no calculateMonthlyTotals, computed directly from cfg fields
   const discountPercent = cfg.discountPercent ?? 0
-  const totalNet = totals.netTotal + renMonthly
+  const totalNet = planFee + deliveryFee + hardwareMonthly + renMonthly
   const discountAmount = totalNet * (discountPercent / 100)
   const netAfterDiscount = totalNet - discountAmount
   const ivaAmount = netAfterDiscount * 0.21
@@ -246,9 +244,9 @@ export function ProposalEditor({ deal, cfg, today, initialSections }: ProposalEd
             <div className="mt-4 space-y-2">
               {cfg.activeAddons.map((id) => {
                 const addon = ADDONS[id]
-                // Delivery: use persisted deliveryFixedTotal (engine priceMonthly is 0)
+                // Delivery: computed from catalog using persisted plan key
                 const monthlyFee =
-                  id === 'delivery_integrations' ? deliveryFixedFee
+                  id === 'delivery_integrations' ? deliveryFee
                   : id === 'datafono' ? eco.datafonoFeeMonthly
                   : addon.perLocation && addon.priceMonthly != null
                   ? addon.priceMonthly * cfg.locations
@@ -366,18 +364,15 @@ export function ProposalEditor({ deal, cfg, today, initialSections }: ProposalEd
         <div className="px-10 py-8 border-b border-zinc-100">
           <SectionLabel>Resumen económico</SectionLabel>
           <div className="mt-4 space-y-0 divide-y divide-zinc-100 border border-zinc-100 rounded-xl overflow-hidden">
-            <SummaryRow label="Plan" value={`${formatCurrency(totals.planFee)}/mes`} />
-            {totalAddonFee > 0 && (
-              <SummaryRow label="Add-ons" value={`${formatCurrency(totalAddonFee)}/mes`} />
+            <SummaryRow label="Plan + Add-ons" value={`${formatCurrency(planFee)}/mes`} />
+            {deliveryFee > 0 && (
+              <SummaryRow label="Integración delivery" value={`${formatCurrency(deliveryFee)}/mes`} />
             )}
-            {eco.datafonoFeeMonthly > 0 && (
-              <SummaryRow label="Datáfono" value={`${formatCurrency(eco.datafonoFeeMonthly)}/mes`} />
+            {hardwareMonthly > 0 && (
+              <SummaryRow label="Hardware (cuotas)" value={`${formatCurrency(hardwareMonthly)}/mes`} />
             )}
             {renEnabled && (
               <SummaryRow label="REN — Logística propia" value={`${formatCurrency(renMonthly)}/mes`} />
-            )}
-            {eco.hardwareRevenueMonthly > 0 && (
-              <SummaryRow label="Hardware (cuotas)" value={`${formatCurrency(eco.hardwareRevenueMonthly)}/mes`} />
             )}
             <SummaryRow label="Total NETO" value={`${formatCurrency(totalNet)}/mes`} bold />
             {discountPercent > 0 && (
