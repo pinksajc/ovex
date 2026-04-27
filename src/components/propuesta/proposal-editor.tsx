@@ -106,6 +106,8 @@ export function ProposalEditor({ deal, cfg, today, initialSections }: ProposalEd
     activeAddons: cfg.activeAddons,
     deliveryPlan: deliveryPlanId,
     deliveryFixedFeePerLoc: eco.deliveryFixedFee,
+    kdsVenues: cfg.kdsVenues,
+    kioskVenues: cfg.kioskVenues,
   })
   const deliveryFixedFee = totals.deliveryFee
   // Add-ons row: engine addonFee + delivery (excludes datafono, shown separately)

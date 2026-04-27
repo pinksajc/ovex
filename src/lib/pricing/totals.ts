@@ -78,14 +78,20 @@ export function calculateMonthlyTotals(input: MonthlyTotalsInput): MonthlyTotals
   const kdsVenues = input.kdsVenues ?? locations
   const kioskVenues = input.kioskVenues ?? locations
 
+  // Guard against null/undefined from old JSONB snapshots — any nullish field would
+  // NaN-poison the entire netTotal, which renders as "0,00 €" in Chromium.
+  const planFeeMonthly = economics.planFeeMonthly || 0
+  const addonFeeMonthly = economics.addonFeeMonthly || 0
+  const hardwareRevenueMonthly = economics.hardwareRevenueMonthly || 0
+
   // Plan fee — ceil to whole euros for billing
-  const planFee = Math.ceil(economics.planFeeMonthly)
+  const planFee = Math.ceil(planFeeMonthly)
 
   // Add-on fee = engine result + per-venue overrides for KDS/Kiosk
   // (engine computes kds/kiosk at cfg.locations venues; adjust for configured venue counts)
   const kdsAdj = hasAddon(activeAddons, 'kds') ? KDS_PRICE_MONTHLY * (kdsVenues - locations) : 0
   const kioskAdj = hasAddon(activeAddons, 'kiosk') ? KIOSK_PRICE_MONTHLY * (kioskVenues - locations) : 0
-  const addonFee = economics.addonFeeMonthly + kdsAdj + kioskAdj
+  const addonFee = addonFeeMonthly + kdsAdj + kioskAdj
 
   // Datafono (% of GMV — variable; shown separately in UI)
   const datafonoFee = economics.datafonoFeeMonthly ?? 0
@@ -96,7 +102,7 @@ export function calculateMonthlyTotals(input: MonthlyTotalsInput): MonthlyTotals
     : 0
 
   // Hardware monthly (already Math.ceil'd by engine for financed items)
-  const hardwareMonthly = economics.hardwareRevenueMonthly
+  const hardwareMonthly = hardwareRevenueMonthly
 
   // Totals — caller applies discounts and REN on top
   const netTotal = planFee + addonFee + datafonoFee + deliveryFee + hardwareMonthly
