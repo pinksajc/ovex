@@ -858,7 +858,9 @@ function s11Economics(deal: Deal, cfg: DealConfiguration, sections: ProposalSect
     ${cfg.calculateVariable ? (() => {
       const rosTotal = plan.variableFee * eco.totalMonthlyVolume
       const renTotal = renEnabled && renVenues > 0 ? renFeePerOrder * deliveryPerVenue * renVenues : 0
-      const varTotal = rosTotal + renTotal
+      const varGross = rosTotal + renTotal
+      const varDiscountAmount = varGross * (discountPercent / 100)
+      const varNet = varGross - varDiscountAmount
       return `
     <div style="border:2px solid #64748b;border-radius:12px;padding:14px 20px;background:#f8fafc;margin-bottom:10px;">
       <div style="font-size:8.5px;color:#64748b;text-transform:uppercase;letter-spacing:1.5px;margin-bottom:10px;text-align:center;">+ Coste variable estimado (según volumen)</div>
@@ -866,19 +868,20 @@ function s11Economics(deal: Deal, cfg: DealConfiguration, sections: ProposalSect
       <div style="display:flex;flex-direction:column;gap:3px;margin-bottom:10px;padding-bottom:10px;border-bottom:2px solid #e2e8f0;">
         ${simpleRow(`ROS · ${plan.variableFee.toFixed(2).replace('.', ',')}€/ticket × ${fmtN(eco.totalMonthlyVolume)} pedidos`, `${fmt(rosTotal)}/mes`)}
         ${renEnabled && renVenues > 0 ? simpleRow(`REN · ${renFeePerOrder.toFixed(2).replace('.', ',')}€/pedido × ${fmtN(deliveryPerVenue * renVenues)} pedidos`, `${fmt(renTotal)}/mes`) : ''}
+        ${discountPercent > 0 ? simpleRow(eco.discountName ? `Descuento ${eco.discountName} −${discountPercent}%` : `Descuento −${discountPercent}%`, `−${fmt(varDiscountAmount)}/mes`, true) : ''}
       </div>
       <!-- Subtotals -->
       <div style="display:flex;flex-direction:column;gap:3px;margin-bottom:12px;">
-        ${simpleRow('Base imponible', `${fmt(varTotal)}`)}
-        ${simpleRow('IVA 21%', `${fmt(varTotal * 0.21)}`)}
+        ${simpleRow('Base imponible', `${fmt(varNet)}`)}
+        ${simpleRow('IVA 21%', `${fmt(varNet * 0.21)}`)}
       </div>
       <!-- Total -->
       <div style="display:flex;align-items:center;justify-content:space-between;background:#475569;border-radius:8px;padding:10px 16px;">
         <span style="font-size:9px;font-weight:700;color:rgba(255,255,255,0.75);text-transform:uppercase;letter-spacing:1.5px;">Total estimado variable (IVA incl.)</span>
-        <span style="font-size:18px;font-weight:900;color:#fff;font-family:'Courier New',monospace;line-height:1;">${fmt2(varTotal * 1.21)}/mes</span>
+        <span style="font-size:18px;font-weight:900;color:#fff;font-family:'Courier New',monospace;line-height:1;">${fmt2(varNet * 1.21)}/mes</span>
       </div>
       <div style="font-size:8px;color:#94a3b8;margin-top:8px;line-height:1.5;">
-        Estimación basada en volumen configurado. Se factura a mes vencido según pedidos reales del período.
+        Estimación basada en volumen configurado. Se factura a mes vencido según pedidos reales del período.${discountPercent > 0 ? ' Descuento aplicado sobre fee variable estimado.' : ''}
       </div>
     </div>`
     })() : ''}
