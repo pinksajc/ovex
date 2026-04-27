@@ -5,20 +5,32 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { formatCurrency } from '@/lib/format'
 import { activateVersionAction } from '@/app/actions/activate-version'
-import type { Deal, DealConfiguration, DealEconomics } from '@/types'
+import { DELIVERY_PLANS } from '@/lib/pricing/catalog'
+import type { Deal, DealConfiguration, DealEconomics, DeliveryPlanId } from '@/types'
 
 function computeDisplayMRR(config: DealConfiguration): number {
   const eco = config.economics as DealEconomics & {
-    totalWithIva?: number
-    deliveryFixedFee?: number
+    deliveryPlanKey?: string
+    deliveryPlan?: string
   }
-  const locations = config.locations
-  if (eco.totalWithIva != null) return eco.totalWithIva
-  return (
-    eco.softwareRevenueMonthly +
-    (eco.deliveryFixedFee ?? 0) * locations +
-    eco.hardwareRevenueMonthly
-  ) * 1.21
+
+  const renEnabled = (config.renEnabled === true) && ((config.renVenues ?? 0) > 0)
+  const renMonthly = renEnabled
+    ? (config.renFeePerOrder ?? 0.10) * (config.deliveryOrdersPerVenue ?? 0) * (config.renVenues ?? 0)
+    : 0
+
+  const deliveryPlanId = (eco.deliveryPlanKey ?? eco.deliveryPlan ?? config.deliveryPlan ?? 'start') as DeliveryPlanId
+  const deliveryFee = config.activeAddons.includes('delivery_integrations')
+    ? (DELIVERY_PLANS[deliveryPlanId]?.priceMonthly ?? 0) * config.locations
+    : 0
+
+  const hardwareMonthly = (config.hardware ?? [])
+    .filter(item => item.mode === 'financed' && Number(item.financeMonths ?? 0) > 0)
+    .reduce((sum, item) => sum + Math.ceil(Number(item.unitPrice) / Number(item.financeMonths)) * Number(item.quantity), 0)
+
+  const planFee = eco.softwareRevenueMonthly || 0
+
+  return planFee + deliveryFee + hardwareMonthly + renMonthly
 }
 
 interface VersionListProps {
