@@ -702,12 +702,15 @@ function s11Economics(deal: Deal, cfg: DealConfiguration, sections: ProposalSect
   })
 
   const discountPercent = eco.discountPercent ?? 0
-  // Discount applies to software only (plan + addons + datafono + delivery), not hardware
-  // Discount applies only to plan + add-ons + datafono — delivery fee is never discounted
-  const softwareBase = totals.planFee + totals.addonFee + totals.datafonoFee
+  // Fixed plan base only — excludes per-ticket variable component (shown separately in variable box)
+  const planFixedFee = Math.ceil(plan.priceMonthly * cfg.locations)
+  // Discount base: fixed plan fee + addons (excl. delivery, hardware, variable)
+  const softwareBase = planFixedFee + totals.addonFee + totals.datafonoFee
   const discountAmount = softwareBase * (discountPercent / 100)
-  // Fixed monthly net = (software − discount) + delivery (undiscounted) + hardware monthly; excludes variable REN
-  const fixedMonthlyNet = totals.netTotal - discountAmount
+  // Fixed subtotal = fixed software + delivery (undiscounted) + hardware monthly
+  const subtotalFixed = softwareBase + totals.deliveryFee + (eco.hardwareRevenueMonthly ?? 0)
+  // Fixed monthly net excludes variable REN and variable plan component
+  const fixedMonthlyNet = subtotalFixed - discountAmount
 
   const execSummary = sections.executiveSummary
     ? sections.executiveSummary +
@@ -823,19 +826,17 @@ function s11Economics(deal: Deal, cfg: DealConfiguration, sections: ProposalSect
 
     <!-- Total fijo mensual (always shown) -->
     ${(() => {
-      const softwareFee = totals.planFee + totals.addonFee + totals.datafonoFee
-      const subtotal = totals.netTotal
       return `
     <div style="border:2px solid #1e3a5f;border-radius:12px;padding:14px 20px;background:#f0f5fb;margin-bottom:10px;">
       <!-- Line items -->
       <div style="display:flex;flex-direction:column;gap:3px;margin-bottom:10px;padding-bottom:10px;border-bottom:2px solid #dde6f0;">
-        ${simpleRow('Plan', `${fmt(softwareFee)}/mes`)}
+        ${simpleRow('Plan', `${fmt(softwareBase)}/mes`)}
         ${totals.deliveryFee > 0 ? simpleRow('Integración delivery', `${fmt(totals.deliveryFee)}/mes`) : ''}
         ${eco.hardwareRevenueMonthly > 0 ? simpleRow('Hardware (cuotas)', `${fmt(eco.hardwareRevenueMonthly)}/mes`) : ''}
       </div>
       <!-- Subtotal → discount → neto → IVA → total -->
       <div style="display:flex;flex-direction:column;gap:3px;margin-bottom:12px;">
-        ${simpleRow('Subtotal', `${fmt(subtotal)}/mes`)}
+        ${simpleRow('Subtotal', `${fmt(subtotalFixed)}/mes`)}
         ${discountPercent > 0 ? simpleRow(eco.discountName ? `Descuento ${eco.discountName}` : 'Descuento', `−${fmt(discountAmount)}/mes`, true) : ''}
         ${simpleRow('Neto', `${fmt(fixedMonthlyNet)}/mes`)}
         ${simpleRow('IVA 21%', `${fmt(fixedMonthlyNet * 0.21)}/mes`)}
