@@ -77,6 +77,14 @@ export default async function DealPage({
 
   const cfg = getActiveConfig(deal)
 
+  const cfgRenEnabled = (cfg?.renEnabled === true) && ((cfg?.renVenues ?? 0) > 0)
+  const cfgRenFeePerOrder = cfg?.renFeePerOrder ?? 0.10
+  const cfgDeliveryPerVenue = cfg?.deliveryOrdersPerVenue ?? 0
+  const cfgRenVenues = cfg?.renVenues ?? 0
+  const cfgRenMonthly = cfgRenEnabled ? cfgRenFeePerOrder * cfgDeliveryPerVenue * cfgRenVenues : 0
+  const cfgMrr = (cfg?.economics.totalMonthlyRevenue ?? 0) + cfgRenMonthly
+  const cfgArr = cfgMrr * 12
+
   return (
     <div className="p-8 max-w-5xl mx-auto">
       {/* Breadcrumb */}
@@ -251,10 +259,10 @@ export default async function DealPage({
           <div className="grid grid-cols-4 gap-4">
             <Metric
               label="MRR"
-              value={formatCurrency(cfg.economics.totalMonthlyRevenue)}
+              value={formatCurrency(cfgMrr)}
               highlight
             />
-            <Metric label="ARR" value={formatCurrency(cfg.economics.annualRevenue)} />
+            <Metric label="ARR" value={formatCurrency(cfgArr)} />
             <Metric label="Plan" value={cfg.plan.charAt(0).toUpperCase() + cfg.plan.slice(1)} />
             <Metric label="Locales" value={String(cfg.locations)} />
             <Metric
