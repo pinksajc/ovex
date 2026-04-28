@@ -113,9 +113,15 @@ export default async function DealPage({
         kioskVenues: cfgEco.kioskVenues,
       })
     : null
-  // Override hardwareMonthly with fresh computation; everything else from canonical totals
+  // REN monthly fee (variable, excluded from engine; computed from config fields)
+  const cfgRenEnabled = (cfg?.renEnabled === true) && ((cfg?.renVenues ?? 0) > 0)
+  const cfgRenFeePerOrder = cfg?.renFeePerOrder ?? 0.10
+  const cfgDeliveryPerVenue = cfg?.deliveryOrdersPerVenue ?? 0
+  const cfgRenVenues = cfg?.renVenues ?? 0
+  const cfgRenMonthly = cfgRenEnabled ? cfgRenFeePerOrder * cfgDeliveryPerVenue * cfgRenVenues : 0
+  // Override hardwareMonthly with fresh computation; add REN monthly fee
   const cfgMrr = cfgTotals
-    ? cfgTotals.planFee + cfgTotals.addonFee + cfgTotals.datafonoFee + cfgTotals.deliveryFee + cfgHardwareMonthly
+    ? cfgTotals.planFee + cfgTotals.addonFee + cfgTotals.datafonoFee + cfgTotals.deliveryFee + cfgHardwareMonthly + cfgRenMonthly
     : 0
   const cfgArr = cfgMrr * 12
   const cfgPaybackMonths =
