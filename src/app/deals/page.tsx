@@ -13,27 +13,28 @@ export default async function DealsPage({
   const { status, focus, scope } = await searchParams
   const focusMode = focus === 'close'
 
-  const [userOrNull, allDeals] = await Promise.all([
-    getCurrentUser(),
-    getDeals(),
-  ])
-
+  // Resolve user first — getDeals scoping depends on role
+  const userOrNull = await getCurrentUser()
   // Middleware guarantees auth, but getCurrentUser can return null if profile
   // creation fails — default to a sales-scoped view to avoid crash.
   const user: AuthUser = userOrNull ?? { id: '', email: '', name: null, role: 'sales', mustChangePassword: false }
-
-  // Admins can toggle mine/all; sales always see all deals
   const isAdmin = user.role === 'admin'
+
+  // Fetch deals and workspace members in parallel.
+  // getDeals(user) enforces scoping at query level: sales users only receive their own deals.
+  const [allDeals, members] = await Promise.all([
+    getDeals(user),
+    isAdmin ? getWorkspaceMembers() : Promise.resolve([] as Awaited<ReturnType<typeof getWorkspaceMembers>>),
+  ])
+
+  // Admins can toggle mine/all; sales users always see only their own deals (query-level)
   const effectiveScope: 'mine' | 'all' = isAdmin
     ? (scope === 'mine' ? 'mine' : 'all')
-    : 'all'
+    : 'mine'
 
-  const deals = effectiveScope === 'mine'
+  const deals = isAdmin && effectiveScope === 'mine'
     ? allDeals.filter((d) => d.ownerId === null || d.ownerId === user.id)
     : allDeals
-
-  // Load members only for admins (for reassign UI)
-  const members = isAdmin ? await getWorkspaceMembers() : []
 
   const totalMRR = deals.reduce((sum, d) => sum + (getActiveConfig(d)?.economics.totalMonthlyRevenue ?? 0), 0)
   const totalARR = deals.reduce((sum, d) => sum + (getActiveConfig(d)?.economics.annualRevenue ?? 0), 0)

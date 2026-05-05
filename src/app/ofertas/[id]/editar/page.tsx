@@ -1,6 +1,7 @@
 import { notFound } from 'next/navigation'
 import { getPresupuesto } from '@/lib/supabase/presupuestos'
 import { getDeals } from '@/lib/deals'
+import { getCurrentUser } from '@/lib/auth'
 import { EditOfertaForm } from './form'
 
 export default async function EditarOfertaPage({ params }: { params: Promise<{ id: string }> }) {
@@ -10,7 +11,8 @@ export default async function EditarOfertaPage({ params }: { params: Promise<{ i
 
   let deals: { id: string; company: { name: string; cif?: string; address?: string } }[] = []
   try {
-    const allDeals = await getDeals()
+    const user = await getCurrentUser()
+    const allDeals = await getDeals(user ?? undefined)
     deals = allDeals.map((d) => ({
       id: d.id,
       company: { name: d.company.name, cif: d.company.cif, address: d.company.address },

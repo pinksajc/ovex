@@ -19,16 +19,11 @@ function isSupabaseConfigured(): boolean {
 // READS
 // =========================================
 
-/**
- * Lista todos los deals con commercialStatus y hasProposal precalculados.
- * Cacheado 60 s — invalidar con revalidateTag('attio-deals').
- */
-export const getDeals: () => Promise<Deal[]> = unstable_cache(
-  async () => {
+const _cachedGetDeals = unstable_cache(
+  async (ownerFilter: string | null) => {
     const baseDeals = isSupabaseConfigured()
-      ? await getDealsFromSupabase()
+      ? await getDealsFromSupabase(ownerFilter ?? undefined)
       : await import('./mock-data').then((m) => m.MOCK_DEALS)
-
     return enrichWithCommercialStatus(baseDeals)
   },
   ['deals-list'],
@@ -36,11 +31,23 @@ export const getDeals: () => Promise<Deal[]> = unstable_cache(
 )
 
 /**
+ * Lista deals con commercialStatus y hasProposal precalculados.
+ * Admins reciben todos los deals; usuarios sales sólo los suyos.
+ * Cacheado 60 s por ownerFilter — invalidar con revalidateTag('attio-deals').
+ */
+export async function getDeals(user?: { id: string; role: string }): Promise<Deal[]> {
+  const ownerFilter = user?.role === 'sales' ? (user.id || null) : null
+  return _cachedGetDeals(ownerFilter)
+}
+
+/**
  * Obtiene un deal por ID.
  * Cacheado 60 s — invalidar con revalidateTag('attio-deals').
+ * Pasa user para aplicar la comprobación de acceso: los usuarios sales
+ * sólo pueden acceder a deals de los que son propietarios.
  */
-export async function getDeal(id: string): Promise<Deal | undefined> {
-  return unstable_cache(
+export async function getDeal(id: string, user?: { id: string; role: string }): Promise<Deal | undefined> {
+  const deal = await unstable_cache(
     async () => {
       const base = isSupabaseConfigured()
         ? await getDealFromSupabase(id)
@@ -53,6 +60,9 @@ export async function getDeal(id: string): Promise<Deal | undefined> {
     ['deal', id],
     { revalidate: 60, tags: ['attio-deals'] }
   )()
+  if (!deal) return undefined
+  if (user?.role === 'sales' && deal.ownerId !== user.id) return undefined
+  return deal
 }
 
 /**
@@ -271,12 +281,12 @@ async function enrichWithCommercialStatus(deals: Deal[]): Promise<Deal[]> {
 // IMPLEMENTATION — Supabase
 // =========================================
 
-async function getDealsFromSupabase(): Promise<Deal[]> {
+async function getDealsFromSupabase(ownerId?: string): Promise<Deal[]> {
   const { listDeals } = await import('./supabase/deals')
   const { getBatchActiveConfigsForDeals } = await import('./supabase/configs')
   const { getSupabaseClient } = await import('./supabase/client')
 
-  const baseDeals = await listDeals()
+  const baseDeals = await listDeals(ownerId)
   if (baseDeals.length === 0) return []
 
   const dealIds = baseDeals.map((d) => d.id)

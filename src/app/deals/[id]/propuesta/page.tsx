@@ -3,6 +3,7 @@ export const dynamic = 'force-dynamic'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { getDeal, getActiveConfig, getProposal } from '@/lib/deals'
+import { getCurrentUser } from '@/lib/auth'
 import { logEvent, getProposalViewStats } from '@/lib/supabase/events'
 import { formatNumber } from '@/lib/format'
 import { PLANS, ADDONS, HARDWARE } from '@/lib/pricing/catalog'
@@ -22,7 +23,8 @@ export default async function PropuestaPage({
   params: Promise<{ id: string }>
 }) {
   const { id } = await params
-  const deal = await getDeal(id)
+  const user = await getCurrentUser()
+  const deal = await getDeal(id, user ?? undefined)
   if (!deal) notFound()
   void logEvent('deal_opened', id)
 

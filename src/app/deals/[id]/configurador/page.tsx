@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { getDeal, getActiveConfig } from '@/lib/deals'
+import { getCurrentUser } from '@/lib/auth'
 import { logEvent } from '@/lib/supabase/events'
 import { Simulator } from '@/components/configurador/simulator'
 
@@ -14,7 +15,8 @@ export default async function ConfiguradorPage({
   const { id } = await params
   const { config: configQueryParam } = await searchParams
 
-  const deal = await getDeal(id)
+  const user = await getCurrentUser()
+  const deal = await getDeal(id, user ?? undefined)
   if (!deal) notFound()
   void logEvent('deal_opened', id)
 
