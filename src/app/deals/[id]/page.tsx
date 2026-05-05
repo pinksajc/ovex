@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { getDeal, getActiveConfig } from '@/lib/deals'
+import { getCurrentUser } from '@/lib/auth'
 import { formatCurrency } from '@/lib/format'
 import { calculateMonthlyTotals } from '@/lib/pricing/totals'
 import { ContactEditor } from '@/components/contact-editor'
@@ -67,8 +68,9 @@ export default async function DealPage({
   params: Promise<{ id: string }>
 }) {
   const { id } = await params
+  const user = await getCurrentUser()
   const [deal, members, presupuestos, facturas] = await Promise.all([
-    getDeal(id),
+    getDeal(id, user ?? undefined),
     getWorkspaceMembers(),
     getPresupuestosByDeal(id).catch(() => []),
     getInvoicesByDeal(id).catch(() => []),

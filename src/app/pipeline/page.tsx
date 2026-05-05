@@ -1,8 +1,10 @@
 import { getDeals } from '@/lib/deals'
+import { getCurrentUser } from '@/lib/auth'
 import { PipelineBoard } from '@/components/pipeline/pipeline-board'
 
 export default async function PipelinePage() {
-  const deals = await getDeals()
+  const user = await getCurrentUser()
+  const deals = await getDeals(user ?? undefined)
 
   return (
     <div className="p-8 h-full flex flex-col">

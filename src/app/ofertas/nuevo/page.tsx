@@ -1,4 +1,5 @@
 import { getDeals } from '@/lib/deals'
+import { getCurrentUser } from '@/lib/auth'
 import { NuevaOfertaForm } from './form'
 
 export default async function NuevaOfertaPage({
@@ -10,7 +11,8 @@ export default async function NuevaOfertaPage({
 
   let deals: { id: string; company: { name: string; cif?: string; address?: string } }[] = []
   try {
-    const allDeals = await getDeals()
+    const user = await getCurrentUser()
+    const allDeals = await getDeals(user ?? undefined)
     deals = allDeals.map((d) => ({
       id: d.id,
       company: { name: d.company.name, cif: d.company.cif, address: d.company.address },
