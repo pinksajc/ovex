@@ -60,22 +60,47 @@ export async function getCurrentUser(): Promise<AuthUser | null> {
 
   try {
     const db = getSupabaseClient()
-    let { data: profile } = await db
+    const { data: profile, error: profileError } = await db
       .from('profiles')
       .select('role, full_name, must_change_password')
       .eq('id', authUser.id)
-      .maybeSingle() as { data: { role: string; full_name: string | null; must_change_password: boolean | null } | null; error: unknown }
+      .maybeSingle() as { data: { role: string; full_name: string | null; must_change_password: boolean | null } | null; error: { message: string; code?: string } | null }
+
+    console.log('[getCurrentUser] profile query result:', {
+      userId: authUser.id,
+      email,
+      data: profile,
+      error: profileError ?? null,
+    })
 
     if (!profile) {
+      // ⚠️  Profile missing or query failed — auto-create will upsert role='sales',
+      // which overwrites any manually-set admin role if the query errored out.
+      // Check the error above to diagnose (e.g. unknown column → migration pending).
+      console.error('[getCurrentUser] profile is null — auto-create will run with role=sales.', {
+        userId: authUser.id,
+        email,
+        queryError: profileError,
+      })
+
       // Auto-create profile (user created via Supabase dashboard, trigger may not exist)
       const autoRole = isAdminByEnv ? 'admin' : 'sales'
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      await (db.from('profiles') as any).upsert({
+      const { error: upsertError } = await (db.from('profiles') as any).upsert({
         id: authUser.id,
         full_name: derivedName,
         role: autoRole,
       })
-      profile = { role: autoRole, full_name: derivedName, must_change_password: null }
+
+      console.log('[getCurrentUser] auto-create upsert result:', { autoRole, upsertError: upsertError ?? null })
+
+      return {
+        id: authUser.id,
+        email,
+        name: derivedName,
+        role: isAdminByEnv ? 'admin' : autoRole,
+        mustChangePassword: false,
+      }
     }
 
     return {
@@ -86,9 +111,10 @@ export async function getCurrentUser(): Promise<AuthUser | null> {
       role: isAdminByEnv ? 'admin' : ((profile.role as UserRole) ?? 'sales'),
       mustChangePassword: profile.must_change_password === true,
     }
-  } catch {
+  } catch (err) {
     // profiles table not migrated yet or other DB error — return user with defaults
     // so the app is still usable
+    console.error('[getCurrentUser] caught unexpected error fetching profile:', err)
     return {
       id: authUser.id,
       email,
