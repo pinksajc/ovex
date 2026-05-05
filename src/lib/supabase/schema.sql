@@ -55,22 +55,27 @@ alter table deal_configurations disable row level security;
 
 -- Profiles: extiende auth.users con role y nombre
 create table if not exists profiles (
-  id     uuid primary key references auth.users(id) on delete cascade,
-  email  text not null,
-  name   text,
-  role   text not null default 'sales' check (role in ('admin', 'sales')),
-  created_at timestamptz not null default now()
+  id                   uuid primary key references auth.users(id) on delete cascade,
+  email                text not null,
+  full_name            text,
+  role                 text not null default 'sales' check (role in ('admin', 'sales')),
+  must_change_password boolean not null default false,
+  created_at           timestamptz not null default now()
 );
 
 -- Auto-crear perfil al registrar usuario
 create or replace function handle_new_user()
 returns trigger as $$
 begin
-  insert into profiles (id, email, name)
+  insert into profiles (id, email, full_name)
   values (
     new.id,
     new.email,
-    coalesce(new.raw_user_meta_data->>'name', split_part(new.email, '@', 1))
+    coalesce(
+      new.raw_user_meta_data->>'full_name',
+      new.raw_user_meta_data->>'name',
+      split_part(new.email, '@', 1)
+    )
   )
   on conflict (id) do nothing;
   return new;
