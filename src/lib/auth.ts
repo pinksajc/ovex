@@ -83,14 +83,15 @@ export async function getCurrentUser(): Promise<AuthUser | null> {
         queryError: profileError,
       })
 
-      // Auto-create profile (user created via Supabase dashboard, trigger may not exist)
+      // Auto-create profile (user created via Supabase dashboard, trigger may not exist).
+      // ignoreDuplicates: true → ON CONFLICT (id) DO NOTHING, so an existing row
+      // with a manually-set role (e.g. 'admin') is never overwritten.
       const autoRole = isAdminByEnv ? 'admin' : 'sales'
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { error: upsertError } = await (db.from('profiles') as any).upsert({
-        id: authUser.id,
-        full_name: derivedName,
-        role: autoRole,
-      })
+      const { error: upsertError } = await (db.from('profiles') as any).upsert(
+        { id: authUser.id, full_name: derivedName, role: autoRole },
+        { onConflict: 'id', ignoreDuplicates: true }
+      )
 
       console.log('[getCurrentUser] auto-create upsert result:', { autoRole, upsertError: upsertError ?? null })
 
