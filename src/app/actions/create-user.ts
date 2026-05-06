@@ -19,7 +19,8 @@ export async function createUserAction(formData: FormData): Promise<void> {
   const db = getSupabaseClient()
 
   // Invite user — Supabase sends an email with a magic link so the user sets their own password
-  const appUrl = process.env.APP_URL ?? 'https://platomico.vercel.app'
+  const appUrl = process.env.APP_URL
+    ?? (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'http://localhost:3000')
   const { data, error: inviteError } = await db.auth.admin.inviteUserByEmail(email, {
     data: { full_name: name || email.split('@')[0] },
     redirectTo: appUrl,
