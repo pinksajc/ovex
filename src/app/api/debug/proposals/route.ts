@@ -10,10 +10,10 @@ export async function GET(request: Request) {
 
   // 1. Env vars
   const supabaseUrl = process.env.SUPABASE_URL
-  const supabaseKey = process.env.SUPABASE_SERVICE_KEY
+  const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY
   steps.env = {
     SUPABASE_URL: supabaseUrl ? `set (${supabaseUrl})` : 'MISSING',
-    SUPABASE_SERVICE_KEY: supabaseKey ? `set (${supabaseKey.slice(0, 20)}...)` : 'MISSING',
+    SUPABASE_SERVICE_ROLE_KEY: supabaseKey ? `set (${supabaseKey.slice(0, 20)}...)` : 'MISSING',
   }
 
   if (!supabaseUrl || !supabaseKey) {
