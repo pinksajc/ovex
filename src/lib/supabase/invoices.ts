@@ -89,7 +89,10 @@ export async function getInvoices(): Promise<Invoice[]> {
     .select('*')
     .order('created_at', { ascending: false })
 
-  if (error) throw error
+  if (error) {
+    console.error('[getInvoices] Supabase error:', { code: error.code, message: error.message, details: (error as unknown as Record<string, unknown>).details, hint: (error as unknown as Record<string, unknown>).hint })
+    throw error
+  }
   return (data as InvoiceRow[]).map(rowToInvoice)
 }
 
