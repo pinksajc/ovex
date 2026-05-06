@@ -11,20 +11,20 @@ export default async function FacturasPage({
   const { tab } = await searchParams
 
   let invoices: Invoice[] = []
-  let invoiceFetchError = false
+  let invoiceFetchError: string | null = null
   let ofertas: Presupuesto[] = []
-  let ofertaFetchError = false
+  let ofertaFetchError: string | null = null
 
   try {
     invoices = await getInvoices()
-  } catch {
-    invoiceFetchError = true
+  } catch (err) {
+    invoiceFetchError = err instanceof Error ? err.message : 'Error desconocido'
   }
 
   try {
     ofertas = await getPresupuestos()
-  } catch {
-    ofertaFetchError = true
+  } catch (err) {
+    ofertaFetchError = err instanceof Error ? err.message : 'Error desconocido'
   }
 
   return (
