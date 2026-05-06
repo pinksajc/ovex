@@ -66,10 +66,13 @@ export async function getCurrentUser(): Promise<AuthUser | null> {
       .eq('id', authUser.id)
       .maybeSingle() as { data: { role: string; full_name: string | null; must_change_password: boolean | null } | null; error: { message: string; code?: string } | null }
 
-    console.log('[getCurrentUser] profile query result:', {
+    console.log('[getCurrentUser] raw profile query result:', {
       userId: authUser.id,
       email,
-      data: profile,
+      raw_role: profile?.role ?? null,
+      raw_full_name: profile?.full_name ?? null,
+      raw_must_change_password: profile?.must_change_password ?? null,
+      profile_is_null: profile === null,
       error: profileError ?? null,
     })
 
