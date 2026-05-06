@@ -111,19 +111,8 @@ export async function getCurrentUser(): Promise<AuthUser | null> {
   // Fallback: role only (if primary errored — e.g. column doesn't exist yet in production)
   if (!profile && s1 !== 200) {
     const { row: minProfile, status: s2 } = await fetchProfile('role')
-    console.log('[getCurrentUser] role-only fallback:', { userId: authUser.id, row: minProfile, status: s2 })
     if (minProfile) profile = minProfile
   }
-
-  console.log('[getCurrentUser] resolved profile:', {
-    userId: authUser.id,
-    email,
-    raw_role: profile?.role ?? null,
-    raw_full_name: profile?.full_name ?? null,
-    raw_must_change_password: profile?.must_change_password ?? null,
-    profile_is_null: profile === null,
-    primaryHttpStatus: s1,
-  })
 
   if (!profile) {
     // Row genuinely missing — auto-create.
@@ -138,7 +127,6 @@ export async function getCurrentUser(): Promise<AuthUser | null> {
         { id: authUser.id, email, full_name: derivedName, role: autoRole },
         { onConflict: 'id', ignoreDuplicates: true }
       )
-      console.log('[getCurrentUser] auto-create result:', { autoRole, upsertError: upsertError ?? null })
     } catch (err) {
       console.error('[getCurrentUser] auto-create threw:', err)
     }
