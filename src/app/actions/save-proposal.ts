@@ -33,7 +33,7 @@ export async function saveProposalAction(
       attioDealId,
       configId,
       SUPABASE_URL: process.env.SUPABASE_URL ?? 'MISSING',
-      SUPABASE_SERVICE_KEY: process.env.SUPABASE_SERVICE_KEY ? 'set' : 'MISSING',
+      SUPABASE_SERVICE_ROLE_KEY: process.env.SUPABASE_SERVICE_ROLE_KEY ? 'set' : 'MISSING',
     })
     return {
       ok: false,

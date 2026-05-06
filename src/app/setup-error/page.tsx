@@ -18,7 +18,7 @@ async function SetupErrorContent() {
       'Clave pública anon del proyecto. Cópiala de: Supabase Dashboard → Settings → API → anon / public',
     SUPABASE_URL:
       'URL del proyecto Supabase (server-only). Igual que NEXT_PUBLIC_SUPABASE_URL pero sin prefijo NEXT_PUBLIC_.',
-    SUPABASE_SERVICE_KEY:
+    SUPABASE_SERVICE_ROLE_KEY:
       'Clave service_role (privada). Supabase Dashboard → Settings → API → service_role.',
   }
 
@@ -74,7 +74,7 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIs...
 
 # Supabase — privado (solo servidor)
 SUPABASE_URL=https://xxxx.supabase.co
-SUPABASE_SERVICE_KEY=eyJhbGciOiJIUzI1NiIs...`}
+SUPABASE_SERVICE_ROLE_KEY=eyJhbGciOiJIUzI1NiIs...`}
             </pre>
           </div>
 

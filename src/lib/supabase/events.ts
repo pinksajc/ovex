@@ -28,7 +28,7 @@ export async function getLastActivityByDeal(
 
   try {
     const url = process.env.SUPABASE_URL
-    const key = process.env.SUPABASE_SERVICE_KEY
+    const key = process.env.SUPABASE_SERVICE_ROLE_KEY
     if (!url || !key) return result
 
     const { getSupabaseClient } = await import('./client')
@@ -63,7 +63,7 @@ export async function getProposalViewStats(
 ): Promise<{ count: number; lastAt: string | null }> {
   try {
     const url = process.env.SUPABASE_URL
-    const key = process.env.SUPABASE_SERVICE_KEY
+    const key = process.env.SUPABASE_SERVICE_ROLE_KEY
     if (!url || !key) return { count: 0, lastAt: null }
 
     const { getSupabaseClient } = await import('./client')
@@ -94,7 +94,7 @@ export async function getLastProposalViewByDeal(
 
   try {
     const url = process.env.SUPABASE_URL
-    const key = process.env.SUPABASE_SERVICE_KEY
+    const key = process.env.SUPABASE_SERVICE_ROLE_KEY
     if (!url || !key) return result
 
     const { getSupabaseClient } = await import('./client')
@@ -137,7 +137,7 @@ export async function logEvent(
 ): Promise<void> {
   try {
     const url = process.env.SUPABASE_URL
-    const key = process.env.SUPABASE_SERVICE_KEY
+    const key = process.env.SUPABASE_SERVICE_ROLE_KEY
     if (!url || !key) return // mock mode — skip silently
 
     const { getSupabaseClient } = await import('./client')

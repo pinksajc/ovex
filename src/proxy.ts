@@ -66,7 +66,7 @@ export async function proxy(request: NextRequest) {
 
   // ── must_change_password — force new users to set their own password ────────
   if (pathname !== '/change-password') {
-    const serviceKey = process.env.SUPABASE_SERVICE_KEY
+    const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
     if (serviceKey) {
       try {
         const supabaseUrl = process.env.SUPABASE_URL ?? envResult.env.url
