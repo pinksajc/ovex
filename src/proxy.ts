@@ -56,7 +56,13 @@ export async function proxy(request: NextRequest) {
   })
 
   // getUser() validates the JWT with Supabase (no stale session risk)
-  const { data: { user } } = await supabase.auth.getUser()
+  let user: Awaited<ReturnType<typeof supabase.auth.getUser>>['data']['user'] = null
+  try {
+    const { data } = await supabase.auth.getUser()
+    user = data.user
+  } catch (err) {
+    console.error('[proxy] supabase.auth.getUser() threw — treating as unauthenticated:', err)
+  }
 
   if (!user) {
     const loginUrl = new URL('/login', request.url)
