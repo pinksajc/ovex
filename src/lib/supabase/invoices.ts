@@ -83,10 +83,6 @@ async function generateInvoiceNumber(type: InvoiceType): Promise<string> {
 // =========================================
 
 export async function getInvoices(): Promise<Invoice[]> {
-  console.log('[getInvoices] env check:', {
-    SUPABASE_URL: process.env.SUPABASE_URL ?? 'MISSING',
-    SUPABASE_SERVICE_ROLE_KEY: process.env.SUPABASE_SERVICE_ROLE_KEY ? 'SET' : 'MISSING',
-  })
   const db = getSupabaseClient()
   const { data, error } = await invoicesTable(db)
     .select('*')
