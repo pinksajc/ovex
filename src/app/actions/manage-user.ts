@@ -59,7 +59,8 @@ export async function reinviteUserAction(
     // generateLink({ type: 'invite' }) works for already-registered users
     // (unlike inviteUserByEmail which fails if the user exists).
     // GoTrue sends the invite email automatically and regenerates the token.
-    const appUrl = process.env.APP_URL ?? 'https://platomico.vercel.app'
+    const appUrl = process.env.APP_URL
+      ?? (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'http://localhost:3000')
     const { error } = await db.auth.admin.generateLink({
       type: 'invite',
       email,
