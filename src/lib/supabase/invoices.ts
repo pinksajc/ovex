@@ -93,6 +93,7 @@ export async function getInvoices(): Promise<Invoice[]> {
     console.error('[getInvoices] Supabase error:', { code: error.code, message: error.message, details: (error as unknown as Record<string, unknown>).details, hint: (error as unknown as Record<string, unknown>).hint })
     throw error
   }
+  console.log('[getInvoices] result:', { count: (data ?? []).length, first: (data ?? [])[0] ?? null })
   return (data as InvoiceRow[]).map(rowToInvoice)
 }
 
