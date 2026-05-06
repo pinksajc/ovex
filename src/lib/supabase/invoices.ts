@@ -83,17 +83,12 @@ async function generateInvoiceNumber(type: InvoiceType): Promise<string> {
 // =========================================
 
 export async function getInvoices(): Promise<Invoice[]> {
-  console.log('[getInvoices] SUPABASE_URL =', process.env.SUPABASE_URL ?? 'MISSING')
   const db = getSupabaseClient()
   const { data, error } = await invoicesTable(db)
     .select('*')
     .order('created_at', { ascending: false })
 
-  if (error) {
-    console.error('[getInvoices] Supabase error:', { code: error.code, message: error.message, details: (error as unknown as Record<string, unknown>).details, hint: (error as unknown as Record<string, unknown>).hint })
-    throw error
-  }
-  console.log('[getInvoices] result:', { count: (data ?? []).length, first: (data ?? [])[0] ?? null })
+  if (error) throw error
   return (data as InvoiceRow[]).map(rowToInvoice)
 }
 
