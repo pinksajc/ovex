@@ -58,6 +58,17 @@ export async function getCurrentUser(): Promise<AuthUser | null> {
     .filter(Boolean)
   const isAdminByEnv = adminEmails.length > 0 && adminEmails.includes(email.toLowerCase())
 
+  // ── ADMIN_EMAIL bypass — skip DB entirely ─────────────────────────────────
+  if (isAdminByEnv) {
+    return {
+      id: authUser.id,
+      email,
+      name: (authUser.user_metadata?.full_name as string | undefined) ?? derivedName,
+      role: 'admin',
+      mustChangePassword: false,
+    }
+  }
+
   // ── Profile lookup via raw PostgREST fetch (cache: 'no-store') ───────────────
   // Using fetch directly instead of the Supabase SDK so that Next.js's fetch
   // cache is explicitly bypassed. The SDK goes through the same global fetch,
