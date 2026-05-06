@@ -79,8 +79,8 @@ export function FacturasContent({
 }: {
   invoices: Invoice[]
   ofertas: Presupuesto[]
-  invoiceFetchError: boolean
-  ofertaFetchError: boolean
+  invoiceFetchError: string | null
+  ofertaFetchError: string | null
   initialTab?: string
 }) {
   const isOfertasTab = initialTab === 'ofertas'
@@ -187,7 +187,7 @@ export function FacturasContent({
 
           {invoiceFetchError && (
             <div className="mb-6 bg-red-50 border border-red-200 rounded-xl px-5 py-4 text-sm text-red-700">
-              Error al cargar las facturas. Asegúrate de que la tabla <code>invoices</code> existe en Supabase.
+              Error al cargar las facturas: {invoiceFetchError}
             </div>
           )}
 
@@ -296,7 +296,7 @@ export function FacturasContent({
 
           {ofertaFetchError && (
             <div className="mb-6 bg-red-50 border border-red-200 rounded-xl px-5 py-4 text-sm text-red-700">
-              Error al cargar las ofertas. Asegúrate de que la tabla <code>presupuestos</code> existe en Supabase.
+              Error al cargar las ofertas: {ofertaFetchError}
             </div>
           )}
 
