@@ -58,97 +58,96 @@ export async function getCurrentUser(): Promise<AuthUser | null> {
     .filter(Boolean)
   const isAdminByEnv = adminEmails.length > 0 && adminEmails.includes(email.toLowerCase())
 
-  try {
-    const db = getSupabaseClient()
+  // ── Profile lookup via raw PostgREST fetch (cache: 'no-store') ───────────────
+  // Using fetch directly instead of the Supabase SDK so that Next.js's fetch
+  // cache is explicitly bypassed. The SDK goes through the same global fetch,
+  // and without cache:'no-store' a cached 'sales' response can persist even
+  // after the DB row is updated to 'admin'.
+  //
+  // Two-step: try full columns first; if 4xx (column missing in prod), retry
+  // with role-only so schema drift never hides an admin's role.
+  const supabaseUrl  = process.env.SUPABASE_URL
+  const supabaseKey  = process.env.SUPABASE_SERVICE_ROLE_KEY
 
-    type FullRow = { role: string; full_name: string | null; must_change_password: boolean | null }
-    type MinRow  = { role: string }
+  type ProfileRow = { role: string; full_name?: string | null; must_change_password?: boolean | null }
 
-    // ── Primary query — all columns we use ────────────────────────────────────
-    const { data: profile, error: profileError } = await db
-      .from('profiles')
-      .select('role, full_name, must_change_password')
-      .eq('id', authUser.id)
-      .maybeSingle() as { data: FullRow | null; error: { message: string; code?: string } | null }
-
-    console.log('[getCurrentUser] raw profile query result:', {
-      userId: authUser.id,
-      email,
-      raw_role: profile?.role ?? null,
-      raw_full_name: profile?.full_name ?? null,
-      raw_must_change_password: profile?.must_change_password ?? null,
-      profile_is_null: profile === null,
-      error: profileError ?? null,
-    })
-
-    // ── Fallback query — if full query failed (e.g. column missing in production)
-    // retry with just `role` so schema drift never hides an admin's role ────────
-    let resolvedProfile: FullRow | null = profile
-    if (profileError && !profile) {
-      console.warn('[getCurrentUser] full query failed, retrying with role-only query:', profileError.message)
-      const { data: minProfile, error: minError } = await db
-        .from('profiles')
-        .select('role')
-        .eq('id', authUser.id)
-        .maybeSingle() as { data: MinRow | null; error: { message: string } | null }
-
-      console.log('[getCurrentUser] role-only fallback result:', {
-        userId: authUser.id,
-        data: minProfile,
-        error: minError ?? null,
-      })
-
-      if (!minError && minProfile) {
-        resolvedProfile = { role: minProfile.role, full_name: null, must_change_password: null }
-      }
+  async function fetchProfile(select: string): Promise<{ row: ProfileRow | null; status: number }> {
+    if (!supabaseUrl || !supabaseKey) return { row: null, status: 0 }
+    try {
+      const res = await fetch(
+        `${supabaseUrl}/rest/v1/profiles?id=eq.${authUser!.id}&select=${select}&limit=1`,
+        {
+          headers: {
+            apikey: supabaseKey,
+            Authorization: `Bearer ${supabaseKey}`,
+            Accept: 'application/json',
+          },
+          cache: 'no-store',
+        }
+      )
+      if (!res.ok) return { row: null, status: res.status }
+      const rows = (await res.json()) as ProfileRow[]
+      return { row: rows[0] ?? null, status: res.status }
+    } catch (e) {
+      console.error('[getCurrentUser] fetch error:', e)
+      return { row: null, status: -1 }
     }
+  }
 
-    if (!resolvedProfile) {
-      // Row genuinely missing — auto-create with role='sales' as default.
-      // ON CONFLICT DO NOTHING ensures we never overwrite an existing role.
-      console.error('[getCurrentUser] profile row not found — auto-creating.', {
-        userId: authUser.id,
-        email,
-        primaryError: profileError ?? null,
-      })
+  // Primary: all columns
+  let { row: profile, status: s1 } = await fetchProfile('role,full_name,must_change_password')
 
-      const autoRole = isAdminByEnv ? 'admin' : 'sales'
+  // Fallback: role only (if primary errored — e.g. column doesn't exist yet in production)
+  if (!profile && s1 !== 200) {
+    const { row: minProfile, status: s2 } = await fetchProfile('role')
+    console.log('[getCurrentUser] role-only fallback:', { userId: authUser.id, row: minProfile, status: s2 })
+    if (minProfile) profile = minProfile
+  }
+
+  console.log('[getCurrentUser] resolved profile:', {
+    userId: authUser.id,
+    email,
+    raw_role: profile?.role ?? null,
+    raw_full_name: profile?.full_name ?? null,
+    raw_must_change_password: profile?.must_change_password ?? null,
+    profile_is_null: profile === null,
+    primaryHttpStatus: s1,
+  })
+
+  if (!profile) {
+    // Row genuinely missing — auto-create.
+    // ON CONFLICT DO NOTHING so a row with a manually-set role is never overwritten.
+    console.error('[getCurrentUser] profile row not found — auto-creating.', { userId: authUser.id, email })
+
+    const autoRole = isAdminByEnv ? 'admin' : 'sales'
+    try {
+      const db = getSupabaseClient()
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const { error: upsertError } = await (db.from('profiles') as any).upsert(
         { id: authUser.id, email, full_name: derivedName, role: autoRole },
         { onConflict: 'id', ignoreDuplicates: true }
       )
-
-      console.log('[getCurrentUser] auto-create upsert result:', { autoRole, upsertError: upsertError ?? null })
-
-      return {
-        id: authUser.id,
-        email,
-        name: derivedName,
-        role: isAdminByEnv ? 'admin' : autoRole,
-        mustChangePassword: false,
-      }
+      console.log('[getCurrentUser] auto-create result:', { autoRole, upsertError: upsertError ?? null })
+    } catch (err) {
+      console.error('[getCurrentUser] auto-create threw:', err)
     }
 
-    return {
-      id: authUser.id,
-      email,
-      name: resolvedProfile.full_name ?? derivedName,
-      // ADMIN_EMAIL always wins over whatever is stored in the DB
-      role: isAdminByEnv ? 'admin' : ((resolvedProfile.role as UserRole) ?? 'sales'),
-      mustChangePassword: resolvedProfile.must_change_password === true,
-    }
-  } catch (err) {
-    // Unexpected error (e.g. network, profiles table missing entirely) — still
-    // return a usable session rather than crashing, but log it for diagnosis.
-    console.error('[getCurrentUser] caught unexpected error fetching profile:', err)
     return {
       id: authUser.id,
       email,
       name: derivedName,
-      role: isAdminByEnv ? 'admin' : 'sales',
+      role: isAdminByEnv ? 'admin' : autoRole,
       mustChangePassword: false,
     }
+  }
+
+  return {
+    id: authUser.id,
+    email,
+    name: profile.full_name ?? derivedName,
+    // ADMIN_EMAIL always wins over whatever is stored in the DB
+    role: isAdminByEnv ? 'admin' : ((profile.role as UserRole) ?? 'sales'),
+    mustChangePassword: profile.must_change_password === true,
   }
 }
 
