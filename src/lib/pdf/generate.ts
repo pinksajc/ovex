@@ -824,15 +824,65 @@ function s11Economics(deal: Deal, cfg: DealConfiguration, sections: ProposalSect
       </div>
     </div>
 
-    <!-- Total fijo mensual (always shown) -->
-    ${(() => {
+    <!-- Pricing block: unified when calculateVariable, fixed-only otherwise -->
+    ${cfg.calculateVariable ? (() => {
+      // Fixed components
+      const fixedAddonFee = totals.addonFee + totals.datafonoFee
+      const fixedDeliveryFee = totals.deliveryFee
+      const fixedHwFee = (eco.hardwareRevenueMonthly as number | undefined) ?? 0
+      const subtotalFijo = planFixedFee + fixedAddonFee + fixedDeliveryFee + fixedHwFee
+
+      // Variable components
+      const rosTotal = plan.variableFee * eco.totalMonthlyVolume
+      const renTotal = renEnabled && renVenues > 0 ? renFeePerOrder * deliveryPerVenue * renVenues : 0
+      const subtotalVariable = rosTotal + renTotal
+
+      // Discount on software base (plan + addons), then net + IVA + total
+      const netoTotal = subtotalFijo + subtotalVariable - discountAmount
+      const ivaTotal  = netoTotal * 0.21
+      const totalEst  = netoTotal * 1.21
+
+      return `
+    <div style="border:2px solid #1e3a5f;border-radius:12px;padding:14px 20px;background:#f0f5fb;margin-bottom:10px;">
+      <!-- Fixed rows -->
+      <div style="font-size:7.5px;font-weight:700;color:#1e3a5f;text-transform:uppercase;letter-spacing:1px;margin-bottom:6px;">Costes fijos</div>
+      <div style="display:flex;flex-direction:column;gap:3px;margin-bottom:8px;padding-bottom:8px;border-bottom:1px solid #dde6f0;">
+        ${planFixedFee > 0 ? simpleRow('Plan', `${fmt(planFixedFee)}/mes`) : ''}
+        ${fixedAddonFee > 0 ? simpleRow('Add-ons', `${fmt(fixedAddonFee)}/mes`) : ''}
+        ${fixedDeliveryFee > 0 ? simpleRow('REN fijo — Integración delivery', `${fmt(fixedDeliveryFee)}/mes`) : ''}
+        ${fixedHwFee > 0 ? simpleRow('Hardware (cuotas)', `${fmt(fixedHwFee)}/mes`) : ''}
+        ${simpleRow('Subtotal fijo', `${fmt(subtotalFijo)}/mes`)}
+      </div>
+      <!-- Variable rows -->
+      <div style="font-size:7.5px;font-weight:700;color:#1e3a5f;text-transform:uppercase;letter-spacing:1px;margin-bottom:6px;">Costes variables (estimado)</div>
+      <div style="display:flex;flex-direction:column;gap:3px;margin-bottom:8px;padding-bottom:8px;border-bottom:1px solid #dde6f0;">
+        ${simpleRow(`ROS variable · ${plan.variableFee.toFixed(2).replace('.', ',')} €/ticket × ${fmtN(eco.totalMonthlyVolume)} pedidos`, `${fmt(rosTotal)}/mes`)}
+        ${renTotal > 0 ? simpleRow(`REN variable · ${renFeePerOrder.toFixed(2).replace('.', ',')} €/pedido × ${fmtN(deliveryPerVenue * renVenues)} pedidos`, `${fmt(renTotal)}/mes`) : ''}
+        ${simpleRow('Subtotal variable', `${fmt(subtotalVariable)}/mes`)}
+      </div>
+      <!-- Totals -->
+      <div style="display:flex;flex-direction:column;gap:3px;margin-bottom:12px;">
+        ${discountPercent > 0 ? simpleRow(eco.discountName ? `Descuento ${eco.discountName}` : 'Descuento', `−${fmt(discountAmount)}/mes`, true) : ''}
+        ${simpleRow('Neto total', `${fmt(netoTotal)}/mes`)}
+        ${simpleRow('IVA 21%', `${fmt(ivaTotal)}/mes`)}
+      </div>
+      <!-- Grand total -->
+      <div style="display:flex;align-items:center;justify-content:space-between;background:#1e3a5f;border-radius:8px;padding:10px 16px;">
+        <span style="font-size:9px;font-weight:700;color:rgba(255,255,255,0.75);text-transform:uppercase;letter-spacing:1.5px;">Total estimado (IVA incl.)</span>
+        <span style="font-size:24px;font-weight:900;color:#fff;font-family:'Courier New',monospace;line-height:1;">${fmt(totalEst)}</span>
+      </div>
+      <div style="font-size:8px;color:#64748b;margin-top:8px;line-height:1.5;">
+        Estimación basada en volumen configurado. La parte variable se factura a mes vencido según pedidos reales.${discountPercent > 0 ? ' Descuento aplicado sobre costes fijos de software.' : ''}
+      </div>
+    </div>`
+    })() : (() => {
       return `
     <div style="border:2px solid #1e3a5f;border-radius:12px;padding:14px 20px;background:#f0f5fb;margin-bottom:10px;">
       <!-- Line items -->
       <div style="display:flex;flex-direction:column;gap:3px;margin-bottom:10px;padding-bottom:10px;border-bottom:2px solid #dde6f0;">
         ${simpleRow('Plan', `${fmt(softwareBase)}/mes`)}
         ${totals.deliveryFee > 0 ? simpleRow('Integración delivery', `${fmt(totals.deliveryFee)}/mes`) : ''}
-        ${eco.hardwareRevenueMonthly > 0 ? simpleRow('Hardware (cuotas)', `${fmt(eco.hardwareRevenueMonthly)}/mes`) : ''}
+        ${(eco.hardwareRevenueMonthly as number | undefined) ?? 0 > 0 ? simpleRow('Hardware (cuotas)', `${fmt(eco.hardwareRevenueMonthly)}/mes`) : ''}
         ${renMonthly > 0 ? simpleRow('REN — Logística propia', `${fmt(renMonthly)}/mes`) : ''}
       </div>
       <!-- Subtotal → discount → neto → IVA → total -->
@@ -854,38 +904,6 @@ function s11Economics(deal: Deal, cfg: DealConfiguration, sections: ProposalSect
     <div style="border:1px solid #e8eef6;border-radius:8px;padding:10px 14px;background:#f8fafc;font-size:8.5px;color:#334155;line-height:1.6;margin-bottom:10px;">
       <strong>Pago único hardware:</strong> ${fmt(hwUpfrontNet)} — facturado a la activación.
     </div>` : ''}
-
-    <!-- Coste variable estimado (only when calculateVariable=true) -->
-    ${cfg.calculateVariable ? (() => {
-      const rosTotal = plan.variableFee * eco.totalMonthlyVolume
-      const renTotal = renEnabled && renVenues > 0 ? renFeePerOrder * deliveryPerVenue * renVenues : 0
-      const varGross = rosTotal + renTotal
-      const varDiscountAmount = varGross * (discountPercent / 100)
-      const varNet = varGross - varDiscountAmount
-      return `
-    <div style="border:2px solid #64748b;border-radius:12px;padding:14px 20px;background:#f8fafc;margin-bottom:10px;">
-      <div style="font-size:8.5px;color:#64748b;text-transform:uppercase;letter-spacing:1.5px;margin-bottom:10px;text-align:center;">+ Coste variable estimado (según volumen)</div>
-      <!-- Line items -->
-      <div style="display:flex;flex-direction:column;gap:3px;margin-bottom:10px;padding-bottom:10px;border-bottom:2px solid #e2e8f0;">
-        ${simpleRow(`ROS · ${plan.variableFee.toFixed(2).replace('.', ',')}€/ticket × ${fmtN(eco.totalMonthlyVolume)} pedidos`, `${fmt(rosTotal)}/mes`)}
-        ${renEnabled && renVenues > 0 ? simpleRow(`REN · ${renFeePerOrder.toFixed(2).replace('.', ',')}€/pedido × ${fmtN(deliveryPerVenue * renVenues)} pedidos`, `${fmt(renTotal)}/mes`) : ''}
-        ${discountPercent > 0 ? simpleRow(eco.discountName ? `Descuento ${eco.discountName} −${discountPercent}%` : `Descuento −${discountPercent}%`, `−${fmt(varDiscountAmount)}/mes`, true) : ''}
-      </div>
-      <!-- Subtotals -->
-      <div style="display:flex;flex-direction:column;gap:3px;margin-bottom:12px;">
-        ${simpleRow('Base imponible', `${fmt(varNet)}`)}
-        ${simpleRow('IVA 21%', `${fmt(varNet * 0.21)}`)}
-      </div>
-      <!-- Total -->
-      <div style="display:flex;align-items:center;justify-content:space-between;background:#475569;border-radius:8px;padding:10px 16px;">
-        <span style="font-size:9px;font-weight:700;color:rgba(255,255,255,0.75);text-transform:uppercase;letter-spacing:1.5px;">Total estimado variable (IVA incl.)</span>
-        <span style="font-size:18px;font-weight:900;color:#fff;font-family:'Courier New',monospace;line-height:1;">${fmt2(varNet * 1.21)}/mes</span>
-      </div>
-      <div style="font-size:8px;color:#94a3b8;margin-top:8px;line-height:1.5;">
-        Estimación basada en volumen configurado. Se factura a mes vencido según pedidos reales del período.${discountPercent > 0 ? ' Descuento aplicado sobre fee variable estimado.' : ''}
-      </div>
-    </div>`
-    })() : ''}
 
     `
   return pg(logoUri, content)
