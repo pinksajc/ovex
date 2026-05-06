@@ -60,11 +60,16 @@ export async function getCurrentUser(): Promise<AuthUser | null> {
 
   try {
     const db = getSupabaseClient()
+
+    type FullRow = { role: string; full_name: string | null; must_change_password: boolean | null }
+    type MinRow  = { role: string }
+
+    // ── Primary query — all columns we use ────────────────────────────────────
     const { data: profile, error: profileError } = await db
       .from('profiles')
       .select('role, full_name, must_change_password')
       .eq('id', authUser.id)
-      .maybeSingle() as { data: { role: string; full_name: string | null; must_change_password: boolean | null } | null; error: { message: string; code?: string } | null }
+      .maybeSingle() as { data: FullRow | null; error: { message: string; code?: string } | null }
 
     console.log('[getCurrentUser] raw profile query result:', {
       userId: authUser.id,
@@ -76,23 +81,41 @@ export async function getCurrentUser(): Promise<AuthUser | null> {
       error: profileError ?? null,
     })
 
-    if (!profile) {
-      // ⚠️  Profile missing or query failed — auto-create will upsert role='sales',
-      // which overwrites any manually-set admin role if the query errored out.
-      // Check the error above to diagnose (e.g. unknown column → migration pending).
-      console.error('[getCurrentUser] profile is null — auto-create will run with role=sales.', {
+    // ── Fallback query — if full query failed (e.g. column missing in production)
+    // retry with just `role` so schema drift never hides an admin's role ────────
+    let resolvedProfile: FullRow | null = profile
+    if (profileError && !profile) {
+      console.warn('[getCurrentUser] full query failed, retrying with role-only query:', profileError.message)
+      const { data: minProfile, error: minError } = await db
+        .from('profiles')
+        .select('role')
+        .eq('id', authUser.id)
+        .maybeSingle() as { data: MinRow | null; error: { message: string } | null }
+
+      console.log('[getCurrentUser] role-only fallback result:', {
         userId: authUser.id,
-        email,
-        queryError: profileError,
+        data: minProfile,
+        error: minError ?? null,
       })
 
-      // Auto-create profile (user created via Supabase dashboard, trigger may not exist).
-      // ignoreDuplicates: true → ON CONFLICT (id) DO NOTHING, so an existing row
-      // with a manually-set role (e.g. 'admin') is never overwritten.
+      if (!minError && minProfile) {
+        resolvedProfile = { role: minProfile.role, full_name: null, must_change_password: null }
+      }
+    }
+
+    if (!resolvedProfile) {
+      // Row genuinely missing — auto-create with role='sales' as default.
+      // ON CONFLICT DO NOTHING ensures we never overwrite an existing role.
+      console.error('[getCurrentUser] profile row not found — auto-creating.', {
+        userId: authUser.id,
+        email,
+        primaryError: profileError ?? null,
+      })
+
       const autoRole = isAdminByEnv ? 'admin' : 'sales'
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const { error: upsertError } = await (db.from('profiles') as any).upsert(
-        { id: authUser.id, full_name: derivedName, role: autoRole },
+        { id: authUser.id, email, full_name: derivedName, role: autoRole },
         { onConflict: 'id', ignoreDuplicates: true }
       )
 
@@ -110,14 +133,14 @@ export async function getCurrentUser(): Promise<AuthUser | null> {
     return {
       id: authUser.id,
       email,
-      name: profile.full_name ?? derivedName,
+      name: resolvedProfile.full_name ?? derivedName,
       // ADMIN_EMAIL always wins over whatever is stored in the DB
-      role: isAdminByEnv ? 'admin' : ((profile.role as UserRole) ?? 'sales'),
-      mustChangePassword: profile.must_change_password === true,
+      role: isAdminByEnv ? 'admin' : ((resolvedProfile.role as UserRole) ?? 'sales'),
+      mustChangePassword: resolvedProfile.must_change_password === true,
     }
   } catch (err) {
-    // profiles table not migrated yet or other DB error — return user with defaults
-    // so the app is still usable
+    // Unexpected error (e.g. network, profiles table missing entirely) — still
+    // return a usable session rather than crashing, but log it for diagnosis.
     console.error('[getCurrentUser] caught unexpected error fetching profile:', err)
     return {
       id: authUser.id,
