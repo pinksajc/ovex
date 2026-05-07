@@ -6,6 +6,7 @@ import { createAuthBrowserClient } from '@/lib/supabase/auth'
 import type { AuthUser } from '@/lib/auth'
 
 const NAV = [
+  { href: '/dashboard', label: 'Dashboard', icon: IconDashboard },
   { href: '/deals', label: 'Deals', icon: IconDeals },
   { href: '/pipeline', label: 'Pipeline', icon: IconPipeline },
   { href: '/facturas', label: 'Facturas', icon: IconInvoice },
@@ -39,7 +40,9 @@ export function Sidebar({ user }: { user: AuthUser }) {
       <nav className="flex-1 px-3 py-4 space-y-0.5">
         {NAV.map(({ href, label, icon: Icon }) => {
           const active =
-            href === '/deals'
+            href === '/dashboard'
+              ? pathname === '/dashboard'
+              : href === '/deals'
               ? pathname.startsWith('/deals')
               : href === '/facturas'
               ? pathname.startsWith('/facturas') || pathname.startsWith('/ofertas')
@@ -122,6 +125,23 @@ export function Sidebar({ user }: { user: AuthUser }) {
 }
 
 // ---- Icons (inline SVG — sin dependencias) ----
+
+function IconDashboard({ className }: { className?: string }) {
+  return (
+    <svg
+      className={className}
+      viewBox="0 0 16 16"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.5"
+    >
+      <rect x="2" y="2" width="5" height="5" rx="1" />
+      <rect x="9" y="2" width="5" height="3" rx="1" />
+      <rect x="9" y="7" width="5" height="7" rx="1" />
+      <rect x="2" y="9" width="5" height="5" rx="1" />
+    </svg>
+  )
+}
 
 function IconDeals({ className }: { className?: string }) {
   return (
