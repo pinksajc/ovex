@@ -71,7 +71,7 @@ function overlayProposal(page: PDFPage, oferta: Presupuesto, font: PDFFont, bold
   // Scale helpers (round to avoid sub-pixel drift in PDF coordinates)
   const px = (n: number) => Math.round(n * sx)
   const py = (n: number) => Math.round(n * sy)
-  const fs = (n: number) => Math.round((n + 2) * sy)  // font sizes scale with height (+2pt across the board)
+  const fs = (n: number) => Math.round((n + 4) * sy)  // font sizes scale with height (+4pt across the board)
 
   const lineItems = (oferta.lineItems ?? []).filter((i) => i.type === 'line')
   const vatAmount = oferta.amountNet * (oferta.vatRate / 100)
