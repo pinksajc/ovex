@@ -257,7 +257,7 @@ export async function generateSalesDeckPdf(oferta: Presupuesto): Promise<Buffer>
   const p1H = page1.getHeight()
   // y=320 was the reference position on a 1080pt page — scale proportionally
   const p1Y   = Math.round(320 * p1H / 1080)
-  const p1Sz  = Math.round(26  * p1H / 1080)
+  const p1Sz  = 14
   drawCentered(page1, oferta.clientName, p1Y, font, p1Sz, rgb(0.4, 0.4, 0.4), page1.getWidth())
 
   // ── Page index 10 (slide 11): replace proposal placeholder ──────────────
