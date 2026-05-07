@@ -235,6 +235,7 @@ function overlayProposal(page: PDFPage, oferta: Presupuesto, font: PDFFont, bold
 
 // ---- Main export ----
 export async function generateSalesDeckPdf(oferta: Presupuesto): Promise<Buffer> {
+  console.log('SALES DECK GENERATOR v2 called')
   const deckPath  = path.join(process.cwd(), 'public', 'Sales Deck.pdf')
   const deckBytes = fs.readFileSync(deckPath)
   const doc       = await PDFDocument.load(deckBytes)
