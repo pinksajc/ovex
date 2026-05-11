@@ -73,8 +73,10 @@ function overlayProposal(page: PDFPage, oferta: Presupuesto, font: PDFFont, bold
   const py = (n: number) => Math.round(n * sy)
   const fs = (n: number) => Math.round((n + 4) * sy)  // font sizes scale with height (+4pt across the board)
 
-  const lineItems = (oferta.lineItems ?? []).filter((i) => i.type === 'line')
-  const vatAmount = oferta.amountNet * (oferta.vatRate / 100)
+  const allItems     = oferta.lineItems ?? []
+  const lineItems    = allItems.filter((i) => i.type === 'line')
+  const discountRows = allItems.filter((i) => i.type === 'discount')
+  const vatAmount    = oferta.amountNet * (oferta.vatRate / 100)
 
   // ── Colors ──────────────────────────────────────────────────────────────
   const bg       = rgb(  5/255,   9/255,  26/255)
@@ -82,11 +84,21 @@ function overlayProposal(page: PDFPage, oferta: Presupuesto, font: PDFFont, bold
   const headBg   = rgb( 20/255,  44/255,  80/255)
   const rowEven  = rgb(  1/255,   3/255,  10/255)
   const rowOdd   = rgb(  8/255,  14/255,  35/255)
+  const discBg   = rgb(  2/255,  12/255,   8/255)
   const totFinal = rgb( 26/255,  39/255,  68/255)
   const white    = rgb(1, 1, 1)
   const dim      = rgb(0.40, 0.45, 0.55)
   const muted    = rgb(0.60, 0.65, 0.72)
   const light    = rgb(0.88, 0.91, 0.95)
+  const green    = rgb(0.13, 0.77, 0.37)
+
+  // ── Strikethrough helper ───────────────────────────────────────────────
+  const strikeRight = (text: string, rightX: number, y: number, f: PDFFont, size: number, color: Rgb): void => {
+    const w = f.widthOfTextAtSize(text, size)
+    const x = rightX - w
+    page.drawText(text, { x, y, font: f, size, color })
+    page.drawLine({ start: { x, y: y + size * 0.38 }, end: { x: x + w, y: y + size * 0.38 }, thickness: 0.8, color })
+  }
 
   // ── Full background ──────────────────────────────────────────────────────
   page.drawRectangle({ x: 0, y: 0, width: W, height: H, color: bg })
@@ -160,10 +172,11 @@ function overlayProposal(page: PDFPage, oferta: Presupuesto, font: PDFFont, bold
   }
 
   // ── Line items table ──────────────────────────────────────────────────────
-  const TABLE_X = px(80)
-  const TABLE_W = W - px(160)
-  const HEAD_H  = py(44)
-  const ROW_H   = py(40)
+  const TABLE_X  = px(80)
+  const TABLE_W  = W - px(160)
+  const HEAD_H   = py(44)
+  const ROW_H    = py(50)   // taller: fits description + period/discount-name
+  const DISC_H   = py(36)   // height for global discount rows
 
   const HEAD_BOT = CARD_BOT - py(30) - HEAD_H
 
@@ -174,26 +187,56 @@ function overlayProposal(page: PDFPage, oferta: Presupuesto, font: PDFFont, bold
   page.drawRectangle({ x: TABLE_X, y: HEAD_BOT, width: TABLE_W, height: HEAD_H, color: headBg })
 
   const TH_Y = HEAD_BOT + py(16)
-  page.drawText('DESCRIPCIÓN', { x: TABLE_X + px(20), y: TH_Y, font: bold, size: fs(11), color: muted })
-  drawRight(page, 'CANTIDAD',     QTY_RX,  TH_Y, bold, fs(11), muted)
+  page.drawText('DESCRIPCIÓN',  { x: TABLE_X + px(20), y: TH_Y, font: bold, size: fs(11), color: muted })
+  drawRight(page, 'CANT./UD.',   QTY_RX,  TH_Y, bold, fs(11), muted)
   drawRight(page, 'PRECIO UNIT.', UNIT_RX, TH_Y, bold, fs(11), muted)
-  drawRight(page, 'IMPORTE',      AMT_RX,  TH_Y, bold, fs(11), muted)
+  drawRight(page, 'IMPORTE',     AMT_RX,  TH_Y, bold, fs(11), muted)
 
-  // Item rows (up to 8)
+  // ── Regular line rows (up to 8) ──────────────────────────────────────────
   let rowBotY = HEAD_BOT
   const visible = lineItems.slice(0, 8)
 
   for (let i = 0; i < visible.length; i++) {
-    const item   = visible[i]
-    const rowBot = rowBotY - ROW_H
-    const rowBg  = i % 2 === 0 ? rowEven : rowOdd
+    const item        = visible[i]
+    const hasExtra    = !!(item.period || item.discountName)
+    const hasLineDisc = (item.lineDiscountPercent ?? 0) > 0
+    const rowBot      = rowBotY - ROW_H
+    const rowBg       = i % 2 === 0 ? rowEven : rowOdd
+
     page.drawRectangle({ x: TABLE_X, y: rowBot, width: TABLE_W, height: ROW_H, color: rowBg })
 
-    const TEXT_Y = rowBot + py(14)
-    page.drawText(truncate(item.description, 70), { x: TABLE_X + px(20), y: TEXT_Y, font, size: fs(12), color: light })
-    drawRight(page, String(item.quantity), QTY_RX,  TEXT_Y, font, fs(12), muted)
-    drawRight(page, fmt(item.unitPrice),   UNIT_RX, TEXT_Y, font, fs(12), muted)
-    drawRight(page, fmt(item.amount),      AMT_RX,  TEXT_Y, bold, fs(12), light)
+    // Vertical positioning: if a secondary line exists push main line up
+    const MAIN_Y = hasExtra ? rowBot + py(30) : rowBot + py(19)
+    const SUB_Y  = rowBot + py(13)
+
+    // Description
+    page.drawText(truncate(item.description, 70), {
+      x: TABLE_X + px(20), y: MAIN_Y, font, size: fs(12), color: light,
+    })
+
+    // Secondary line: period (gray) or discount name (green)
+    if (item.period) {
+      page.drawText(item.period, { x: TABLE_X + px(20), y: SUB_Y, font, size: fs(9), color: dim })
+    } else if (item.discountName) {
+      page.drawText(item.discountName, { x: TABLE_X + px(20), y: SUB_Y, font, size: fs(9), color: green })
+    }
+
+    // Quantity + unit
+    const qtyLabel = item.unit ? `${item.quantity} ${item.unit}` : String(item.quantity)
+    drawRight(page, qtyLabel, QTY_RX, MAIN_Y, font, fs(12), muted)
+
+    // Unit price — strikethrough if line discount applied
+    if (hasLineDisc) {
+      strikeRight(fmt(item.unitPrice), UNIT_RX, MAIN_Y, font, fs(10), dim)
+      // Show effective price below
+      const effPrice = item.unitPrice * (1 - (item.lineDiscountPercent ?? 0) / 100)
+      drawRight(page, fmt(effPrice), UNIT_RX, SUB_Y, font, fs(9), green)
+    } else {
+      drawRight(page, fmt(item.unitPrice), UNIT_RX, MAIN_Y, font, fs(12), muted)
+    }
+
+    // Amount — green if discounted
+    drawRight(page, fmt(item.amount), AMT_RX, MAIN_Y, bold, fs(12), hasLineDisc ? green : light)
 
     rowBotY = rowBot
   }
@@ -203,9 +246,25 @@ function overlayProposal(page: PDFPage, oferta: Presupuesto, font: PDFFont, bold
     const rowBot = rowBotY - ROW_H
     page.drawRectangle({ x: TABLE_X, y: rowBot, width: TABLE_W, height: ROW_H, color: rowEven })
     page.drawText(truncate(oferta.concept || '—', 80), {
-      x: TABLE_X + px(20), y: rowBot + py(14), font, size: fs(12), color: light,
+      x: TABLE_X + px(20), y: rowBot + py(19), font, size: fs(12), color: light,
     })
-    drawRight(page, fmt(oferta.amountNet), AMT_RX, rowBot + py(14), bold, fs(12), light)
+    drawRight(page, fmt(oferta.amountNet), AMT_RX, rowBot + py(19), bold, fs(12), light)
+    rowBotY = rowBot
+  }
+
+  // ── Global discount rows ─────────────────────────────────────────────────
+  for (const disc of discountRows) {
+    const rowBot = rowBotY - DISC_H
+    page.drawRectangle({ x: TABLE_X, y: rowBot, width: TABLE_W, height: DISC_H, color: discBg })
+
+    const label = disc.description?.trim()
+      || (disc.discountMode === 'percent' ? `Descuento (${disc.discountValue}%)` : 'Descuento')
+    const discSuffix = disc.discountMode === 'percent' ? ` (−${disc.discountValue}%)` : ''
+
+    page.drawText(truncate(label + discSuffix, 80), {
+      x: TABLE_X + px(20), y: rowBot + py(13), font, size: fs(11), color: green,
+    })
+    drawRight(page, fmt(disc.amount), AMT_RX, rowBot + py(13), bold, fs(12), green)
     rowBotY = rowBot
   }
 
