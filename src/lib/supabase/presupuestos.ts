@@ -47,6 +47,7 @@ interface PresupuestoRow {
   status: string
   valid_until: string | null
   notes: string | null
+  requires_signature?: boolean | null
   created_at: string
   updated_at: string
 }
@@ -79,6 +80,7 @@ function rowToPresupuesto(row: PresupuestoRow): Presupuesto {
     status: row.status as PresupuestoStatus,
     validUntil: row.valid_until,
     notes: row.notes,
+    requiresSignature: row.requires_signature === true,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   }
@@ -197,6 +199,15 @@ export async function updatePresupuestoStatus(id: string, status: PresupuestoSta
   const db = getSupabaseClient()
   const { error } = await presupuestosTable(db)
     .update({ status })
+    .eq('id', id)
+
+  if (error) throw error
+}
+
+export async function updatePresupuestoSignatureRequired(id: string, value: boolean): Promise<void> {
+  const db = getSupabaseClient()
+  const { error } = await presupuestosTable(db)
+    .update({ requires_signature: value })
     .eq('id', id)
 
   if (error) throw error

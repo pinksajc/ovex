@@ -2,6 +2,7 @@ import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import { getPresupuesto } from '@/lib/supabase/presupuestos'
 import { OfertaActions } from './actions'
+import { RequiresSignatureToggle } from './requires-signature-toggle'
 import type { PresupuestoStatus } from '@/types'
 
 const STATUS_LABELS: Record<PresupuestoStatus, string> = {
@@ -153,6 +154,14 @@ export default async function OfertaDetailPage({ params }: { params: Promise<{ i
           <div className="bg-white border border-zinc-200 rounded-xl p-5">
             <h2 className="text-[10px] font-semibold text-zinc-400 uppercase tracking-widest mb-3">Cambiar estado</h2>
             <OfertaActions presupuestoId={presupuesto.id} currentStatus={presupuesto.status} />
+          </div>
+
+          <div className="bg-white border border-zinc-200 rounded-xl p-5">
+            <h2 className="text-[10px] font-semibold text-zinc-400 uppercase tracking-widest mb-3">PDF</h2>
+            <RequiresSignatureToggle
+              presupuestoId={presupuesto.id}
+              initialValue={presupuesto.requiresSignature}
+            />
           </div>
 
           {presupuesto.dealId && (

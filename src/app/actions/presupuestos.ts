@@ -3,7 +3,7 @@
 import { redirect } from 'next/navigation'
 import { revalidatePath } from 'next/cache'
 import { isRedirectError } from 'next/dist/client/components/redirect-error'
-import { createPresupuesto, updatePresupuesto, updatePresupuestoStatus, getPresupuesto } from '@/lib/supabase/presupuestos'
+import { createPresupuesto, updatePresupuesto, updatePresupuestoStatus, updatePresupuestoSignatureRequired, getPresupuesto } from '@/lib/supabase/presupuestos'
 import type { CreatePresupuestoInput, UpdatePresupuestoInput, PresupuestoStatus } from '@/types'
 
 export async function createPresupuestoAction(input: CreatePresupuestoInput): Promise<{ error?: string }> {
@@ -54,6 +54,19 @@ export async function updatePresupuestoStatusAction(
  * Marks a presupuesto as 'accepted' and prepends contract reference +
  * acceptance date to the notes field.
  */
+export async function toggleRequiresSignatureAction(
+  id: string,
+  value: boolean,
+): Promise<{ ok: boolean; error?: string }> {
+  try {
+    await updatePresupuestoSignatureRequired(id, value)
+    revalidatePath(`/ofertas/${id}`)
+    return { ok: true }
+  } catch (err) {
+    return { ok: false, error: (err as { message?: string })?.message ?? 'Error desconocido' }
+  }
+}
+
 export async function acceptContratoAction(
   id: string,
   contractRef: string,
