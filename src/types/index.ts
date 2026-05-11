@@ -343,6 +343,7 @@ export interface Presupuesto {
   status: PresupuestoStatus
   validUntil: string | null
   notes: string | null
+  requiresSignature: boolean
   createdAt: string
   updatedAt: string
 }

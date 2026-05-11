@@ -292,6 +292,73 @@ export async function generatePresupuestoPdf(presupuesto: Presupuesto): Promise<
     text-align: center;
     line-height: 1.6;
   }
+  /* ── Signature block ── */
+  .signature-section {
+    margin-top: 52px;
+    page-break-inside: avoid;
+  }
+  .signature-title {
+    font-size: 8px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    color: #94a3b8;
+    text-align: center;
+    margin-bottom: 16px;
+  }
+  .signature-boxes {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 24px;
+  }
+  .signature-box {
+    border: 1.5px solid #cbd5e1;
+    border-radius: 8px;
+    padding: 16px 18px 18px;
+  }
+  .sig-party {
+    font-size: 7px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    color: #94a3b8;
+    margin-bottom: 3px;
+  }
+  .sig-company {
+    font-size: 10px;
+    font-weight: 700;
+    color: #1e3a5f;
+    margin-bottom: 16px;
+  }
+  .sig-field {
+    display: flex;
+    align-items: flex-end;
+    gap: 8px;
+    margin-bottom: 14px;
+  }
+  .sig-field:last-child { margin-bottom: 0; }
+  .sig-label {
+    font-size: 8px;
+    color: #64748b;
+    white-space: nowrap;
+    min-width: 42px;
+    padding-bottom: 2px;
+  }
+  .sig-blank {
+    flex: 1;
+    border-bottom: 1px solid #334155;
+    min-height: 20px;
+  }
+  .sig-blank--tall {
+    min-height: 44px;
+  }
+  .sig-blank--prefilled {
+    font-size: 9px;
+    color: #334155;
+    border-bottom: 1px solid #e2e8f0;
+    padding-bottom: 2px;
+    flex: 1;
+  }
 </style>
 </head>
 <body>
@@ -409,6 +476,55 @@ ${presupuesto.notes ? `
 <div class="notes-block">
   <div class="notes-title">Notas</div>
   <div class="notes-body">${esc(presupuesto.notes)}</div>
+</div>` : ''}
+
+${presupuesto.requiresSignature ? `
+<!-- Signature block -->
+<div class="signature-section">
+  <div class="signature-title">Firmas de conformidad</div>
+  <div class="signature-boxes">
+
+    <!-- Left: CLIENTE -->
+    <div class="signature-box">
+      <div class="sig-party">Cliente</div>
+      <div class="sig-company">${esc(presupuesto.clientName)}</div>
+      <div class="sig-field">
+        <span class="sig-label">Firma:</span>
+        <div class="sig-blank sig-blank--tall"></div>
+      </div>
+      <div class="sig-field">
+        <span class="sig-label">Nombre:</span>
+        <div class="sig-blank"></div>
+      </div>
+      <div class="sig-field">
+        <span class="sig-label">Fecha:</span>
+        <div class="sig-blank"></div>
+      </div>
+      <div class="sig-field">
+        <span class="sig-label">DNI/NIF:</span>
+        <div class="sig-blank"></div>
+      </div>
+    </div>
+
+    <!-- Right: PLATOMICO -->
+    <div class="signature-box">
+      <div class="sig-party">Platomico</div>
+      <div class="sig-company">Platomico, S.L.</div>
+      <div class="sig-field">
+        <span class="sig-label">Firma:</span>
+        <div class="sig-blank sig-blank--tall"></div>
+      </div>
+      <div class="sig-field">
+        <span class="sig-label">Nombre:</span>
+        <div class="sig-blank--prefilled">César Augusto Castro Sáder</div>
+      </div>
+      <div class="sig-field">
+        <span class="sig-label">Fecha:</span>
+        <div class="sig-blank"></div>
+      </div>
+    </div>
+
+  </div>
 </div>` : ''}
 
 <!-- Footer -->
