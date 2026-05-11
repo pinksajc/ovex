@@ -479,6 +479,18 @@ ${presupuesto.notes ? `
 </div>` : ''}
 
 ${presupuesto.requiresSignature ? `
+<!-- Legal clauses -->
+<div style="margin-top:40px;padding-top:14px;border-top:1px solid #e2e8f0;">
+  <div style="font-size:7.5px;font-weight:700;text-transform:uppercase;letter-spacing:1.5px;color:#94a3b8;margin-bottom:10px;">Términos y condiciones</div>
+  <div style="font-size:8px;color:#64748b;line-height:1.65;text-align:justify;">
+    <p style="margin-bottom:7px;"><strong style="color:#475569;">1. ACEPTACIÓN —</strong> La firma del presente documento implica la aceptación de los servicios descritos en esta oferta y de las condiciones del contrato marco suscrito entre las partes.</p>
+    <p style="margin-bottom:7px;"><strong style="color:#475569;">2. VIGENCIA —</strong> Esta oferta tiene validez hasta la fecha indicada. Transcurrido dicho plazo sin aceptación firmada, Platomico, S.L. se reserva el derecho de modificar las condiciones.</p>
+    <p style="margin-bottom:7px;"><strong style="color:#475569;">3. FACTURACIÓN —</strong> Los servicios se facturarán según la periodicidad acordada (mensual o trimestral), con vencimiento a 30 días desde la emisión de la factura.</p>
+    <p style="margin-bottom:7px;"><strong style="color:#475569;">4. PROTECCIÓN DE DATOS —</strong> Los datos personales facilitados serán tratados por Platomico, S.L. (CIF B22741094) conforme al RGPD (UE) 2016/679 y la LOPDGDD, únicamente para la gestión comercial y prestación de servicios.</p>
+    <p><strong style="color:#475569;">5. JURISDICCIÓN —</strong> Las partes se someten a los Juzgados y Tribunales de Madrid para la resolución de cualquier controversia derivada de la presente oferta.</p>
+  </div>
+</div>
+
 <!-- Signature block -->
 <div class="signature-section">
   <div class="signature-title">Firmas de conformidad</div>
