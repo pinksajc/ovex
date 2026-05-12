@@ -27,6 +27,8 @@ export interface SaveVersionPayload {
   discountName?: string
   deliveryPlan?: DeliveryPlanId
   label?: string
+  itemDiscounts?: { plan?: number; delivery?: number; addons?: Record<string, number>; hardware?: Record<string, number> }
+  itemPriceOverrides?: { plan?: number | null; delivery?: number | null; hardware?: Record<string, number | null> }
 }
 
 export interface SaveVersionResult {
@@ -68,6 +70,8 @@ export async function saveNewVersionAction(
         : 0,
       deliveryExtraFeePerOrder: DELIVERY_PLANS[payload.deliveryPlan ?? 'start'].extraOrderFee,
       deliveryIncludedOrders: DELIVERY_PLANS[payload.deliveryPlan ?? 'start'].includedOrders,
+      itemDiscounts: payload.itemDiscounts ?? { plan: 0, delivery: 0, addons: {}, hardware: {} },
+      itemPriceOverrides: payload.itemPriceOverrides ?? { plan: null, delivery: null, hardware: {} },
     }
 
     const result = await saveNewConfigVersion(payload.dealId, {

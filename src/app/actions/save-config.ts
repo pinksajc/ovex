@@ -31,6 +31,8 @@ export interface SaveConfigPayload {
   calculateVariable?: boolean
   discountName?: string
   deliveryPlan?: DeliveryPlanId
+  itemDiscounts?: { plan?: number; delivery?: number; addons?: Record<string, number>; hardware?: Record<string, number> }
+  itemPriceOverrides?: { plan?: number | null; delivery?: number | null; hardware?: Record<string, number | null> }
 }
 
 export interface SaveConfigResult {
@@ -70,6 +72,8 @@ export async function saveConfigAction(
         : 0,
       deliveryExtraFeePerOrder: DELIVERY_PLANS[payload.deliveryPlan ?? 'start'].extraOrderFee,
       deliveryIncludedOrders: DELIVERY_PLANS[payload.deliveryPlan ?? 'start'].includedOrders,
+      itemDiscounts: payload.itemDiscounts ?? { plan: 0, delivery: 0, addons: {}, hardware: {} },
+      itemPriceOverrides: payload.itemPriceOverrides ?? { plan: null, delivery: null, hardware: {} },
     }
 
     // Fetch current active config to reuse its id/version (avoids always writing v1)
