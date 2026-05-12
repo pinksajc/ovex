@@ -51,7 +51,7 @@ export default async function OfertaDetailPage({ params }: { params: Promise<{ i
     <div className="p-8 max-w-3xl mx-auto">
       {/* Back */}
       <Link
-        href="/facturas?tab=ofertas"
+        href="/ofertas"
         className="inline-flex items-center gap-1 text-xs text-zinc-400 hover:text-zinc-700 mb-6 transition-colors"
       >
         ← Ofertas

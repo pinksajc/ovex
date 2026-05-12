@@ -1,19 +1,10 @@
 import { getInvoices } from '@/lib/supabase/invoices'
-import { getPresupuestos } from '@/lib/supabase/presupuestos'
 import { FacturasContent } from '@/components/facturas/facturas-content'
-import type { Invoice, Presupuesto } from '@/types'
+import type { Invoice } from '@/types'
 
-export default async function FacturasPage({
-  searchParams,
-}: {
-  searchParams: Promise<{ tab?: string }>
-}) {
-  const { tab } = await searchParams
-
+export default async function FacturasPage() {
   let invoices: Invoice[] = []
   let invoiceFetchError: string | null = null
-  let ofertas: Presupuesto[] = []
-  let ofertaFetchError: string | null = null
 
   try {
     invoices = await getInvoices()
@@ -21,20 +12,11 @@ export default async function FacturasPage({
     invoiceFetchError = err instanceof Error ? err.message : 'Error desconocido'
   }
 
-  try {
-    ofertas = await getPresupuestos()
-  } catch (err) {
-    ofertaFetchError = err instanceof Error ? err.message : 'Error desconocido'
-  }
-
   return (
     <div className="p-8 max-w-7xl mx-auto">
       <FacturasContent
         invoices={invoices}
-        ofertas={ofertas}
         invoiceFetchError={invoiceFetchError}
-        ofertaFetchError={ofertaFetchError}
-        initialTab={tab}
       />
     </div>
   )
