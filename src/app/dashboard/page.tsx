@@ -1,11 +1,12 @@
-import type { ReactNode } from 'react'
 import { getCurrentUser } from '@/lib/auth'
 import { getDeals, getActiveConfig } from '@/lib/deals'
 import { getInvoices } from '@/lib/supabase/invoices'
 import { getPresupuestos } from '@/lib/supabase/presupuestos'
 import { formatCurrency } from '@/lib/format'
+import { MrrChart, type MrrPoint } from './mrr-chart'
+import type { Deal } from '@/types'
 
-// ── Stage config ─────────────────────────────────────────────────────────────
+// ── Stage config ──────────────────────────────────────────────────────────────
 const STAGE_ORDER = [
   'prospecting',
   'qualified',
@@ -29,11 +30,63 @@ const STAGE_COLORS: Record<string, string> = {
   qualified:     '#60a5fa',
   negotiation:   '#c084fc',
   proposal_sent: '#818cf8',
-  closed_won:    '#22c55e',
-  closed_lost:   '#f87171',
+  closed_won:    '#34c759',
+  closed_lost:   '#ff3b30',
 }
 
-// ── Page ─────────────────────────────────────────────────────────────────────
+// ── MRR history helper ────────────────────────────────────────────────────────
+function computeMrrData(deals: Deal[], numMonths: number): MrrPoint[] {
+  const now = new Date()
+  const result: MrrPoint[] = []
+
+  for (let i = numMonths - 1; i >= 0; i--) {
+    const baseMonth = now.getMonth() - i
+    const year  = now.getFullYear() + Math.floor(baseMonth / 12)
+    const month = ((baseMonth % 12) + 12) % 12
+    const monthEnd  = new Date(year, month + 1, 0, 23, 59, 59, 999)
+    const monthLabel = new Date(year, month, 1).toLocaleDateString('es-ES', {
+      month: 'short',
+      year: '2-digit',
+    })
+
+    let totalMrr = 0
+    for (const deal of deals) {
+      if (deal.stage === 'closed_lost' || deal.stage === 'rejected') continue
+      const configs = deal.configurations ?? []
+      const eligible = configs.filter((c) => new Date(c.createdAt) <= monthEnd)
+      if (eligible.length === 0) continue
+      const latest = eligible.reduce((best, c) =>
+        new Date(c.createdAt) > new Date(best.createdAt) ? c : best,
+      )
+      totalMrr += latest.economics?.totalMonthlyRevenue ?? 0
+    }
+
+    result.push({ month: monthLabel, mrr: Math.round(totalMrr) })
+  }
+
+  // Projected next 3 months (last real MRR × 1.05^n)
+  const lastMrr = result[result.length - 1]?.mrr ?? 0
+  // Overlap: seed projected from last real point so lines connect
+  result[result.length - 1] = {
+    ...result[result.length - 1],
+    projected: lastMrr,
+  }
+  for (let i = 1; i <= 3; i++) {
+    const futureDate = new Date(now.getFullYear(), now.getMonth() + i, 1)
+    const monthLabel = futureDate.toLocaleDateString('es-ES', {
+      month: 'short',
+      year: '2-digit',
+    })
+    result.push({
+      month: monthLabel,
+      projected: Math.round(lastMrr * Math.pow(1.05, i)),
+    })
+  }
+
+  return result
+}
+
+// ── Page ──────────────────────────────────────────────────────────────────────
 export default async function DashboardPage() {
   const user = await getCurrentUser()
   if (!user) return null
@@ -44,7 +97,7 @@ export default async function DashboardPage() {
     getPresupuestos(),
   ])
 
-  // ── Section 1: Revenue ──────────────────────────────────────────────────
+  // ── Section 1: KPIs ────────────────────────────────────────────────────────
   const pipelineDeals = deals.filter(
     (d) => d.stage !== 'closed_lost' && d.stage !== 'rejected',
   )
@@ -54,10 +107,10 @@ export default async function DashboardPage() {
   )
   const arr = mrr * 12
 
-  const now = new Date()
+  const now       = new Date()
   const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString()
+  const thisMonth  = invoices.filter((i) => i.createdAt >= monthStart)
 
-  const thisMonth = invoices.filter((i) => i.createdAt >= monthStart)
   const facturacionMes = thisMonth
     .filter((i) => i.status === 'issued' || i.status === 'paid')
     .reduce((s, i) => s + i.amountTotal, 0)
@@ -68,7 +121,10 @@ export default async function DashboardPage() {
     .filter((i) => i.status === 'issued')
     .reduce((s, i) => s + i.amountTotal, 0)
 
-  // ── Section 2: Facturas ─────────────────────────────────────────────────
+  // ── Section 2: MRR chart ───────────────────────────────────────────────────
+  const mrrData = computeMrrData(deals, 12)
+
+  // ── Section 3: Facturas donut ──────────────────────────────────────────────
   const sum = (arr: typeof invoices) => arr.reduce((s, i) => s + i.amountTotal, 0)
   const paid    = invoices.filter((i) => i.status === 'paid')
   const issued  = invoices.filter((i) => i.status === 'issued')
@@ -76,34 +132,41 @@ export default async function DashboardPage() {
   const overdue = invoices.filter((i) => i.status === 'overdue')
 
   const donutSegments = [
-    { label: 'Pagadas',    count: paid.length,    amount: sum(paid),    color: '#22c55e' },
-    { label: 'Emitidas',   count: issued.length,  amount: sum(issued),  color: '#3b82f6' },
+    { label: 'Pagadas',    count: paid.length,    amount: sum(paid),    color: '#34c759' },
+    { label: 'Emitidas',   count: issued.length,  amount: sum(issued),  color: '#0071e3' },
     { label: 'Borradores', count: draft.length,   amount: sum(draft),   color: '#d4d4d8' },
-    { label: 'Vencidas',   count: overdue.length, amount: sum(overdue), color: '#f87171' },
+    { label: 'Vencidas',   count: overdue.length, amount: sum(overdue), color: '#ff3b30' },
   ]
 
-  // ── Section 3: Pipeline ─────────────────────────────────────────────────
-  const pipeline = STAGE_ORDER.map((stage) => ({
-    stage,
-    label: STAGE_LABELS[stage],
-    count: deals.filter((d) => d.stage === stage).length,
-    color: STAGE_COLORS[stage],
-  }))
-  const maxCount = Math.max(...pipeline.map((p) => p.count), 1)
+  // ── Section 3: Pipeline ────────────────────────────────────────────────────
+  const pipeline = STAGE_ORDER.map((stage) => {
+    const stageDeals = deals.filter((d) => d.stage === stage)
+    return {
+      stage,
+      label: STAGE_LABELS[stage],
+      count: stageDeals.length,
+      mrr: stageDeals.reduce(
+        (s, d) => s + (getActiveConfig(d)?.economics.totalMonthlyRevenue ?? 0),
+        0,
+      ),
+      color: STAGE_COLORS[stage],
+    }
+  })
+  const maxPipelineMrr = Math.max(...pipeline.map((p) => p.mrr), 1)
 
-  // ── Section 4: Propuestas ───────────────────────────────────────────────
+  // ── Section 4: Propuestas ──────────────────────────────────────────────────
   const pqSent     = presupuestos.filter((p) => p.status === 'sent' || p.status === 'accepted')
   const pqAccepted = presupuestos.filter((p) => p.status === 'accepted')
   const pqRejected = presupuestos.filter((p) => p.status === 'rejected')
   const convBase   = pqSent.length + pqRejected.length
   const convRate   = convBase > 0 ? (pqAccepted.length / convBase) * 100 : 0
 
-  const closedWon    = deals.filter((d) => d.stage === 'closed_won')
-  const mrrMedioWon  = closedWon.length > 0
+  const closedWon   = deals.filter((d) => d.stage === 'closed_won')
+  const mrrMedioWon = closedWon.length > 0
     ? closedWon.reduce((s, d) => s + (getActiveConfig(d)?.economics.totalMonthlyRevenue ?? 0), 0) / closedWon.length
     : 0
 
-  // ── Section 5: Owners ───────────────────────────────────────────────────
+  // ── Section 4: Owners leaderboard ─────────────────────────────────────────
   const ownerMap = new Map<string, { name: string; count: number; mrr: number }>()
   for (const deal of deals) {
     const key  = deal.ownerId ?? '__none__'
@@ -115,213 +178,285 @@ export default async function DashboardPage() {
   }
   const owners = Array.from(ownerMap.values()).sort((a, b) => b.mrr - a.mrr)
 
-  // ── Render ──────────────────────────────────────────────────────────────
+  // ── Render ─────────────────────────────────────────────────────────────────
   return (
-    <div className="p-6 max-w-7xl mx-auto space-y-8">
+    <div className="min-h-full bg-[#f5f5f7] p-8 space-y-5">
 
       {/* Header */}
-      <div>
-        <h1 className="text-xl font-semibold text-zinc-900 tracking-tight">Dashboard</h1>
-        <p className="text-sm text-zinc-400 mt-0.5">Resumen del negocio</p>
+      <div className="mb-2">
+        <h1 className="text-2xl font-bold text-zinc-900 tracking-tight">Dashboard</h1>
+        <p className="text-sm text-zinc-400 mt-0.5">
+          {now.toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
+        </p>
       </div>
 
-      {/* ── Section 1: Revenue KPIs ── */}
-      <section>
-        <SectionLabel>Revenue</SectionLabel>
-        <div className="grid grid-cols-5 gap-4">
-          <KpiCard label="MRR" value={formatCurrency(mrr)} accent />
-          <KpiCard label="ARR" value={formatCurrency(arr)} accent />
-          <KpiCard label="Facturado (mes)" value={formatCurrency(facturacionMes)} />
-          <KpiCard label="Cobrado (mes)" value={formatCurrency(cobradoMes)} />
-          <KpiCard label="Pendiente de cobro" value={formatCurrency(pendiente)} warn={pendiente > 0} />
+      {/* ── Section 1: KPI strip ── */}
+      <div className="grid grid-cols-5 gap-4">
+        <KpiCard label="MRR" value={formatCurrency(mrr)} color="#0071e3" />
+        <KpiCard label="ARR" value={formatCurrency(arr)} color="#0071e3" />
+        <KpiCard label="Facturado este mes" value={formatCurrency(facturacionMes)} color="#8e8e93" />
+        <KpiCard label="Cobrado este mes" value={formatCurrency(cobradoMes)} color="#34c759" />
+        <KpiCard label="Pendiente de cobro" value={formatCurrency(pendiente)} color={pendiente > 0 ? '#ff9f0a' : '#8e8e93'} />
+      </div>
+
+      {/* ── Section 2: MRR line chart ── */}
+      <div className="bg-white rounded-2xl shadow-sm p-7">
+        <div className="flex items-end justify-between mb-6">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-widest text-zinc-400 mb-1">Evolución MRR</p>
+            <p className="text-3xl font-bold text-zinc-900 tracking-tight">{formatCurrency(mrr)}</p>
+          </div>
+          <div className="flex items-center gap-5 pb-1">
+            <LegendDot color="#0071e3" label="MRR real" />
+            <LegendDot color="#0071e3" label="Proyectado" dashed />
+          </div>
         </div>
-      </section>
+        <MrrChart data={mrrData} currentMrr={mrr} />
+      </div>
 
-      {/* ── Sections 2 + 3: Facturas + Pipeline ── */}
-      <div className="grid grid-cols-2 gap-6">
+      {/* ── Section 3: Facturas + Pipeline ── */}
+      <div className="grid grid-cols-2 gap-5">
 
-        {/* Section 2: Facturas donut */}
-        <div className="bg-white border border-zinc-100 rounded-2xl shadow-sm p-6">
-          <SectionLabel>Facturas</SectionLabel>
-          <div className="flex items-center gap-8 mt-2">
+        {/* Facturas donut */}
+        <div className="bg-white rounded-2xl shadow-sm p-7">
+          <p className="text-xs font-semibold uppercase tracking-widest text-zinc-400 mb-6">Facturas</p>
+          <div className="flex items-center gap-8">
             <DonutChart segments={donutSegments} />
-            <div className="flex-1 space-y-2.5">
+            <div className="flex-1 space-y-3.5">
               {donutSegments.map((seg) => (
                 <div key={seg.label} className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2.5">
                     <span
                       className="w-2.5 h-2.5 rounded-full shrink-0"
                       style={{ background: seg.color }}
                     />
-                    <span className="text-xs text-zinc-600">{seg.label}</span>
-                    <span className="text-xs font-semibold text-zinc-900">{seg.count}</span>
+                    <span className="text-sm text-zinc-600">{seg.label}</span>
+                    <span className="text-sm font-semibold text-zinc-900">{seg.count}</span>
                   </div>
-                  <span className="text-xs text-zinc-400">{formatCurrency(seg.amount)}</span>
+                  <span className="text-xs font-mono text-zinc-400">{formatCurrency(seg.amount)}</span>
                 </div>
               ))}
             </div>
           </div>
         </div>
 
-        {/* Section 3: Pipeline */}
-        <div className="bg-white border border-zinc-100 rounded-2xl shadow-sm p-6">
-          <SectionLabel>Pipeline de deals</SectionLabel>
-          <div className="mt-2 space-y-3">
-            {pipeline.map(({ stage, label, count, color }) => (
+        {/* Pipeline bars */}
+        <div className="bg-white rounded-2xl shadow-sm p-7">
+          <p className="text-xs font-semibold uppercase tracking-widest text-zinc-400 mb-6">Pipeline de deals</p>
+          <div className="space-y-3">
+            {pipeline.map(({ stage, label, count, mrr: stageMrr, color }) => (
               <div key={stage} className="flex items-center gap-3">
-                <span className="text-xs text-zinc-500 w-36 shrink-0 text-right truncate">
-                  {label}
-                </span>
-                <div className="flex-1 h-5 bg-zinc-50 rounded-md overflow-hidden">
+                <span className="text-xs text-zinc-500 w-36 shrink-0 text-right truncate">{label}</span>
+                <div className="flex-1 h-8 bg-zinc-50 rounded-full overflow-hidden">
                   <div
-                    className="h-full rounded-md"
+                    className="h-full rounded-full transition-all"
                     style={{
-                      width: `${Math.max((count / maxCount) * 100, count > 0 ? 4 : 0)}%`,
-                      background: color,
+                      width: `${Math.max((stageMrr / maxPipelineMrr) * 100, count > 0 ? 5 : 0)}%`,
+                      backgroundColor: color,
                     }}
                   />
                 </div>
-                <span className="text-xs font-semibold text-zinc-900 w-5 text-right">
-                  {count}
-                </span>
+                <div className="text-right shrink-0 w-20">
+                  <span className="text-xs font-semibold text-zinc-900 block">{count} deal{count !== 1 ? 's' : ''}</span>
+                  {stageMrr > 0 && (
+                    <span className="text-[10px] font-mono text-zinc-400">{formatCurrency(stageMrr)}</span>
+                  )}
+                </div>
               </div>
             ))}
           </div>
         </div>
       </div>
 
-      {/* ── Sections 4 + 5: Propuestas + Owners ── */}
-      <div className="grid grid-cols-2 gap-6">
+      {/* ── Section 4: Propuestas + Leaderboard ── */}
+      <div className="grid grid-cols-2 gap-5">
 
-        {/* Section 4: Propuestas */}
-        <div className="bg-white border border-zinc-100 rounded-2xl shadow-sm p-6">
-          <SectionLabel>Propuestas</SectionLabel>
-          <div className="mt-2 grid grid-cols-3 gap-3">
-            <StatTile
-              label="Enviadas / Aceptadas"
-              value={`${pqSent.length} / ${pqAccepted.length}`}
+        {/* Propuestas */}
+        <div className="bg-white rounded-2xl shadow-sm p-7">
+          <p className="text-xs font-semibold uppercase tracking-widest text-zinc-400 mb-5">Propuestas</p>
+
+          {/* 3 stat cards */}
+          <div className="grid grid-cols-3 gap-3 mb-5">
+            <StatCard
+              label="Enviadas"
+              value={String(pqSent.length)}
+              sub={`${pqAccepted.length} aceptadas`}
             />
-            <StatTile
-              label="Tasa de conversión"
-              value={`${convRate.toFixed(1)}%`}
-              accent
+            <StatCard
+              label="Conversión"
+              value={`${convRate.toFixed(0)}%`}
+              color="#34c759"
             />
-            <StatTile
-              label="MRR medio cerrado"
+            <StatCard
+              label="MRR medio"
               value={formatCurrency(mrrMedioWon)}
+              sub="por deal cerrado"
             />
           </div>
-          <div className="mt-4 pt-4 border-t border-zinc-50 grid grid-cols-3 text-center">
-            <Micro label="Borradores" value={presupuestos.filter((p) => p.status === 'draft').length} />
-            <Micro label="Rechazadas" value={pqRejected.length} />
-            <Micro label="Expiradas" value={presupuestos.filter((p) => p.status === 'expired').length} />
+
+          {/* Mini stats row */}
+          <div className="pt-4 border-t border-zinc-50 grid grid-cols-3 text-center gap-2">
+            <MiniStat
+              label="Borradores"
+              value={presupuestos.filter((p) => p.status === 'draft').length}
+            />
+            <MiniStat label="Rechazadas" value={pqRejected.length} color="#ff3b30" />
+            <MiniStat
+              label="Expiradas"
+              value={presupuestos.filter((p) => p.status === 'expired').length}
+              color="#ff9f0a"
+            />
           </div>
         </div>
 
-        {/* Section 5: Owners */}
-        <div className="bg-white border border-zinc-100 rounded-2xl shadow-sm p-6">
-          <SectionLabel>Por comercial</SectionLabel>
-          <div className="mt-2">
-            {owners.length === 0 ? (
-              <p className="text-xs text-zinc-400 py-4 text-center">Sin datos</p>
-            ) : (
-              <table className="w-full">
-                <thead>
-                  <tr className="border-b border-zinc-50">
-                    <th className="text-left text-[10px] font-semibold uppercase tracking-wider text-zinc-400 pb-2">
-                      Comercial
-                    </th>
-                    <th className="text-right text-[10px] font-semibold uppercase tracking-wider text-zinc-400 pb-2">
-                      Deals
-                    </th>
-                    <th className="text-right text-[10px] font-semibold uppercase tracking-wider text-zinc-400 pb-2">
-                      MRR total
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {owners.map((o) => (
-                    <tr
-                      key={o.name}
-                      className="border-b border-zinc-50 last:border-0"
+        {/* Owner leaderboard */}
+        <div className="bg-white rounded-2xl shadow-sm p-7">
+          <p className="text-xs font-semibold uppercase tracking-widest text-zinc-400 mb-5">Por comercial</p>
+          {owners.length === 0 ? (
+            <p className="text-sm text-zinc-400 py-8 text-center">Sin datos</p>
+          ) : (
+            <div className="space-y-3">
+              {owners.map((owner, idx) => {
+                const initials = owner.name
+                  .split(' ')
+                  .map((w) => w[0])
+                  .join('')
+                  .slice(0, 2)
+                  .toUpperCase()
+                const rankColors = ['#0071e3', '#34c759', '#ff9f0a']
+                const rankColor = rankColors[idx] ?? '#a1a1aa'
+                return (
+                  <div key={owner.name} className="flex items-center gap-4">
+                    {/* Rank */}
+                    <span
+                      className="text-sm font-bold w-5 text-right shrink-0"
+                      style={{ color: rankColor }}
                     >
-                      <td className="py-2.5 text-sm font-medium text-zinc-800">{o.name}</td>
-                      <td className="py-2.5 text-sm text-zinc-400 text-right">{o.count}</td>
-                      <td className="py-2.5 text-sm font-semibold text-zinc-900 text-right">
-                        {formatCurrency(o.mrr)}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            )}
-          </div>
+                      {idx + 1}
+                    </span>
+                    {/* Avatar */}
+                    <div
+                      className="w-9 h-9 rounded-full flex items-center justify-center text-xs font-bold text-white shrink-0"
+                      style={{ backgroundColor: rankColor }}
+                    >
+                      {initials || '?'}
+                    </div>
+                    {/* Name + MRR */}
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-semibold text-zinc-900 truncate">{owner.name}</p>
+                      <p className="text-xs font-mono text-zinc-400">{formatCurrency(owner.mrr)}/mes</p>
+                    </div>
+                    {/* Deal count badge */}
+                    <span className="text-xs font-semibold bg-zinc-100 text-zinc-600 px-2.5 py-1 rounded-full shrink-0">
+                      {owner.count} deal{owner.count !== 1 ? 's' : ''}
+                    </span>
+                  </div>
+                )
+              })}
+            </div>
+          )}
         </div>
       </div>
     </div>
   )
 }
 
-// ── Sub-components (server-renderable) ───────────────────────────────────────
-
-function SectionLabel({ children }: { children: ReactNode }) {
-  return (
-    <p className="text-[10px] font-semibold uppercase tracking-widest text-zinc-400 mb-3">
-      {children}
-    </p>
-  )
-}
+// ── Sub-components ────────────────────────────────────────────────────────────
 
 function KpiCard({
   label,
   value,
-  accent,
-  warn,
+  color = '#18181b',
 }: {
   label: string
   value: string
-  accent?: boolean
-  warn?: boolean
+  color?: string
 }) {
   return (
-    <div className="bg-white border border-zinc-100 rounded-2xl shadow-sm p-5">
-      <p className="text-xs text-zinc-400 mb-2 leading-tight">{label}</p>
+    <div className="bg-white rounded-2xl shadow-sm p-5">
+      <p className="text-xs font-semibold uppercase tracking-widest text-zinc-400 mb-3 leading-tight">
+        {label}
+      </p>
+      <p className="text-2xl font-bold tracking-tight" style={{ color }}>
+        {value}
+      </p>
+    </div>
+  )
+}
+
+function LegendDot({
+  color,
+  label,
+  dashed,
+}: {
+  color: string
+  label: string
+  dashed?: boolean
+}) {
+  return (
+    <div className="flex items-center gap-1.5">
+      <svg width="20" height="4" viewBox="0 0 20 4">
+        {dashed ? (
+          <line
+            x1="0" y1="2" x2="20" y2="2"
+            stroke={color}
+            strokeWidth="2"
+            strokeDasharray="4 3"
+            strokeOpacity={0.5}
+          />
+        ) : (
+          <line x1="0" y1="2" x2="20" y2="2" stroke={color} strokeWidth="2.5" />
+        )}
+      </svg>
+      <span className="text-xs text-zinc-400">{label}</span>
+    </div>
+  )
+}
+
+function StatCard({
+  label,
+  value,
+  sub,
+  color,
+}: {
+  label: string
+  value: string
+  sub?: string
+  color?: string
+}) {
+  return (
+    <div className="bg-[#f5f5f7] rounded-xl p-4">
+      <p className="text-[10px] font-semibold uppercase tracking-widest text-zinc-400 mb-2 leading-tight">
+        {label}
+      </p>
       <p
-        className={`text-xl font-bold tracking-tight ${
-          accent ? 'text-indigo-600' : warn ? 'text-amber-500' : 'text-zinc-900'
-        }`}
+        className="text-2xl font-bold leading-none tracking-tight"
+        style={{ color: color ?? '#18181b' }}
       >
         {value}
       </p>
+      {sub && <p className="text-[10px] text-zinc-400 mt-1.5 leading-tight">{sub}</p>}
     </div>
   )
 }
 
-function StatTile({
+function MiniStat({
   label,
   value,
-  accent,
+  color,
 }: {
   label: string
-  value: string
-  accent?: boolean
+  value: number
+  color?: string
 }) {
   return (
-    <div className="bg-zinc-50 rounded-xl p-4">
-      <p className="text-[9px] font-semibold uppercase tracking-wider text-zinc-400 mb-1 leading-tight">
-        {label}
-      </p>
-      <p className={`text-xl font-bold ${accent ? 'text-indigo-600' : 'text-zinc-900'}`}>
+    <div>
+      <p
+        className="text-xl font-bold tracking-tight"
+        style={{ color: color ?? '#18181b' }}
+      >
         {value}
       </p>
-    </div>
-  )
-}
-
-function Micro({ label, value }: { label: string; value: number }) {
-  return (
-    <div>
-      <p className="text-lg font-bold text-zinc-900">{value}</p>
       <p className="text-[10px] text-zinc-400 mt-0.5">{label}</p>
     </div>
   )
@@ -333,14 +468,14 @@ function DonutChart({
   segments: { label: string; count: number; color: string }[]
 }) {
   const total = segments.reduce((s, d) => s + d.count, 0)
-  const cx = 56, cy = 56, r = 40, sw = 14
+  const cx = 72, cy = 72, r = 52, sw = 16
   const circ = 2 * Math.PI * r
 
   if (total === 0) {
     return (
-      <svg width="112" height="112" viewBox="0 0 112 112" className="shrink-0">
+      <svg width="144" height="144" viewBox="0 0 144 144" className="shrink-0">
         <circle cx={cx} cy={cy} r={r} fill="none" stroke="#e4e4e7" strokeWidth={sw} />
-        <text x={cx} y={cy + 5} textAnchor="middle" fontSize={13} fontWeight="600" fill="#a1a1aa">
+        <text x={cx} y={cy + 6} textAnchor="middle" fontSize={16} fontWeight="700" fill="#a1a1aa">
           0
         </text>
       </svg>
@@ -370,13 +505,13 @@ function DonutChart({
     })
 
   return (
-    <svg width="112" height="112" viewBox="0 0 112 112" className="shrink-0">
+    <svg width="144" height="144" viewBox="0 0 144 144" className="shrink-0">
       {arcs}
-      <text x={cx} y={cy + 1} textAnchor="middle" fontSize={17} fontWeight="700" fill="#18181b">
+      <text x={cx} y={cy + 1} textAnchor="middle" fontSize={22} fontWeight="700" fill="#18181b">
         {total}
       </text>
-      <text x={cx} y={cy + 15} textAnchor="middle" fontSize={9} fill="#a1a1aa">
-        total
+      <text x={cx} y={cy + 17} textAnchor="middle" fontSize={10} fill="#a1a1aa" fontWeight="500">
+        facturas
       </text>
     </svg>
   )
