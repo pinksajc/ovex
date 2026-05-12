@@ -43,7 +43,7 @@ export default async function DealsPage({
 
   if (focusMode) {
     return (
-      <div className="p-6 max-w-7xl mx-auto">
+      <div className="p-6">
         <div className="mb-5 flex items-center justify-between">
           <div>
             <div className="flex items-center gap-2 mb-0.5">
@@ -67,7 +67,7 @@ export default async function DealsPage({
   }
 
   return (
-    <div className="p-8 max-w-7xl mx-auto">
+    <div className="p-8">
       {/* Header */}
       <div className="mb-8 flex items-start justify-between flex-wrap gap-3">
         <div>

@@ -242,19 +242,19 @@ export function DealsTable({
 
       {/* Responsive scroll wrapper */}
       <div className="overflow-x-auto">
-        <table className="w-full text-sm min-w-[700px]">
+        <table className="w-full text-sm min-w-[900px]">
           <thead>
             <tr className="border-b border-zinc-100 bg-zinc-50">
-              <th className="text-left px-4 py-3 text-xs font-medium text-zinc-400 uppercase tracking-wide w-[220px]">Empresa</th>
-              <th className="text-left px-4 py-3 text-xs font-medium text-zinc-400 uppercase tracking-wide hidden md:table-cell">Contacto</th>
-              <th className="text-left px-4 py-3 text-xs font-medium text-zinc-400 uppercase tracking-wide hidden lg:table-cell">Stage</th>
-              <th className="text-left px-4 py-3 text-xs font-medium text-zinc-400 uppercase tracking-wide">Estado</th>
-              <th className="text-right px-4 py-3 text-xs font-medium text-zinc-400 uppercase tracking-wide" title="Basado en versión activa">MRR</th>
-              <th className="text-right px-4 py-3 text-xs font-medium text-zinc-400 uppercase tracking-wide hidden lg:table-cell">ARR</th>
-              <th className="text-right px-4 py-3 text-xs font-medium text-zinc-400 uppercase tracking-wide hidden lg:table-cell">Payback</th>
-              <th className="text-left px-4 py-3 text-xs font-medium text-zinc-400 uppercase tracking-wide hidden md:table-cell w-[100px]">Owner</th>
-              <th className="text-right px-4 py-3 text-xs font-medium text-zinc-400 uppercase tracking-wide hidden md:table-cell">Actividad</th>
-              <th className="px-4 py-3 text-xs font-medium text-zinc-400 uppercase tracking-wide text-right">Acción</th>
+              <th className="text-left px-3 py-3 text-xs font-medium text-zinc-400 uppercase tracking-wide whitespace-nowrap w-[200px]">Empresa</th>
+              <th className="text-left px-3 py-3 text-xs font-medium text-zinc-400 uppercase tracking-wide whitespace-nowrap hidden md:table-cell">Contacto</th>
+              <th className="text-left px-3 py-3 text-xs font-medium text-zinc-400 uppercase tracking-wide whitespace-nowrap hidden lg:table-cell">Stage</th>
+              <th className="text-left px-3 py-3 text-xs font-medium text-zinc-400 uppercase tracking-wide whitespace-nowrap">Estado</th>
+              <th className="text-right px-3 py-3 text-xs font-medium text-zinc-400 uppercase tracking-wide whitespace-nowrap" title="Basado en versión activa">MRR</th>
+              <th className="text-right px-3 py-3 text-xs font-medium text-zinc-400 uppercase tracking-wide whitespace-nowrap hidden lg:table-cell">ARR</th>
+              <th className="text-right px-3 py-3 text-xs font-medium text-zinc-400 uppercase tracking-wide whitespace-nowrap hidden lg:table-cell">Payback</th>
+              <th className="text-left px-3 py-3 text-xs font-medium text-zinc-400 uppercase tracking-wide whitespace-nowrap hidden md:table-cell w-[90px]">Owner</th>
+              <th className="text-right px-3 py-3 text-xs font-medium text-zinc-400 uppercase tracking-wide whitespace-nowrap hidden md:table-cell">Actividad</th>
+              <th className="px-3 py-3 text-xs font-medium text-zinc-400 uppercase tracking-wide whitespace-nowrap text-right">Acción</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-zinc-100">
@@ -346,7 +346,7 @@ function DealRow({
       </td>
 
       {/* Contacto */}
-      <td className="px-4 py-3 hidden md:table-cell">
+      <td className="px-3 py-3 hidden md:table-cell">
         <Link href={`/deals/${deal.id}`} className="block">
           {deal.contact.name !== 'Sin contacto' ? (
             <>
@@ -360,14 +360,14 @@ function DealRow({
       </td>
 
       {/* Stage */}
-      <td className="px-4 py-3 hidden lg:table-cell">
+      <td className="px-3 py-3 hidden lg:table-cell">
         <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium whitespace-nowrap ${STAGE_COLORS[deal.stage]}`}>
           {STAGE_LABELS[deal.stage]}
         </span>
       </td>
 
       {/* Estado */}
-      <td className="px-4 py-3">
+      <td className="px-3 py-3">
         <div className="flex flex-col gap-1 items-start">
           <StatusBadge status={deal.commercialStatus} dealId={deal.id} />
           {versionLabel && (
@@ -377,7 +377,7 @@ function DealRow({
       </td>
 
       {/* MRR */}
-      <td className="px-4 py-3 text-right">
+      <td className="px-3 py-3 text-right">
         {cfg ? (
           <span className="font-mono font-semibold text-sm text-zinc-900 tabular-nums">{formatCurrency(mrr)}</span>
         ) : (
@@ -386,7 +386,7 @@ function DealRow({
       </td>
 
       {/* ARR */}
-      <td className="px-4 py-3 text-right hidden lg:table-cell">
+      <td className="px-3 py-3 text-right hidden lg:table-cell">
         {cfg ? (
           <span className="font-mono text-sm text-zinc-500 tabular-nums">{formatCurrency(arr)}</span>
         ) : (
@@ -395,7 +395,7 @@ function DealRow({
       </td>
 
       {/* Payback */}
-      <td className="px-4 py-3 text-right hidden lg:table-cell">
+      <td className="px-3 py-3 text-right hidden lg:table-cell">
         {cfg ? (
           payback !== null ? (
             <span className={`font-mono text-sm font-medium tabular-nums ${paybackColor(payback)}`}>{payback}m</span>
@@ -408,7 +408,7 @@ function DealRow({
       </td>
 
       {/* Owner */}
-      <td className="px-4 py-3 hidden md:table-cell">
+      <td className="px-3 py-3 hidden md:table-cell">
         {isAdmin && members.length > 0 ? (
           <OwnerSelect deal={deal} members={members} />
         ) : (
@@ -417,7 +417,7 @@ function DealRow({
       </td>
 
       {/* Última actividad */}
-      <td className="px-4 py-3 text-right hidden md:table-cell">
+      <td className="px-3 py-3 text-right hidden md:table-cell">
         {(() => {
           const label = formatActivity(deal.lastActivityAt)
           const noActivity = label === '—'
@@ -435,7 +435,7 @@ function DealRow({
       </td>
 
       {/* Acción principal */}
-      <td className="px-4 py-3 text-right">
+      <td className="px-3 py-3 text-right">
         <div className="flex items-center gap-1.5 justify-end">
           <Link
             href={`/deals/${deal.id}/configurador`}
