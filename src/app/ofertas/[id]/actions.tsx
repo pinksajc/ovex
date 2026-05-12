@@ -193,6 +193,57 @@ function AceptarContratoModal({
   )
 }
 
+// ---- Revert confirmation modal ----
+function RevertirModal({
+  onClose,
+  onConfirm,
+  isPending,
+}: {
+  onClose: () => void
+  onConfirm: () => void
+  isPending: boolean
+}) {
+  return (
+    <>
+      <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm" onClick={onClose} aria-hidden="true" />
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 pointer-events-none">
+        <div
+          className="bg-white rounded-2xl shadow-2xl w-full max-w-sm pointer-events-auto"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div className="px-6 pt-6 pb-4 border-b border-zinc-100 flex items-center justify-between">
+            <h2 className="text-sm font-semibold text-zinc-900">Revertir estado</h2>
+            <button onClick={onClose} className="text-zinc-400 hover:text-zinc-700 transition-colors text-lg leading-none" aria-label="Cerrar">×</button>
+          </div>
+          <div className="px-6 py-5">
+            <p className="text-sm text-zinc-600 leading-relaxed">
+              ¿Revertir esta oferta a estado <strong className="text-zinc-900">Enviado</strong>? Esta acción cambiará el estado actual.
+            </p>
+            <div className="flex items-center justify-end gap-3 mt-5">
+              <button
+                type="button"
+                onClick={onClose}
+                disabled={isPending}
+                className="px-4 py-2 text-xs font-medium text-zinc-600 hover:text-zinc-900 border border-zinc-200 hover:border-zinc-400 rounded-lg transition-colors disabled:opacity-50"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={onConfirm}
+                disabled={isPending}
+                className="px-4 py-2 text-xs font-medium bg-blue-600 text-white hover:bg-blue-700 rounded-lg transition-colors disabled:opacity-50"
+              >
+                {isPending ? 'Actualizando…' : 'Confirmar'}
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </>
+  )
+}
+
 // ---- Main component ----
 export function OfertaActions({
   presupuestoId,
@@ -204,11 +255,13 @@ export function OfertaActions({
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
   const [error, setError]            = useState<string | null>(null)
-  const [modalOpen, setModalOpen]    = useState(false)
-  const [toast, setToast]            = useState<string | null>(null)
+  const [modalOpen, setModalOpen]       = useState(false)
+  const [revertModalOpen, setRevertModalOpen] = useState(false)
+  const [toast, setToast]               = useState<string | null>(null)
 
   const actions = TRANSITIONS[currentStatus]
   const showContratoBtn = currentStatus === 'draft' || currentStatus === 'sent'
+  const showRevertBtn   = currentStatus === 'accepted' || currentStatus === 'rejected'
 
   function handleAction(next: PresupuestoStatus) {
     setError(null)
@@ -228,7 +281,21 @@ export function OfertaActions({
     router.refresh()
   }
 
-  if (actions.length === 0 && !showContratoBtn) {
+  function handleRevert() {
+    setError(null)
+    startTransition(async () => {
+      const result = await updatePresupuestoStatusAction(presupuestoId, 'sent')
+      if (!result.ok) {
+        setError(result.error ?? 'Error desconocido')
+      } else {
+        setRevertModalOpen(false)
+        setToast('Estado revertido a Enviado')
+        router.refresh()
+      }
+    })
+  }
+
+  if (actions.length === 0 && !showContratoBtn && !showRevertBtn) {
     return <p className="text-xs text-zinc-400 italic">No hay acciones disponibles para este estado.</p>
   }
 
@@ -257,7 +324,25 @@ export function OfertaActions({
             Aceptar bajo contrato
           </button>
         )}
+
+        {showRevertBtn && (
+          <button
+            onClick={() => setRevertModalOpen(true)}
+            disabled={isPending}
+            className="w-full text-left px-3 py-2 rounded-lg border border-zinc-200 text-zinc-500 hover:bg-zinc-50 hover:text-zinc-700 text-xs font-medium transition-colors disabled:opacity-50"
+          >
+            Volver a Enviado
+          </button>
+        )}
       </div>
+
+      {revertModalOpen && (
+        <RevertirModal
+          onClose={() => setRevertModalOpen(false)}
+          onConfirm={handleRevert}
+          isPending={isPending}
+        />
+      )}
 
       {modalOpen && (
         <AceptarContratoModal
