@@ -25,6 +25,24 @@ interface HardwareItemState {
 
 type HardwareState = Record<HardwareId, HardwareItemState>
 
+// Per-item discounts (0-100%) — persisted in economics JSONB
+interface ItemDiscounts {
+  plan: number
+  delivery: number
+  addons: Partial<Record<AddonId, number>>
+  hardware: Partial<Record<HardwareId, number>>
+}
+
+// Per-item price overrides — persisted in economics JSONB
+interface ItemPriceOverrides {
+  plan: number | null       // monthly total override for plan fee
+  delivery: number | null   // monthly total override for delivery fixed fee
+  hardware: Partial<Record<HardwareId, number | null>> // per-unit monthly override
+}
+
+const EMPTY_ITEM_DISCOUNTS: ItemDiscounts = { plan: 0, delivery: 0, addons: {}, hardware: {} }
+const EMPTY_ITEM_OVERRIDES: ItemPriceOverrides = { plan: null, delivery: null, hardware: {} }
+
 // Hardware items that have an auto-included portion based on plan.
 // state.quantity for these IDs = EXTRA units beyond the auto-included ones.
 const AUTO_INCLUDED_HARDWARE: ReadonlySet<HardwareId> = new Set(['bouncepad_kiosk', 'counter_stand'])
@@ -85,6 +103,24 @@ function initStarterIncluded(saved?: HardwareLineItem[]): StarterIncluded {
     return 'counter_stand'
   }
   return 'bouncepad_kiosk'
+}
+
+/** Monthly fee for a single addon ID (excluding delivery). Used for per-item discount calc. */
+function getAddonMonthly(
+  id: AddonId,
+  economics: DealEconomics,
+  locations: number,
+  kdsVenues: number,
+  kioskVenues: number,
+): number {
+  const addon = ADDONS[id]
+  if (id === 'datafono') return economics.datafonoFeeMonthly
+  if (id === 'delivery_integrations') return 0 // handled separately
+  if (id === 'kds') return (addon.priceMonthly ?? 19) * kdsVenues
+  if (id === 'kiosk') return (addon.priceMonthly ?? 19) * kioskVenues
+  if (addon.perLocation && addon.priceMonthly != null) return addon.priceMonthly * locations
+  if (addon.perConsumption) return 0
+  return addon.priceMonthly ?? 0
 }
 
 function hardwareStateToLineItems(
@@ -149,7 +185,9 @@ function serializeSimState(
   starterIncluded: StarterIncluded,
   calculateVariable: boolean,
   discountName: string,
-  deliveryPlan: DeliveryPlanId
+  deliveryPlan: DeliveryPlanId,
+  itemDiscounts: ItemDiscounts,
+  itemPriceOverrides: ItemPriceOverrides,
 ): string {
   return JSON.stringify({
     dailyOrders,
@@ -169,6 +207,8 @@ function serializeSimState(
     calculateVariable,
     discountName,
     deliveryPlan,
+    itemDiscounts,
+    itemPriceOverrides,
   })
 }
 
@@ -212,6 +252,39 @@ export function Simulator({ deal, initialConfig, loadedConfigId }: SimulatorProp
     initStarterIncluded(init?.hardware)
   )
 
+  // ---- Per-item discounts & price overrides ----
+  const [itemDiscounts, setItemDiscounts] = useState<ItemDiscounts>(() => {
+    const saved = (init?.economics as Record<string, unknown> | undefined)
+    const s = saved?.itemDiscounts as Partial<ItemDiscounts> | undefined
+    return {
+      plan: (s?.plan as number) ?? 0,
+      delivery: (s?.delivery as number) ?? 0,
+      addons: (s?.addons as Partial<Record<AddonId, number>>) ?? {},
+      hardware: (s?.hardware as Partial<Record<HardwareId, number>>) ?? {},
+    }
+  })
+  const [itemPriceOverrides, setItemPriceOverrides] = useState<ItemPriceOverrides>(() => {
+    const saved = (init?.economics as Record<string, unknown> | undefined)
+    const s = saved?.itemPriceOverrides as Partial<ItemPriceOverrides> | undefined
+    return {
+      plan: (s?.plan as number | null) ?? null,
+      delivery: (s?.delivery as number | null) ?? null,
+      hardware: (s?.hardware as Partial<Record<HardwareId, number | null>>) ?? {},
+    }
+  })
+  // Transient editing state (not persisted)
+  const [planPriceEditing, setPlanPriceEditing] = useState(false)
+  const [deliveryPriceEditing, setDeliveryPriceEditing] = useState(false)
+  const [hwPriceEditing, setHwPriceEditing] = useState<Set<HardwareId>>(new Set())
+
+  function toggleHwPriceEditing(id: HardwareId) {
+    setHwPriceEditing(prev => {
+      const next = new Set(prev)
+      next.has(id) ? next.delete(id) : next.add(id)
+      return next
+    })
+  }
+
   const router = useRouter()
 
   // ---- Save state (overwrite active) ----
@@ -233,8 +306,20 @@ export function Simulator({ deal, initialConfig, loadedConfigId }: SimulatorProp
   const [lastNewVersionPersisted, setLastNewVersionPersisted] = useState(false)
 
   // ---- Unsaved changes detection ----
-  const [savedSnapshot, setSavedSnapshot] = useState<string>(() =>
-    serializeSimState(
+  const [savedSnapshot, setSavedSnapshot] = useState<string>(() => {
+    const saved = init?.economics as Record<string, unknown> | undefined
+    const initItemDiscounts: ItemDiscounts = {
+      plan: ((saved?.itemDiscounts as Partial<ItemDiscounts>)?.plan as number) ?? 0,
+      delivery: ((saved?.itemDiscounts as Partial<ItemDiscounts>)?.delivery as number) ?? 0,
+      addons: ((saved?.itemDiscounts as Partial<ItemDiscounts>)?.addons as Partial<Record<AddonId, number>>) ?? {},
+      hardware: ((saved?.itemDiscounts as Partial<ItemDiscounts>)?.hardware as Partial<Record<HardwareId, number>>) ?? {},
+    }
+    const initItemOverrides: ItemPriceOverrides = {
+      plan: ((saved?.itemPriceOverrides as Partial<ItemPriceOverrides>)?.plan as number | null) ?? null,
+      delivery: ((saved?.itemPriceOverrides as Partial<ItemPriceOverrides>)?.delivery as number | null) ?? null,
+      hardware: ((saved?.itemPriceOverrides as Partial<ItemPriceOverrides>)?.hardware as Partial<Record<HardwareId, number | null>>) ?? {},
+    }
+    return serializeSimState(
       init?.dailyOrdersPerLocation ?? 4500,
       init?.deliveryOrdersPerVenue ?? 500,
       init?.locations ?? 1,
@@ -251,13 +336,15 @@ export function Simulator({ deal, initialConfig, loadedConfigId }: SimulatorProp
       initStarterIncluded(init?.hardware),
       init?.calculateVariable ?? false,
       init?.discountName ?? '',
-      init?.deliveryPlan ?? 'start'
+      init?.deliveryPlan ?? 'start',
+      initItemDiscounts,
+      initItemOverrides,
     )
-  )
+  })
 
   const hasUnsavedChanges = useMemo(
-    () => serializeSimState(dailyOrders, deliveryOrders, locations, avgTicket, planOverride, activeAddons, hardware, renEnabled, renFeePerOrder, renVenues, kdsVenues, kioskVenues, discountPercent, starterIncluded, calculateVariable, discountName, deliveryPlan) !== savedSnapshot,
-    [dailyOrders, deliveryOrders, locations, avgTicket, planOverride, activeAddons, hardware, renEnabled, renFeePerOrder, renVenues, kdsVenues, kioskVenues, discountPercent, starterIncluded, calculateVariable, discountName, deliveryPlan, savedSnapshot]
+    () => serializeSimState(dailyOrders, deliveryOrders, locations, avgTicket, planOverride, activeAddons, hardware, renEnabled, renFeePerOrder, renVenues, kdsVenues, kioskVenues, discountPercent, starterIncluded, calculateVariable, discountName, deliveryPlan, itemDiscounts, itemPriceOverrides) !== savedSnapshot,
+    [dailyOrders, deliveryOrders, locations, avgTicket, planOverride, activeAddons, hardware, renEnabled, renFeePerOrder, renVenues, kdsVenues, kioskVenues, discountPercent, starterIncluded, calculateVariable, discountName, deliveryPlan, itemDiscounts, itemPriceOverrides, savedSnapshot]
   )
 
   useEffect(() => {
@@ -356,11 +443,13 @@ export function Simulator({ deal, initialConfig, loadedConfigId }: SimulatorProp
         calculateVariable,
         discountName,
         deliveryPlan,
+        itemDiscounts,
+        itemPriceOverrides,
       })
       if (result.ok) {
         setSaveState('saved')
         setLastSavePersisted(result.persisted)
-        setSavedSnapshot(serializeSimState(dailyOrders, deliveryOrders, locations, avgTicket, planOverride, activeAddons, hardware, renEnabled, renFeePerOrder, renVenues, kdsVenues, kioskVenues, discountPercent, starterIncluded, calculateVariable, discountName, deliveryPlan))
+        setSavedSnapshot(serializeSimState(dailyOrders, deliveryOrders, locations, avgTicket, planOverride, activeAddons, hardware, renEnabled, renFeePerOrder, renVenues, kdsVenues, kioskVenues, discountPercent, starterIncluded, calculateVariable, discountName, deliveryPlan, itemDiscounts, itemPriceOverrides))
         router.refresh()
       } else {
         setSaveState('error')
@@ -390,12 +479,14 @@ export function Simulator({ deal, initialConfig, loadedConfigId }: SimulatorProp
         calculateVariable,
         discountName,
         deliveryPlan,
+        itemDiscounts,
+        itemPriceOverrides,
       })
       if (result.ok) {
         setSaveNewState('saved')
         setLastNewVersion(result.version)
         setLastNewVersionPersisted(result.persisted)
-        setSavedSnapshot(serializeSimState(dailyOrders, deliveryOrders, locations, avgTicket, planOverride, activeAddons, hardware, renEnabled, renFeePerOrder, renVenues, kdsVenues, kioskVenues, discountPercent, starterIncluded, calculateVariable, discountName, deliveryPlan))
+        setSavedSnapshot(serializeSimState(dailyOrders, deliveryOrders, locations, avgTicket, planOverride, activeAddons, hardware, renEnabled, renFeePerOrder, renVenues, kdsVenues, kioskVenues, discountPercent, starterIncluded, calculateVariable, discountName, deliveryPlan, itemDiscounts, itemPriceOverrides))
         router.refresh()
       } else {
         setSaveNewState('error')
@@ -555,14 +646,75 @@ export function Simulator({ deal, initialConfig, loadedConfigId }: SimulatorProp
           </div>
 
           {activePlan ? (
-            <div className="mt-3 bg-zinc-50 rounded-lg px-4 py-3">
+            <div className="mt-3 bg-zinc-50 rounded-lg px-4 py-3 space-y-2">
               <p className="text-xs font-mono text-zinc-500">
                 {PLANS[activePlan].priceMonthly > 0 && `${PLANS[activePlan].priceMonthly}€ × ${locations} local${locations > 1 ? 'es' : ''}`}
                 {PLANS[activePlan].priceMonthly > 0 && PLANS[activePlan].variableFee > 0 && ' + '}
                 {PLANS[activePlan].variableFee > 0 && `${PLANS[activePlan].variableFee}€ × ${formatNumber(economics.totalMonthlyVolume)} tickets/mes`}
                 {' = '}
-                <span className="font-semibold text-zinc-800">{formatCurrency(economics.planFeeMonthly)}/mes</span>
+                {(itemDiscounts.plan > 0 || itemPriceOverrides.plan != null) ? (
+                  <>
+                    <span className="line-through text-zinc-400">{formatCurrency(economics.planFeeMonthly)}</span>
+                    {' '}
+                    <span className="font-semibold text-emerald-600">
+                      {formatCurrency((itemPriceOverrides.plan ?? economics.planFeeMonthly) * (1 - itemDiscounts.plan / 100))}/mes
+                    </span>
+                  </>
+                ) : (
+                  <span className="font-semibold text-zinc-800">{formatCurrency(economics.planFeeMonthly)}/mes</span>
+                )}
               </p>
+              {/* Per-item controls */}
+              <div className="flex items-center gap-3 flex-wrap" onClick={(e) => e.stopPropagation()}>
+                {/* Discount % */}
+                <div className="flex items-center gap-1 shrink-0">
+                  <span className="text-[10px] text-zinc-400">Dto.</span>
+                  <div className="flex items-center border border-zinc-200 rounded overflow-hidden bg-white focus-within:ring-1 focus-within:ring-zinc-900">
+                    <input
+                      type="number" min={0} max={100} step={1}
+                      value={itemDiscounts.plan}
+                      onChange={(e) => setItemDiscounts(prev => ({ ...prev, plan: Math.min(100, Math.max(0, Number(e.target.value))) }))}
+                      className="w-10 px-1.5 py-0.5 text-xs font-mono text-zinc-900 outline-none"
+                    />
+                    <span className="px-1 text-[10px] text-zinc-400 bg-zinc-50 border-l border-zinc-200">%</span>
+                  </div>
+                  {itemDiscounts.plan > 0 && (
+                    <button onClick={() => setItemDiscounts(prev => ({ ...prev, plan: 0 }))} className="text-zinc-300 hover:text-red-400 text-xs transition-colors">×</button>
+                  )}
+                </div>
+                {/* Price override */}
+                {!planPriceEditing ? (
+                  <div className="flex items-center gap-1">
+                    {itemPriceOverrides.plan != null && (
+                      <span className="text-[10px] text-amber-600 font-medium">{formatCurrency(itemPriceOverrides.plan)} custom</span>
+                    )}
+                    <button
+                      onClick={() => setPlanPriceEditing(true)}
+                      className="text-zinc-300 hover:text-zinc-600 transition-colors"
+                      title="Ajustar precio base"
+                    >
+                      <svg className="w-3 h-3" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5">
+                        <path d="M7.5 2l2.5 2.5L3.5 11H1v-2.5L7.5 2z" strokeLinecap="round" strokeLinejoin="round"/>
+                      </svg>
+                    </button>
+                    {itemPriceOverrides.plan != null && (
+                      <button onClick={() => setItemPriceOverrides(prev => ({ ...prev, plan: null }))} className="text-zinc-300 hover:text-red-400 text-xs transition-colors">×</button>
+                    )}
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-1">
+                    <input
+                      type="number" min={0} step={1}
+                      defaultValue={itemPriceOverrides.plan ?? economics.planFeeMonthly}
+                      onBlur={(e) => { setItemPriceOverrides(prev => ({ ...prev, plan: Number(e.target.value) })); setPlanPriceEditing(false) }}
+                      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === 'Escape') e.currentTarget.blur() }}
+                      autoFocus
+                      className="w-20 px-2 py-0.5 text-xs font-mono border border-zinc-300 rounded focus:outline-none focus:ring-1 focus:ring-zinc-900"
+                    />
+                    <span className="text-[10px] text-zinc-400">€/mes</span>
+                  </div>
+                )}
+              </div>
             </div>
           ) : (
             <div className="mt-3 bg-zinc-50 rounded-lg px-4 py-3">
@@ -650,9 +802,40 @@ export function Simulator({ deal, initialConfig, loadedConfigId }: SimulatorProp
                     <p className="text-xs text-zinc-500 mt-0.5">{addon.description}</p>
                     <p className="text-xs font-mono text-zinc-600 mt-1">{price}</p>
                     {active && !addon.perConsumption && (
-                      <p className="text-xs font-mono font-semibold text-emerald-700 mt-0.5">
-                        +{formatCurrency(monthlyImpact)}/mes
-                      </p>
+                      <>
+                        <p className="text-xs font-mono font-semibold text-emerald-700 mt-0.5">
+                          {(itemDiscounts.addons?.[id] ?? 0) > 0 ? (
+                            <>
+                              <span className="line-through text-zinc-400 font-normal mr-1">+{formatCurrency(monthlyImpact)}</span>
+                              <span className="text-emerald-600">+{formatCurrency(monthlyImpact * (1 - (itemDiscounts.addons?.[id] ?? 0) / 100))}/mes</span>
+                            </>
+                          ) : (
+                            <>+{formatCurrency(monthlyImpact)}/mes</>
+                          )}
+                        </p>
+                        {/* Per-addon discount input */}
+                        <div className="flex items-center gap-1 mt-1" onClick={(e) => e.stopPropagation()}>
+                          <span className="text-[10px] text-zinc-400">Dto.</span>
+                          <div className="flex items-center border border-zinc-200 rounded overflow-hidden bg-white focus-within:ring-1 focus-within:ring-zinc-900">
+                            <input
+                              type="number" min={0} max={100} step={1}
+                              value={itemDiscounts.addons?.[id] ?? 0}
+                              onChange={(e) => setItemDiscounts(prev => ({
+                                ...prev,
+                                addons: { ...prev.addons, [id]: Math.min(100, Math.max(0, Number(e.target.value))) }
+                              }))}
+                              className="w-10 px-1.5 py-0.5 text-xs font-mono text-zinc-900 outline-none"
+                            />
+                            <span className="px-1 text-[10px] text-zinc-400 bg-zinc-50 border-l border-zinc-200">%</span>
+                          </div>
+                          {(itemDiscounts.addons?.[id] ?? 0) > 0 && (
+                            <button
+                              onClick={() => setItemDiscounts(prev => ({ ...prev, addons: { ...prev.addons, [id]: 0 } }))}
+                              className="text-zinc-300 hover:text-red-400 text-xs transition-colors"
+                            >×</button>
+                          )}
+                        </div>
+                      </>
                     )}
                     {active && isKiosk && venueCount != null && setVenueCount && venueLabel && (
                       <div className="mt-2" onClick={(e) => e.stopPropagation()}>
@@ -727,9 +910,61 @@ export function Simulator({ deal, initialConfig, loadedConfigId }: SimulatorProp
                           </button>
                         )
                       })}
-                      <p className="text-xs font-mono font-semibold text-emerald-700 pt-1">
-                        +{formatCurrency(deliveryMonthlyFixed)}/mes fijo · pedidos adic. variable
-                      </p>
+                      {(itemDiscounts.delivery > 0 || itemPriceOverrides.delivery != null) ? (
+                        <p className="text-xs font-mono font-semibold text-emerald-700 pt-1">
+                          <span className="line-through text-zinc-400 font-normal mr-1">+{formatCurrency(deliveryMonthlyFixed)}</span>
+                          +{formatCurrency((itemPriceOverrides.delivery ?? deliveryMonthlyFixed) * (1 - itemDiscounts.delivery / 100))}/mes fijo
+                        </p>
+                      ) : (
+                        <p className="text-xs font-mono font-semibold text-emerald-700 pt-1">
+                          +{formatCurrency(deliveryMonthlyFixed)}/mes fijo · pedidos adic. variable
+                        </p>
+                      )}
+                      {/* Delivery discount + override */}
+                      <div className="flex items-center gap-3 flex-wrap mt-1" onClick={(e) => e.stopPropagation()}>
+                        <div className="flex items-center gap-1 shrink-0">
+                          <span className="text-[10px] text-zinc-400">Dto.</span>
+                          <div className="flex items-center border border-zinc-200 rounded overflow-hidden bg-white focus-within:ring-1 focus-within:ring-zinc-900">
+                            <input
+                              type="number" min={0} max={100} step={1}
+                              value={itemDiscounts.delivery}
+                              onChange={(e) => setItemDiscounts(prev => ({ ...prev, delivery: Math.min(100, Math.max(0, Number(e.target.value))) }))}
+                              className="w-10 px-1.5 py-0.5 text-xs font-mono text-zinc-900 outline-none"
+                            />
+                            <span className="px-1 text-[10px] text-zinc-400 bg-zinc-50 border-l border-zinc-200">%</span>
+                          </div>
+                          {itemDiscounts.delivery > 0 && (
+                            <button onClick={() => setItemDiscounts(prev => ({ ...prev, delivery: 0 }))} className="text-zinc-300 hover:text-red-400 text-xs transition-colors">×</button>
+                          )}
+                        </div>
+                        {!deliveryPriceEditing ? (
+                          <div className="flex items-center gap-1">
+                            {itemPriceOverrides.delivery != null && (
+                              <span className="text-[10px] text-amber-600 font-medium">{formatCurrency(itemPriceOverrides.delivery)} custom</span>
+                            )}
+                            <button onClick={() => setDeliveryPriceEditing(true)} className="text-zinc-300 hover:text-zinc-600 transition-colors" title="Ajustar precio">
+                              <svg className="w-3 h-3" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5">
+                                <path d="M7.5 2l2.5 2.5L3.5 11H1v-2.5L7.5 2z" strokeLinecap="round" strokeLinejoin="round"/>
+                              </svg>
+                            </button>
+                            {itemPriceOverrides.delivery != null && (
+                              <button onClick={() => setItemPriceOverrides(prev => ({ ...prev, delivery: null }))} className="text-zinc-300 hover:text-red-400 text-xs transition-colors">×</button>
+                            )}
+                          </div>
+                        ) : (
+                          <div className="flex items-center gap-1">
+                            <input
+                              type="number" min={0} step={1}
+                              defaultValue={itemPriceOverrides.delivery ?? deliveryMonthlyFixed}
+                              onBlur={(e) => { setItemPriceOverrides(prev => ({ ...prev, delivery: Number(e.target.value) })); setDeliveryPriceEditing(false) }}
+                              onKeyDown={(e) => { if (e.key === 'Enter' || e.key === 'Escape') e.currentTarget.blur() }}
+                              autoFocus
+                              className="w-20 px-2 py-0.5 text-xs font-mono border border-zinc-300 rounded focus:outline-none focus:ring-1 focus:ring-zinc-900"
+                            />
+                            <span className="text-[10px] text-zinc-400">€/mes</span>
+                          </div>
+                        )}
+                      </div>
                     </div>
                   )}
                 </div>
@@ -956,24 +1191,87 @@ export function Simulator({ deal, initialConfig, loadedConfigId }: SimulatorProp
                         </div>
                       )}
 
-                      {extraQty > 0 && (
-                        <div className="mt-2 flex items-center justify-between">
-                          <span className="text-xs text-zinc-400">
-                            {extraQty} adicional{extraQty > 1 ? 'es' : ''} ·{' '}
-                            {state.mode === 'sold' ? 'cliente paga upfront' : HARDWARE_MODE_LABELS[state.mode]}
-                          </span>
-                          <span className={`text-xs font-mono font-semibold ${
-                            state.mode === 'rented' ? 'text-blue-600' :
-                            state.mode === 'financed' ? 'text-amber-600' : 'text-zinc-700'
-                          }`}>
-                            {state.mode === 'financed'
-                              ? `${formatCurrency(Math.ceil(extraLineTotal / state.financeMonths))}/mes`
-                              : state.mode === 'rented'
-                              ? `${formatCurrency(extraLineTotal)}/mes`
-                              : formatCurrency(extraLineTotal)}
-                          </span>
-                        </div>
-                      )}
+                      {extraQty > 0 && (() => {
+                        const hwDiscE = itemDiscounts.hardware?.[id] ?? 0
+                        const hwOverrideE = itemPriceOverrides.hardware?.[id] ?? null
+                        const hwEffUnitE = hwOverrideE ?? (state.mode === 'rented' ? rentalUnitPrice : state.mode === 'financed' ? Math.ceil(item.unitPrice / state.financeMonths) : 0)
+                        const hwEffLineTotalE = (state.mode === 'rented' || state.mode === 'financed')
+                          ? hwEffUnitE * extraQty * (1 - hwDiscE / 100)
+                          : extraLineTotal
+                        const hwHasAdjE = (hwDiscE > 0 || hwOverrideE != null) && (state.mode === 'rented' || state.mode === 'financed')
+                        return (
+                          <>
+                            <div className="mt-2 flex items-center justify-between">
+                              <span className="text-xs text-zinc-400">
+                                {extraQty} adicional{extraQty > 1 ? 'es' : ''} ·{' '}
+                                {state.mode === 'sold' ? 'cliente paga upfront' : HARDWARE_MODE_LABELS[state.mode]}
+                              </span>
+                              <span className={`text-xs font-mono font-semibold ${
+                                state.mode === 'rented' ? 'text-blue-600' :
+                                state.mode === 'financed' ? 'text-amber-600' : 'text-zinc-700'
+                              }`}>
+                                {hwHasAdjE ? (
+                                  <>
+                                    <span className="line-through text-zinc-400 font-normal mr-1">
+                                      {state.mode === 'financed' ? formatCurrency(Math.ceil(extraLineTotal / state.financeMonths)) : formatCurrency(extraLineTotal)}
+                                    </span>
+                                    <span className="text-emerald-600">{formatCurrency(hwEffLineTotalE)}/mes</span>
+                                  </>
+                                ) : (
+                                  state.mode === 'financed'
+                                    ? `${formatCurrency(Math.ceil(extraLineTotal / state.financeMonths))}/mes`
+                                    : state.mode === 'rented'
+                                    ? `${formatCurrency(extraLineTotal)}/mes`
+                                    : formatCurrency(extraLineTotal)
+                                )}
+                              </span>
+                            </div>
+                            {/* Per-item discount + override */}
+                            {(state.mode === 'rented' || state.mode === 'financed') && (
+                              <div className="mt-2 flex items-center gap-3 flex-wrap">
+                                <div className="flex items-center gap-1 shrink-0">
+                                  <span className="text-[10px] text-zinc-400">Dto.</span>
+                                  <div className="flex items-center border border-zinc-200 rounded overflow-hidden bg-white focus-within:ring-1 focus-within:ring-zinc-900">
+                                    <input
+                                      type="number" min={0} max={100} step={1}
+                                      value={hwDiscE}
+                                      onChange={(e) => setItemDiscounts(prev => ({ ...prev, hardware: { ...prev.hardware, [id]: Math.min(100, Math.max(0, Number(e.target.value))) } }))}
+                                      className="w-10 px-1.5 py-0.5 text-xs font-mono text-zinc-900 outline-none"
+                                    />
+                                    <span className="px-1 text-[10px] text-zinc-400 bg-zinc-50 border-l border-zinc-200">%</span>
+                                  </div>
+                                  {hwDiscE > 0 && (
+                                    <button onClick={() => setItemDiscounts(prev => ({ ...prev, hardware: { ...prev.hardware, [id]: 0 } }))} className="text-zinc-300 hover:text-red-400 text-xs transition-colors">×</button>
+                                  )}
+                                </div>
+                                {!hwPriceEditing.has(id as HardwareId) ? (
+                                  <div className="flex items-center gap-1">
+                                    {hwOverrideE != null && <span className="text-[10px] text-amber-600 font-medium">{formatCurrency(hwOverrideE)}/ud custom</span>}
+                                    <button onClick={() => toggleHwPriceEditing(id as HardwareId)} className="text-zinc-300 hover:text-zinc-600 transition-colors" title="Ajustar precio">
+                                      <svg className="w-3 h-3" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5">
+                                        <path d="M7.5 2l2.5 2.5L3.5 11H1v-2.5L7.5 2z" strokeLinecap="round" strokeLinejoin="round"/>
+                                      </svg>
+                                    </button>
+                                    {hwOverrideE != null && <button onClick={() => setItemPriceOverrides(prev => ({ ...prev, hardware: { ...prev.hardware, [id]: null } }))} className="text-zinc-300 hover:text-red-400 text-xs transition-colors">×</button>}
+                                  </div>
+                                ) : (
+                                  <div className="flex items-center gap-1">
+                                    <input
+                                      type="number" min={0} step={1}
+                                      defaultValue={hwOverrideE ?? (state.mode === 'rented' ? rentalUnitPrice : Math.ceil(item.unitPrice / state.financeMonths))}
+                                      onBlur={(e) => { setItemPriceOverrides(prev => ({ ...prev, hardware: { ...prev.hardware, [id]: Number(e.target.value) } })); toggleHwPriceEditing(id as HardwareId) }}
+                                      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === 'Escape') e.currentTarget.blur() }}
+                                      autoFocus
+                                      className="w-20 px-2 py-0.5 text-xs font-mono border border-zinc-300 rounded focus:outline-none focus:ring-1 focus:ring-zinc-900"
+                                    />
+                                    <span className="text-[10px] text-zinc-400">€/ud/mes</span>
+                                  </div>
+                                )}
+                              </div>
+                            )}
+                          </>
+                        )
+                      })()}
                     </div>
                   </div>
                 )
@@ -981,6 +1279,13 @@ export function Simulator({ deal, initialConfig, loadedConfigId }: SimulatorProp
 
               // Standard hardware item
               const lineTotal = (state.mode === 'rented' ? rentalUnitPrice : item.unitPrice) * state.quantity
+              const hwDisc = itemDiscounts.hardware?.[id] ?? 0
+              const hwOverride = itemPriceOverrides.hardware?.[id] ?? null
+              const hwEffUnit = hwOverride ?? (state.mode === 'rented' ? rentalUnitPrice : state.mode === 'financed' ? Math.ceil(item.unitPrice / state.financeMonths) : item.unitPrice)
+              const hwEffLineTotal = state.quantity > 0 && (state.mode === 'rented' || state.mode === 'financed')
+                ? hwEffUnit * state.quantity * (1 - hwDisc / 100)
+                : lineTotal
+              const hwHasAdj = state.quantity > 0 && (hwDisc > 0 || hwOverride != null) && (state.mode === 'rented' || state.mode === 'financed')
 
               return (
                 <div
@@ -1081,12 +1386,78 @@ export function Simulator({ deal, initialConfig, loadedConfigId }: SimulatorProp
                         state.mode === 'financed' ? 'text-amber-600' :
                         'text-zinc-700'
                       }`}>
-                        {state.mode === 'financed'
-                          ? `${formatCurrency(Math.ceil(lineTotal / state.financeMonths))}/mes`
-                          : state.mode === 'rented'
-                          ? `${formatCurrency(lineTotal)}/mes`
-                          : formatCurrency(lineTotal)}
+                        {hwHasAdj ? (
+                          <>
+                            <span className="line-through text-zinc-400 font-normal mr-1">
+                              {state.mode === 'financed'
+                                ? formatCurrency(Math.ceil(lineTotal / state.financeMonths))
+                                : state.mode === 'rented'
+                                ? formatCurrency(lineTotal)
+                                : formatCurrency(lineTotal)}
+                            </span>
+                            <span className="text-emerald-600">{formatCurrency(hwEffLineTotal)}/mes</span>
+                          </>
+                        ) : (
+                          state.mode === 'financed'
+                            ? `${formatCurrency(Math.ceil(lineTotal / state.financeMonths))}/mes`
+                            : state.mode === 'rented'
+                            ? `${formatCurrency(lineTotal)}/mes`
+                            : formatCurrency(lineTotal)
+                        )}
                       </span>
+                    </div>
+                  )}
+                  {/* Per-item discount + override for monthly items */}
+                  {state.quantity > 0 && (state.mode === 'rented' || state.mode === 'financed') && (
+                    <div className="mt-2 flex items-center gap-3 flex-wrap">
+                      <div className="flex items-center gap-1 shrink-0">
+                        <span className="text-[10px] text-zinc-400">Dto.</span>
+                        <div className="flex items-center border border-zinc-200 rounded overflow-hidden bg-white focus-within:ring-1 focus-within:ring-zinc-900">
+                          <input
+                            type="number" min={0} max={100} step={1}
+                            value={hwDisc}
+                            onChange={(e) => setItemDiscounts(prev => ({
+                              ...prev,
+                              hardware: { ...prev.hardware, [id]: Math.min(100, Math.max(0, Number(e.target.value))) }
+                            }))}
+                            className="w-10 px-1.5 py-0.5 text-xs font-mono text-zinc-900 outline-none"
+                          />
+                          <span className="px-1 text-[10px] text-zinc-400 bg-zinc-50 border-l border-zinc-200">%</span>
+                        </div>
+                        {hwDisc > 0 && (
+                          <button onClick={() => setItemDiscounts(prev => ({ ...prev, hardware: { ...prev.hardware, [id]: 0 } }))} className="text-zinc-300 hover:text-red-400 text-xs transition-colors">×</button>
+                        )}
+                      </div>
+                      {!hwPriceEditing.has(id as HardwareId) ? (
+                        <div className="flex items-center gap-1">
+                          {hwOverride != null && (
+                            <span className="text-[10px] text-amber-600 font-medium">{formatCurrency(hwOverride)}/ud custom</span>
+                          )}
+                          <button onClick={() => toggleHwPriceEditing(id as HardwareId)} className="text-zinc-300 hover:text-zinc-600 transition-colors" title="Ajustar precio">
+                            <svg className="w-3 h-3" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5">
+                              <path d="M7.5 2l2.5 2.5L3.5 11H1v-2.5L7.5 2z" strokeLinecap="round" strokeLinejoin="round"/>
+                            </svg>
+                          </button>
+                          {hwOverride != null && (
+                            <button onClick={() => setItemPriceOverrides(prev => ({ ...prev, hardware: { ...prev.hardware, [id]: null } }))} className="text-zinc-300 hover:text-red-400 text-xs transition-colors">×</button>
+                          )}
+                        </div>
+                      ) : (
+                        <div className="flex items-center gap-1">
+                          <input
+                            type="number" min={0} step={1}
+                            defaultValue={hwOverride ?? (state.mode === 'rented' ? rentalUnitPrice : Math.ceil(item.unitPrice / state.financeMonths))}
+                            onBlur={(e) => {
+                              setItemPriceOverrides(prev => ({ ...prev, hardware: { ...prev.hardware, [id]: Number(e.target.value) } }))
+                              toggleHwPriceEditing(id as HardwareId)
+                            }}
+                            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === 'Escape') e.currentTarget.blur() }}
+                            autoFocus
+                            className="w-20 px-2 py-0.5 text-xs font-mono border border-zinc-300 rounded focus:outline-none focus:ring-1 focus:ring-zinc-900"
+                          />
+                          <span className="text-[10px] text-zinc-400">€/ud/mes</span>
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>
@@ -1180,6 +1551,8 @@ export function Simulator({ deal, initialConfig, loadedConfigId }: SimulatorProp
           discountName={discountName}
           onDiscountNameChange={setDiscountName}
           deliveryPlan={deliveryPlan}
+          itemDiscounts={itemDiscounts}
+          itemPriceOverrides={itemPriceOverrides}
         />
       </div>
     </div>
@@ -1219,6 +1592,8 @@ function EconomicsPanel({
   discountName,
   onDiscountNameChange,
   deliveryPlan,
+  itemDiscounts,
+  itemPriceOverrides,
 }: {
   economics: DealEconomics
   locations: number
@@ -1247,16 +1622,49 @@ function EconomicsPanel({
   discountName: string
   onDiscountNameChange: (v: string) => void
   deliveryPlan: DeliveryPlanId
+  itemDiscounts: ItemDiscounts
+  itemPriceOverrides: ItemPriceOverrides
 }) {
   const hasDatafono = activeAddons.has('datafono')
   const renMonthly = renEnabled ? renFeePerOrder * deliveryOrders * renVenues : 0
   // Unified monthly totals — plan fee ceiled, KDS/Kiosk venue adj, delivery from sub-plan
   const totals = calculateMonthlyTotals({ economics, locations, activeAddons, deliveryPlan, kdsVenues, kioskVenues })
   const deliveryFixedFee = totals.deliveryFee
-  // Discount applies only to plan + add-ons + datafono — delivery fee is never discounted
-  const discountableBase = totals.planFee + totals.addonFee + totals.datafonoFee
+
+  // ---- Per-item effective prices ----
+  // Plan: apply override then discount
+  const planFeeEffective = (itemPriceOverrides.plan ?? totals.planFee) * (1 - (itemDiscounts.plan || 0) / 100)
+  // Add-ons: per-addon discount (no override for addons)
+  let addonFeeEffective = 0
+  for (const addonId of activeAddons) {
+    if (addonId === 'delivery_integrations') continue
+    const base = getAddonMonthly(addonId, economics, locations, kdsVenues, kioskVenues)
+    const disc = (itemDiscounts.addons?.[addonId] ?? 0) / 100
+    addonFeeEffective += base * (1 - disc)
+  }
+  const datafonoFeeEffective = hasDatafono ? economics.datafonoFeeMonthly : 0
+  // Delivery: apply override then discount
+  const deliveryFeeEffective = (itemPriceOverrides.delivery ?? deliveryFixedFee) * (1 - (itemDiscounts.delivery || 0) / 100)
+  // Hardware: rented items with per-unit override and discount; financed with discount only
+  let hwMonthlyEffective = 0
+  for (const hid of HARDWARE_ORDER as HardwareId[]) {
+    const s = hardware[hid]
+    if (s.quantity === 0) continue
+    const disc = (itemDiscounts.hardware?.[hid] ?? 0) / 100
+    if (s.mode === 'rented') {
+      const rentalUnit = HARDWARE[hid].rentalMonthlyPrice ?? RENTAL_MONTHLY_PRICE
+      const eff = (itemPriceOverrides.hardware?.[hid] ?? rentalUnit) * s.quantity * (1 - disc)
+      hwMonthlyEffective += eff
+    } else if (s.mode === 'financed') {
+      const installment = Math.ceil(HARDWARE[hid].unitPrice * s.quantity / s.financeMonths)
+      hwMonthlyEffective += installment * (1 - disc)
+    }
+    // sold: no monthly charge, ignore
+  }
+  // Global discount applies to the item-effective (plan + addons + datafono) base
+  const discountableBase = planFeeEffective + addonFeeEffective + datafonoFeeEffective
   const discountAmount = discountableBase * (discountPercent / 100)
-  const adjustedMRR = discountableBase - discountAmount + totals.deliveryFee + renMonthly + totals.hardwareMonthly
+  const adjustedMRR = discountableBase - discountAmount + deliveryFeeEffective + renMonthly + hwMonthlyEffective
   const rentedMonthly = HARDWARE_ORDER.reduce((sum, id) => {
     const s = hardware[id]
     return s.mode === 'rented' ? sum + (HARDWARE[id].rentalMonthlyPrice ?? RENTAL_MONTHLY_PRICE) * s.quantity : sum
@@ -1287,12 +1695,24 @@ function EconomicsPanel({
           Desglose ingresos
         </p>
         <div className="space-y-2">
-          <BreakdownRow label="Plan" value={formatCurrency(totals.planFee)} />
+          <BreakdownRow
+            label="Plan"
+            value={formatCurrency(planFeeEffective)}
+            strikeValue={planFeeEffective < totals.planFee ? formatCurrency(totals.planFee) : undefined}
+          />
           {totals.addonFee > 0 && (
-            <BreakdownRow label="Add-ons" value={formatCurrency(totals.addonFee)} />
+            <BreakdownRow
+              label="Add-ons"
+              value={formatCurrency(addonFeeEffective)}
+              strikeValue={addonFeeEffective < totals.addonFee ? formatCurrency(totals.addonFee) : undefined}
+            />
           )}
           {deliveryFixedFee > 0 && (
-            <BreakdownRow label={`${DELIVERY_PLANS[deliveryPlan].label}`} value={formatCurrency(deliveryFixedFee)} />
+            <BreakdownRow
+              label={`${DELIVERY_PLANS[deliveryPlan].label}`}
+              value={formatCurrency(deliveryFeeEffective)}
+              strikeValue={deliveryFeeEffective < deliveryFixedFee ? formatCurrency(deliveryFixedFee) : undefined}
+            />
           )}
           {hasDatafono && economics.datafonoFeeMonthly > 0 && (
             <BreakdownRow label="Datáfono (0.8% GMV)" value={formatCurrency(economics.datafonoFeeMonthly)} />
@@ -1357,8 +1777,12 @@ function EconomicsPanel({
           {renMonthly > 0 && (
             <BreakdownRow label="REN" value={`+${formatCurrency(renMonthly)}/mes`} />
           )}
-          {economics.hardwareRevenueMonthly > 0 && (
-            <BreakdownRow label="Hardware (financiado)" value={formatCurrency(economics.hardwareRevenueMonthly)} />
+          {hwMonthlyEffective > 0 && (
+            <BreakdownRow
+              label="Hardware (mensual)"
+              value={formatCurrency(hwMonthlyEffective)}
+              strikeValue={hwMonthlyEffective < totals.hardwareMonthly ? formatCurrency(totals.hardwareMonthly) : undefined}
+            />
           )}
           <div className="pt-2 border-t border-zinc-100">
             <BreakdownRow label="Total mensual" value={formatCurrency(adjustedMRR)} bold />
@@ -1655,21 +2079,28 @@ function NumberInput({
 }
 
 function BreakdownRow({
-  label, value, bold, muted, highlight,
+  label, value, bold, muted, highlight, strikeValue,
 }: {
   label: string; value: string
   bold?: boolean; muted?: boolean; highlight?: boolean
+  strikeValue?: string
 }) {
   return (
     <div className="flex justify-between items-baseline gap-2">
       <span className={`text-xs ${muted ? 'text-red-400' : 'text-zinc-600'}`}>{label}</span>
-      <span className={`text-xs font-mono ${
-        bold ? 'font-semibold text-zinc-900' :
-        highlight ? 'font-semibold text-red-600' :
-        muted ? 'text-red-400' :
-        'text-zinc-800'
-      }`}>
-        {value}
+      <span className="flex items-baseline gap-1.5">
+        {strikeValue && (
+          <span className="text-xs font-mono text-zinc-400 line-through">{strikeValue}</span>
+        )}
+        <span className={`text-xs font-mono ${
+          strikeValue ? 'font-semibold text-emerald-600' :
+          bold ? 'font-semibold text-zinc-900' :
+          highlight ? 'font-semibold text-red-600' :
+          muted ? 'text-red-400' :
+          'text-zinc-800'
+        }`}>
+          {value}
+        </span>
       </span>
     </div>
   )
