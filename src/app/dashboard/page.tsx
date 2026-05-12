@@ -3,7 +3,7 @@ import { getDeals, getActiveConfig } from '@/lib/deals'
 import { getInvoices } from '@/lib/supabase/invoices'
 import { getPresupuestos } from '@/lib/supabase/presupuestos'
 import { formatCurrency } from '@/lib/format'
-import { MrrChart, type MrrPoint } from './mrr-chart'
+import { BillingChart } from './billing-chart'
 import type { Deal } from '@/types'
 
 // ── Stage config ──────────────────────────────────────────────────────────────
@@ -32,58 +32,6 @@ const STAGE_COLORS: Record<string, string> = {
   proposal_sent: '#818cf8',
   closed_won:    '#34c759',
   closed_lost:   '#ff3b30',
-}
-
-// ── MRR history helper ────────────────────────────────────────────────────────
-function computeMrrData(deals: Deal[], numMonths: number): MrrPoint[] {
-  const now = new Date()
-  const result: MrrPoint[] = []
-
-  for (let i = numMonths - 1; i >= 0; i--) {
-    const baseMonth = now.getMonth() - i
-    const year  = now.getFullYear() + Math.floor(baseMonth / 12)
-    const month = ((baseMonth % 12) + 12) % 12
-    const monthEnd  = new Date(year, month + 1, 0, 23, 59, 59, 999)
-    const monthLabel = new Date(year, month, 1).toLocaleDateString('es-ES', {
-      month: 'short',
-      year: '2-digit',
-    })
-
-    let totalMrr = 0
-    for (const deal of deals) {
-      if (deal.stage === 'closed_lost' || deal.stage === 'rejected') continue
-      const configs = deal.configurations ?? []
-      const eligible = configs.filter((c) => new Date(c.createdAt) <= monthEnd)
-      if (eligible.length === 0) continue
-      const latest = eligible.reduce((best, c) =>
-        new Date(c.createdAt) > new Date(best.createdAt) ? c : best,
-      )
-      totalMrr += latest.economics?.totalMonthlyRevenue ?? 0
-    }
-
-    result.push({ month: monthLabel, mrr: Math.round(totalMrr) })
-  }
-
-  // Projected next 3 months (last real MRR × 1.05^n)
-  const lastMrr = result[result.length - 1]?.mrr ?? 0
-  // Overlap: seed projected from last real point so lines connect
-  result[result.length - 1] = {
-    ...result[result.length - 1],
-    projected: lastMrr,
-  }
-  for (let i = 1; i <= 3; i++) {
-    const futureDate = new Date(now.getFullYear(), now.getMonth() + i, 1)
-    const monthLabel = futureDate.toLocaleDateString('es-ES', {
-      month: 'short',
-      year: '2-digit',
-    })
-    result.push({
-      month: monthLabel,
-      projected: Math.round(lastMrr * Math.pow(1.05, i)),
-    })
-  }
-
-  return result
 }
 
 // ── Page ──────────────────────────────────────────────────────────────────────
@@ -120,9 +68,6 @@ export default async function DashboardPage() {
   const pendiente = invoices
     .filter((i) => i.status === 'issued')
     .reduce((s, i) => s + i.amountTotal, 0)
-
-  // ── Section 2: MRR chart ───────────────────────────────────────────────────
-  const mrrData = computeMrrData(deals, 12)
 
   // ── Section 3: Facturas donut ──────────────────────────────────────────────
   const sum = (arr: typeof invoices) => arr.reduce((s, i) => s + i.amountTotal, 0)
@@ -199,19 +144,21 @@ export default async function DashboardPage() {
         <KpiCard label="Pendiente de cobro" value={formatCurrency(pendiente)} color={pendiente > 0 ? '#ff9f0a' : '#8e8e93'} />
       </div>
 
-      {/* ── Section 2: MRR line chart ── */}
+      {/* ── Section 2: Billing line chart ── */}
       <div className="bg-white rounded-2xl shadow-sm p-7">
-        <div className="flex items-end justify-between mb-6">
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-widest text-zinc-400 mb-1">Evolución MRR</p>
+        <div className="flex items-start justify-between mb-4 gap-4">
+          <div className="shrink-0">
+            <p className="text-xs font-semibold uppercase tracking-widest text-zinc-400 mb-1">Evolución Facturación</p>
             <p className="text-3xl font-bold text-zinc-900 tracking-tight">{formatCurrency(mrr)}</p>
+            <p className="text-xs text-zinc-400 mt-1">MRR pipeline</p>
           </div>
-          <div className="flex items-center gap-5 pb-1">
-            <LegendDot color="#0071e3" label="MRR real" />
+          <div className="flex items-center gap-5 pt-1">
+            <LegendDot color="#0071e3" label="Facturado" />
+            <LegendDot color="#34c759" label="Cobrado" />
             <LegendDot color="#0071e3" label="Proyectado" dashed />
           </div>
         </div>
-        <MrrChart data={mrrData} currentMrr={mrr} />
+        <BillingChart invoices={invoices} />
       </div>
 
       {/* ── Section 3: Facturas + Pipeline ── */}
