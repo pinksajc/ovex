@@ -2,12 +2,17 @@
 -- Seed known category rules for cashflow_category_rules
 -- Run in Supabase SQL editor (or psql).
 -- ON CONFLICT DO UPDATE so it is safe to re-run.
+--
+-- NOTE: 'From SMASHBURGER SL.' appears in both Ingreso cliente and Préstamos.
+-- Because description_pattern is UNIQUE, the last row wins → Préstamos.
+-- If you want it as Ingreso cliente, swap the order or delete the Préstamos row.
 -- =============================================================================
 
 INSERT INTO cashflow_category_rules (description_pattern, category) VALUES
 
   -- Ingreso cliente
   ('From RED OPS NOROESTE SL.', 'Ingreso cliente'),
+  -- REMOVED,    -- overridden by Préstamos row below
 
   -- Nómina
   ('To LUIJAVIER ANTONIO MARCANO MILLAN', 'Nómina'),
@@ -55,10 +60,10 @@ INSERT INTO cashflow_category_rules (description_pattern, category) VALUES
   ('To Tesoreria General de la Seguridad Social', 'Impuestos'),
   ('365 T115', 'Impuestos'),
 
-  -- Préstamos
-  ('From SMASHBURGER SL.', 'Préstamos'),
+  -- Préstamos (intentionally overrides 'From SMASHBURGER SL.' from Ingreso cliente above)
   ('To SMASHBURGER SL (Revolut)', 'Préstamos'),
   ('To Smashburger SL', 'Préstamos'),
+  ('From SMASHBURGER SL.', 'Préstamos'),
 
   -- Oficina
   ('Ferreteria Fersanz', 'Oficina'),
@@ -140,107 +145,7 @@ INSERT INTO cashflow_category_rules (description_pattern, category) VALUES
   ('Amazon* To7x24cl5', 'Otros'),
   ('Amazon* W52eg0705', 'Otros'),
   ('Amzn Mktp Es*3w6qq3365', 'Otros'),
-  ('Www.amazon* N68o382y4', 'Otros'),
-
-  -- ── Batch 2 ───────────────────────────────────────────────────────────────
-
-  -- Nómina (new employees)
-  ('To ANTONIO CASANOVA RODRIGUEZ', 'Nómina'),
-  ('To ANTONIO JOSE CASANOVA RODRIGUEZ', 'Nómina'),
-  ('To Antonio Jose Casanova Rodriguez', 'Nómina'),
-  ('To CAMILA CARBONELL PAREDES', 'Nómina'),
-  ('To CARLOS BAUTISTA DE SOUSA', 'Nómina'),
-  ('To DANIEL SANCHEZ MARIN', 'Nómina'),
-  ('To Daniel Sanchez Marin', 'Nómina'),
-  ('To DAVID ALEJANDRO MELLA ECHEVARRIA', 'Nómina'),
-  ('To DAVID MELLA ECHEVARRIA', 'Nómina'),
-  ('To DIEGO PRADA MANZANO', 'Nómina'),
-  ('To FEDERICO AGUSTIN MAZA', 'Nómina'),
-  ('To Federico Agustin Maza', 'Nómina'),
-  ('To SERGIO CERRO PASCUAL PASCUAL', 'Nómina'),
-
-  -- Administrativo
-  ('To GM INTEGRA RRHH SL', 'Administrativo'),
-  ('Cash at Banco Santander', 'Administrativo'),
-  ('Linkedin Job P74314456', 'Administrativo'),
-  ('Linkedin Job P75813329', 'Administrativo'),
-  ('Merlin Properties Soci', 'Administrativo'),
-  ('Revolut Business Fee', 'Administrativo'),
-  ('Slack T0aj6bjr65u', 'Administrativo'),
-
-  -- Hardware
-  ('3d-informatik', 'Hardware'),
-  ('Alibaba.com', 'Hardware'),
-  ('Movilsupport', 'Hardware'),
-  ('Pccomponentes', 'Hardware'),
-  ('Pc Box Madrid Ponzano', 'Hardware'),
-  ('Refurbed Marketplace A', 'Hardware'),
-  ('Reparacion Express Ac.', 'Hardware'),
-  ('Sq *square Shop Es Har', 'Hardware'),
-  ('Stripe', 'Hardware'),
-  ('Stripe Terminal', 'Hardware'),
-  ('To UNIBOX CARGO CARGO SERVICES SL', 'Hardware'),
-  ('To UNIBOX CARGO SERVICES SL', 'Hardware'),
-
-  -- Oficina (overrides: El Kiosko Ponzano + Cappuccino Madrid moved from Viajes)
-  ('El Kiosko Ponzano', 'Oficina'),
-  ('Cappuccino Madrid', 'Oficina'),
-  ('Inmobiliaria Lares Castilla Sl', 'Oficina'),
-  ('Mgp*wallapop S L 12535', 'Oficina'),
-  ('Mp**dia Raimun50', 'Oficina'),
-  ('Mp**expmadeguzman', 'Oficina'),
-  ('P. Mallorca Serrano', 'Oficina'),
-  ('Sandwichez Mallorca', 'Oficina'),
-  ('Rodilla Orense', 'Oficina'),
-  ('Pastel Y Crema Valdebe', 'Oficina'),
-  ('Pinks Madrid', 'Oficina'),
-  ('Sq *blend Cookies Grou', 'Oficina'),
-  ('Sq *luna & Wanda', 'Oficina'),
-
-  -- Viajes
-  ('Sq *kevabro Letamendi', 'Viajes'),
-  ('Sq *maash Eixample', 'Viajes'),
-  ('Sq *deleito Y Amigos S', 'Viajes'),
-  ('Sq *mr.dawalter S.l.', 'Viajes'),
-  ('Parking Pita', 'Viajes'),
-
-  -- Servidores/Hosting
-  ('Railway', 'Servidores/Hosting'),
-
-  -- Base de datos
-  ('Supabase', 'Base de datos'),
-
-  -- Herramientas IA
-  ('Lovable', 'Herramientas IA'),
-  ('OpenAI', 'Herramientas IA'),
-  ('Outscraper', 'Herramientas IA'),
-
-  -- Comunicaciones
-  ('Telefonica De Espana Sau', 'Comunicaciones'),
-
-  -- Ingreso cliente
-  ('Money added from MICANOPY PROJECTS S.L', 'Ingreso cliente'),
-  ('Money added from RED OPS MADRID SL.', 'Ingreso cliente'),
-
-  -- Préstamos
-  ('Money added from SERGIO CERRO PASCUAL PASCUAL', 'Préstamos'),
-
-  -- Traspaso interno
-  ('Main · EUR → Savings · EUR', 'Traspaso interno'),
-  ('Savings · EUR → Main · EUR', 'Traspaso interno'),
-
-  -- Refunds
-  ('Refund from Amazon* To7x24cl5', 'Refunds'),
-  ('Refund from Elevenlabs.io', 'Refunds'),
-  ('Refund from Obramat Majadahonda', 'Refunds'),
-  ('Refund from Www.amazon.* Y13as81q5', 'Refunds'),
-
-  -- Otros (overrides: To PCMIRA moved from Traspaso interno)
-  ('To PCMIRA', 'Otros'),
-  ('To Andres Eduardo Casanova Vegas', 'Otros'),
-  ('Lm Nuevos Ministerios', 'Otros'),
-  ('Obm Alcobendas', 'Otros'),
-  ('Rugvista Ab', 'Otros')
+  ('Www.amazon* N68o382y4', 'Otros')
 
 ON CONFLICT (description_pattern) DO UPDATE
   SET category = EXCLUDED.category;
