@@ -1,118 +1,193 @@
 import { redirect } from 'next/navigation'
 import { getCurrentUser } from '@/lib/auth'
 import { getCashflowTransactions } from '@/lib/supabase/cashflow'
+import { getCashflowPlanned } from '@/lib/supabase/cashflow-planned'
+import { getInvoices } from '@/lib/supabase/invoices'
 import { formatCurrency } from '@/lib/format'
 import { UploadZone } from '@/components/cashflow/upload-zone'
 import { RecategorizeButton } from '@/components/cashflow/recategorize-button'
 import { DateRangeFilter } from '@/components/cashflow/date-range-filter'
 import { AddTransactionButton } from '@/components/cashflow/add-transaction-button'
+import { CashflowTabs } from '@/components/cashflow/cashflow-tabs'
+import { PlanningView } from '@/components/cashflow/planning-view'
 import { TransactionsTable } from '@/components/cashflow/transactions-table'
 import {
   IncomeExpenseChart,
   ExpenseCategoryDonut,
   BalanceTrendChart,
 } from '@/components/cashflow/cashflow-charts'
+import type { CashflowTransaction } from '@/types'
+import type { SuggestedRecurring } from '@/lib/supabase/cashflow-planned'
+
+// ── Recurring-expense detector (server-side) ──────────────────────────────────
+
+function detectRecurring(transactions: CashflowTransaction[]): SuggestedRecurring[] {
+  const now = new Date()
+  const thisMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
+  const prev = new Date(now.getFullYear(), now.getMonth() - 1, 1)
+  const prevMonth = `${prev.getFullYear()}-${String(prev.getMonth() + 1).padStart(2, '0')}`
+
+  const thisMap = new Map<string, { amount: number; category: string }>()
+  const prevMap = new Map<string, { amount: number; category: string }>()
+
+  for (const t of transactions) {
+    if (t.type !== 'expense') continue
+    const m = t.date.slice(0, 7)
+    if (m === thisMonth) thisMap.set(t.description, { amount: Math.abs(t.amount), category: t.category })
+    else if (m === prevMonth) prevMap.set(t.description, { amount: Math.abs(t.amount), category: t.category })
+  }
+
+  const results: SuggestedRecurring[] = []
+  for (const [desc, thisData] of thisMap) {
+    const prevData = prevMap.get(desc)
+    if (!prevData) continue
+    const diff = Math.abs(thisData.amount - prevData.amount) / Math.max(thisData.amount, prevData.amount)
+    if (diff <= 0.2) {
+      results.push({
+        description: desc,
+        averageAmount: (thisData.amount + prevData.amount) / 2,
+        category: thisData.category,
+      })
+    }
+  }
+
+  return results.sort((a, b) => b.averageAmount - a.averageAmount).slice(0, 15)
+}
+
+// ── Page ──────────────────────────────────────────────────────────────────────
 
 export default async function CashflowPage({
   searchParams,
 }: {
-  searchParams: Promise<{ from?: string; to?: string }>
+  searchParams: Promise<{ from?: string; to?: string; tab?: string }>
 }) {
   const user = await getCurrentUser()
   if (!user) redirect('/login')
   if (user.role !== 'owner' && user.role !== 'admin') redirect('/dashboard')
 
   const now = new Date()
+  const { from: fromParam, to: toParam, tab: tabParam } = await searchParams
 
-  // ── Date range — default: Jan 1 of current year → today ──────────────────
-  const { from: fromParam, to: toParam } = await searchParams
+  const activeTab = tabParam === 'planning' ? 'planning' : 'transactions'
+
+  // ── Always fetch transactions (needed in both tabs for recurring detection) ──
+  const allTransactions = await getCashflowTransactions()
+
+  // ── Planning tab: additional fetches ─────────────────────────────────────────
+  const [plannedItems, allInvoices] =
+    activeTab === 'planning'
+      ? await Promise.all([getCashflowPlanned(), getInvoices()])
+      : [[], [] as Awaited<ReturnType<typeof getInvoices>>]
+
+  const pendingInvoices = allInvoices
+    .filter((inv) => inv.status === 'issued')
+    .map((inv) => ({
+      id: inv.id,
+      number: inv.number,
+      clientName: inv.clientName,
+      amountTotal: inv.amountTotal,
+      dueAt: inv.dueAt,
+    }))
+
+  const suggestedRecurring = activeTab === 'planning' ? detectRecurring(allTransactions) : []
+  const currentBalance = allTransactions.find((t) => t.balance != null)?.balance ?? 0
+
+  // ── Transactions tab: date filtering + KPIs ───────────────────────────────────
   const defaultFrom = `${now.getFullYear()}-01-01`
   const defaultTo   = now.toISOString().split('T')[0]
   const dateFrom    = fromParam ?? defaultFrom
   const dateTo      = toParam   ?? defaultTo
 
-  // ── Fetch all + filter by date range ──────────────────────────────────────
-  const allTransactions = await getCashflowTransactions()
-  const transactions = allTransactions.filter(
-    (t) => t.date >= dateFrom && t.date <= dateTo,
-  )
+  const transactions = allTransactions.filter((t) => t.date >= dateFrom && t.date <= dateTo)
 
-  // ── KPIs ────────────────────────────────────────────────────────────────────
-
-  // KPI 1: Saldo neto — excludes Traspaso interno
   const operational  = transactions.filter((t) => t.category !== 'Traspaso interno')
   const totalIncome  = operational.filter((t) => t.amount > 0).reduce((s, t) => s + t.amount, 0)
   const totalExpense = operational.filter((t) => t.amount < 0).reduce((s, t) => s + Math.abs(t.amount), 0)
   const netBalance   = totalIncome - totalExpense
 
-  // KPI 2: Préstamos netos
   const prestamosNet = transactions
     .filter((t) => t.category === 'Préstamos')
     .reduce((s, t) => s + t.amount, 0)
 
-  // KPI 3: Ingreso mes actual within the filtered set — income only, excludes Traspaso interno
-  const thisMonthKey  = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
+  const thisMonthKey    = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
   const thisMonthIncome = transactions
     .filter((t) => t.date.startsWith(thisMonthKey) && t.amount > 0 && t.category !== 'Traspaso interno')
     .reduce((s, t) => s + t.amount, 0)
 
   return (
     <div className="min-h-full bg-[#f5f5f7] p-8 space-y-5">
-      {/* Header */}
+      {/* ── Header ─────────────────────────────────────────────────────────── */}
       <div className="mb-2 flex items-start justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-zinc-900 tracking-tight">Flujo de Caja</h1>
           <p className="text-sm text-zinc-400 mt-0.5">
-            {transactions.length} transacciones · datos de Revolut
+            {allTransactions.length} transacciones · datos de Revolut
           </p>
         </div>
         <div className="flex items-center gap-3 pt-1">
-          <DateRangeFilter from={dateFrom} to={dateTo} />
-          <AddTransactionButton />
-          <RecategorizeButton />
+          {activeTab === 'transactions' && (
+            <>
+              <DateRangeFilter from={dateFrom} to={dateTo} />
+              <AddTransactionButton />
+              <RecategorizeButton />
+            </>
+          )}
+          <CashflowTabs activeTab={activeTab} />
         </div>
       </div>
 
-      {/* KPI strip */}
-      <div className="grid grid-cols-3 gap-4">
-        <CfKpi
-          label="Saldo neto"
-          value={formatCurrency(Math.abs(netBalance))}
-          color={netBalance >= 0 ? '#34c759' : '#ff3b30'}
-          prefix={netBalance >= 0 ? '+' : '−'}
-          sub="Total ingresos − gastos del período"
+      {/* ── Tab content ────────────────────────────────────────────────────── */}
+      {activeTab === 'planning' ? (
+        <PlanningView
+          plannedItems={plannedItems}
+          pendingInvoices={pendingInvoices}
+          suggestedRecurring={suggestedRecurring}
+          currentBalance={currentBalance}
         />
-        <CfKpi
-          label="Total préstamos"
-          value={formatCurrency(Math.abs(prestamosNet))}
-          color={prestamosNet >= 0 ? '#34c759' : '#ff3b30'}
-          prefix={prestamosNet >= 0 ? '+' : '−'}
-          sub="Préstamos netos del período"
-        />
-        <CfKpi
-          label={`Ingresos ${now.toLocaleDateString('es-ES', { month: 'long' })}`}
-          value={formatCurrency(thisMonthIncome)}
-          color="#0071e3"
-          sub={`Ingresos ${now.toLocaleDateString('es-ES', { month: 'long' })} (sin traspasos)`}
-        />
-      </div>
+      ) : (
+        <>
+          {/* KPI strip */}
+          <div className="grid grid-cols-3 gap-4">
+            <CfKpi
+              label="Saldo neto"
+              value={formatCurrency(Math.abs(netBalance))}
+              color={netBalance >= 0 ? '#34c759' : '#ff3b30'}
+              prefix={netBalance >= 0 ? '+' : '−'}
+              sub="Total ingresos − gastos del período"
+            />
+            <CfKpi
+              label="Total préstamos"
+              value={formatCurrency(Math.abs(prestamosNet))}
+              color={prestamosNet >= 0 ? '#34c759' : '#ff3b30'}
+              prefix={prestamosNet >= 0 ? '+' : '−'}
+              sub="Préstamos netos del período"
+            />
+            <CfKpi
+              label={`Ingresos ${now.toLocaleDateString('es-ES', { month: 'long' })}`}
+              value={formatCurrency(thisMonthIncome)}
+              color="#0071e3"
+              sub={`Ingresos ${now.toLocaleDateString('es-ES', { month: 'long' })} (sin traspasos)`}
+            />
+          </div>
 
-      {/* Charts row 1 */}
-      <div className="grid grid-cols-3 gap-5">
-        <div className="col-span-2">
-          <IncomeExpenseChart transactions={transactions} />
-        </div>
-        <ExpenseCategoryDonut transactions={transactions} />
-      </div>
+          {/* Charts row 1 */}
+          <div className="grid grid-cols-3 gap-5">
+            <div className="col-span-2">
+              <IncomeExpenseChart transactions={transactions} />
+            </div>
+            <ExpenseCategoryDonut transactions={transactions} />
+          </div>
 
-      {/* Charts row 2 */}
-      <BalanceTrendChart transactions={transactions} />
+          {/* Charts row 2 */}
+          <BalanceTrendChart transactions={transactions} />
 
-      {/* Upload zone */}
-      <UploadZone />
+          {/* Upload zone */}
+          <UploadZone />
 
-      {/* Transactions table */}
-      <TransactionsTable transactions={transactions} />
+          {/* Transactions table */}
+          <TransactionsTable transactions={transactions} />
+        </>
+      )}
     </div>
   )
 }
