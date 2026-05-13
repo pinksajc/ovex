@@ -2,7 +2,8 @@
 
 import { redirect } from 'next/navigation'
 import { revalidatePath } from 'next/cache'
-import { createInvoice, updateInvoice, updateInvoiceStatus } from '@/lib/supabase/invoices'
+import { createInvoice, updateInvoice, updateInvoiceStatus, getInvoice } from '@/lib/supabase/invoices'
+import { insertCashflowTransactions } from '@/lib/supabase/cashflow'
 import type { CreateInvoiceInput, UpdateInvoiceInput, InvoiceStatus } from '@/types'
 
 export async function createInvoiceAction(input: CreateInvoiceInput): Promise<{ error?: string }> {
@@ -37,7 +38,27 @@ export async function updateInvoiceStatusAction(
   status: InvoiceStatus
 ): Promise<{ ok: boolean; error?: string }> {
   try {
+    // Fetch before updating so we know the previous status and have invoice details
+    const invoice = await getInvoice(id)
     await updateInvoiceStatus(id, status)
+
+    // Auto-create cashflow income entry the first time a factura is marked paid
+    if (status === 'paid' && invoice?.status !== 'paid' && invoice) {
+      const today = new Date().toISOString().split('T')[0]
+      await insertCashflowTransactions([{
+        date: today,
+        description: `Factura ${invoice.number} · ${invoice.clientName}`,
+        amount: invoice.amountTotal,
+        type: 'income',
+        category: 'Ingreso cliente',
+        currency: 'EUR',
+        state: null,
+        balance: null,
+        sourceFile: 'orvex-facturas',
+      }])
+      revalidatePath('/cashflow')
+    }
+
     revalidatePath('/facturas')
     revalidatePath(`/facturas/${id}`)
     return { ok: true }
