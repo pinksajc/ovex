@@ -363,3 +363,35 @@ export interface CreatePresupuestoInput {
 }
 
 export type UpdatePresupuestoInput = CreatePresupuestoInput
+
+// =========================================
+// CASHFLOW
+// =========================================
+
+export type CashflowTxType = 'income' | 'expense'
+
+export interface CashflowTransaction {
+  id: string
+  date: string           // "YYYY-MM-DD"
+  description: string
+  amount: number         // positive = income, negative = expense
+  type: CashflowTxType
+  category: string
+  currency: string
+  state: string | null
+  balance: number | null
+  sourceFile: string | null
+  createdAt: string
+}
+
+export interface InsertCashflowTransaction {
+  date: string
+  description: string
+  amount: number
+  type: CashflowTxType
+  category: string
+  currency: string
+  state: string | null
+  balance: number | null
+  sourceFile: string | null
+}

@@ -18,7 +18,7 @@ export default async function DealsPage({
   // Middleware guarantees auth, but getCurrentUser can return null if profile
   // creation fails — default to a sales-scoped view to avoid crash.
   const user: AuthUser = userOrNull ?? { id: '', email: '', name: null, role: 'sales', mustChangePassword: false }
-  const isAdmin = user.role === 'admin'
+  const isAdmin = user.role === 'admin' || user.role === 'owner'
 
   // Fetch deals and workspace members in parallel.
   // getDeals(user) enforces scoping at query level: sales users only receive their own deals.

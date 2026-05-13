@@ -9,7 +9,7 @@ export async function assignDealOwnerAction(
 ): Promise<{ ok: boolean; error?: string }> {
   try {
     const user = await requireAuth()
-    if (user.role !== 'admin') return { ok: false, error: 'Sin permisos' }
+    if (user.role !== 'admin' && user.role !== 'owner') return { ok: false, error: 'Sin permisos' }
 
     const { setDealOwner } = await import('@/lib/supabase/deal-owners')
     await setDealOwner(attioDealId, newOwnerId, user.id)
