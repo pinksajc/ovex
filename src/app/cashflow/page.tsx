@@ -19,21 +19,24 @@ export default async function CashflowPage() {
   const transactions = await getCashflowTransactions()
 
   // ── KPIs ────────────────────────────────────────────────────────────────────
-  const income  = transactions.filter((t) => t.type === 'income')
-  const expense = transactions.filter((t) => t.type === 'expense')
+  const now = new Date()
 
-  const totalIncome  = income.reduce((s, t) => s + t.amount, 0)
-  const totalExpense = expense.reduce((s, t) => s + Math.abs(t.amount), 0)
+  // KPI 1: Saldo neto — excludes Traspaso interno
+  const operational = transactions.filter((t) => t.category !== 'Traspaso interno')
+  const totalIncome  = operational.filter((t) => t.amount > 0).reduce((s, t) => s + t.amount, 0)
+  const totalExpense = operational.filter((t) => t.amount < 0).reduce((s, t) => s + Math.abs(t.amount), 0)
   const netBalance   = totalIncome - totalExpense
 
-  // Last balance value (most recent transaction with a balance field)
-  const lastBalance = transactions.find((t) => t.balance != null)?.balance ?? null
+  // KPI 2: Préstamos netos
+  const prestamosNet = transactions
+    .filter((t) => t.category === 'Préstamos')
+    .reduce((s, t) => s + t.amount, 0)
 
-  const now = new Date()
+  // KPI 3: Ingreso mes actual — income only, excludes Traspaso interno
   const thisMonthKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
-  const thisMonthTxs = transactions.filter((t) => t.date.startsWith(thisMonthKey))
-  const thisMonthIncome  = thisMonthTxs.filter((t) => t.type === 'income').reduce((s, t) => s + t.amount, 0)
-  const thisMonthExpense = thisMonthTxs.filter((t) => t.type === 'expense').reduce((s, t) => s + Math.abs(t.amount), 0)
+  const thisMonthIncome = transactions
+    .filter((t) => t.date.startsWith(thisMonthKey) && t.amount > 0 && t.category !== 'Traspaso interno')
+    .reduce((s, t) => s + t.amount, 0)
 
   return (
     <div className="min-h-full bg-[#f5f5f7] p-8 space-y-5">
@@ -51,25 +54,26 @@ export default async function CashflowPage() {
       </div>
 
       {/* KPI strip */}
-      <div className="grid grid-cols-5 gap-4">
-        <CfKpi label="Total ingresos"    value={formatCurrency(totalIncome)}  color="#34c759" />
-        <CfKpi label="Total gastos"      value={formatCurrency(totalExpense)} color="#ff3b30" />
+      <div className="grid grid-cols-3 gap-4">
         <CfKpi
           label="Saldo neto"
           value={formatCurrency(Math.abs(netBalance))}
-          color={netBalance >= 0 ? '#0071e3' : '#ff3b30'}
+          color={netBalance >= 0 ? '#34c759' : '#ff3b30'}
           prefix={netBalance >= 0 ? '+' : '−'}
+          sub="Total ingresos − gastos del período"
         />
         <CfKpi
-          label="Saldo actual"
-          value={lastBalance != null ? formatCurrency(Math.abs(lastBalance)) : '—'}
-          color={lastBalance != null && lastBalance >= 0 ? '#34c759' : '#ff3b30'}
+          label="Total préstamos"
+          value={formatCurrency(Math.abs(prestamosNet))}
+          color={prestamosNet >= 0 ? '#34c759' : '#ff3b30'}
+          prefix={prestamosNet >= 0 ? '+' : '−'}
+          sub="Préstamos netos del período"
         />
         <CfKpi
-          label={`Neto ${now.toLocaleDateString('es-ES', { month: 'long' })}`}
-          value={formatCurrency(Math.abs(thisMonthIncome - thisMonthExpense))}
-          color={(thisMonthIncome - thisMonthExpense) >= 0 ? '#34c759' : '#ff3b30'}
-          sub={`+${formatCurrency(thisMonthIncome)} · −${formatCurrency(thisMonthExpense)}`}
+          label={`Ingresos ${now.toLocaleDateString('es-ES', { month: 'long' })}`}
+          value={formatCurrency(thisMonthIncome)}
+          color="#0071e3"
+          sub={`Ingresos ${now.toLocaleDateString('es-ES', { month: 'long' })} (sin traspasos)`}
         />
       </div>
 
