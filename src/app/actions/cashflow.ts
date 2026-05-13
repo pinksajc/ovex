@@ -221,3 +221,53 @@ export async function updateCashflowCategoryAction(
     return { ok: false, error: err instanceof Error ? err.message : 'Error' }
   }
 }
+
+// ── Manual transaction entry ───────────────────────────────────────────────────
+
+export interface AddManualTransactionPayload {
+  date: string        // "YYYY-MM-DD"
+  description: string
+  amount: number      // always positive; sign derived from type
+  type: 'income' | 'expense'
+  category: string
+  notes?: string      // appended to description if present
+}
+
+export interface AddManualTransactionResult {
+  ok: boolean
+  error?: string
+}
+
+export async function addManualTransactionAction(
+  payload: AddManualTransactionPayload,
+): Promise<AddManualTransactionResult> {
+  try {
+    const user = await requireAuth()
+    assertOwner(user.role)
+
+    const signed  = payload.type === 'expense'
+      ? -Math.abs(payload.amount)
+      :  Math.abs(payload.amount)
+
+    const description = payload.notes?.trim()
+      ? `${payload.description} — ${payload.notes.trim()}`
+      : payload.description
+
+    await insertCashflowTransactions([{
+      date: payload.date,
+      description,
+      amount: signed,
+      type: payload.type,
+      category: payload.category,
+      currency: 'EUR',
+      state: null,
+      balance: null,
+      sourceFile: 'manual',
+    }])
+
+    revalidatePath('/cashflow')
+    return { ok: true }
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : 'Error desconocido' }
+  }
+}

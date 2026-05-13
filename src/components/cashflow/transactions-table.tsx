@@ -33,12 +33,11 @@ function CategoryCell({
   description: string
   category: string
 }) {
-  const [editing, setEditing]     = useState(false)
+  const [editing, setEditing]       = useState(false)
   const [optimistic, setOptimistic] = useOptimistic(category)
-  const [, startTransition]       = useTransition()
-  const [toast, setToast]         = useState(false)
+  const [, startTransition]         = useTransition()
+  const [toast, setToast]           = useState(false)
 
-  // Auto-dismiss toast after 2.5 s
   useEffect(() => {
     if (!toast) return
     const t = setTimeout(() => setToast(false), 2500)
@@ -78,8 +77,6 @@ function CategoryCell({
           <PencilIcon className="w-3 h-3 opacity-0 group-hover:opacity-50 transition-opacity shrink-0" />
         </button>
       )}
-
-      {/* "Regla guardada" toast */}
       {toast && (
         <div className="absolute left-0 top-full mt-1 z-10 pointer-events-none">
           <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-1 rounded-md shadow-sm whitespace-nowrap">
@@ -91,15 +88,55 @@ function CategoryCell({
   )
 }
 
+// ── Transaction row (shared between flat + expanded grouped) ──────────────────
+
+function TxRow({ t }: { t: CashflowTransaction }) {
+  return (
+    <tr className="border-b border-zinc-50 hover:bg-zinc-50/50 transition-colors">
+      <td className="px-5 py-3 text-xs text-zinc-500 whitespace-nowrap font-mono">
+        {formatDate(t.date)}
+      </td>
+      <td className="px-5 py-3 text-xs text-zinc-700 max-w-xs truncate">
+        {t.description}
+      </td>
+      <td className={`px-5 py-3 text-xs font-semibold font-mono text-right whitespace-nowrap ${
+        t.type === 'income' ? 'text-emerald-600' : 'text-red-500'
+      }`}>
+        {formatEur(t.amount)}
+      </td>
+      <td className="px-5 py-3">
+        <CategoryCell id={t.id} description={t.description} category={t.category} />
+      </td>
+      <td className="px-5 py-3 text-xs text-zinc-400 whitespace-nowrap">
+        {t.state ?? '—'}
+      </td>
+      <td className="px-5 py-3 text-xs font-mono text-zinc-400 text-right whitespace-nowrap">
+        {t.balance != null
+          ? `${t.balance.toLocaleString('es-ES', { minimumFractionDigits: 2 })} €`
+          : '—'}
+      </td>
+    </tr>
+  )
+}
+
 // ── Main component ─────────────────────────────────────────────────────────────
 
+interface GroupEntry {
+  category: string
+  total: number
+  count: number
+  transactions: CashflowTransaction[]
+}
+
 export function TransactionsTable({ transactions }: { transactions: CashflowTransaction[] }) {
-  const [search, setSearch]     = useState('')
-  const [typeFilter, setType]   = useState<'all' | 'income' | 'expense'>('all')
-  const [catFilter, setCat]     = useState('all')
-  const [dateFrom, setDateFrom] = useState('')
-  const [dateTo, setDateTo]     = useState('')
-  const [page, setPage]         = useState(1)
+  const [search, setSearch]       = useState('')
+  const [typeFilter, setType]     = useState<'all' | 'income' | 'expense'>('all')
+  const [catFilter, setCat]       = useState('all')
+  const [dateFrom, setDateFrom]   = useState('')
+  const [dateTo, setDateTo]       = useState('')
+  const [page, setPage]           = useState(1)
+  const [grouped, setGrouped]     = useState(false)
+  const [expandedCats, setExpCats] = useState<Set<string>>(new Set())
 
   const filtered = useMemo(() => {
     return transactions.filter((t) => {
@@ -115,6 +152,37 @@ export function TransactionsTable({ transactions }: { transactions: CashflowTran
     })
   }, [transactions, typeFilter, catFilter, dateFrom, dateTo, search])
 
+  // ── Grouped data ─────────────────────────────────────────────────────────────
+  const groupedData = useMemo<GroupEntry[]>(() => {
+    const map = new Map<string, { total: number; txs: CashflowTransaction[] }>()
+    for (const t of filtered) {
+      const rec = map.get(t.category) ?? { total: 0, txs: [] }
+      rec.total += t.amount
+      rec.txs.push(t)
+      map.set(t.category, rec)
+    }
+    return Array.from(map.entries())
+      .sort(([, a], [, b]) => Math.abs(b.total) - Math.abs(a.total))
+      .map(([category, { total, txs }]) => ({
+        category,
+        total,
+        count: txs.length,
+        transactions: txs.sort((a, b) => b.date.localeCompare(a.date)),
+      }))
+  }, [filtered])
+
+  function toggleCat(cat: string) {
+    setExpCats((prev) => {
+      const next = new Set(prev)
+      if (next.has(cat)) next.delete(cat)
+      else next.add(cat)
+      return next
+    })
+  }
+  function expandAll()   { setExpCats(new Set(groupedData.map((g) => g.category))) }
+  function collapseAll() { setExpCats(new Set()) }
+
+  // ── Flat view pagination ──────────────────────────────────────────────────────
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE))
   const safePage   = Math.min(page, totalPages)
   const paged      = filtered.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE)
@@ -178,12 +246,51 @@ export function TransactionsTable({ transactions }: { transactions: CashflowTran
           className="text-xs bg-zinc-100 border-0 rounded-lg px-3 py-2 text-zinc-600 focus:outline-none focus:ring-1 focus:ring-zinc-300"
         />
 
-        <div className="ml-auto text-xs text-zinc-400">
-          <span className="font-semibold text-emerald-600">+{formatEur(sumIncome)}</span>
-          {' · '}
-          <span className="font-semibold text-red-500">{formatEur(sumExpense)}</span>
-          {' · '}
-          {filtered.length} registros
+        {/* Group toggle */}
+        <div className="flex items-center bg-zinc-100 rounded-lg p-0.5">
+          <button
+            onClick={() => { setGrouped(false) }}
+            className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
+              !grouped ? 'bg-white text-zinc-900 shadow-sm' : 'text-zinc-500 hover:text-zinc-700'
+            }`}
+          >
+            Ver todas
+          </button>
+          <button
+            onClick={() => { setGrouped(true); setExpCats(new Set()) }}
+            className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
+              grouped ? 'bg-white text-zinc-900 shadow-sm' : 'text-zinc-500 hover:text-zinc-700'
+            }`}
+          >
+            Agrupar por categoría
+          </button>
+        </div>
+
+        <div className="ml-auto flex items-center gap-3">
+          {grouped && (
+            <div className="flex items-center gap-1.5">
+              <button
+                onClick={expandAll}
+                className="text-[11px] text-zinc-400 hover:text-zinc-700 transition-colors"
+              >
+                Expandir todo
+              </button>
+              <span className="text-zinc-300">·</span>
+              <button
+                onClick={collapseAll}
+                className="text-[11px] text-zinc-400 hover:text-zinc-700 transition-colors"
+              >
+                Colapsar todo
+              </button>
+            </div>
+          )}
+          <div className="text-xs text-zinc-400">
+            <span className="font-semibold text-emerald-600">+{formatEur(sumIncome)}</span>
+            {' · '}
+            <span className="font-semibold text-red-500">{formatEur(sumExpense)}</span>
+            {' · '}
+            {filtered.length} registros
+          </div>
         </div>
       </div>
 
@@ -192,69 +299,82 @@ export function TransactionsTable({ transactions }: { transactions: CashflowTran
         <table className="w-full min-w-[700px] text-sm">
           <thead>
             <tr className="border-b border-zinc-100">
-              <th className="px-5 py-3 text-left text-[10px] font-semibold uppercase tracking-widest text-zinc-400 whitespace-nowrap w-28">
-                Fecha
-              </th>
-              <th className="px-5 py-3 text-left text-[10px] font-semibold uppercase tracking-widest text-zinc-400">
-                Descripción
-              </th>
-              <th className="px-5 py-3 text-right text-[10px] font-semibold uppercase tracking-widest text-zinc-400 whitespace-nowrap w-32">
-                Importe
-              </th>
-              <th className="px-5 py-3 text-left text-[10px] font-semibold uppercase tracking-widest text-zinc-400 whitespace-nowrap w-44">
-                Categoría
-              </th>
-              <th className="px-5 py-3 text-left text-[10px] font-semibold uppercase tracking-widest text-zinc-400 whitespace-nowrap w-28">
-                Estado
-              </th>
-              <th className="px-5 py-3 text-right text-[10px] font-semibold uppercase tracking-widest text-zinc-400 whitespace-nowrap w-32">
-                Saldo
-              </th>
+              <th className="px-5 py-3 text-left text-[10px] font-semibold uppercase tracking-widest text-zinc-400 whitespace-nowrap w-28">Fecha</th>
+              <th className="px-5 py-3 text-left text-[10px] font-semibold uppercase tracking-widest text-zinc-400">Descripción</th>
+              <th className="px-5 py-3 text-right text-[10px] font-semibold uppercase tracking-widest text-zinc-400 whitespace-nowrap w-32">Importe</th>
+              <th className="px-5 py-3 text-left text-[10px] font-semibold uppercase tracking-widest text-zinc-400 whitespace-nowrap w-44">Categoría</th>
+              <th className="px-5 py-3 text-left text-[10px] font-semibold uppercase tracking-widest text-zinc-400 whitespace-nowrap w-28">Estado</th>
+              <th className="px-5 py-3 text-right text-[10px] font-semibold uppercase tracking-widest text-zinc-400 whitespace-nowrap w-32">Saldo</th>
             </tr>
           </thead>
           <tbody>
-            {paged.length === 0 ? (
-              <tr>
-                <td colSpan={6} className="px-5 py-12 text-center text-sm text-zinc-400">
-                  Sin transacciones para los filtros seleccionados
-                </td>
-              </tr>
-            ) : (
-              paged.map((t) => (
-                <tr key={t.id} className="border-b border-zinc-50 hover:bg-zinc-50/50 transition-colors">
-                  <td className="px-5 py-3 text-xs text-zinc-500 whitespace-nowrap font-mono">
-                    {formatDate(t.date)}
-                  </td>
-                  <td className="px-5 py-3 text-xs text-zinc-700 max-w-xs truncate">
-                    {t.description}
-                  </td>
-                  <td
-                    className={`px-5 py-3 text-xs font-semibold font-mono text-right whitespace-nowrap ${
-                      t.type === 'income' ? 'text-emerald-600' : 'text-red-500'
-                    }`}
-                  >
-                    {formatEur(t.amount)}
-                  </td>
-                  <td className="px-5 py-3">
-                    <CategoryCell id={t.id} description={t.description} category={t.category} />
-                  </td>
-                  <td className="px-5 py-3 text-xs text-zinc-400 whitespace-nowrap">
-                    {t.state ?? '—'}
-                  </td>
-                  <td className="px-5 py-3 text-xs font-mono text-zinc-400 text-right whitespace-nowrap">
-                    {t.balance != null
-                      ? `${t.balance.toLocaleString('es-ES', { minimumFractionDigits: 2 })} €`
-                      : '—'}
+            {grouped ? (
+              // ── Grouped view ────────────────────────────────────────────────
+              groupedData.length === 0 ? (
+                <tr>
+                  <td colSpan={6} className="px-5 py-12 text-center text-sm text-zinc-400">
+                    Sin transacciones para los filtros seleccionados
                   </td>
                 </tr>
-              ))
+              ) : (
+                groupedData.map((group) => {
+                  const isExpanded = expandedCats.has(group.category)
+                  const isIncome   = group.total >= 0
+                  return (
+                    <>
+                      {/* Group header row */}
+                      <tr
+                        key={`grp-${group.category}`}
+                        onClick={() => toggleCat(group.category)}
+                        className="border-b border-zinc-100 bg-zinc-50/70 hover:bg-zinc-100/60 cursor-pointer transition-colors select-none"
+                      >
+                        <td className="px-5 py-3" colSpan={2}>
+                          <div className="flex items-center gap-2">
+                            <ChevronIcon
+                              open={isExpanded}
+                              className="w-3.5 h-3.5 text-zinc-400 shrink-0 transition-transform"
+                            />
+                            <span className="text-xs font-semibold text-zinc-700">
+                              {group.category}
+                            </span>
+                            <span className="text-[10px] text-zinc-400">
+                              {group.count} transacción{group.count !== 1 ? 'es' : ''}
+                            </span>
+                          </div>
+                        </td>
+                        <td className={`px-5 py-3 text-xs font-bold font-mono text-right whitespace-nowrap ${
+                          isIncome ? 'text-emerald-600' : 'text-red-500'
+                        }`}>
+                          {formatEur(group.total)}
+                        </td>
+                        <td colSpan={3} />
+                      </tr>
+                      {/* Expanded transaction rows */}
+                      {isExpanded && group.transactions.map((t) => (
+                        <TxRow key={t.id} t={t} />
+                      ))}
+                    </>
+                  )
+                })
+              )
+            ) : (
+              // ── Flat view ────────────────────────────────────────────────────
+              paged.length === 0 ? (
+                <tr>
+                  <td colSpan={6} className="px-5 py-12 text-center text-sm text-zinc-400">
+                    Sin transacciones para los filtros seleccionados
+                  </td>
+                </tr>
+              ) : (
+                paged.map((t) => <TxRow key={t.id} t={t} />)
+              )
             )}
           </tbody>
         </table>
       </div>
 
-      {/* Pagination */}
-      {totalPages > 1 && (
+      {/* Pagination (flat view only) */}
+      {!grouped && totalPages > 1 && (
         <div className="px-5 py-4 border-t border-zinc-100 flex items-center justify-between">
           <p className="text-xs text-zinc-400">
             Página {safePage} de {totalPages} · {filtered.length} registros
@@ -281,10 +401,29 @@ export function TransactionsTable({ transactions }: { transactions: CashflowTran
   )
 }
 
+// ── Icons ──────────────────────────────────────────────────────────────────────
+
 function PencilIcon({ className }: { className?: string }) {
   return (
     <svg className={className} viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5">
       <path d="M8.5 1.5 10.5 3.5 4 10H2V8L8.5 1.5Z" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  )
+}
+
+function ChevronIcon({ open, className }: { open: boolean; className?: string }) {
+  return (
+    <svg
+      className={className}
+      style={{ transform: open ? 'rotate(90deg)' : 'rotate(0deg)' }}
+      viewBox="0 0 12 12"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M4 2l4 4-4 4" />
     </svg>
   )
 }
