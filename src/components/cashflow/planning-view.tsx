@@ -33,15 +33,10 @@ export interface PendingInvoice {
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
+const _EUR2 = new Intl.NumberFormat('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+function formatEurFull(n: number) { return `${_EUR2.format(n)} €` }
 function formatEur(n: number) {
-  const abs = Math.abs(n)
-  const sign = n < 0 ? '−' : ''
-  if (abs >= 1000) return `${sign}${(abs / 1000).toFixed(1).replace('.0', '')}k €`
-  return `${sign}${abs.toFixed(0)} €`
-}
-
-function formatEurFull(n: number) {
-  return new Intl.NumberFormat('es-ES', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format(n)
+  return new Intl.NumberFormat('es-ES', { maximumFractionDigits: 0 }).format(n)
 }
 
 function monthLabel(key: string) {
