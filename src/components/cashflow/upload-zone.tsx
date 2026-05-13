@@ -39,14 +39,21 @@ function parseRevolutCSV(text: string): ParsedRow[] {
     .filter(Boolean)
   if (lines.length < 2) return []
 
+  // Normalise header: lowercase + collapse whitespace for flexible matching
   const header = parseCSVLine(lines[0]).map((h) => h.toLowerCase().replace(/\s+/g, ' '))
 
+  // Real Revolut Business CSV columns (as of 2024-2025):
+  //   "Date started (UTC)", "Date completed (UTC)", "ID", "Type", "State",
+  //   "Description", "Reference", "Payer", "Card number", "Card label",
+  //   "Card state", "Orig currency", "Orig amount", "Payment currency",
+  //   "Amount", "Total amount", "Exchange rate", "Fee", "Fee currency",
+  //   "Balance", "Account", …
   const idx = {
-    completedDate: header.indexOf('completed date'),
-    startedDate:   header.indexOf('started date'),
+    completedDate: header.indexOf('date completed (utc)'),
+    startedDate:   header.indexOf('date started (utc)'),
     description:   header.indexOf('description'),
     amount:        header.indexOf('amount'),
-    currency:      header.indexOf('currency'),
+    currency:      header.indexOf('payment currency'),
     state:         header.indexOf('state'),
     balance:       header.indexOf('balance'),
   }
@@ -56,7 +63,11 @@ function parseRevolutCSV(text: string): ParsedRow[] {
     const cols = parseCSVLine(lines[i])
     if (cols.length < 4) continue
 
-    // Date: prefer Completed Date, fall back to Started Date
+    // Skip non-completed rows (PENDING, REVERTED, FAILED, etc.)
+    const state = idx.state >= 0 ? (cols[idx.state] || '').toUpperCase() : ''
+    if (state && state !== 'COMPLETED') continue
+
+    // Date: use "Date completed (UTC)", fall back to "Date started (UTC)"
     const rawDate =
       (idx.completedDate >= 0 ? cols[idx.completedDate] : '') ||
       (idx.startedDate   >= 0 ? cols[idx.startedDate]   : '') ||
@@ -67,16 +78,16 @@ function parseRevolutCSV(text: string): ParsedRow[] {
     const description = idx.description >= 0 ? cols[idx.description] || '' : ''
     if (!description) continue
 
-    // Amount: strip unicode minus (−) and other non-numeric chars, preserve ASCII minus
+    // Amount: already signed in Revolut CSVs (negative = expense, positive = income)
+    // Strip unicode minus (−) and thousands separators; keep ASCII minus and decimal
     const rawAmount = idx.amount >= 0 ? cols[idx.amount] : '0'
     const cleanAmount = rawAmount
-      .replace(/−/g, '-')   // unicode minus → ASCII minus
-      .replace(/[^\d.\-]/g, '')  // remove everything else except digits, dot, minus
+      .replace(/−/g, '-')              // unicode minus → ASCII minus
+      .replace(/[^\d.\-]/g, '')        // remove everything else
     const amount = parseFloat(cleanAmount)
     if (isNaN(amount)) continue
 
     const currency = idx.currency >= 0 ? cols[idx.currency] || 'EUR' : 'EUR'
-    const state    = idx.state   >= 0 ? cols[idx.state]   || null : null
 
     const rawBalance = idx.balance >= 0 ? cols[idx.balance] : ''
     const cleanBalance = rawBalance
@@ -84,7 +95,14 @@ function parseRevolutCSV(text: string): ParsedRow[] {
       .replace(/[^\d.\-]/g, '')
     const balance = cleanBalance ? parseFloat(cleanBalance) : null
 
-    rows.push({ date, description, amount, currency, state, balance: isNaN(balance!) ? null : balance })
+    rows.push({
+      date,
+      description,
+      amount,
+      currency,
+      state: state || null,
+      balance: balance !== null && isNaN(balance) ? null : balance,
+    })
   }
 
   return rows
