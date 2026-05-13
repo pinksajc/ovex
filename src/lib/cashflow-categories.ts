@@ -18,6 +18,7 @@ export const CASHFLOW_CATEGORIES = [
   'Marketing',
   'Otras herramientas',
   'Traspaso interno',
+  'Refunds',
   'Otros',
 ] as const
 
