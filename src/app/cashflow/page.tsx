@@ -5,6 +5,7 @@ import { formatCurrency } from '@/lib/format'
 import { UploadZone } from '@/components/cashflow/upload-zone'
 import { RecategorizeButton } from '@/components/cashflow/recategorize-button'
 import { DateRangeFilter } from '@/components/cashflow/date-range-filter'
+import { AddTransactionButton } from '@/components/cashflow/add-transaction-button'
 import { TransactionsTable } from '@/components/cashflow/transactions-table'
 import {
   IncomeExpenseChart,
@@ -67,6 +68,7 @@ export default async function CashflowPage({
         </div>
         <div className="flex items-center gap-3 pt-1">
           <DateRangeFilter from={dateFrom} to={dateTo} />
+          <AddTransactionButton />
           <RecategorizeButton />
         </div>
       </div>
