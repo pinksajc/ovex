@@ -22,15 +22,10 @@ function monthLabel(key: string) {
   return new Date(y, m - 1, 1).toLocaleDateString('es-ES', { month: 'short', year: '2-digit' })
 }
 
-function formatK(n: number) {
-  if (Math.abs(n) >= 1000) return `${(n / 1000).toFixed(1).replace('.0', '')}k`
-  return `${Math.round(n)}`
-}
-
-function formatEur(n: number) {
-  const abs = Math.abs(n)
-  if (abs >= 1000) return `${(abs / 1000).toFixed(2).replace(/\.?0+$/, '')}k €`
-  return `${abs.toFixed(2)} €`
+const _EUR2 = new Intl.NumberFormat('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+function eur(n: number) { return `${_EUR2.format(Math.abs(n))} €` }
+function eurAxis(n: number) {
+  return new Intl.NumberFormat('es-ES', { maximumFractionDigits: 0 }).format(n)
 }
 
 // ── Tooltip interfaces (recharts v3 compat) ───────────────────────────────────
@@ -47,10 +42,10 @@ function IncomeExpenseTooltip({ active, payload, label }: {
   return (
     <div className="bg-white rounded-xl shadow-lg px-4 py-3 border border-zinc-100 text-xs space-y-0.5">
       <p className="font-semibold text-zinc-700 mb-1.5">{label}</p>
-      <p className="font-mono" style={{ color: '#34c759' }}>Ingresos: {formatEur(income)}</p>
-      <p className="font-mono" style={{ color: '#ff3b30' }}>Gastos: {formatEur(expense)}</p>
+      <p className="font-mono" style={{ color: '#34c759' }}>Ingresos: {eur(income)}</p>
+      <p className="font-mono" style={{ color: '#ff3b30' }}>Gastos: {eur(expense)}</p>
       <p className="font-mono font-semibold" style={{ color: neto >= 0 ? '#0071e3' : '#ff3b30' }}>
-        Neto: {neto >= 0 ? '+' : '−'}{formatEur(Math.abs(neto))}
+        Neto: {neto >= 0 ? '+' : '−'}{eur(Math.abs(neto))}
       </p>
     </div>
   )
@@ -65,7 +60,7 @@ function LineTooltip({ active, payload, label }: {
     <div className="bg-white rounded-xl shadow-lg px-4 py-3 border border-zinc-100 text-xs">
       <p className="font-semibold text-zinc-700 mb-1">{label}</p>
       <p className="font-mono" style={{ color: val >= 0 ? '#0071e3' : '#ff3b30' }}>
-        Saldo: {formatEur(val)}
+        Saldo: {eur(val)}
       </p>
     </div>
   )
@@ -111,7 +106,7 @@ export function IncomeExpenseChart({ transactions }: { transactions: CashflowTra
         <LineChart data={data} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
           <CartesianGrid strokeDasharray="0" stroke="#f0f0f0" vertical={false} />
           <XAxis dataKey="month" tick={{ fontSize: 10, fill: '#a1a1aa' }} axisLine={false} tickLine={false} dy={4} />
-          <YAxis tickFormatter={formatK} tick={{ fontSize: 10, fill: '#a1a1aa' }} axisLine={false} tickLine={false} dx={-4} width={40} />
+          <YAxis tickFormatter={eurAxis} tick={{ fontSize: 10, fill: '#a1a1aa' }} axisLine={false} tickLine={false} dx={-4} width={40} />
           <Tooltip content={<IncomeExpenseTooltip />} />
           <Line
             type="monotone"
@@ -187,7 +182,7 @@ export function ExpenseCategoryDonut({ transactions }: { transactions: CashflowT
               })
             })()}
             <text x={cx} y={cy + 1} textAnchor="middle" fontSize={13} fontWeight="700" fill="#18181b">
-              {formatK(total)}
+              {eurAxis(total)}
             </text>
             <text x={cx} y={cy + 16} textAnchor="middle" fontSize={9} fill="#a1a1aa" fontWeight="500">
               total gasto
@@ -201,7 +196,7 @@ export function ExpenseCategoryDonut({ transactions }: { transactions: CashflowT
                   <span className="w-2 h-2 rounded-full shrink-0" style={{ background: seg.color }} />
                   <span className="text-xs text-zinc-600 truncate">{seg.label}</span>
                 </div>
-                <span className="text-xs font-mono text-zinc-400 shrink-0">{formatEur(seg.amount)}</span>
+                <span className="text-xs font-mono text-zinc-400 shrink-0">{eur(seg.amount)}</span>
               </div>
             ))}
           </div>
@@ -263,7 +258,7 @@ export function BalanceTrendChart({ transactions }: { transactions: CashflowTran
         <LineChart data={data} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
           <CartesianGrid strokeDasharray="0" stroke="#f0f0f0" vertical={false} />
           <XAxis dataKey="month" tick={{ fontSize: 10, fill: '#a1a1aa' }} axisLine={false} tickLine={false} dy={4} />
-          <YAxis tickFormatter={formatK} tick={{ fontSize: 10, fill: '#a1a1aa' }} axisLine={false} tickLine={false} dx={-4} width={44} />
+          <YAxis tickFormatter={eurAxis} tick={{ fontSize: 10, fill: '#a1a1aa' }} axisLine={false} tickLine={false} dx={-4} width={44} />
           <Tooltip content={<LineTooltip />} />
           {hasNegative && <ReferenceLine y={0} stroke="#e4e4e7" strokeWidth={1} />}
           <Line

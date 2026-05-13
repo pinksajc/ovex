@@ -5,11 +5,9 @@ import { updateCashflowCategoryAction } from '@/app/actions/cashflow'
 import { CASHFLOW_CATEGORIES } from '@/lib/cashflow-categories'
 import type { CashflowTransaction } from '@/types'
 
+const _EUR2 = new Intl.NumberFormat('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 function formatEur(n: number) {
-  const abs = Math.abs(n)
-  if (abs >= 1000)
-    return `${n < 0 ? '−' : '+'}${(abs / 1000).toFixed(2).replace(/\.?0+$/, '')}k €`
-  return `${n < 0 ? '−' : '+'}${abs.toFixed(2)} €`
+  return `${n < 0 ? '−' : '+'}${_EUR2.format(Math.abs(n))} €`
 }
 
 function formatDate(d: string) {
@@ -112,7 +110,7 @@ function TxRow({ t }: { t: CashflowTransaction }) {
       </td>
       <td className="px-5 py-3 text-xs font-mono text-zinc-400 text-right whitespace-nowrap">
         {t.balance != null
-          ? `${t.balance.toLocaleString('es-ES', { minimumFractionDigits: 2 })} €`
+          ? `${_EUR2.format(t.balance)} €`
           : '—'}
       </td>
     </tr>
