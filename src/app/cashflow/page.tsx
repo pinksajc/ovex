@@ -3,6 +3,7 @@ import { getCurrentUser } from '@/lib/auth'
 import { getCashflowTransactions } from '@/lib/supabase/cashflow'
 import { formatCurrency } from '@/lib/format'
 import { UploadZone } from '@/components/cashflow/upload-zone'
+import { RecategorizeButton } from '@/components/cashflow/recategorize-button'
 import { TransactionsTable } from '@/components/cashflow/transactions-table'
 import {
   IncomeExpenseChart,
@@ -37,11 +38,16 @@ export default async function CashflowPage() {
   return (
     <div className="min-h-full bg-[#f5f5f7] p-8 space-y-5">
       {/* Header */}
-      <div className="mb-2">
-        <h1 className="text-2xl font-bold text-zinc-900 tracking-tight">Flujo de Caja</h1>
-        <p className="text-sm text-zinc-400 mt-0.5">
-          {transactions.length} transacciones · datos de Revolut
-        </p>
+      <div className="mb-2 flex items-start justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold text-zinc-900 tracking-tight">Flujo de Caja</h1>
+          <p className="text-sm text-zinc-400 mt-0.5">
+            {transactions.length} transacciones · datos de Revolut
+          </p>
+        </div>
+        <div className="pt-1">
+          <RecategorizeButton />
+        </div>
       </div>
 
       {/* KPI strip */}

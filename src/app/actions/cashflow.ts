@@ -9,6 +9,7 @@ import {
   updateCashflowCategoryByDescription,
   getCategoryRulesMap,
   upsertCategoryRule,
+  recategorizeAllTransactions,
 } from '@/lib/supabase/cashflow'
 import { CATEGORIZABLE } from '@/lib/cashflow-categories'
 import type { InsertCashflowTransaction } from '@/types'
@@ -165,6 +166,26 @@ export async function importCashflowAction(
       skipped: 0,
       error: err instanceof Error ? err.message : 'Error desconocido',
     }
+  }
+}
+
+// ── Recategorize all transactions from saved rules ────────────────────────────
+
+export interface RecategorizeResult {
+  ok: boolean
+  updated: number
+  error?: string
+}
+
+export async function recategorizeAllAction(): Promise<RecategorizeResult> {
+  try {
+    const user = await requireAuth()
+    assertOwner(user.role)
+    const updated = await recategorizeAllTransactions()
+    revalidatePath('/cashflow')
+    return { ok: true, updated }
+  } catch (err) {
+    return { ok: false, updated: 0, error: err instanceof Error ? err.message : 'Error' }
   }
 }
 

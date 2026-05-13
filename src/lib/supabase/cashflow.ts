@@ -150,3 +150,31 @@ export async function upsertCategoryRule(
   )
   if (error) throw new Error(`upsertCategoryRule: ${error.message}`)
 }
+
+/**
+ * Re-apply every saved rule to existing transactions.
+ * For each rule, bulk-updates all transactions whose description matches
+ * and whose current category differs.  Returns total rows changed.
+ */
+export async function recategorizeAllTransactions(): Promise<number> {
+  const rules = await getCategoryRulesMap()
+  if (rules.size === 0) return 0
+
+  const db = getSupabaseClient()
+  let totalUpdated = 0
+
+  for (const [description, category] of rules) {
+    const { data, error } = await table(db)
+      .update({ category })
+      .eq('description', description)
+      .neq('category', category)   // skip rows already correct
+      .select('id')
+    if (error) {
+      console.warn(`[recategorize] error for "${description}":`, error.message)
+      continue
+    }
+    totalUpdated += (data as { id: string }[]).length
+  }
+
+  return totalUpdated
+}
