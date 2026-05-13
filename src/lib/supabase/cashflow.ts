@@ -163,27 +163,146 @@ function escapeLikePattern(s: string): string {
     .replace(/_/g,  '\\_')  // literal underscore (e.g. "Ups_es")
 }
 
+// ── Hardcoded wildcard rules ────────────────────────────────────────────────────
+// Applied as a fallback (only to 'Sin categoría' rows) after DB rules.
+// Order matters: more specific multi-part patterns must come before broader ones
+// (e.g. vercel%supabase before vercel so the former wins for those rows).
+
+interface WildcardRule {
+  /** One or more ILIKE patterns — joined with OR. */
+  patterns: string[]
+  category: string
+}
+
+const HARDCODED_WILDCARD_RULES: WildcardRule[] = [
+  // ── Nómina ──────────────────────────────────────────────────────────────────
+  { patterns: ['%casanova%'],                              category: 'Nómina' },
+  { patterns: ['%camila%carbonell%', '%camila%betania%'],  category: 'Nómina' },
+  { patterns: ['%diego%prada%'],                           category: 'Nómina' },
+  { patterns: ['%daniel%sanchez%', '%daniel%marin%'],      category: 'Nómina' },
+  { patterns: ['%david%mella%'],                           category: 'Nómina' },
+  { patterns: ['%federico%maza%'],                         category: 'Nómina' },
+  { patterns: ['%carlos%bautista%'],                       category: 'Nómina' },
+  { patterns: ['%sergio%cerro%'],                          category: 'Nómina' },
+  { patterns: ['%yolgelis%'],                              category: 'Nómina' },
+  { patterns: ['%luijavier%'],                             category: 'Nómina' },
+  { patterns: ['%luniel%'],                                category: 'Nómina' },
+  { patterns: ['%romulo%'],                                category: 'Nómina' },
+  { patterns: ['%michael%arismendi%'],                     category: 'Nómina' },
+  { patterns: ['%marco%davis%'],                           category: 'Nómina' },
+  { patterns: ['%luis%lucena%'],                           category: 'Nómina' },
+
+  // ── Hardware ─────────────────────────────────────────────────────────────────
+  { patterns: ['%humberto%fernandez%'],                    category: 'Hardware' },
+  { patterns: ['%grover%'],                                category: 'Hardware' },
+  { patterns: ['%stripe%'],                                category: 'Hardware' },
+  { patterns: ['%pccomponentes%', '%pc box%', '%refurbed%'], category: 'Hardware' },
+  { patterns: ['%unibox%'],                                category: 'Hardware' },
+
+  // ── Préstamos ────────────────────────────────────────────────────────────────
+  { patterns: ['%smashburger%'],                           category: 'Préstamos' },
+
+  // ── Administrativo ───────────────────────────────────────────────────────────
+  { patterns: ['%inversiones%toribio%'],                   category: 'Administrativo' },
+  { patterns: ['%gacimartin%'],                            category: 'Administrativo' },
+  { patterns: ['%soler%lluch%'],                           category: 'Administrativo' },
+  { patterns: ['%slack%'],                                 category: 'Administrativo' },
+  { patterns: ['%revolut%fee%'],                           category: 'Administrativo' },
+  { patterns: ['%linkedin%'],                              category: 'Administrativo' },
+  { patterns: ['%gm integra%'],                            category: 'Administrativo' },
+  { patterns: ['%merlin properties%'],                     category: 'Administrativo' },
+
+  // ── Impuestos ────────────────────────────────────────────────────────────────
+  { patterns: ['%tesoreria%general%'],                     category: 'Impuestos' },
+
+  // ── Oficina ──────────────────────────────────────────────────────────────────
+  { patterns: ['%inmobiliaria%lares%'],                    category: 'Oficina' },
+  { patterns: ['%mp**%', '%mp*%'],                         category: 'Oficina' },
+  { patterns: ['%wallapop%'],                              category: 'Oficina' },
+
+  // ── Ingreso cliente ──────────────────────────────────────────────────────────
+  { patterns: ['%red ops%'],                               category: 'Ingreso cliente' },
+  { patterns: ['%micanopy%'],                              category: 'Ingreso cliente' },
+
+  // ── Traspaso interno ─────────────────────────────────────────────────────────
+  { patterns: ['%platomico%'],                             category: 'Traspaso interno' },
+
+  // ── Herramientas IA ──────────────────────────────────────────────────────────
+  { patterns: ['%openai%'],                                category: 'Herramientas IA' },
+  { patterns: ['%outscraper%'],                            category: 'Herramientas IA' },
+  { patterns: ['%lovable%'],                               category: 'Herramientas IA' },
+  { patterns: ['%elevenlabs%'],                            category: 'Herramientas IA' },
+
+  // ── Comunicaciones ───────────────────────────────────────────────────────────
+  { patterns: ['%telefonica%'],                            category: 'Comunicaciones' },
+  { patterns: ['%twilio%'],                                category: 'Comunicaciones' },
+  { patterns: ['%rinkel%'],                                category: 'Comunicaciones' },
+  { patterns: ['%resend%'],                                category: 'Comunicaciones' },
+
+  // ── Base de datos (specific compound pattern before broad vercel) ─────────────
+  { patterns: ['%vercel%supabase%'],                       category: 'Base de datos' },
+  { patterns: ['%supabase%'],                              category: 'Base de datos' },
+  { patterns: ['%redis%'],                                 category: 'Base de datos' },
+
+  // ── Servidores/Hosting ───────────────────────────────────────────────────────
+  { patterns: ['%vercel%'],                                category: 'Servidores/Hosting' },
+  { patterns: ['%aws%'],                                   category: 'Servidores/Hosting' },
+  { patterns: ['%railway%'],                               category: 'Servidores/Hosting' },
+
+  // ── Refunds ──────────────────────────────────────────────────────────────────
+  { patterns: ['%refund%'],                                category: 'Refunds' },
+
+  // ── Otros ────────────────────────────────────────────────────────────────────
+  { patterns: ['%amazon%'],                                category: 'Otros' },
+]
+
 /**
- * Re-apply every saved rule to existing transactions using case-insensitive
- * description matching (ILIKE with escaped literal pattern).
- * Only updates rows whose category actually differs.  Returns total rows changed.
+ * Re-apply every saved rule to existing transactions using keyword-based
+ * ILIKE matching (%pattern%), then apply hardcoded wildcard rules as a
+ * fallback for still-uncategorised rows.
+ * Returns total rows changed.
  */
 export async function recategorizeAllTransactions(): Promise<number> {
-  const rules = await getCategoryRulesMap()
-  if (rules.size === 0) return 0
-
   const db = getSupabaseClient()
   let totalUpdated = 0
 
+  // ── 1. DB rules — keyword ILIKE ('%pattern%') ─────────────────────────────
+  const rules = await getCategoryRulesMap()
+
   for (const [description, category] of rules) {
-    const pattern = escapeLikePattern(description)
+    const keyword = escapeLikePattern(description)
+    const pattern = `%${keyword}%`
     const { data, error } = await table(db)
       .update({ category })
-      .ilike('description', pattern)  // case-insensitive exact match
-      .neq('category', category)      // skip rows already correct
+      .ilike('description', pattern)
+      .neq('category', category)
       .select('id')
     if (error) {
-      console.warn(`[recategorize] error for "${description}":`, error.message)
+      console.warn(`[recategorize] DB rule error for "${description}":`, error.message)
+      continue
+    }
+    totalUpdated += (data as { id: string }[]).length
+  }
+
+  // ── 2. Hardcoded wildcard rules — fallback only for 'Sin categoría' ────────
+  for (const rule of HARDCODED_WILDCARD_RULES) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    let query: any = table(db)
+      .update({ category: rule.category })
+      .eq('category', 'Sin categoría')
+
+    if (rule.patterns.length === 1) {
+      query = query.ilike('description', rule.patterns[0])
+    } else {
+      const orFilter = rule.patterns
+        .map((p) => `description.ilike.${p}`)
+        .join(',')
+      query = query.or(orFilter)
+    }
+
+    const { data, error } = await query.select('id')
+    if (error) {
+      console.warn(`[recategorize] wildcard rule error for ${rule.patterns.join('|')}:`, error.message)
       continue
     }
     totalUpdated += (data as { id: string }[]).length
