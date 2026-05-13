@@ -104,3 +104,49 @@ export async function updateCashflowCategory(id: string, category: string): Prom
   const { error } = await table(db).update({ category }).eq('id', id)
   if (error) throw new Error(`updateCashflowCategory: ${error.message}`)
 }
+
+/** Bulk-update every transaction that shares the same description. */
+export async function updateCashflowCategoryByDescription(
+  description: string,
+  category: string,
+): Promise<void> {
+  const db = getSupabaseClient()
+  const { error } = await table(db).update({ category }).eq('description', description)
+  if (error) throw new Error(`updateCashflowCategoryByDescription: ${error.message}`)
+}
+
+// ── Category rules ─────────────────────────────────────────────────────────────
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function rulesTable(db: ReturnType<typeof getSupabaseClient>) {
+  return (db as unknown as { from(t: string): any }).from('cashflow_category_rules')
+}
+
+/** Returns a Map<description_pattern, category> for all saved rules. */
+export async function getCategoryRulesMap(): Promise<Map<string, string>> {
+  const db = getSupabaseClient()
+  const { data, error } = await rulesTable(db).select('description_pattern,category')
+  if (error) {
+    // Table may not exist yet — return empty map rather than crashing
+    console.warn('[cashflow] getCategoryRulesMap error (table may not exist yet):', error.message)
+    return new Map()
+  }
+  return new Map(
+    (data as { description_pattern: string; category: string }[]).map(
+      (r) => [r.description_pattern, r.category],
+    ),
+  )
+}
+
+/** Upsert a single rule — ON CONFLICT DO UPDATE. */
+export async function upsertCategoryRule(
+  descriptionPattern: string,
+  category: string,
+): Promise<void> {
+  const db = getSupabaseClient()
+  const { error } = await rulesTable(db).upsert(
+    { description_pattern: descriptionPattern, category },
+    { onConflict: 'description_pattern' },
+  )
+  if (error) throw new Error(`upsertCategoryRule: ${error.message}`)
+}

@@ -1,20 +1,9 @@
 'use client'
 
-import { useState, useMemo, useTransition, useOptimistic } from 'react'
+import { useState, useMemo, useTransition, useOptimistic, useEffect } from 'react'
 import { updateCashflowCategoryAction } from '@/app/actions/cashflow'
+import { CASHFLOW_CATEGORIES } from '@/lib/cashflow-categories'
 import type { CashflowTransaction } from '@/types'
-
-const CATEGORIES = [
-  'Sin categoría',
-  'Ingreso cliente',
-  'Nómina',
-  'Proveedor',
-  'Impuestos',
-  'Software',
-  'Marketing',
-  'Oficina',
-  'Otros',
-] as const
 
 function formatEur(n: number) {
   const abs = Math.abs(n)
@@ -33,64 +22,84 @@ function formatDate(d: string) {
 
 const PAGE_SIZE = 50
 
-// ── Category cell with inline dropdown ────────────────────────────────────────
+// ── Category cell with inline dropdown + "Regla guardada" toast ───────────────
 
 function CategoryCell({
   id,
+  description,
   category,
 }: {
   id: string
+  description: string
   category: string
 }) {
-  const [editing, setEditing] = useState(false)
+  const [editing, setEditing]     = useState(false)
   const [optimistic, setOptimistic] = useOptimistic(category)
-  const [, startTransition] = useTransition()
+  const [, startTransition]       = useTransition()
+  const [toast, setToast]         = useState(false)
+
+  // Auto-dismiss toast after 2.5 s
+  useEffect(() => {
+    if (!toast) return
+    const t = setTimeout(() => setToast(false), 2500)
+    return () => clearTimeout(t)
+  }, [toast])
 
   function handleChange(e: React.ChangeEvent<HTMLSelectElement>) {
     const next = e.target.value
     startTransition(async () => {
       setOptimistic(next)
       setEditing(false)
-      await updateCashflowCategoryAction(id, next)
+      const result = await updateCashflowCategoryAction(id, description, next)
+      if (result.ruleCreated) setToast(true)
     })
   }
 
-  if (editing) {
-    return (
-      <select
-        value={optimistic}
-        onChange={handleChange}
-        onBlur={() => setEditing(false)}
-        autoFocus
-        className="text-xs border border-blue-300 rounded-md px-2 py-1 bg-white focus:outline-none focus:ring-1 focus:ring-blue-400"
-      >
-        {CATEGORIES.map((c) => (
-          <option key={c} value={c}>{c}</option>
-        ))}
-      </select>
-    )
-  }
-
   return (
-    <button
-      onClick={() => setEditing(true)}
-      className="group flex items-center gap-1.5 text-xs text-zinc-500 hover:text-zinc-900 transition-colors"
-    >
-      <span>{optimistic}</span>
-      <PencilIcon className="w-3 h-3 opacity-0 group-hover:opacity-50 transition-opacity shrink-0" />
-    </button>
+    <div className="relative">
+      {editing ? (
+        <select
+          value={optimistic}
+          onChange={handleChange}
+          onBlur={() => setEditing(false)}
+          autoFocus
+          className="text-xs border border-blue-300 rounded-md px-2 py-1 bg-white focus:outline-none focus:ring-1 focus:ring-blue-400"
+        >
+          {CASHFLOW_CATEGORIES.map((c) => (
+            <option key={c} value={c}>{c}</option>
+          ))}
+        </select>
+      ) : (
+        <button
+          onClick={() => setEditing(true)}
+          className="group flex items-center gap-1.5 text-xs text-zinc-500 hover:text-zinc-900 transition-colors"
+        >
+          <span>{optimistic}</span>
+          <PencilIcon className="w-3 h-3 opacity-0 group-hover:opacity-50 transition-opacity shrink-0" />
+        </button>
+      )}
+
+      {/* "Regla guardada" toast */}
+      {toast && (
+        <div className="absolute left-0 top-full mt-1 z-10 pointer-events-none">
+          <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-1 rounded-md shadow-sm whitespace-nowrap">
+            ✓ Regla guardada
+          </span>
+        </div>
+      )}
+    </div>
   )
 }
 
 // ── Main component ─────────────────────────────────────────────────────────────
 
 export function TransactionsTable({ transactions }: { transactions: CashflowTransaction[] }) {
-  const [search, setSearch]       = useState('')
-  const [typeFilter, setType]     = useState<'all' | 'income' | 'expense'>('all')
-  const [catFilter, setCat]       = useState('all')
-  const [dateFrom, setDateFrom]   = useState('')
-  const [dateTo, setDateTo]       = useState('')
-  const [page, setPage]           = useState(1)
+  const [search, setSearch]     = useState('')
+  const [typeFilter, setType]   = useState<'all' | 'income' | 'expense'>('all')
+  const [catFilter, setCat]     = useState('all')
+  const [dateFrom, setDateFrom] = useState('')
+  const [dateTo, setDateTo]     = useState('')
+  const [page, setPage]         = useState(1)
 
   const filtered = useMemo(() => {
     return transactions.filter((t) => {
@@ -110,7 +119,6 @@ export function TransactionsTable({ transactions }: { transactions: CashflowTran
   const safePage   = Math.min(page, totalPages)
   const paged      = filtered.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE)
 
-  // Summary for filtered set
   const sumIncome  = filtered.filter((t) => t.type === 'income').reduce((s, t) => s + t.amount, 0)
   const sumExpense = filtered.filter((t) => t.type === 'expense').reduce((s, t) => s + t.amount, 0)
 
@@ -193,7 +201,7 @@ export function TransactionsTable({ transactions }: { transactions: CashflowTran
               <th className="px-5 py-3 text-right text-[10px] font-semibold uppercase tracking-widest text-zinc-400 whitespace-nowrap w-32">
                 Importe
               </th>
-              <th className="px-5 py-3 text-left text-[10px] font-semibold uppercase tracking-widest text-zinc-400 whitespace-nowrap w-40">
+              <th className="px-5 py-3 text-left text-[10px] font-semibold uppercase tracking-widest text-zinc-400 whitespace-nowrap w-44">
                 Categoría
               </th>
               <th className="px-5 py-3 text-left text-[10px] font-semibold uppercase tracking-widest text-zinc-400 whitespace-nowrap w-28">
@@ -228,13 +236,15 @@ export function TransactionsTable({ transactions }: { transactions: CashflowTran
                     {formatEur(t.amount)}
                   </td>
                   <td className="px-5 py-3">
-                    <CategoryCell id={t.id} category={t.category} />
+                    <CategoryCell id={t.id} description={t.description} category={t.category} />
                   </td>
                   <td className="px-5 py-3 text-xs text-zinc-400 whitespace-nowrap">
                     {t.state ?? '—'}
                   </td>
                   <td className="px-5 py-3 text-xs font-mono text-zinc-400 text-right whitespace-nowrap">
-                    {t.balance != null ? `${t.balance.toLocaleString('es-ES', { minimumFractionDigits: 2 })} €` : '—'}
+                    {t.balance != null
+                      ? `${t.balance.toLocaleString('es-ES', { minimumFractionDigits: 2 })} €`
+                      : '—'}
                   </td>
                 </tr>
               ))
