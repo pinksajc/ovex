@@ -93,10 +93,10 @@ export function AddTransactionButton() {
       {/* Trigger button */}
       <button
         onClick={handleOpen}
-        className="inline-flex items-center gap-1.5 text-xs font-medium text-white bg-zinc-900 hover:bg-zinc-700 px-3 py-1.5 rounded-lg transition-colors"
+        className="inline-flex items-center gap-1 text-xs font-medium text-zinc-600 hover:text-zinc-900 bg-white border border-zinc-200 hover:border-zinc-400 px-2.5 py-1.5 rounded-lg transition-colors"
       >
         <PlusIcon className="w-3 h-3" />
-        Añadir transacción
+        Añadir
       </button>
 
       {/* Modal */}
