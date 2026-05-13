@@ -4,6 +4,7 @@ import { getCashflowTransactions } from '@/lib/supabase/cashflow'
 import { formatCurrency } from '@/lib/format'
 import { UploadZone } from '@/components/cashflow/upload-zone'
 import { RecategorizeButton } from '@/components/cashflow/recategorize-button'
+import { DateRangeFilter } from '@/components/cashflow/date-range-filter'
 import { TransactionsTable } from '@/components/cashflow/transactions-table'
 import {
   IncomeExpenseChart,
@@ -11,18 +12,34 @@ import {
   BalanceTrendChart,
 } from '@/components/cashflow/cashflow-charts'
 
-export default async function CashflowPage() {
+export default async function CashflowPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ from?: string; to?: string }>
+}) {
   const user = await getCurrentUser()
   if (!user) redirect('/login')
   if (user.role !== 'owner' && user.role !== 'admin') redirect('/dashboard')
 
-  const transactions = await getCashflowTransactions()
-
-  // ── KPIs ────────────────────────────────────────────────────────────────────
   const now = new Date()
 
+  // ── Date range — default: Jan 1 of current year → today ──────────────────
+  const { from: fromParam, to: toParam } = await searchParams
+  const defaultFrom = `${now.getFullYear()}-01-01`
+  const defaultTo   = now.toISOString().split('T')[0]
+  const dateFrom    = fromParam ?? defaultFrom
+  const dateTo      = toParam   ?? defaultTo
+
+  // ── Fetch all + filter by date range ──────────────────────────────────────
+  const allTransactions = await getCashflowTransactions()
+  const transactions = allTransactions.filter(
+    (t) => t.date >= dateFrom && t.date <= dateTo,
+  )
+
+  // ── KPIs ────────────────────────────────────────────────────────────────────
+
   // KPI 1: Saldo neto — excludes Traspaso interno
-  const operational = transactions.filter((t) => t.category !== 'Traspaso interno')
+  const operational  = transactions.filter((t) => t.category !== 'Traspaso interno')
   const totalIncome  = operational.filter((t) => t.amount > 0).reduce((s, t) => s + t.amount, 0)
   const totalExpense = operational.filter((t) => t.amount < 0).reduce((s, t) => s + Math.abs(t.amount), 0)
   const netBalance   = totalIncome - totalExpense
@@ -32,8 +49,8 @@ export default async function CashflowPage() {
     .filter((t) => t.category === 'Préstamos')
     .reduce((s, t) => s + t.amount, 0)
 
-  // KPI 3: Ingreso mes actual — income only, excludes Traspaso interno
-  const thisMonthKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
+  // KPI 3: Ingreso mes actual within the filtered set — income only, excludes Traspaso interno
+  const thisMonthKey  = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
   const thisMonthIncome = transactions
     .filter((t) => t.date.startsWith(thisMonthKey) && t.amount > 0 && t.category !== 'Traspaso interno')
     .reduce((s, t) => s + t.amount, 0)
@@ -48,7 +65,8 @@ export default async function CashflowPage() {
             {transactions.length} transacciones · datos de Revolut
           </p>
         </div>
-        <div className="pt-1">
+        <div className="flex items-center gap-3 pt-1">
+          <DateRangeFilter from={dateFrom} to={dateTo} />
           <RecategorizeButton />
         </div>
       </div>
