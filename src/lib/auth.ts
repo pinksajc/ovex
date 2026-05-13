@@ -8,7 +8,7 @@ import { cookies } from 'next/headers'
 import { createAuthServerClient } from '@/lib/supabase/auth'
 import { getSupabaseClient } from '@/lib/supabase/client'
 
-export type UserRole = 'admin' | 'sales'
+export type UserRole = 'admin' | 'sales' | 'owner'
 
 export interface AuthUser {
   id: string
@@ -56,7 +56,29 @@ export async function getCurrentUser(): Promise<AuthUser | null> {
     .split(',')
     .map((s) => s.trim().toLowerCase())
     .filter(Boolean)
-  const isAdminByEnv = adminEmails.length > 0 && adminEmails.includes(email.toLowerCase())
+
+  // OWNER_EMAIL env var: highest-privilege role — can access /cashflow and all admin areas.
+  // Falls back to ADMIN_EMAIL when unset, so existing admin users automatically become owners.
+  // Example: OWNER_EMAIL=antonio@platomico.com
+  const ownerEmails = (process.env.OWNER_EMAIL ?? process.env.ADMIN_EMAIL ?? '')
+    .split(',')
+    .map((s) => s.trim().toLowerCase())
+    .filter(Boolean)
+
+  const isOwnerByEnv = ownerEmails.length > 0 && ownerEmails.includes(email.toLowerCase())
+  // Admin check only for users that are in ADMIN_EMAIL but NOT in ownerEmails
+  const isAdminByEnv = !isOwnerByEnv && adminEmails.length > 0 && adminEmails.includes(email.toLowerCase())
+
+  // ── OWNER_EMAIL bypass — skip DB entirely ─────────────────────────────────
+  if (isOwnerByEnv) {
+    return {
+      id: authUser.id,
+      email,
+      name: (authUser.user_metadata?.full_name as string | undefined) ?? derivedName,
+      role: 'owner',
+      mustChangePassword: false,
+    }
+  }
 
   // ── ADMIN_EMAIL bypass — skip DB entirely ─────────────────────────────────
   if (isAdminByEnv) {
@@ -119,7 +141,7 @@ export async function getCurrentUser(): Promise<AuthUser | null> {
     // ON CONFLICT DO NOTHING so a row with a manually-set role is never overwritten.
     console.error('[getCurrentUser] profile row not found — auto-creating.', { userId: authUser.id, email })
 
-    const autoRole = isAdminByEnv ? 'admin' : 'sales'
+    const autoRole = isOwnerByEnv ? 'owner' : isAdminByEnv ? 'admin' : 'sales'
     try {
       const db = getSupabaseClient()
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -135,7 +157,7 @@ export async function getCurrentUser(): Promise<AuthUser | null> {
       id: authUser.id,
       email,
       name: derivedName,
-      role: isAdminByEnv ? 'admin' : autoRole,
+      role: isOwnerByEnv ? 'owner' : isAdminByEnv ? 'admin' : autoRole,
       mustChangePassword: false,
     }
   }
@@ -144,8 +166,8 @@ export async function getCurrentUser(): Promise<AuthUser | null> {
     id: authUser.id,
     email,
     name: profile.full_name ?? derivedName,
-    // ADMIN_EMAIL always wins over whatever is stored in the DB
-    role: isAdminByEnv ? 'admin' : ((profile.role as UserRole) ?? 'sales'),
+    // Env-var overrides always win over whatever is stored in the DB
+    role: isOwnerByEnv ? 'owner' : isAdminByEnv ? 'admin' : ((profile.role as UserRole) ?? 'sales'),
     mustChangePassword: profile.must_change_password === true,
   }
 }

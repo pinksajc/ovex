@@ -6,7 +6,7 @@ import { getSupabaseClient } from '@/lib/supabase/client'
 
 async function assertAdmin() {
   const me = await requireAuth()
-  if (me.role !== 'admin') throw new Error('No autorizado')
+  if (me.role !== 'admin' && me.role !== 'owner') throw new Error('No autorizado')
 }
 
 export async function deleteUserAction(

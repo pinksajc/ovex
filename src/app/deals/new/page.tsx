@@ -22,7 +22,7 @@ export default async function NewDealPage({
   if (!user) redirect('/login')
 
   const { error } = await searchParams
-  const isAdmin = user.role === 'admin'
+  const isAdmin = user.role === 'admin' || user.role === 'owner'
   const members = isAdmin ? await getWorkspaceMembers() : []
 
   return (

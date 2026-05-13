@@ -9,7 +9,7 @@ export default async function AdminUsersPage({
 }) {
   const user = await getCurrentUser()
   if (!user) redirect('/login')
-  if (user.role !== 'admin') redirect('/deals')
+  if (user.role !== 'admin' && user.role !== 'owner') redirect('/deals')
 
   const { error, success } = await searchParams
   const members = await getWorkspaceMembersAdmin()

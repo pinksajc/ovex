@@ -6,7 +6,7 @@ import { getSupabaseClient } from '@/lib/supabase/client'
 
 export async function createUserAction(formData: FormData): Promise<void> {
   const me = await requireAuth()
-  if (me.role !== 'admin') redirect('/deals')
+  if (me.role !== 'admin' && me.role !== 'owner') redirect('/deals')
 
   const name  = (formData.get('name')  as string | null)?.trim() ?? ''
   const email = (formData.get('email') as string | null)?.trim() ?? ''
@@ -48,7 +48,7 @@ export async function createUserAction(formData: FormData): Promise<void> {
 
 export async function createUserManualAction(formData: FormData): Promise<void> {
   const me = await requireAuth()
-  if (me.role !== 'admin') redirect('/deals')
+  if (me.role !== 'admin' && me.role !== 'owner') redirect('/deals')
 
   const name     = (formData.get('name')     as string | null)?.trim() ?? ''
   const email    = (formData.get('email')    as string | null)?.trim() ?? ''

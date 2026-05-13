@@ -64,8 +64,30 @@ export function Sidebar({ user }: { user: AuthUser }) {
           )
         })}
 
+        {/* Owner-only: Flujo de Caja */}
+        {(user.role === 'owner' || user.role === 'admin') && (
+          <>
+            <div className="pt-3 pb-1 px-3">
+              <span className="text-[9px] font-semibold uppercase tracking-widest text-zinc-600">
+                Finanzas
+              </span>
+            </div>
+            <Link
+              href="/cashflow"
+              className={`flex items-center gap-2.5 px-3 py-2 rounded-md text-sm transition-colors ${
+                pathname.startsWith('/cashflow')
+                  ? 'bg-zinc-800 text-white'
+                  : 'text-zinc-400 hover:bg-zinc-800/60 hover:text-zinc-100'
+              }`}
+            >
+              <IconCashflow className="w-4 h-4 shrink-0" />
+              Flujo de Caja
+            </Link>
+          </>
+        )}
+
         {/* Admin-only section */}
-        {user.role === 'admin' && (
+        {(user.role === 'admin' || user.role === 'owner') && (
           <>
             <div className="pt-3 pb-1 px-3">
               <span className="text-[9px] font-semibold uppercase tracking-widest text-zinc-600">
@@ -205,6 +227,22 @@ function IconUsers({ className }: { className?: string }) {
       <path d="M1 13c0-2.76 2.24-5 5-5" />
       <circle cx="12" cy="5" r="2" />
       <path d="M10.5 8.5c.5-.1 1-.15 1.5-.15 1.93 0 3.5 1.57 3.5 3.5" />
+    </svg>
+  )
+}
+
+function IconCashflow({ className }: { className?: string }) {
+  return (
+    <svg
+      className={className}
+      viewBox="0 0 16 16"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.5"
+    >
+      <rect x="1" y="3" width="14" height="10" rx="1.5" />
+      <path d="M1 6h14" strokeLinecap="round" />
+      <path d="M4 10h2M10 10h2" strokeLinecap="round" />
     </svg>
   )
 }

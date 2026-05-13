@@ -17,9 +17,11 @@ export function UserList({ members, currentUserId }: { members: WorkspaceMember[
 function UserRow({ member, isSelf }: { member: WorkspaceMember; isSelf: boolean }) {
   const [editing, setEditing] = useState(false)
   const [name, setName] = useState(member.name ?? '')
-  const [role, setRole] = useState<'admin' | 'sales'>(member.role)
+  // 'owner' role is assigned via OWNER_EMAIL env var; UI only allows admin/sales
+  const effectiveRole = (member.role === 'owner' ? 'admin' : member.role) as 'admin' | 'sales'
+  const [role, setRole] = useState<'admin' | 'sales'>(effectiveRole)
   const [displayName, setDisplayName] = useState(member.name ?? '')
-  const [displayRole, setDisplayRole] = useState<'admin' | 'sales'>(member.role)
+  const [displayRole, setDisplayRole] = useState<'admin' | 'sales'>(effectiveRole)
   const [error, setError] = useState<string | null>(null)
   const [feedback, setFeedback] = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
