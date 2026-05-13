@@ -152,9 +152,21 @@ export async function upsertCategoryRule(
 }
 
 /**
- * Re-apply every saved rule to existing transactions.
- * For each rule, bulk-updates all transactions whose description matches
- * and whose current category differs.  Returns total rows changed.
+ * Escape a string for use as a literal pattern in SQL LIKE / ILIKE.
+ * Postgres ILIKE wildcards are % (any sequence) and _ (single char).
+ * Backslash is the default escape character.
+ */
+function escapeLikePattern(s: string): string {
+  return s
+    .replace(/\\/g, '\\\\') // escape backslash first
+    .replace(/%/g,  '\\%')  // literal percent
+    .replace(/_/g,  '\\_')  // literal underscore (e.g. "Ups_es")
+}
+
+/**
+ * Re-apply every saved rule to existing transactions using case-insensitive
+ * description matching (ILIKE with escaped literal pattern).
+ * Only updates rows whose category actually differs.  Returns total rows changed.
  */
 export async function recategorizeAllTransactions(): Promise<number> {
   const rules = await getCategoryRulesMap()
@@ -164,10 +176,11 @@ export async function recategorizeAllTransactions(): Promise<number> {
   let totalUpdated = 0
 
   for (const [description, category] of rules) {
+    const pattern = escapeLikePattern(description)
     const { data, error } = await table(db)
       .update({ category })
-      .eq('description', description)
-      .neq('category', category)   // skip rows already correct
+      .ilike('description', pattern)  // case-insensitive exact match
+      .neq('category', category)      // skip rows already correct
       .select('id')
     if (error) {
       console.warn(`[recategorize] error for "${description}":`, error.message)
