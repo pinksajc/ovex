@@ -10,6 +10,7 @@ import {
   getCategoryRulesMap,
   upsertCategoryRule,
   recategorizeAllTransactions,
+  getLatestBalance,
 } from '@/lib/supabase/cashflow'
 import { CATEGORIZABLE } from '@/lib/cashflow-categories'
 import type { InsertCashflowTransaction } from '@/types'
@@ -253,6 +254,9 @@ export async function addManualTransactionAction(
       ? `${payload.description} — ${payload.notes.trim()}`
       : payload.description
 
+    const latestBalance = await getLatestBalance()
+    const runningBalance = latestBalance + signed
+
     await insertCashflowTransactions([{
       date: payload.date,
       description,
@@ -260,8 +264,8 @@ export async function addManualTransactionAction(
       type: payload.type,
       category: payload.category,
       currency: 'EUR',
-      state: null,
-      balance: null,
+      state: 'COMPLETED',
+      balance: runningBalance,
       sourceFile: 'manual',
     }])
 
