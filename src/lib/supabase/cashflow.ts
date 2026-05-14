@@ -46,12 +46,25 @@ function rowToTx(row: CashflowRow): CashflowTransaction {
 export async function getCashflowTransactions(): Promise<CashflowTransaction[]> {
   const db = getSupabaseClient()
   const { data, error } = await table(db)
-    .select('*')
+    .select('id, date, description, amount, type, category, currency, state, balance, source_file, created_at')
     .order('date', { ascending: false })
     .order('created_at', { ascending: false })
 
   if (error) throw new Error(`getCashflowTransactions: ${error.message}`)
-  return (data as CashflowRow[]).map(rowToTx)
+
+  // Debug: log raw DB row for first manual transaction to verify balance field
+  const rows = data as CashflowRow[]
+  const firstManual = rows.find((r) => r.source_file === 'manual')
+  if (firstManual) {
+    console.log('[cashflow] raw manual row from DB:', JSON.stringify({
+      id: firstManual.id,
+      balance: firstManual.balance,
+      balance_type: typeof firstManual.balance,
+      state: firstManual.state,
+    }))
+  }
+
+  return rows.map(rowToTx)
 }
 
 /** Returns the most recent non-null balance from the table, or 0 if none. */

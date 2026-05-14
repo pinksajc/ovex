@@ -259,6 +259,7 @@ export async function addManualTransactionAction(
 
     const latestBalance = await getLatestBalance()
     const runningBalance = latestBalance + signed
+    console.log('[cashflow/addManual] latestBalance:', latestBalance, 'signed:', signed, 'runningBalance:', runningBalance)
 
     await insertCashflowTransactions([{
       date: payload.date,
