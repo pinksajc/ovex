@@ -184,6 +184,8 @@ export async function recategorizeAllAction(): Promise<RecategorizeResult> {
     const user = await requireAuth()
     assertOwner(user.role)
     const updated = await recategorizeAllTransactions()
+    // Also repair any manual transactions that are missing their running balance
+    await backfillManualBalances()
     revalidatePath('/cashflow')
     return { ok: true, updated }
   } catch (err) {
