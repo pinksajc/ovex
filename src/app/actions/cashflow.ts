@@ -11,6 +11,7 @@ import {
   upsertCategoryRule,
   recategorizeAllTransactions,
   getLatestBalance,
+  backfillManualBalances,
 } from '@/lib/supabase/cashflow'
 import { CATEGORIZABLE } from '@/lib/cashflow-categories'
 import type { InsertCashflowTransaction } from '@/types'
@@ -268,6 +269,8 @@ export async function addManualTransactionAction(
       balance: runningBalance,
       sourceFile: 'manual',
     }])
+
+    await backfillManualBalances()
 
     revalidatePath('/cashflow')
     return { ok: true }

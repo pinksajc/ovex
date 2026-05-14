@@ -72,6 +72,57 @@ export async function getLatestBalance(): Promise<number> {
   return rows.length > 0 && rows[0].balance != null ? Number(rows[0].balance) : 0
 }
 
+/**
+ * Walk all transactions oldest→newest. For each manual transaction (source_file='manual')
+ * with a null balance, compute its balance from the nearest preceding non-null balance
+ * and persist it. Idempotent — skips rows that already have a balance.
+ */
+export async function backfillManualBalances(): Promise<void> {
+  const db = getSupabaseClient()
+  const { data, error } = await table(db)
+    .select('id,date,amount,balance,source_file,created_at')
+    .order('date', { ascending: true })
+    .order('created_at', { ascending: true })
+
+  if (error) throw new Error(`backfillManualBalances: ${error.message}`)
+
+  const rows = data as {
+    id: string
+    date: string
+    amount: number | string
+    balance: number | string | null
+    source_file: string | null
+    created_at: string
+  }[]
+
+  let running: number | null = null
+  const updates: { id: string; balance: number }[] = []
+
+  for (const row of rows) {
+    const amount = Number(row.amount)
+    const balance = row.balance != null ? Number(row.balance) : null
+
+    if (balance != null) {
+      running = balance
+    } else if (row.source_file === 'manual' && running != null) {
+      const newBalance: number = running + amount
+      updates.push({ id: row.id, balance: newBalance })
+      running = newBalance
+    } else if (running != null) {
+      running += amount
+    }
+  }
+
+  for (const { id, balance } of updates) {
+    const { error: updateError } = await table(db)
+      .update({ balance })
+      .eq('id', id)
+    if (updateError) {
+      console.warn(`[cashflow] backfillManualBalances update error for ${id}:`, updateError.message)
+    }
+  }
+}
+
 // ── Duplicate detection ─────────────────────────────────────────────────────────
 // Returns the subset of hashes ("date|description|amount") that already exist in DB.
 
