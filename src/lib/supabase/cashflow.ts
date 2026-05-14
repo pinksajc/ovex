@@ -54,6 +54,24 @@ export async function getCashflowTransactions(): Promise<CashflowTransaction[]> 
   return (data as CashflowRow[]).map(rowToTx)
 }
 
+/** Returns the most recent balance value stored in the table, or 0 if none. */
+export async function getLatestBalance(): Promise<number> {
+  const db = getSupabaseClient()
+  const { data, error } = await table(db)
+    .select('balance')
+    .not('balance', 'is', null)
+    .order('date', { ascending: false })
+    .order('created_at', { ascending: false })
+    .limit(1)
+
+  if (error) {
+    console.warn('[cashflow] getLatestBalance error:', error.message)
+    return 0
+  }
+  const rows = data as { balance: number | string | null }[]
+  return rows.length > 0 && rows[0].balance != null ? Number(rows[0].balance) : 0
+}
+
 // ── Duplicate detection ─────────────────────────────────────────────────────────
 // Returns the subset of hashes ("date|description|amount") that already exist in DB.
 

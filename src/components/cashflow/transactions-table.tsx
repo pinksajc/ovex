@@ -106,7 +106,10 @@ function TxRow({ t }: { t: CashflowTransaction }) {
         <CategoryCell id={t.id} description={t.description} category={t.category} />
       </td>
       <td className="px-5 py-3 text-xs text-zinc-400 whitespace-nowrap">
-        {t.state ?? '—'}
+        {t.state
+          ? t.state
+          : <span className="inline-block text-[10px] font-semibold px-1.5 py-0.5 rounded bg-zinc-100 text-zinc-400">MANUAL</span>
+        }
       </td>
       <td className="px-5 py-3 text-xs font-mono text-zinc-400 text-right whitespace-nowrap">
         {t.balance != null
