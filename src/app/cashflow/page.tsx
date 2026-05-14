@@ -75,14 +75,15 @@ export default async function CashflowPage({
 
   // ── Debug: log first manual transaction to verify balance field ──────────────
   const firstManual = allTransactions.find((t) => t.sourceFile === 'manual')
-  console.log('[cashflow/page] first manual tx:', firstManual
+  console.log('[cashflow/page] first manual tx (post-fetch):', firstManual
     ? { id: firstManual.id, balance: firstManual.balance, state: firstManual.state, sourceFile: firstManual.sourceFile }
     : 'none found')
 
-  // ── Auto-heal: backfill any manual txs that still have null balance ───────────
-  if (allTransactions.some((t) => t.sourceFile === 'manual' && t.balance === null)) {
-    console.log('[cashflow/page] found manual txs with null balance — running backfill…')
-    await backfillManualBalances()
+  // ── Auto-heal: always run backfill for any null-balance manual txs ────────────
+  // Runs one SELECT; only issues UPDATEs when rows actually need fixing.
+  const backfilled = await backfillManualBalances()
+  if (backfilled > 0) {
+    console.log(`[cashflow/page] backfilled ${backfilled} manual tx balance(s) — re-fetching`)
     allTransactions = await getCashflowTransactions()
   }
 
