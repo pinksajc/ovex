@@ -186,6 +186,50 @@ export async function insertCashflowTransactions(
   if (error) throw new Error(`insertCashflowTransactions: ${error.message}`)
 }
 
+export async function updateManualTransaction(
+  id: string,
+  fields: {
+    date: string
+    description: string
+    amount: number
+    type: 'income' | 'expense'
+    category: string
+  },
+): Promise<void> {
+  const db = getSupabaseClient()
+  const { error } = await table(db)
+    .update({
+      date: fields.date,
+      description: fields.description,
+      amount: fields.amount,
+      type: fields.type,
+      category: fields.category,
+      balance: null, // recomputed by resetAndBackfillManualBalances
+    })
+    .eq('id', id)
+  if (error) throw new Error(`updateManualTransaction: ${error.message}`)
+}
+
+export async function deleteManualTransaction(id: string): Promise<void> {
+  const db = getSupabaseClient()
+  const { error } = await table(db).delete().eq('id', id)
+  if (error) throw new Error(`deleteManualTransaction: ${error.message}`)
+}
+
+/**
+ * Reset every manual transaction's balance to null, then recompute all
+ * manual balances in chronological order using non-manual rows as anchors.
+ * Safe to call after any edit / delete of a manual row.
+ */
+export async function resetAndBackfillManualBalances(): Promise<number> {
+  const db = getSupabaseClient()
+  const { error: resetErr } = await table(db)
+    .update({ balance: null })
+    .eq('source_file', 'manual')
+  if (resetErr) throw new Error(`resetAndBackfillManualBalances (reset): ${resetErr.message}`)
+  return backfillManualBalances()
+}
+
 export async function updateCashflowCategory(id: string, category: string): Promise<void> {
   const db = getSupabaseClient()
   const { error } = await table(db).update({ category }).eq('id', id)

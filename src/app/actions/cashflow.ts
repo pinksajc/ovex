@@ -12,6 +12,9 @@ import {
   recategorizeAllTransactions,
   getLatestBalance,
   backfillManualBalances,
+  updateManualTransaction,
+  deleteManualTransaction,
+  resetAndBackfillManualBalances,
 } from '@/lib/supabase/cashflow'
 import { CATEGORIZABLE } from '@/lib/cashflow-categories'
 import type { InsertCashflowTransaction } from '@/types'
@@ -277,6 +280,76 @@ export async function addManualTransactionAction(
     // a null balance (e.g. inserted before this fix was deployed).
     await backfillManualBalances()
 
+    revalidatePath('/cashflow')
+    return { ok: true }
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : 'Error desconocido' }
+  }
+}
+
+// ── Update manual transaction ──────────────────────────────────────────────────
+
+export interface UpdateManualTransactionPayload {
+  date: string
+  description: string
+  amount: number   // always positive; sign derived from type
+  type: 'income' | 'expense'
+  category: string
+  notes?: string
+}
+
+export interface UpdateManualTransactionResult {
+  ok: boolean
+  error?: string
+}
+
+export async function updateManualTransactionAction(
+  id: string,
+  payload: UpdateManualTransactionPayload,
+): Promise<UpdateManualTransactionResult> {
+  try {
+    const user = await requireAuth()
+    assertOwner(user.role)
+
+    const signed = payload.type === 'expense'
+      ? -Math.abs(payload.amount)
+      :  Math.abs(payload.amount)
+
+    const description = payload.notes?.trim()
+      ? `${payload.description.trim()} — ${payload.notes.trim()}`
+      : payload.description.trim()
+
+    await updateManualTransaction(id, {
+      date: payload.date,
+      description,
+      amount: signed,
+      type: payload.type,
+      category: payload.category,
+    })
+
+    await resetAndBackfillManualBalances()
+    revalidatePath('/cashflow')
+    return { ok: true }
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : 'Error desconocido' }
+  }
+}
+
+// ── Delete manual transaction ──────────────────────────────────────────────────
+
+export interface DeleteManualTransactionResult {
+  ok: boolean
+  error?: string
+}
+
+export async function deleteManualTransactionAction(
+  id: string,
+): Promise<DeleteManualTransactionResult> {
+  try {
+    const user = await requireAuth()
+    assertOwner(user.role)
+    await deleteManualTransaction(id)
+    await resetAndBackfillManualBalances()
     revalidatePath('/cashflow')
     return { ok: true }
   } catch (err) {
