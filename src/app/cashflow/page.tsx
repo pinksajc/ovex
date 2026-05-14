@@ -4,8 +4,8 @@ import { getCashflowTransactions, backfillManualBalances } from '@/lib/supabase/
 import { getCashflowPlanned } from '@/lib/supabase/cashflow-planned'
 import { getInvoices } from '@/lib/supabase/invoices'
 import { formatCurrency } from '@/lib/format'
-import { UploadZone } from '@/components/cashflow/upload-zone'
 import { RecategorizeButton } from '@/components/cashflow/recategorize-button'
+import { MoreActionsDropdown } from '@/components/cashflow/more-actions-dropdown'
 import { DateRangeFilter } from '@/components/cashflow/date-range-filter'
 import { AddTransactionButton } from '@/components/cashflow/add-transaction-button'
 import { CashflowTabs } from '@/components/cashflow/cashflow-tabs'
@@ -144,6 +144,7 @@ export default async function CashflowPage({
               <DateRangeFilter from={dateFrom} to={dateTo} />
               <AddTransactionButton />
               <RecategorizeButton />
+              <MoreActionsDropdown />
             </>
           )}
           <CashflowTabs activeTab={activeTab} />
@@ -194,9 +195,6 @@ export default async function CashflowPage({
 
           {/* Charts row 2 */}
           <BalanceTrendChart transactions={transactions} />
-
-          {/* Upload zone */}
-          <UploadZone />
 
           {/* Transactions table */}
           <TransactionsTable transactions={transactions} />
