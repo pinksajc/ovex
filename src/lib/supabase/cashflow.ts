@@ -54,7 +54,7 @@ export async function getCashflowTransactions(): Promise<CashflowTransaction[]> 
   return (data as CashflowRow[]).map(rowToTx)
 }
 
-/** Returns the most recent balance value stored in the table, or 0 if none. */
+/** Returns the most recent non-null balance from the table, or 0 if none. */
 export async function getLatestBalance(): Promise<number> {
   const db = getSupabaseClient()
   const { data, error } = await table(db)
@@ -73,54 +73,59 @@ export async function getLatestBalance(): Promise<number> {
 }
 
 /**
- * Walk all transactions oldest→newest. For each manual transaction (source_file='manual')
- * with a null balance, compute its balance from the nearest preceding non-null balance
- * and persist it. Idempotent — skips rows that already have a balance.
+ * Walk all transactions in chronological order (date ASC, created_at ASC).
+ * For every manual transaction (source_file = 'manual') that has a null balance,
+ * compute its balance as: lastKnownBalance + amount, where lastKnownBalance is
+ * the most recent non-null balance seen so far.  Runs a single SELECT then one
+ * UPDATE per null-balance manual row found.  Returns number of rows updated.
  */
-export async function backfillManualBalances(): Promise<void> {
+export async function backfillManualBalances(): Promise<number> {
   const db = getSupabaseClient()
+
   const { data, error } = await table(db)
-    .select('id,date,amount,balance,source_file,created_at')
+    .select('id, date, amount, balance, source_file, created_at')
     .order('date', { ascending: true })
     .order('created_at', { ascending: true })
 
   if (error) throw new Error(`backfillManualBalances: ${error.message}`)
 
-  const rows = data as {
+  type BalRow = {
     id: string
     date: string
     amount: number | string
     balance: number | string | null
     source_file: string | null
     created_at: string
-  }[]
+  }
 
-  let running: number | null = null
+  const rows = data as BalRow[]
+  let lastKnownBalance = 0
   const updates: { id: string; balance: number }[] = []
 
   for (const row of rows) {
-    const amount = Number(row.amount)
-    const balance = row.balance != null ? Number(row.balance) : null
-
-    if (balance != null) {
-      running = balance
-    } else if (row.source_file === 'manual' && running != null) {
-      const newBalance: number = running + amount
-      updates.push({ id: row.id, balance: newBalance })
-      running = newBalance
-    } else if (running != null) {
-      running += amount
+    if (row.balance != null) {
+      // Non-null balance row — use it as the running anchor
+      lastKnownBalance = Number(row.balance)
+    } else if (row.source_file === 'manual') {
+      // Manual tx without a balance — compute and queue
+      const computed = lastKnownBalance + Number(row.amount)
+      updates.push({ id: row.id, balance: computed })
+      lastKnownBalance = computed   // advance anchor for subsequent manual txs
     }
+    // Non-manual rows with null balance are skipped (shouldn't normally exist)
   }
 
+  let updated = 0
   for (const { id, balance } of updates) {
-    const { error: updateError } = await table(db)
-      .update({ balance })
-      .eq('id', id)
-    if (updateError) {
-      console.warn(`[cashflow] backfillManualBalances update error for ${id}:`, updateError.message)
+    const { error: upErr } = await table(db).update({ balance }).eq('id', id)
+    if (upErr) {
+      console.warn(`[backfillManualBalances] update error for id=${id}:`, upErr.message)
+    } else {
+      updated++
     }
   }
+
+  return updated
 }
 
 // ── Duplicate detection ─────────────────────────────────────────────────────────

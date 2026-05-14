@@ -270,6 +270,8 @@ export async function addManualTransactionAction(
       sourceFile: 'manual',
     }])
 
+    // Backfill any previously-inserted manual transactions that still have
+    // a null balance (e.g. inserted before this fix was deployed).
     await backfillManualBalances()
 
     revalidatePath('/cashflow')
