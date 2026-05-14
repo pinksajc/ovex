@@ -158,7 +158,7 @@ export default async function CashflowPage({
             <CfKpi
               label="Total préstamos"
               value={formatCurrency(Math.abs(prestamosNet))}
-              color={prestamosNet >= 0 ? '#34c759' : '#ff3b30'}
+              color={prestamosNet >= 0 ? '#ff9f0a' : '#ff3b30'}
               prefix={prestamosNet >= 0 ? '+' : '−'}
               sub="Préstamos netos del período"
             />
