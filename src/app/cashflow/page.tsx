@@ -1,6 +1,6 @@
 import { redirect } from 'next/navigation'
 import { getCurrentUser } from '@/lib/auth'
-import { getCashflowTransactions } from '@/lib/supabase/cashflow'
+import { getCashflowTransactions, backfillManualBalances } from '@/lib/supabase/cashflow'
 import { getCashflowPlanned } from '@/lib/supabase/cashflow-planned'
 import { getInvoices } from '@/lib/supabase/invoices'
 import { formatCurrency } from '@/lib/format'
@@ -71,7 +71,20 @@ export default async function CashflowPage({
   const activeTab = tabParam === 'planning' ? 'planning' : 'transactions'
 
   // ── Always fetch transactions (needed in both tabs for recurring detection) ──
-  const allTransactions = await getCashflowTransactions()
+  let allTransactions = await getCashflowTransactions()
+
+  // ── Debug: log first manual transaction to verify balance field ──────────────
+  const firstManual = allTransactions.find((t) => t.sourceFile === 'manual')
+  console.log('[cashflow/page] first manual tx:', firstManual
+    ? { id: firstManual.id, balance: firstManual.balance, state: firstManual.state, sourceFile: firstManual.sourceFile }
+    : 'none found')
+
+  // ── Auto-heal: backfill any manual txs that still have null balance ───────────
+  if (allTransactions.some((t) => t.sourceFile === 'manual' && t.balance === null)) {
+    console.log('[cashflow/page] found manual txs with null balance — running backfill…')
+    await backfillManualBalances()
+    allTransactions = await getCashflowTransactions()
+  }
 
   // ── Planning tab: additional fetches ─────────────────────────────────────────
   const [plannedItems, allInvoices] =

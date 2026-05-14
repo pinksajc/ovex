@@ -130,6 +130,12 @@ interface GroupEntry {
 }
 
 export function TransactionsTable({ transactions }: { transactions: CashflowTransaction[] }) {
+  // Debug: log first manual transaction on mount so balance field is visible in browser console
+  useEffect(() => {
+    const firstManual = transactions.find((t) => t.sourceFile === 'manual')
+    console.log('[cashflow/table] first manual tx:', firstManual ?? 'none found')
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
   const [search, setSearch]       = useState('')
   const [typeFilter, setType]     = useState<'all' | 'income' | 'expense'>('all')
   const [catFilter, setCat]       = useState('all')
