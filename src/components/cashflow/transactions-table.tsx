@@ -1,11 +1,13 @@
 'use client'
 
-import { useState, useMemo, useTransition, useOptimistic, useEffect, useCallback } from 'react'
+import { useState, useMemo, useTransition, useOptimistic, useEffect, useCallback, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import {
   updateCashflowCategoryAction,
   updateManualTransactionAction,
   deleteManualTransactionAction,
+  deleteTransactionAction,
+  bulkDeleteTransactionsAction,
 } from '@/app/actions/cashflow'
 import { CASHFLOW_CATEGORIES } from '@/lib/cashflow-categories'
 import type { CashflowTransaction } from '@/types'
@@ -387,12 +389,36 @@ function TransactionDetailPanel({
   transaction,
   onClose,
   onEdit,
+  onDeleted,
 }: {
   transaction: CashflowTransaction | null
   onClose: () => void
   onEdit: (t: CashflowTransaction) => void
+  onDeleted: () => void
 }) {
+  const [confirmDelete, setConfirmDelete] = useState(false)
+  const [isDeleting, startDelete]         = useTransition()
+  const [deleteError, setDeleteError]     = useState<string | null>(null)
   const visible = transaction !== null
+
+  // Reset confirm state when panel closes
+  useEffect(() => {
+    if (!visible) { setConfirmDelete(false); setDeleteError(null) }
+  }, [visible])
+
+  function handleDelete() {
+    if (!transaction) return
+    startDelete(async () => {
+      const result = await deleteTransactionAction(transaction.id)
+      if (result.ok) {
+        onClose()
+        onDeleted()
+      } else {
+        setDeleteError(result.error ?? 'Error al eliminar')
+        setConfirmDelete(false)
+      }
+    })
+  }
 
   if (!transaction) {
     return (
@@ -531,9 +557,12 @@ function TransactionDetailPanel({
           )}
         </div>
 
-        {/* Footer (manual only) */}
-        {isManual && (
-          <div className="px-5 py-4 border-t border-zinc-100 shrink-0">
+        {/* Footer — delete (all) + edit (manual) */}
+        <div className="px-5 py-4 border-t border-zinc-100 shrink-0 space-y-2">
+          {deleteError && (
+            <p className="text-xs text-red-500 bg-red-50 px-3 py-2 rounded-lg">{deleteError}</p>
+          )}
+          {isManual && (
             <button
               onClick={() => { onEdit(transaction); onClose() }}
               className="w-full flex items-center justify-center gap-2 text-sm font-medium text-zinc-700 hover:text-zinc-900 bg-zinc-50 hover:bg-zinc-100 border border-zinc-200 px-4 py-2.5 rounded-xl transition-colors"
@@ -541,8 +570,36 @@ function TransactionDetailPanel({
               <PencilIcon className="w-3.5 h-3.5" />
               Editar transacción
             </button>
-          </div>
-        )}
+          )}
+          {confirmDelete ? (
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-zinc-500 mr-1">¿Eliminar esta transacción?</span>
+              <button
+                onClick={handleDelete}
+                disabled={isDeleting}
+                className="flex-1 text-xs font-medium text-white bg-red-500 hover:bg-red-600 px-3 py-2 rounded-lg disabled:opacity-50 transition-colors"
+              >
+                {isDeleting ? 'Eliminando…' : 'Sí, eliminar'}
+              </button>
+              <button
+                onClick={() => setConfirmDelete(false)}
+                disabled={isDeleting}
+                className="text-xs text-zinc-500 hover:text-zinc-700 px-3 py-2 rounded-lg border border-zinc-200 transition-colors"
+              >
+                Cancelar
+              </button>
+            </div>
+          ) : (
+            <button
+              onClick={() => setConfirmDelete(true)}
+              disabled={isDeleting}
+              className="w-full flex items-center justify-center gap-2 text-sm font-medium text-red-500 hover:text-red-700 bg-red-50 hover:bg-red-100 border border-red-100 px-4 py-2.5 rounded-xl transition-colors disabled:opacity-50"
+            >
+              <TrashIcon className="w-3.5 h-3.5" />
+              Eliminar transacción
+            </button>
+          )}
+        </div>
       </div>
     </>
   )
@@ -569,10 +626,14 @@ function DetailRow({
 
 function TxRow({
   t,
+  checked,
+  onToggleCheck,
   onRowClick,
   onEditClick,
 }: {
   t: CashflowTransaction
+  checked: boolean
+  onToggleCheck: (id: string, e: React.MouseEvent) => void
   onRowClick: (t: CashflowTransaction) => void
   onEditClick: (t: CashflowTransaction) => void
 }) {
@@ -580,8 +641,19 @@ function TxRow({
   return (
     <tr
       onClick={() => onRowClick(t)}
-      className="group border-b border-zinc-50 hover:bg-zinc-50/60 transition-colors cursor-pointer"
+      className={`group border-b border-zinc-50 transition-colors cursor-pointer ${
+        checked ? 'bg-red-50/40 hover:bg-red-50/60' : 'hover:bg-zinc-50/60'
+      }`}
     >
+      {/* Checkbox */}
+      <td className="pl-4 pr-2 py-3 w-8" onClick={(e) => onToggleCheck(t.id, e)}>
+        <input
+          type="checkbox"
+          checked={checked}
+          onChange={() => {/* controlled via onClick */}}
+          className="w-3.5 h-3.5 rounded border-zinc-300 text-red-500 focus:ring-red-400 cursor-pointer"
+        />
+      </td>
       <td className="px-5 py-3 text-xs text-zinc-500 whitespace-nowrap font-mono">
         {formatDate(t.date)}
       </td>
@@ -654,6 +726,13 @@ export function TransactionsTable({ transactions }: { transactions: CashflowTran
   const [selectedTx, setSelectedTx]   = useState<CashflowTransaction | null>(null)
   const [editingTx, setEditingTx]     = useState<CashflowTransaction | null>(null)
 
+  // Bulk-delete state
+  const [checkedIds, setCheckedIds]           = useState<Set<string>>(new Set())
+  const [confirmBulk, setConfirmBulk]         = useState(false)
+  const [isBulkDeleting, startBulkDelete]     = useTransition()
+  const [bulkError, setBulkError]             = useState<string | null>(null)
+  const selectAllRef                          = useRef<HTMLInputElement>(null)
+
   const handleRowClick = useCallback((t: CashflowTransaction) => {
     setSelectedTx(t)
   }, [])
@@ -668,6 +747,31 @@ export function TransactionsTable({ transactions }: { transactions: CashflowTran
     setSelectedTx(null)
     router.refresh()
   }, [router])
+
+  const handleToggleCheck = useCallback((id: string, e: React.MouseEvent) => {
+    e.stopPropagation()
+    setCheckedIds((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }, [])
+
+  function handleBulkDelete() {
+    const ids = Array.from(checkedIds)
+    startBulkDelete(async () => {
+      const result = await bulkDeleteTransactionsAction(ids)
+      if (result.ok) {
+        setCheckedIds(new Set())
+        setConfirmBulk(false)
+        router.refresh()
+      } else {
+        setBulkError(result.error ?? 'Error al eliminar')
+        setConfirmBulk(false)
+      }
+    })
+  }
 
   const filtered = useMemo(() => {
     return transactions.filter((t) => {
@@ -722,6 +826,32 @@ export function TransactionsTable({ transactions }: { transactions: CashflowTran
   const sumExpense = filtered.filter((t) => t.type === 'expense').reduce((s, t) => s + t.amount, 0)
 
   const allCategories = Array.from(new Set(transactions.map((t) => t.category))).sort()
+
+  // Select-all checkbox indeterminate state
+  const visibleIds  = paged.map((t) => t.id)
+  const allChecked  = visibleIds.length > 0 && visibleIds.every((id) => checkedIds.has(id))
+  const someChecked = visibleIds.some((id) => checkedIds.has(id))
+  useEffect(() => {
+    if (selectAllRef.current) {
+      selectAllRef.current.indeterminate = someChecked && !allChecked
+    }
+  }, [someChecked, allChecked])
+
+  function handleSelectAll() {
+    if (allChecked) {
+      setCheckedIds((prev) => {
+        const next = new Set(prev)
+        visibleIds.forEach((id) => next.delete(id))
+        return next
+      })
+    } else {
+      setCheckedIds((prev) => {
+        const next = new Set(prev)
+        visibleIds.forEach((id) => next.add(id))
+        return next
+      })
+    }
+  }
 
   return (
     <>
@@ -816,6 +946,51 @@ export function TransactionsTable({ transactions }: { transactions: CashflowTran
                 </button>
               </div>
             )}
+
+            {/* Bulk delete bar */}
+            {checkedIds.size > 0 && (
+              <div className="flex items-center gap-2">
+                {bulkError && (
+                  <span className="text-xs text-red-500">{bulkError}</span>
+                )}
+                {confirmBulk ? (
+                  <>
+                    <span className="text-xs text-zinc-500">¿Eliminar {checkedIds.size} transacción{checkedIds.size !== 1 ? 'es' : ''}?</span>
+                    <button
+                      onClick={handleBulkDelete}
+                      disabled={isBulkDeleting}
+                      className="text-xs font-medium text-white bg-red-500 hover:bg-red-600 px-3 py-1.5 rounded-lg disabled:opacity-50 transition-colors"
+                    >
+                      {isBulkDeleting ? 'Eliminando…' : 'Sí, eliminar'}
+                    </button>
+                    <button
+                      onClick={() => setConfirmBulk(false)}
+                      disabled={isBulkDeleting}
+                      className="text-xs text-zinc-500 hover:text-zinc-700 px-2 py-1.5 transition-colors"
+                    >
+                      Cancelar
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <button
+                      onClick={() => setCheckedIds(new Set())}
+                      className="text-xs text-zinc-400 hover:text-zinc-600 transition-colors"
+                    >
+                      Deseleccionar todo
+                    </button>
+                    <button
+                      onClick={() => { setBulkError(null); setConfirmBulk(true) }}
+                      className="inline-flex items-center gap-1.5 text-xs font-medium text-white bg-red-500 hover:bg-red-600 px-3 py-1.5 rounded-lg transition-colors"
+                    >
+                      <TrashIcon className="w-3 h-3" />
+                      Eliminar seleccionadas ({checkedIds.size})
+                    </button>
+                  </>
+                )}
+              </div>
+            )}
+
             <div className="text-xs text-zinc-400">
               <span className="font-semibold text-emerald-600">+{formatEur(sumIncome)}</span>
               {' · '}
@@ -831,6 +1006,17 @@ export function TransactionsTable({ transactions }: { transactions: CashflowTran
           <table className="w-full min-w-[700px] text-sm">
             <thead>
               <tr className="border-b border-zinc-100">
+                <th className="pl-4 pr-2 py-3 w-8">
+                  {!grouped && (
+                    <input
+                      ref={selectAllRef}
+                      type="checkbox"
+                      checked={allChecked}
+                      onChange={handleSelectAll}
+                      className="w-3.5 h-3.5 rounded border-zinc-300 text-red-500 focus:ring-red-400 cursor-pointer"
+                    />
+                  )}
+                </th>
                 <th className="px-5 py-3 text-left text-[10px] font-semibold uppercase tracking-widest text-zinc-400 whitespace-nowrap w-28">Fecha</th>
                 <th className="px-5 py-3 text-left text-[10px] font-semibold uppercase tracking-widest text-zinc-400">Descripción</th>
                 <th className="px-5 py-3 text-right text-[10px] font-semibold uppercase tracking-widest text-zinc-400 whitespace-nowrap w-32">Importe</th>
@@ -845,7 +1031,7 @@ export function TransactionsTable({ transactions }: { transactions: CashflowTran
                 // ── Grouped view ────────────────────────────────────────────────
                 groupedData.length === 0 ? (
                   <tr>
-                    <td colSpan={7} className="px-5 py-12 text-center text-sm text-zinc-400">
+                    <td colSpan={8} className="px-5 py-12 text-center text-sm text-zinc-400">
                       Sin transacciones para los filtros seleccionados
                     </td>
                   </tr>
@@ -880,13 +1066,15 @@ export function TransactionsTable({ transactions }: { transactions: CashflowTran
                           }`}>
                             {formatEur(group.total)}
                           </td>
-                          <td colSpan={4} />
+                          <td colSpan={5} />
                         </tr>
                         {/* Expanded transaction rows */}
                         {isExpanded && group.transactions.map((t) => (
                           <TxRow
                             key={t.id}
                             t={t}
+                            checked={checkedIds.has(t.id)}
+                            onToggleCheck={handleToggleCheck}
                             onRowClick={handleRowClick}
                             onEditClick={handleEditClick}
                           />
@@ -899,7 +1087,7 @@ export function TransactionsTable({ transactions }: { transactions: CashflowTran
                 // ── Flat view ────────────────────────────────────────────────────
                 paged.length === 0 ? (
                   <tr>
-                    <td colSpan={7} className="px-5 py-12 text-center text-sm text-zinc-400">
+                    <td colSpan={8} className="px-5 py-12 text-center text-sm text-zinc-400">
                       Sin transacciones para los filtros seleccionados
                     </td>
                   </tr>
@@ -908,6 +1096,8 @@ export function TransactionsTable({ transactions }: { transactions: CashflowTran
                     <TxRow
                       key={t.id}
                       t={t}
+                      checked={checkedIds.has(t.id)}
+                      onToggleCheck={handleToggleCheck}
                       onRowClick={handleRowClick}
                       onEditClick={handleEditClick}
                     />
@@ -949,6 +1139,7 @@ export function TransactionsTable({ transactions }: { transactions: CashflowTran
         transaction={selectedTx}
         onClose={() => setSelectedTx(null)}
         onEdit={handleEditClick}
+        onDeleted={() => { setSelectedTx(null); router.refresh() }}
       />
 
       {/* Edit modal */}

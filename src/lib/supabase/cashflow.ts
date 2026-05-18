@@ -142,22 +142,21 @@ export async function backfillManualBalances(): Promise<number> {
 }
 
 // ── Duplicate detection ─────────────────────────────────────────────────────────
-// Returns the subset of hashes ("date|description|amount") that already exist in DB.
+// Returns the subset of hashes ("date|amount") that already exist in DB.
+// Using only date + amount (not description) prevents re-importing the same
+// transaction when Revolut slightly changes its description text.
 
 export async function getExistingDedupeKeys(keys: string[]): Promise<Set<string>> {
   if (keys.length === 0) return new Set()
   const db = getSupabaseClient()
 
-  // We build a OR filter: each key is "date|description|amount"
-  // To avoid building a complex OR we fetch all transactions and check in JS
-  // (acceptable for the typical import batch size of <5k rows).
   const { data, error } = await table(db)
-    .select('date,description,amount')
+    .select('date,amount')
 
   if (error) throw new Error(`getExistingDedupeKeys: ${error.message}`)
   const existing = new Set<string>(
-    (data as { date: string; description: string; amount: number | string }[]).map(
-      (r) => `${r.date}|${r.description}|${Number(r.amount)}`,
+    (data as { date: string; amount: number | string }[]).map(
+      (r) => `${r.date}|${Number(r.amount)}`,
     ),
   )
   return existing
@@ -214,6 +213,21 @@ export async function deleteManualTransaction(id: string): Promise<void> {
   const db = getSupabaseClient()
   const { error } = await table(db).delete().eq('id', id)
   if (error) throw new Error(`deleteManualTransaction: ${error.message}`)
+}
+
+/** Delete any transaction by id (not restricted to manual). */
+export async function deleteTransaction(id: string): Promise<void> {
+  const db = getSupabaseClient()
+  const { error } = await table(db).delete().eq('id', id)
+  if (error) throw new Error(`deleteTransaction: ${error.message}`)
+}
+
+/** Bulk-delete a set of transactions by id. */
+export async function deleteTransactions(ids: string[]): Promise<void> {
+  if (ids.length === 0) return
+  const db = getSupabaseClient()
+  const { error } = await table(db).delete().in('id', ids)
+  if (error) throw new Error(`deleteTransactions: ${error.message}`)
 }
 
 /**

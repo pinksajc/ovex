@@ -15,6 +15,8 @@ import {
   updateManualTransaction,
   deleteManualTransaction,
   resetAndBackfillManualBalances,
+  deleteTransaction,
+  deleteTransactions,
 } from '@/lib/supabase/cashflow'
 import { CATEGORIZABLE } from '@/lib/cashflow-categories'
 import type { InsertCashflowTransaction } from '@/types'
@@ -121,12 +123,13 @@ export async function importCashflowAction(
     const { rows, sourceFile } = payload
     if (rows.length === 0) return { ok: true, inserted: 0, skipped: 0 }
 
-    // ── 1. Deduplicate ────────────────────────────────────────────────────────
-    const incomingKeys = rows.map((r) => `${r.date}|${r.description}|${r.amount}`)
+    // ── 1. Deduplicate — key is date|amount (description excluded so minor
+    //    wording changes in Revolut exports don't cause double-imports) ─────────
+    const incomingKeys = rows.map((r) => `${r.date}|${r.amount}`)
     const existingKeys = await getExistingDedupeKeys(incomingKeys)
 
     const newRows = rows.filter(
-      (r) => !existingKeys.has(`${r.date}|${r.description}|${r.amount}`),
+      (r) => !existingKeys.has(`${r.date}|${r.amount}`),
     )
     const skippedCount = rows.length - newRows.length
 
@@ -352,6 +355,52 @@ export async function deleteManualTransactionAction(
     await resetAndBackfillManualBalances()
     revalidatePath('/cashflow')
     return { ok: true }
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : 'Error desconocido' }
+  }
+}
+
+// ── Delete any transaction (panel delete button) ───────────────────────────────
+
+export interface DeleteTransactionResult {
+  ok: boolean
+  error?: string
+}
+
+export async function deleteTransactionAction(
+  id: string,
+): Promise<DeleteTransactionResult> {
+  try {
+    const user = await requireAuth()
+    assertOwner(user.role)
+    await deleteTransaction(id)
+    await resetAndBackfillManualBalances()
+    revalidatePath('/cashflow')
+    return { ok: true }
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : 'Error desconocido' }
+  }
+}
+
+// ── Bulk delete ────────────────────────────────────────────────────────────────
+
+export interface BulkDeleteResult {
+  ok: boolean
+  deleted?: number
+  error?: string
+}
+
+export async function bulkDeleteTransactionsAction(
+  ids: string[],
+): Promise<BulkDeleteResult> {
+  if (ids.length === 0) return { ok: true, deleted: 0 }
+  try {
+    const user = await requireAuth()
+    assertOwner(user.role)
+    await deleteTransactions(ids)
+    await resetAndBackfillManualBalances()
+    revalidatePath('/cashflow')
+    return { ok: true, deleted: ids.length }
   } catch (err) {
     return { ok: false, error: err instanceof Error ? err.message : 'Error desconocido' }
   }
