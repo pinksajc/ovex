@@ -22,6 +22,16 @@ export interface PendingInvoice {
 // SuggestedRecurring is re-exported so page.tsx can use it from here unchanged
 export type { SuggestedRecurring } from '@/lib/supabase/cashflow-planned'
 
+/** Pre-computed summary of a past cashflow transaction (deduped by description). */
+export interface TxHistoryItem {
+  description: string
+  category: string
+  avgAmount: number   // average absolute amount across all occurrences
+  type: 'income' | 'expense'
+  count: number       // how many times it appeared
+  lastDate: string    // YYYY-MM-DD of most recent occurrence → used to pre-fill day-of-month
+}
+
 // ── Formatters ─────────────────────────────────────────────────────────────────
 
 const _EUR2 = new Intl.NumberFormat('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
@@ -291,11 +301,12 @@ function ArrowSep() {
   )
 }
 
-// ── Add item form (shared modal) ───────────────────────────────────────────────
+// ── Add item modal (two-tab) ───────────────────────────────────────────────────
 
-interface AddFormProps {
+interface AddModalProps {
   type: 'income' | 'expense'
-  defaultDate?: string
+  transactionHistory: TxHistoryItem[]
+  pendingInvoices: PendingInvoice[]
   onSave: (p: {
     date: string; description: string; amount: number
     type: 'income' | 'expense'; category: string; isRecurring: boolean
@@ -305,20 +316,91 @@ interface AddFormProps {
   error: string | null
 }
 
-function AddItemForm({ type, defaultDate, onSave, onClose, saving, error }: AddFormProps) {
-  const today = defaultDate ?? new Date().toISOString().split('T')[0]
-  const [date, setDate]               = useState(today)
+function AddItemModal({
+  type, transactionHistory, pendingInvoices, onSave, onClose, saving, error,
+}: AddModalProps) {
+  const now = new Date()
+  const today = now.toISOString().split('T')[0]
+
+  const [activeTab, setActiveTab] = useState<'existing' | 'manual'>('existing')
+  const [search, setSearch]       = useState('')
+
+  // Manual-tab form fields
   const [description, setDescription] = useState('')
   const [amount, setAmount]           = useState('')
   const [category, setCategory]       = useState(type === 'income' ? 'Ingreso cliente' : 'Sin categoría')
   const [isRecurring, setRecurring]   = useState(false)
+  const [date, setDate]               = useState(today)
+  const [dayOfMonth, setDayOfMonth]   = useState(now.getDate())
+
+  // ── Existing-tab filtered lists ──────────────────────────────────────────────
+
+  const filteredHistory = useMemo(() => {
+    const q = search.toLowerCase()
+    return transactionHistory
+      .filter((t) => t.type === type)
+      .filter((t) => !q || t.description.toLowerCase().includes(q))
+  }, [transactionHistory, type, search])
+
+  const filteredInvoices = useMemo(() => {
+    if (type !== 'income') return []
+    const q = search.toLowerCase()
+    return pendingInvoices.filter((inv) =>
+      !q || inv.clientName.toLowerCase().includes(q) || inv.number.toLowerCase().includes(q),
+    )
+  }, [pendingInvoices, type, search])
+
+  // ── Selection handlers ───────────────────────────────────────────────────────
+
+  function selectHistoryItem(item: TxHistoryItem) {
+    setDescription(item.description)
+    setAmount(item.avgAmount.toFixed(2))
+    setCategory(item.category)
+    const day = parseDateKey(item.lastDate).getDate()
+    setDayOfMonth(day)
+    // Build a date in the current month with that day
+    const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate()
+    const safeDay = Math.min(day, daysInMonth)
+    const mm = String(now.getMonth() + 1).padStart(2, '0')
+    const dd = String(safeDay).padStart(2, '0')
+    setDate(`${now.getFullYear()}-${mm}-${dd}`)
+    setActiveTab('manual')
+  }
+
+  function selectInvoice(inv: PendingInvoice) {
+    setDescription(`${inv.number} · ${inv.clientName}`)
+    setAmount(inv.amountTotal.toFixed(2))
+    setCategory('Ingreso cliente')
+    if (inv.dueAt) {
+      setDate(inv.dueAt)
+      setDayOfMonth(parseDateKey(inv.dueAt).getDate())
+    }
+    setActiveTab('manual')
+  }
+
+  // ── Submit ────────────────────────────────────────────────────────────────────
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     const amt = parseFloat(amount)
     if (isNaN(amt) || amt <= 0 || !description.trim()) return
-    onSave({ date, description: description.trim(), amount: amt, type, category, isRecurring })
+
+    let finalDate: string
+    if (isRecurring) {
+      // Encode day-of-month into the date (year/month = current, day = chosen)
+      const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate()
+      const safeDay = Math.min(dayOfMonth, daysInMonth)
+      const mm = String(now.getMonth() + 1).padStart(2, '0')
+      const dd = String(safeDay).padStart(2, '0')
+      finalDate = `${now.getFullYear()}-${mm}-${dd}`
+    } else {
+      finalDate = date
+    }
+
+    onSave({ date: finalDate, description: description.trim(), amount: amt, type, category, isRecurring })
   }
+
+  // ── Render ────────────────────────────────────────────────────────────────────
 
   return (
     <div
@@ -326,8 +408,10 @@ function AddItemForm({ type, defaultDate, onSave, onClose, saving, error }: AddF
       style={{ background: 'rgba(0,0,0,0.35)', backdropFilter: 'blur(4px)' }}
       onClick={(e) => { if (e.target === e.currentTarget && !saving) onClose() }}
     >
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm">
-        <div className="px-6 py-4 border-b border-zinc-100 flex items-center justify-between">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md flex flex-col" style={{ maxHeight: '90vh' }}>
+
+        {/* Header */}
+        <div className="px-6 py-4 border-b border-zinc-100 flex items-center justify-between shrink-0">
           <h2 className="text-sm font-semibold text-zinc-900">
             {type === 'income' ? 'Añadir cobro previsto' : 'Añadir pago comprometido'}
           </h2>
@@ -335,56 +419,164 @@ function AddItemForm({ type, defaultDate, onSave, onClose, saving, error }: AddF
             <XIcon className="w-4 h-4" />
           </button>
         </div>
-        <form onSubmit={handleSubmit} className="px-6 py-5 space-y-4">
-          <div>
-            <label className="block text-[11px] font-semibold uppercase tracking-wider text-zinc-400 mb-1.5">Descripción</label>
-            <input
-              autoFocus type="text" value={description} required
-              onChange={(e) => setDescription(e.target.value)}
-              placeholder={type === 'income' ? 'Ej. Pago cliente XYZ' : 'Ej. Suscripción Slack'}
-              className="w-full text-sm bg-zinc-100 border-0 rounded-lg px-3 py-2 text-zinc-700 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-zinc-300"
-            />
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="block text-[11px] font-semibold uppercase tracking-wider text-zinc-400 mb-1.5">Importe (€)</label>
+
+        {/* Tab bar */}
+        <div className="px-6 flex gap-4 border-b border-zinc-100 shrink-0">
+          {(['existing', 'manual'] as const).map((tab) => (
+            <button
+              key={tab}
+              type="button"
+              onClick={() => setActiveTab(tab)}
+              className={`pb-3 pt-3 text-xs font-semibold transition-colors ${
+                activeTab === tab
+                  ? 'text-zinc-900 border-b-2 border-zinc-900'
+                  : 'text-zinc-400 hover:text-zinc-600'
+              }`}
+            >
+              {tab === 'existing' ? 'Seleccionar existente' : 'Nuevo manual'}
+            </button>
+          ))}
+        </div>
+
+        {/* ── Tab: existing ─────────────────────────────────────────────────── */}
+        {activeTab === 'existing' && (
+          <div className="flex flex-col min-h-0 flex-1 overflow-hidden">
+            <div className="px-4 py-3 shrink-0">
               <input
-                type="number" min="0.01" step="0.01" value={amount} required
-                onChange={(e) => setAmount(e.target.value)} placeholder="0,00"
+                autoFocus
+                type="text"
+                placeholder="Buscar…"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
                 className="w-full text-sm bg-zinc-100 border-0 rounded-lg px-3 py-2 text-zinc-700 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-zinc-300"
               />
             </div>
-            <div>
-              <label className="block text-[11px] font-semibold uppercase tracking-wider text-zinc-400 mb-1.5">Fecha</label>
-              <input type="date" value={date} required onChange={(e) => setDate(e.target.value)}
-                className="w-full text-sm bg-zinc-100 border-0 rounded-lg px-3 py-2 text-zinc-700 focus:outline-none focus:ring-2 focus:ring-zinc-300" />
+            <div className="overflow-y-auto flex-1 divide-y divide-zinc-50">
+              {/* Pending invoices (income only) */}
+              {filteredInvoices.map((inv) => (
+                <button
+                  key={inv.id}
+                  type="button"
+                  onClick={() => selectInvoice(inv)}
+                  className="w-full px-4 py-3 flex items-center justify-between hover:bg-zinc-50 transition-colors text-left"
+                >
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2">
+                      <p className="text-sm text-zinc-800 font-medium truncate">{inv.clientName}</p>
+                      <span className="shrink-0 text-[9px] font-semibold uppercase tracking-wide text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded">factura</span>
+                    </div>
+                    <p className="text-xs text-zinc-400 mt-0.5">
+                      {inv.number}{inv.dueAt ? ` · vence ${formatFullDate(inv.dueAt)}` : ''}
+                    </p>
+                  </div>
+                  <span className="text-sm font-bold font-mono text-emerald-600 shrink-0 ml-3">
+                    +{eur(inv.amountTotal)}
+                  </span>
+                </button>
+              ))}
+
+              {/* Transaction history */}
+              {filteredHistory.map((item) => (
+                <button
+                  key={item.description}
+                  type="button"
+                  onClick={() => selectHistoryItem(item)}
+                  className="w-full px-4 py-3 flex items-center justify-between hover:bg-zinc-50 transition-colors text-left"
+                >
+                  <div className="min-w-0">
+                    <p className="text-sm text-zinc-800 font-medium truncate">{item.description}</p>
+                    <p className="text-xs text-zinc-400 mt-0.5">
+                      {item.category} · {item.count}× · día {parseDateKey(item.lastDate).getDate()} del mes
+                    </p>
+                  </div>
+                  <span className={`text-sm font-bold font-mono shrink-0 ml-3 ${
+                    type === 'income' ? 'text-emerald-600' : 'text-red-500'
+                  }`}>
+                    {type === 'income' ? '+' : '−'}{eur(item.avgAmount)}
+                  </span>
+                </button>
+              ))}
+
+              {filteredHistory.length === 0 && filteredInvoices.length === 0 && (
+                <div className="px-4 py-10 text-center">
+                  <p className="text-sm text-zinc-300">
+                    {search ? 'Sin resultados' : 'Sin historial de transacciones'}
+                  </p>
+                </div>
+              )}
             </div>
           </div>
-          <div>
-            <label className="block text-[11px] font-semibold uppercase tracking-wider text-zinc-400 mb-1.5">Categoría</label>
-            <select value={category} onChange={(e) => setCategory(e.target.value)}
-              className="w-full text-sm bg-zinc-100 border-0 rounded-lg px-3 py-2 text-zinc-700 focus:outline-none focus:ring-2 focus:ring-zinc-300">
-              {CASHFLOW_CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
-            </select>
-          </div>
-          {type === 'expense' && (
+        )}
+
+        {/* ── Tab: manual ───────────────────────────────────────────────────── */}
+        {activeTab === 'manual' && (
+          <form onSubmit={handleSubmit} className="px-6 py-5 space-y-4 overflow-y-auto flex-1">
+            <div>
+              <label className="block text-[11px] font-semibold uppercase tracking-wider text-zinc-400 mb-1.5">Descripción</label>
+              <input
+                autoFocus type="text" value={description} required
+                onChange={(e) => setDescription(e.target.value)}
+                placeholder={type === 'income' ? 'Ej. Pago cliente XYZ' : 'Ej. Suscripción Slack'}
+                className="w-full text-sm bg-zinc-100 border-0 rounded-lg px-3 py-2 text-zinc-700 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-zinc-300"
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-[11px] font-semibold uppercase tracking-wider text-zinc-400 mb-1.5">Importe (€)</label>
+                <input
+                  type="number" min="0.01" step="0.01" value={amount} required
+                  onChange={(e) => setAmount(e.target.value)} placeholder="0,00"
+                  className="w-full text-sm bg-zinc-100 border-0 rounded-lg px-3 py-2 text-zinc-700 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-zinc-300"
+                />
+              </div>
+              <div>
+                {isRecurring ? (
+                  <>
+                    <label className="block text-[11px] font-semibold uppercase tracking-wider text-zinc-400 mb-1.5">Día del mes</label>
+                    <input
+                      type="number" min="1" max="31" value={dayOfMonth} required
+                      onChange={(e) => setDayOfMonth(Math.min(31, Math.max(1, parseInt(e.target.value) || 1)))}
+                      className="w-full text-sm bg-zinc-100 border-0 rounded-lg px-3 py-2 text-zinc-700 focus:outline-none focus:ring-2 focus:ring-zinc-300"
+                    />
+                  </>
+                ) : (
+                  <>
+                    <label className="block text-[11px] font-semibold uppercase tracking-wider text-zinc-400 mb-1.5">Fecha</label>
+                    <input type="date" value={date} required onChange={(e) => setDate(e.target.value)}
+                      className="w-full text-sm bg-zinc-100 border-0 rounded-lg px-3 py-2 text-zinc-700 focus:outline-none focus:ring-2 focus:ring-zinc-300" />
+                  </>
+                )}
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-[11px] font-semibold uppercase tracking-wider text-zinc-400 mb-1.5">Categoría</label>
+              <select value={category} onChange={(e) => setCategory(e.target.value)}
+                className="w-full text-sm bg-zinc-100 border-0 rounded-lg px-3 py-2 text-zinc-700 focus:outline-none focus:ring-2 focus:ring-zinc-300">
+                {CASHFLOW_CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
+              </select>
+            </div>
+
             <label className="flex items-center gap-2.5 cursor-pointer select-none">
               <Toggle value={isRecurring} onChange={setRecurring} />
               <span className="text-xs text-zinc-600">Se repite cada mes</span>
             </label>
-          )}
-          {error && <p className="text-xs text-red-500 bg-red-50 px-3 py-2 rounded-lg">{error}</p>}
-          <div className="flex items-center justify-end gap-3 pt-1">
-            <button type="button" onClick={onClose} disabled={saving}
-              className="text-sm text-zinc-500 hover:text-zinc-700 px-2 py-1.5 transition-colors">
-              Cancelar
-            </button>
-            <button type="submit" disabled={saving}
-              className="text-sm font-medium text-white bg-zinc-900 hover:bg-zinc-700 px-5 py-2 rounded-lg disabled:opacity-50 transition-colors">
-              {saving ? 'Guardando…' : 'Guardar'}
-            </button>
-          </div>
-        </form>
+
+            {error && <p className="text-xs text-red-500 bg-red-50 px-3 py-2 rounded-lg">{error}</p>}
+
+            <div className="flex items-center justify-end gap-3 pt-1">
+              <button type="button" onClick={onClose} disabled={saving}
+                className="text-sm text-zinc-500 hover:text-zinc-700 px-2 py-1.5 transition-colors">
+                Cancelar
+              </button>
+              <button type="submit" disabled={saving}
+                className="text-sm font-medium text-white bg-zinc-900 hover:bg-zinc-700 px-5 py-2 rounded-lg disabled:opacity-50 transition-colors">
+                {saving ? 'Guardando…' : 'Guardar'}
+              </button>
+            </div>
+          </form>
+        )}
       </div>
     </div>
   )
@@ -707,12 +899,14 @@ interface PlanningViewProps {
   pendingInvoices: PendingInvoice[]
   suggestedRecurring: SuggestedRecurring[]   // kept for prop-compat with page.tsx
   currentBalance: number
+  transactionHistory: TxHistoryItem[]
 }
 
 export function PlanningView({
   plannedItems,
   pendingInvoices,
   currentBalance,
+  transactionHistory,
 }: PlanningViewProps) {
   const router = useRouter()
   const [, startTransition] = useTransition()
@@ -764,7 +958,7 @@ export function PlanningView({
     })
   }
 
-  async function handleSave(payload: Parameters<AddFormProps['onSave']>[0]) {
+  async function handleSave(payload: Parameters<AddModalProps['onSave']>[0]) {
     setSaving(true)
     setSaveError(null)
     const result = await addPlannedItemAction(payload)
@@ -812,8 +1006,10 @@ export function PlanningView({
 
       {/* Add modal */}
       {addModal && (
-        <AddItemForm
+        <AddItemModal
           type={addModal}
+          transactionHistory={transactionHistory}
+          pendingInvoices={pendingInvoices}
           onSave={handleSave}
           onClose={() => setAddModal(null)}
           saving={saving}

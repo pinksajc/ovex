@@ -18,6 +18,7 @@ import {
 } from '@/components/cashflow/cashflow-charts'
 import type { CashflowTransaction } from '@/types'
 import type { SuggestedRecurring } from '@/lib/supabase/cashflow-planned'
+import type { TxHistoryItem } from '@/components/cashflow/planning-view'
 
 // ── Recurring-expense detector (server-side) ──────────────────────────────────
 
@@ -52,6 +53,37 @@ function detectRecurring(transactions: CashflowTransaction[]): SuggestedRecurrin
   }
 
   return results.sort((a, b) => b.averageAmount - a.averageAmount).slice(0, 15)
+}
+
+// ── Transaction history builder (for planning-view modal) ────────────────────
+
+function computeTxHistory(transactions: CashflowTransaction[]): TxHistoryItem[] {
+  type Acc = { amounts: number[]; type: 'income' | 'expense'; category: string; lastDate: string }
+  const map = new Map<string, Acc>()
+
+  for (const t of transactions) {
+    if (t.category === 'Traspaso interno') continue
+    const type = t.amount >= 0 ? 'income' : 'expense'
+    const abs = Math.abs(t.amount)
+    const existing = map.get(t.description)
+    if (!existing) {
+      map.set(t.description, { amounts: [abs], type, category: t.category, lastDate: t.date })
+    } else {
+      existing.amounts.push(abs)
+      if (t.date > existing.lastDate) existing.lastDate = t.date
+    }
+  }
+
+  return Array.from(map.entries())
+    .map(([description, data]) => ({
+      description,
+      category: data.category,
+      avgAmount: data.amounts.reduce((s, a) => s + a, 0) / data.amounts.length,
+      type: data.type,
+      count: data.amounts.length,
+      lastDate: data.lastDate,
+    }))
+    .sort((a, b) => b.count - a.count)
 }
 
 // ── Page ──────────────────────────────────────────────────────────────────────
@@ -104,6 +136,7 @@ export default async function CashflowPage({
     }))
 
   const suggestedRecurring = activeTab === 'planning' ? detectRecurring(allTransactions) : []
+  const txHistory = activeTab === 'planning' ? computeTxHistory(allTransactions) : []
   const currentBalance = allTransactions.find((t) => t.balance != null)?.balance ?? 0
 
   // ── Transactions tab: date filtering + KPIs ───────────────────────────────────
@@ -158,6 +191,7 @@ export default async function CashflowPage({
           pendingInvoices={pendingInvoices}
           suggestedRecurring={suggestedRecurring}
           currentBalance={currentBalance}
+          transactionHistory={txHistory}
         />
       ) : (
         <>
