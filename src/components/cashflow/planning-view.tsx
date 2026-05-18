@@ -303,17 +303,27 @@ function ArrowSep() {
 
 // ── Add item modal (two-tab) ───────────────────────────────────────────────────
 
+type SavePayload = {
+  date: string; description: string; amount: number
+  type: 'income' | 'expense'; category: string; isRecurring: boolean
+}
+
 interface AddModalProps {
   type: 'income' | 'expense'
   transactionHistory: TxHistoryItem[]
   pendingInvoices: PendingInvoice[]
-  onSave: (p: {
-    date: string; description: string; amount: number
-    type: 'income' | 'expense'; category: string; isRecurring: boolean
-  }) => void
+  onSave: (items: SavePayload[]) => void
   onClose: () => void
   saving: boolean
   error: string | null
+}
+
+/** Convert a day-of-month to a YYYY-MM-DD in the current month. */
+function dayToDateKey(day: number): string {
+  const n = new Date()
+  const daysInMonth = new Date(n.getFullYear(), n.getMonth() + 1, 0).getDate()
+  const safe = Math.min(day, daysInMonth)
+  return `${n.getFullYear()}-${String(n.getMonth() + 1).padStart(2, '0')}-${String(safe).padStart(2, '0')}`
 }
 
 function AddItemModal({
@@ -322,8 +332,9 @@ function AddItemModal({
   const now = new Date()
   const today = now.toISOString().split('T')[0]
 
-  const [activeTab, setActiveTab] = useState<'existing' | 'manual'>('existing')
-  const [search, setSearch]       = useState('')
+  const [activeTab, setActiveTab]   = useState<'existing' | 'manual'>('existing')
+  const [search, setSearch]         = useState('')
+  const [selectedKeys, setSelected] = useState<Set<string>>(new Set())
 
   // Manual-tab form fields
   const [description, setDescription] = useState('')
@@ -333,7 +344,7 @@ function AddItemModal({
   const [date, setDate]               = useState(today)
   const [dayOfMonth, setDayOfMonth]   = useState(now.getDate())
 
-  // ── Existing-tab filtered lists ──────────────────────────────────────────────
+  // ── Filtered lists ───────────────────────────────────────────────────────────
 
   const filteredHistory = useMemo(() => {
     const q = search.toLowerCase()
@@ -350,35 +361,92 @@ function AddItemModal({
     )
   }, [pendingInvoices, type, search])
 
-  // ── Selection handlers ───────────────────────────────────────────────────────
+  // ── Multi-select helpers ─────────────────────────────────────────────────────
 
-  function selectHistoryItem(item: TxHistoryItem) {
-    setDescription(item.description)
-    setAmount(item.avgAmount.toFixed(2))
-    setCategory(item.category)
-    const day = parseDateKey(item.lastDate).getDate()
-    setDayOfMonth(day)
-    // Build a date in the current month with that day
-    const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate()
-    const safeDay = Math.min(day, daysInMonth)
-    const mm = String(now.getMonth() + 1).padStart(2, '0')
-    const dd = String(safeDay).padStart(2, '0')
-    setDate(`${now.getFullYear()}-${mm}-${dd}`)
-    setActiveTab('manual')
+  const allVisibleKeys = useMemo(() => {
+    const keys: string[] = [
+      ...filteredInvoices.map((inv) => `inv:${inv.id}`),
+      ...filteredHistory.map((item) => `hist:${item.description}`),
+    ]
+    return keys
+  }, [filteredInvoices, filteredHistory])
+
+  const allSelected = allVisibleKeys.length > 0 && allVisibleKeys.every((k) => selectedKeys.has(k))
+  const someSelected = selectedKeys.size > 0
+
+  function toggleKey(key: string) {
+    setSelected((prev) => {
+      const next = new Set(prev)
+      if (next.has(key)) next.delete(key)
+      else next.add(key)
+      return next
+    })
   }
 
-  function selectInvoice(inv: PendingInvoice) {
-    setDescription(`${inv.number} · ${inv.clientName}`)
-    setAmount(inv.amountTotal.toFixed(2))
-    setCategory('Ingreso cliente')
-    if (inv.dueAt) {
-      setDate(inv.dueAt)
-      setDayOfMonth(parseDateKey(inv.dueAt).getDate())
+  function selectAll() {
+    setSelected((prev) => {
+      const next = new Set(prev)
+      allVisibleKeys.forEach((k) => next.add(k))
+      return next
+    })
+  }
+
+  function deselectAll() {
+    setSelected((prev) => {
+      const next = new Set(prev)
+      allVisibleKeys.forEach((k) => next.delete(k))
+      return next
+    })
+  }
+
+  // ── Totals for summary bar ───────────────────────────────────────────────────
+
+  const { selectedCount, selectedTotal } = useMemo(() => {
+    let count = 0
+    let total = 0
+    for (const inv of filteredInvoices) {
+      if (selectedKeys.has(`inv:${inv.id}`)) { count++; total += inv.amountTotal }
     }
-    setActiveTab('manual')
+    for (const item of filteredHistory) {
+      if (selectedKeys.has(`hist:${item.description}`)) { count++; total += item.avgAmount }
+    }
+    return { selectedCount: count, selectedTotal: total }
+  }, [selectedKeys, filteredInvoices, filteredHistory])
+
+  // ── Confirm multi-selection ──────────────────────────────────────────────────
+
+  function confirmSelection() {
+    const payloads: SavePayload[] = []
+
+    for (const inv of pendingInvoices) {
+      if (!selectedKeys.has(`inv:${inv.id}`)) continue
+      payloads.push({
+        date: inv.dueAt ?? today,
+        description: `${inv.number} · ${inv.clientName}`,
+        amount: inv.amountTotal,
+        type: 'income',
+        category: 'Ingreso cliente',
+        isRecurring: false,
+      })
+    }
+
+    for (const item of transactionHistory) {
+      if (!selectedKeys.has(`hist:${item.description}`)) continue
+      const day = parseDateKey(item.lastDate).getDate()
+      payloads.push({
+        date: dayToDateKey(day),
+        description: item.description,
+        amount: item.avgAmount,
+        type: item.type,
+        category: item.category,
+        isRecurring: false,
+      })
+    }
+
+    if (payloads.length > 0) onSave(payloads)
   }
 
-  // ── Submit ────────────────────────────────────────────────────────────────────
+  // ── Manual form submit ───────────────────────────────────────────────────────
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -387,7 +455,6 @@ function AddItemModal({
 
     let finalDate: string
     if (isRecurring) {
-      // Encode day-of-month into the date (year/month = current, day = chosen)
       const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate()
       const safeDay = Math.min(dayOfMonth, daysInMonth)
       const mm = String(now.getMonth() + 1).padStart(2, '0')
@@ -397,7 +464,7 @@ function AddItemModal({
       finalDate = date
     }
 
-    onSave({ date: finalDate, description: description.trim(), amount: amt, type, category, isRecurring })
+    onSave([{ date: finalDate, description: description.trim(), amount: amt, type, category, isRecurring }])
   }
 
   // ── Render ────────────────────────────────────────────────────────────────────
@@ -441,61 +508,97 @@ function AddItemModal({
         {/* ── Tab: existing ─────────────────────────────────────────────────── */}
         {activeTab === 'existing' && (
           <div className="flex flex-col min-h-0 flex-1 overflow-hidden">
-            <div className="px-4 py-3 shrink-0">
+
+            {/* Search + select-all toolbar */}
+            <div className="px-4 py-3 flex items-center gap-2 shrink-0">
               <input
                 autoFocus
                 type="text"
                 placeholder="Buscar…"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                className="w-full text-sm bg-zinc-100 border-0 rounded-lg px-3 py-2 text-zinc-700 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-zinc-300"
+                className="flex-1 text-sm bg-zinc-100 border-0 rounded-lg px-3 py-2 text-zinc-700 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-zinc-300"
               />
+              <button
+                type="button"
+                onClick={allSelected ? deselectAll : selectAll}
+                className="shrink-0 text-xs font-medium text-zinc-500 hover:text-zinc-800 transition-colors whitespace-nowrap px-1"
+              >
+                {allSelected ? 'Deseleccionar todo' : 'Seleccionar todo'}
+              </button>
             </div>
+
+            {/* Scrollable list */}
             <div className="overflow-y-auto flex-1 divide-y divide-zinc-50">
+
               {/* Pending invoices (income only) */}
-              {filteredInvoices.map((inv) => (
-                <button
-                  key={inv.id}
-                  type="button"
-                  onClick={() => selectInvoice(inv)}
-                  className="w-full px-4 py-3 flex items-center justify-between hover:bg-zinc-50 transition-colors text-left"
-                >
-                  <div className="min-w-0">
-                    <div className="flex items-center gap-2">
-                      <p className="text-sm text-zinc-800 font-medium truncate">{inv.clientName}</p>
-                      <span className="shrink-0 text-[9px] font-semibold uppercase tracking-wide text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded">factura</span>
+              {filteredInvoices.map((inv) => {
+                const key = `inv:${inv.id}`
+                const checked = selectedKeys.has(key)
+                return (
+                  <label
+                    key={inv.id}
+                    className={`flex items-center gap-3 px-4 py-3 cursor-pointer transition-colors ${
+                      checked ? 'bg-zinc-50' : 'hover:bg-zinc-50/60'
+                    }`}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={checked}
+                      onChange={() => toggleKey(key)}
+                      className="w-4 h-4 rounded border-zinc-300 accent-zinc-900 shrink-0 cursor-pointer"
+                    />
+                    <div className="flex items-center justify-between flex-1 min-w-0">
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2">
+                          <p className="text-sm text-zinc-800 font-medium truncate">{inv.clientName}</p>
+                          <span className="shrink-0 text-[9px] font-semibold uppercase tracking-wide text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded">factura</span>
+                        </div>
+                        <p className="text-xs text-zinc-400 mt-0.5">
+                          {inv.number}{inv.dueAt ? ` · vence ${formatFullDate(inv.dueAt)}` : ''}
+                        </p>
+                      </div>
+                      <span className="text-sm font-bold font-mono text-emerald-600 shrink-0 ml-3">
+                        +{eur(inv.amountTotal)}
+                      </span>
                     </div>
-                    <p className="text-xs text-zinc-400 mt-0.5">
-                      {inv.number}{inv.dueAt ? ` · vence ${formatFullDate(inv.dueAt)}` : ''}
-                    </p>
-                  </div>
-                  <span className="text-sm font-bold font-mono text-emerald-600 shrink-0 ml-3">
-                    +{eur(inv.amountTotal)}
-                  </span>
-                </button>
-              ))}
+                  </label>
+                )
+              })}
 
               {/* Transaction history */}
-              {filteredHistory.map((item) => (
-                <button
-                  key={item.description}
-                  type="button"
-                  onClick={() => selectHistoryItem(item)}
-                  className="w-full px-4 py-3 flex items-center justify-between hover:bg-zinc-50 transition-colors text-left"
-                >
-                  <div className="min-w-0">
-                    <p className="text-sm text-zinc-800 font-medium truncate">{item.description}</p>
-                    <p className="text-xs text-zinc-400 mt-0.5">
-                      {item.category} · {item.count}× · día {parseDateKey(item.lastDate).getDate()} del mes
-                    </p>
-                  </div>
-                  <span className={`text-sm font-bold font-mono shrink-0 ml-3 ${
-                    type === 'income' ? 'text-emerald-600' : 'text-red-500'
-                  }`}>
-                    {type === 'income' ? '+' : '−'}{eur(item.avgAmount)}
-                  </span>
-                </button>
-              ))}
+              {filteredHistory.map((item) => {
+                const key = `hist:${item.description}`
+                const checked = selectedKeys.has(key)
+                return (
+                  <label
+                    key={item.description}
+                    className={`flex items-center gap-3 px-4 py-3 cursor-pointer transition-colors ${
+                      checked ? 'bg-zinc-50' : 'hover:bg-zinc-50/60'
+                    }`}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={checked}
+                      onChange={() => toggleKey(key)}
+                      className="w-4 h-4 rounded border-zinc-300 accent-zinc-900 shrink-0 cursor-pointer"
+                    />
+                    <div className="flex items-center justify-between flex-1 min-w-0">
+                      <div className="min-w-0">
+                        <p className="text-sm text-zinc-800 font-medium truncate">{item.description}</p>
+                        <p className="text-xs text-zinc-400 mt-0.5">
+                          {item.category} · {item.count}× · día {parseDateKey(item.lastDate).getDate()} del mes
+                        </p>
+                      </div>
+                      <span className={`text-sm font-bold font-mono shrink-0 ml-3 ${
+                        type === 'income' ? 'text-emerald-600' : 'text-red-500'
+                      }`}>
+                        {type === 'income' ? '+' : '−'}{eur(item.avgAmount)}
+                      </span>
+                    </div>
+                  </label>
+                )
+              })}
 
               {filteredHistory.length === 0 && filteredInvoices.length === 0 && (
                 <div className="px-4 py-10 text-center">
@@ -505,6 +608,30 @@ function AddItemModal({
                 </div>
               )}
             </div>
+
+            {/* Summary bar — shown when at least one item is selected */}
+            {someSelected && (
+              <div className="shrink-0 border-t border-zinc-100 px-4 py-3 flex items-center justify-between gap-3 bg-zinc-50/80">
+                <p className="text-xs text-zinc-600 min-w-0">
+                  <span className="font-semibold text-zinc-900">{selectedCount}</span>
+                  {' '}transacción{selectedCount !== 1 ? 'es' : ''} seleccionada{selectedCount !== 1 ? 's' : ''}
+                  <span className="text-zinc-400"> · </span>
+                  <span className="font-semibold">{eur(selectedTotal)}</span>
+                </p>
+                <button
+                  type="button"
+                  onClick={confirmSelection}
+                  disabled={saving}
+                  className="shrink-0 text-sm font-medium text-white bg-zinc-900 hover:bg-zinc-700 px-4 py-2 rounded-lg disabled:opacity-50 transition-colors"
+                >
+                  {saving ? 'Guardando…' : 'Confirmar'}
+                </button>
+              </div>
+            )}
+
+            {error && (
+              <p className="shrink-0 mx-4 mb-3 text-xs text-red-500 bg-red-50 px-3 py-2 rounded-lg">{error}</p>
+            )}
           </div>
         )}
 
@@ -958,17 +1085,20 @@ export function PlanningView({
     })
   }
 
-  async function handleSave(payload: Parameters<AddModalProps['onSave']>[0]) {
+  async function handleSave(payloads: Parameters<AddModalProps['onSave']>[0]) {
     setSaving(true)
     setSaveError(null)
-    const result = await addPlannedItemAction(payload)
-    setSaving(false)
-    if (result.ok) {
-      setAddModal(null)
-      router.refresh()
-    } else {
-      setSaveError(result.error ?? 'Error')
+    for (const payload of payloads) {
+      const result = await addPlannedItemAction(payload)
+      if (!result.ok) {
+        setSaveError(result.error ?? 'Error')
+        setSaving(false)
+        return
+      }
     }
+    setSaving(false)
+    setAddModal(null)
+    router.refresh()
   }
 
   // ── Render ─────────────────────────────────────────────────────────────────
