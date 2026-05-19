@@ -478,6 +478,14 @@ ${presupuesto.notes ? `
   <div class="notes-body">${esc(presupuesto.notes)}</div>
 </div>` : ''}
 
+<!-- Legal disclaimer — conditional on requiresSignature -->
+<div style="margin-top:14px;background:#f8fafc;border:1px solid #e8eef6;border-radius:8px;padding:13px 15px;font-size:9.5px;color:#64748b;line-height:1.6;">
+${presupuesto.requiresSignature
+  ? `El presente documento tiene carácter contractual y vinculante para ambas partes una vez firmado por los representantes legales de cada una. Las condiciones económicas y técnicas recogidas en esta oferta quedarán formalizadas mediante la firma del presente documento, que tendrá plena validez legal como contrato de prestación de servicios entre Platomico, S.L. y el cliente.`
+  : `El presente documento tiene carácter informativo y no contractual. Las condiciones económicas y técnicas recogidas en esta oferta están sujetas a modificación hasta la formalización de un contrato escrito firmado por ambas partes.`
+}
+</div>
+
 ${presupuesto.requiresSignature ? `
 <!-- Legal clauses + signature — always on a new page -->
 <div style="page-break-before:always;padding-top:40px;">
