@@ -15,18 +15,24 @@ import type { CashflowTransaction } from '@/types'
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
+/** Returns "YYYY-MM" — always groups by year+month so Jan-25 ≠ Jan-26. */
 function monthKey(date: string) { return date.slice(0, 7) }
 
-function monthLabel(key: string) {
+/** Hardcoded Spanish abbreviations — avoids locale variance across environments. */
+const MONTH_ABBR = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic']
+
+/** "2026-01" → "Ene 26" */
+function monthLabel(key: string): string {
   const [y, m] = key.split('-').map(Number)
-  return new Date(y, m - 1, 1).toLocaleDateString('es-ES', { month: 'short', year: '2-digit' })
+  return `${MONTH_ABBR[m - 1]} ${String(y).slice(2)}`
 }
 
 const _EUR2 = new Intl.NumberFormat('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 function eur(n: number) { return `${_EUR2.format(Math.abs(n))} €` }
-function eurAxis(n: number) {
-  return new Intl.NumberFormat('es-ES', { maximumFractionDigits: 0 }).format(n)
-}
+
+/** Y-axis tick formatter — dots as thousand separators, no decimals. */
+const _EUR0 = new Intl.NumberFormat('es-ES', { maximumFractionDigits: 0 })
+function eurAxis(n: number): string { return _EUR0.format(n) }
 
 // ── Tooltip interfaces (recharts v3 compat) ───────────────────────────────────
 
@@ -74,7 +80,7 @@ export function IncomeExpenseChart({ transactions }: { transactions: CashflowTra
   const data = useMemo<MonthlyBarPoint[]>(() => {
     const map = new Map<string, { income: number; expense: number }>()
     for (const t of transactions) {
-      if (t.category === 'Traspaso interno') continue
+      if (t.category === 'Traspaso interno' || t.category === 'Préstamos') continue
       const k = monthKey(t.date)
       const rec = map.get(k) ?? { income: 0, expense: 0 }
       if (t.type === 'income') rec.income += t.amount
@@ -107,7 +113,7 @@ export function IncomeExpenseChart({ transactions }: { transactions: CashflowTra
         <LineChart data={data} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
           <CartesianGrid strokeDasharray="0" stroke="#f0f0f0" vertical={false} />
           <XAxis dataKey="month" tick={{ fontSize: 10, fill: '#a1a1aa' }} axisLine={false} tickLine={false} dy={4} />
-          <YAxis tickFormatter={eurAxis} tick={{ fontSize: 10, fill: '#a1a1aa' }} axisLine={false} tickLine={false} dx={-4} width={40} />
+          <YAxis tickFormatter={eurAxis} tick={{ fontSize: 10, fill: '#a1a1aa' }} axisLine={false} tickLine={false} dx={-4} width={62} />
           <Tooltip content={<IncomeExpenseTooltip />} />
           <Line
             type="monotone"
@@ -317,7 +323,7 @@ export function BalanceTrendChart({ transactions }: { transactions: CashflowTran
         <LineChart data={data} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
           <CartesianGrid strokeDasharray="0" stroke="#f0f0f0" vertical={false} />
           <XAxis dataKey="month" tick={{ fontSize: 10, fill: '#a1a1aa' }} axisLine={false} tickLine={false} dy={4} />
-          <YAxis tickFormatter={eurAxis} tick={{ fontSize: 10, fill: '#a1a1aa' }} axisLine={false} tickLine={false} dx={-4} width={44} />
+          <YAxis tickFormatter={eurAxis} tick={{ fontSize: 10, fill: '#a1a1aa' }} axisLine={false} tickLine={false} dx={-4} width={62} />
           <Tooltip content={<LineTooltip />} />
           {hasNegative && <ReferenceLine y={0} stroke="#e4e4e7" strokeWidth={1} />}
           <Line
