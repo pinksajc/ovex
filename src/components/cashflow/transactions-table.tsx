@@ -716,8 +716,6 @@ export function TransactionsTable({ transactions }: { transactions: CashflowTran
   const [search, setSearch]       = useState('')
   const [typeFilter, setType]     = useState<'all' | 'income' | 'expense'>('all')
   const [catFilter, setCat]       = useState('all')
-  const [dateFrom, setDateFrom]   = useState('')
-  const [dateTo, setDateTo]       = useState('')
   const [page, setPage]           = useState(1)
   const [grouped, setGrouped]     = useState(false)
   const [expandedCats, setExpCats] = useState<Set<string>>(new Set())
@@ -777,15 +775,13 @@ export function TransactionsTable({ transactions }: { transactions: CashflowTran
     return transactions.filter((t) => {
       if (typeFilter !== 'all' && t.type !== typeFilter) return false
       if (catFilter !== 'all' && t.category !== catFilter) return false
-      if (dateFrom && t.date < dateFrom) return false
-      if (dateTo   && t.date > dateTo)   return false
       if (search) {
         const q = search.toLowerCase()
         if (!t.description.toLowerCase().includes(q)) return false
       }
       return true
     })
-  }, [transactions, typeFilter, catFilter, dateFrom, dateTo, search])
+  }, [transactions, typeFilter, catFilter, search])
 
   // ── Grouped data ─────────────────────────────────────────────────────────────
   const groupedData = useMemo<GroupEntry[]>(() => {
@@ -893,21 +889,6 @@ export function TransactionsTable({ transactions }: { transactions: CashflowTran
             ))}
           </select>
 
-          {/* Date range */}
-          <input
-            type="date"
-            value={dateFrom}
-            onChange={(e) => { setDateFrom(e.target.value); setPage(1) }}
-            className="text-xs bg-zinc-100 border-0 rounded-lg px-3 py-2 text-zinc-600 focus:outline-none focus:ring-1 focus:ring-zinc-300"
-          />
-          <span className="text-xs text-zinc-400">—</span>
-          <input
-            type="date"
-            value={dateTo}
-            onChange={(e) => { setDateTo(e.target.value); setPage(1) }}
-            className="text-xs bg-zinc-100 border-0 rounded-lg px-3 py-2 text-zinc-600 focus:outline-none focus:ring-1 focus:ring-zinc-300"
-          />
-
           {/* Group toggle */}
           <div className="flex items-center bg-zinc-100 rounded-lg p-0.5">
             <button
@@ -992,7 +973,7 @@ export function TransactionsTable({ transactions }: { transactions: CashflowTran
             )}
 
             <div className="text-xs text-zinc-400">
-              <span className="font-semibold text-emerald-600">+{formatEur(sumIncome)}</span>
+              <span className="font-semibold text-emerald-600">{formatEur(sumIncome)}</span>
               {' · '}
               <span className="font-semibold text-red-500">{formatEur(sumExpense)}</span>
               {' · '}
