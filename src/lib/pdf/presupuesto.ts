@@ -495,8 +495,9 @@ ${presupuesto.requiresSignature ? `
     <p style="margin-bottom:7px;"><strong style="color:#475569;">1. ACEPTACIÓN —</strong> La firma del presente documento implica la aceptación de los servicios descritos en esta oferta y de las condiciones del contrato marco suscrito entre las partes.</p>
     <p style="margin-bottom:7px;"><strong style="color:#475569;">2. VIGENCIA —</strong> Esta oferta tiene validez hasta la fecha indicada. Transcurrido dicho plazo sin aceptación firmada, Platomico, S.L. se reserva el derecho de modificar las condiciones.</p>
     <p style="margin-bottom:7px;"><strong style="color:#475569;">3. FACTURACIÓN —</strong> Los servicios se facturarán mensualmente, con vencimiento a 30 días desde la emisión de la factura.</p>
-    <p style="margin-bottom:7px;"><strong style="color:#475569;">4. PROTECCIÓN DE DATOS —</strong> Los datos personales facilitados serán tratados por Platomico, S.L. (CIF B22741094) conforme al RGPD (UE) 2016/679 y la LOPDGDD, únicamente para la gestión comercial y prestación de servicios.</p>
-    <p><strong style="color:#475569;">5. JURISDICCIÓN —</strong> Las partes se someten a los Juzgados y Tribunales de Madrid para la resolución de cualquier controversia derivada de la presente oferta.</p>
+    <p style="margin-bottom:7px;"><strong style="color:#475569;">4. FORMA DE PAGO —</strong> El pago de las facturas se realizará mediante transferencia bancaria a la cuenta de Platomico, S.L.: IBAN: ES69 1583 0001 1993 4722 6761 · BIC: REVOESM2 · Titular: Platomico, S.L. El cliente deberá indicar el número de factura correspondiente en el concepto de la transferencia.</p>
+    <p style="margin-bottom:7px;"><strong style="color:#475569;">5. PROTECCIÓN DE DATOS —</strong> Los datos personales facilitados serán tratados por Platomico, S.L. (CIF B22741094) conforme al RGPD (UE) 2016/679 y la LOPDGDD, únicamente para la gestión comercial y prestación de servicios.</p>
+    <p><strong style="color:#475569;">6. JURISDICCIÓN —</strong> Las partes se someten a los Juzgados y Tribunales de Madrid para la resolución de cualquier controversia derivada de la presente oferta.</p>
   </div>
 </div>
 
