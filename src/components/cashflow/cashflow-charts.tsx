@@ -245,7 +245,7 @@ export function ExpenseCategoryDonut({ transactions }: { transactions: CashflowT
     .map(([label, amount], i) => ({ label, amount, color: CAT_COLORS[i % CAT_COLORS.length] }))
 
   const total = segments.reduce((s, d) => s + d.amount, 0)
-  const cx = 60, cy = 60, r = 44, sw = 14
+  const cx = 72, cy = 72, r = 52, sw = 16
 
   let cumAngle = 0
   const arcs = segments.filter((d) => d.amount > 0).map((seg) => {
@@ -276,11 +276,10 @@ export function ExpenseCategoryDonut({ transactions }: { transactions: CashflowT
             </div>
           )}
 
-          {/* Stacked layout: donut centered, legend below */}
-          <div className="flex flex-col items-center gap-4">
+          <div className="flex items-start gap-6">
             {/* Donut */}
             <svg
-              width="120" height="120" viewBox="0 0 120 120"
+              width="144" height="144" viewBox="0 0 144 144"
               className="shrink-0"
               onMouseLeave={() => setHovered(null)}
             >
@@ -299,30 +298,30 @@ export function ExpenseCategoryDonut({ transactions }: { transactions: CashflowT
                   })}
                 />
               ))}
-              <text x={cx} y={cy + 1} textAnchor="middle" fontSize={12} fontWeight="700" fill="#18181b">
+              <text x={cx} y={cy + 1} textAnchor="middle" fontSize={13} fontWeight="700" fill="#18181b">
                 {eurAxis(total)}
               </text>
-              <text x={cx} y={cy + 14} textAnchor="middle" fontSize={8} fill="#a1a1aa" fontWeight="500">
+              <text x={cx} y={cy + 16} textAnchor="middle" fontSize={9} fill="#a1a1aa" fontWeight="500">
                 total gasto
               </text>
             </svg>
 
-            {/* Legend — full width, no truncation */}
-            <div className="w-full max-h-40 overflow-y-auto space-y-1.5">
+            {/* Legend — side-by-side, names wrap (no truncate) */}
+            <div className="flex-1 min-w-0 max-h-36 overflow-y-auto space-y-1.5 pr-1">
               {segments.map((seg) => (
                 <div
                   key={seg.label}
-                  className="flex items-center justify-between gap-2"
+                  className="flex items-start justify-between gap-2"
                   style={{
                     opacity: hovered && hovered.label !== seg.label ? 0.4 : 1,
                     transition: 'opacity 0.12s',
                   }}
                 >
-                  <div className="flex items-center gap-2 min-w-0">
-                    <span className="w-2 h-2 rounded-full shrink-0" style={{ background: seg.color }} />
+                  <div className="flex items-start gap-2">
+                    <span className="w-2 h-2 rounded-full shrink-0 mt-0.5" style={{ background: seg.color }} />
                     <span className="text-xs text-zinc-600 leading-tight">{seg.label}</span>
                   </div>
-                  <span className="text-xs font-mono text-zinc-400 shrink-0 ml-2">{eur(seg.amount)}</span>
+                  <span className="text-xs font-mono text-zinc-400 shrink-0">{eur(seg.amount)}</span>
                 </div>
               ))}
             </div>
@@ -335,53 +334,49 @@ export function ExpenseCategoryDonut({ transactions }: { transactions: CashflowT
 
 // ── Line chart: saldo acumulado mes a mes ─────────────────────────────────────
 
-interface BalancePoint { period: string; balance: number }
+interface BalancePoint { month: string; balance: number }
 
 export function BalanceTrendChart({
   transactions,
-  dateFrom,
-  dateTo,
 }: {
   transactions: CashflowTransaction[]
   dateFrom: string
   dateTo: string
 }) {
-  const gran = useMemo(() => getGranularity(dateFrom, dateTo), [dateFrom, dateTo])
-
   const data = useMemo<BalancePoint[]>(() => {
-    // Group by bucket, take last balance entry per bucket (Revolut balance is running)
-    const bucketBalances = new Map<string, { balance: number; date: string }>()
+    // Always group by month — take the last (most recent) balance per month.
+    // Include ALL categories: Traspaso interno and Préstamos are real movements
+    // that affect the true bank balance.
+    const monthBalances = new Map<string, { balance: number; date: string }>()
     for (const t of transactions) {
       if (t.balance == null) continue
-      const k = bucketKey(t.date, gran)
-      const existing = bucketBalances.get(k)
-      // Keep the most recent entry (transactions are sorted desc by date already)
+      const k = monthKey(t.date)
+      const existing = monthBalances.get(k)
       if (!existing || t.date > existing.date) {
-        bucketBalances.set(k, { balance: t.balance, date: t.date })
+        monthBalances.set(k, { balance: t.balance, date: t.date })
       }
     }
 
-    if (bucketBalances.size === 0) {
-      // Fallback: cumulative net flow (exclude internal transfers)
-      const netByBucket = new Map<string, number>()
+    if (monthBalances.size === 0) {
+      // Fallback: cumulative net flow — all categories included
+      const netByMonth = new Map<string, number>()
       for (const t of transactions) {
-        if (t.category === 'Traspaso interno') continue
-        const k = bucketKey(t.date, gran)
-        netByBucket.set(k, (netByBucket.get(k) ?? 0) + t.amount)
+        const k = monthKey(t.date)
+        netByMonth.set(k, (netByMonth.get(k) ?? 0) + t.amount)
       }
       let running = 0
-      return Array.from(netByBucket.entries())
+      return Array.from(netByMonth.entries())
         .sort(([a], [b]) => a.localeCompare(b))
         .map(([k, net]) => {
           running += net
-          return { period: bucketLabel(k, gran), balance: Math.round(running) }
+          return { month: monthLabel(k), balance: Math.round(running) }
         })
     }
 
-    return Array.from(bucketBalances.entries())
+    return Array.from(monthBalances.entries())
       .sort(([a], [b]) => a.localeCompare(b))
-      .map(([k, v]) => ({ period: bucketLabel(k, gran), balance: Math.round(v.balance) }))
-  }, [transactions, gran])
+      .map(([k, v]) => ({ month: monthLabel(k), balance: Math.round(v.balance) }))
+  }, [transactions])
 
   if (data.length === 0) return <EmptyChart label="Saldo acumulado" />
 
@@ -390,12 +385,12 @@ export function BalanceTrendChart({
   return (
     <div className="bg-white rounded-2xl shadow-sm p-6">
       <p className="text-xs font-semibold uppercase tracking-widest text-zinc-400 mb-4">
-        Saldo acumulado · {granularityLabel(gran)}
+        Saldo acumulado · mensual
       </p>
       <ResponsiveContainer width="100%" height={200}>
         <LineChart data={data} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
           <CartesianGrid strokeDasharray="0" stroke="#f0f0f0" vertical={false} />
-          <XAxis dataKey="period" tick={{ fontSize: 10, fill: '#a1a1aa' }} axisLine={false} tickLine={false} dy={4} />
+          <XAxis dataKey="month" tick={{ fontSize: 10, fill: '#a1a1aa' }} axisLine={false} tickLine={false} dy={4} />
           <YAxis tickFormatter={eurAxis} tick={{ fontSize: 10, fill: '#a1a1aa' }} axisLine={false} tickLine={false} dx={-4} width={62} />
           <Tooltip content={<LineTooltip />} />
           {hasNegative && <ReferenceLine y={0} stroke="#e4e4e7" strokeWidth={1} />}
