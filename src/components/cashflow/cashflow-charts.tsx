@@ -130,24 +130,20 @@ function BalanceTooltip({ active, payload, label }: {
 
 // ── Line chart: ingresos vs gastos ────────────────────────────────────────────
 
-interface IncomeExpensePoint { period: string; income: number; expense: number }
+interface IncomeExpensePoint { week: string; income: number; expense: number }
 
 export function IncomeExpenseChart({
   transactions,
-  dateFrom,
-  dateTo,
 }: {
   transactions: CashflowTransaction[]
   dateFrom: string
   dateTo: string
 }) {
-  const gran = useMemo(() => getGranularity(dateFrom, dateTo), [dateFrom, dateTo])
-
   const data = useMemo<IncomeExpensePoint[]>(() => {
     const map = new Map<string, { income: number; expense: number }>()
     for (const t of transactions) {
       if (t.category === 'Traspaso interno' || t.category === 'Préstamos') continue
-      const k = bucketKey(t.date, gran)
+      const k = weekStartKey(t.date)
       const rec = map.get(k) ?? { income: 0, expense: 0 }
       if (t.type === 'income') rec.income += t.amount
       else rec.expense += Math.abs(t.amount)
@@ -156,11 +152,11 @@ export function IncomeExpenseChart({
     return Array.from(map.entries())
       .sort(([a], [b]) => a.localeCompare(b))
       .map(([k, v]) => ({
-        period:  bucketLabel(k, gran),
+        week:    weekLabel(k),
         income:  Math.round(v.income),
         expense: Math.round(v.expense),
       }))
-  }, [transactions, gran])
+  }, [transactions])
 
   if (data.length === 0) return <EmptyChart label="Ingresos vs Gastos" />
 
@@ -168,7 +164,7 @@ export function IncomeExpenseChart({
     <div className="bg-white rounded-2xl shadow-sm p-6">
       <div className="flex items-center justify-between mb-4">
         <p className="text-xs font-semibold uppercase tracking-widest text-zinc-400">
-          Ingresos vs Gastos · {granularityLabel(gran)}
+          Ingresos vs Gastos · semanal
         </p>
         <div className="flex items-center gap-4">
           <LegendDot color="#34c759" label="Ingresos" />
@@ -178,24 +174,24 @@ export function IncomeExpenseChart({
       <ResponsiveContainer width="100%" height={200}>
         <LineChart data={data} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
           <CartesianGrid strokeDasharray="0" stroke="#f0f0f0" vertical={false} />
-          <XAxis dataKey="period" tick={{ fontSize: 10, fill: '#a1a1aa' }} axisLine={false} tickLine={false} dy={4} />
+          <XAxis dataKey="week" tick={{ fontSize: 10, fill: '#a1a1aa' }} axisLine={false} tickLine={false} dy={4} />
           <YAxis tickFormatter={eurAxis} tick={{ fontSize: 10, fill: '#a1a1aa' }} axisLine={false} tickLine={false} dx={-4} width={62} />
           <Tooltip content={<IncomeExpenseTooltip />} />
           <Line
             type="monotone"
             dataKey="income"
             stroke="#34c759"
-            strokeWidth={2.5}
-            dot={{ r: 3, fill: '#34c759', strokeWidth: 0 }}
-            activeDot={{ r: 5, fill: '#34c759', strokeWidth: 0 }}
+            strokeWidth={2}
+            dot={false}
+            activeDot={{ r: 4, fill: '#34c759', strokeWidth: 0 }}
           />
           <Line
             type="monotone"
             dataKey="expense"
             stroke="#ff3b30"
-            strokeWidth={2.5}
-            dot={{ r: 3, fill: '#ff3b30', strokeWidth: 0 }}
-            activeDot={{ r: 5, fill: '#ff3b30', strokeWidth: 0 }}
+            strokeWidth={2}
+            dot={false}
+            activeDot={{ r: 4, fill: '#ff3b30', strokeWidth: 0 }}
           />
         </LineChart>
       </ResponsiveContainer>
@@ -338,7 +334,7 @@ export function ExpenseCategoryDonut({ transactions }: { transactions: CashflowT
 
 // ── Line chart: saldo acumulado mes a mes ─────────────────────────────────────
 
-interface BalancePoint { month: string; balance: number; peak: number }
+interface BalancePoint { week: string; balance: number; peak: number }
 
 export function BalanceTrendChart({
   transactions,
@@ -348,14 +344,14 @@ export function BalanceTrendChart({
   dateTo: string
 }) {
   const data = useMemo<BalancePoint[]>(() => {
-    // Group by month — track last (end) and max (peak) balance per month.
+    // Group by week (Mon–Sun) — track last (end) and max (peak) balance per week.
     // All categories included: every transaction affects the real bank balance.
-    type MonthAcc = { balance: number; peak: number; lastDate: string }
-    const map = new Map<string, MonthAcc>()
+    type WeekAcc = { balance: number; peak: number; lastDate: string }
+    const map = new Map<string, WeekAcc>()
 
     for (const t of transactions) {
       if (t.balance == null) continue
-      const k = monthKey(t.date)
+      const k = weekStartKey(t.date)
       const rec = map.get(k)
       if (!rec) {
         map.set(k, { balance: t.balance, peak: t.balance, lastDate: t.date })
@@ -366,25 +362,25 @@ export function BalanceTrendChart({
     }
 
     if (map.size === 0) {
-      // Fallback: cumulative net flow — all categories included, no peak tracking
-      const netByMonth = new Map<string, number>()
+      // Fallback: cumulative net flow — all categories, no peak tracking
+      const netByWeek = new Map<string, number>()
       for (const t of transactions) {
-        const k = monthKey(t.date)
-        netByMonth.set(k, (netByMonth.get(k) ?? 0) + t.amount)
+        const k = weekStartKey(t.date)
+        netByWeek.set(k, (netByWeek.get(k) ?? 0) + t.amount)
       }
       let running = 0
-      return Array.from(netByMonth.entries())
+      return Array.from(netByWeek.entries())
         .sort(([a], [b]) => a.localeCompare(b))
         .map(([k, net]) => {
           running += net
-          return { month: monthLabel(k), balance: Math.round(running), peak: Math.round(running) }
+          return { week: weekLabel(k), balance: Math.round(running), peak: Math.round(running) }
         })
     }
 
     return Array.from(map.entries())
       .sort(([a], [b]) => a.localeCompare(b))
       .map(([k, v]) => ({
-        month:   monthLabel(k),
+        week:    weekLabel(k),
         balance: Math.round(v.balance),
         peak:    Math.round(v.peak),
       }))
@@ -398,17 +394,17 @@ export function BalanceTrendChart({
     <div className="bg-white rounded-2xl shadow-sm p-6">
       <div className="flex items-center justify-between mb-4">
         <p className="text-xs font-semibold uppercase tracking-widest text-zinc-400">
-          Saldo acumulado · mensual
+          Saldo acumulado · semanal
         </p>
         <div className="flex items-center gap-4">
-          <LegendLine color="#60a5fa" dashed label="Saldo máximo" />
-          <LegendLine color="#0071e3" label="Saldo final" />
+          <LegendLine color="#60a5fa" dashed label="Saldo máximo semana" />
+          <LegendLine color="#0071e3" label="Saldo final semana" />
         </div>
       </div>
       <ResponsiveContainer width="100%" height={200}>
         <LineChart data={data} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
           <CartesianGrid strokeDasharray="0" stroke="#f0f0f0" vertical={false} />
-          <XAxis dataKey="month" tick={{ fontSize: 10, fill: '#a1a1aa' }} axisLine={false} tickLine={false} dy={4} />
+          <XAxis dataKey="week" tick={{ fontSize: 10, fill: '#a1a1aa' }} axisLine={false} tickLine={false} dy={4} />
           <YAxis tickFormatter={eurAxis} tick={{ fontSize: 10, fill: '#a1a1aa' }} axisLine={false} tickLine={false} dx={-4} width={62} />
           <Tooltip content={<BalanceTooltip />} />
           {hasNegative && <ReferenceLine y={0} stroke="#e4e4e7" strokeWidth={1} />}
