@@ -109,16 +109,20 @@ function IncomeExpenseTooltip({ active, payload, label }: {
   )
 }
 
-function LineTooltip({ active, payload, label }: {
+function BalanceTooltip({ active, payload, label }: {
   active?: boolean; payload?: TEntry[]; label?: string
 }) {
   if (!active || !payload?.length) return null
-  const val = payload[0]?.value ?? 0
+  const fin  = payload.find((p) => p.name === 'balance')?.value ?? 0
+  const peak = payload.find((p) => p.name === 'peak')?.value
   return (
-    <div className="bg-white rounded-xl shadow-lg px-4 py-3 border border-zinc-100 text-xs">
-      <p className="font-semibold text-zinc-700 mb-1">{label}</p>
-      <p className="font-mono" style={{ color: val >= 0 ? '#0071e3' : '#ff3b30' }}>
-        Saldo: {eur(val)}
+    <div className="bg-white rounded-xl shadow-lg px-4 py-3 border border-zinc-100 text-xs space-y-0.5">
+      <p className="font-semibold text-zinc-700 mb-1.5">{label}</p>
+      {peak != null && peak !== fin && (
+        <p className="font-mono" style={{ color: '#60a5fa' }}>Saldo máximo: {eur(peak)}</p>
+      )}
+      <p className="font-mono" style={{ color: fin >= 0 ? '#0071e3' : '#ff3b30' }}>
+        Saldo final: {eur(fin)}
       </p>
     </div>
   )
@@ -334,7 +338,7 @@ export function ExpenseCategoryDonut({ transactions }: { transactions: CashflowT
 
 // ── Line chart: saldo acumulado mes a mes ─────────────────────────────────────
 
-interface BalancePoint { month: string; balance: number }
+interface BalancePoint { month: string; balance: number; peak: number }
 
 export function BalanceTrendChart({
   transactions,
@@ -344,21 +348,25 @@ export function BalanceTrendChart({
   dateTo: string
 }) {
   const data = useMemo<BalancePoint[]>(() => {
-    // Always group by month — take the last (most recent) balance per month.
-    // Include ALL categories: Traspaso interno and Préstamos are real movements
-    // that affect the true bank balance.
-    const monthBalances = new Map<string, { balance: number; date: string }>()
+    // Group by month — track last (end) and max (peak) balance per month.
+    // All categories included: every transaction affects the real bank balance.
+    type MonthAcc = { balance: number; peak: number; lastDate: string }
+    const map = new Map<string, MonthAcc>()
+
     for (const t of transactions) {
       if (t.balance == null) continue
       const k = monthKey(t.date)
-      const existing = monthBalances.get(k)
-      if (!existing || t.date > existing.date) {
-        monthBalances.set(k, { balance: t.balance, date: t.date })
+      const rec = map.get(k)
+      if (!rec) {
+        map.set(k, { balance: t.balance, peak: t.balance, lastDate: t.date })
+      } else {
+        if (t.balance > rec.peak) rec.peak = t.balance
+        if (t.date > rec.lastDate) { rec.lastDate = t.date; rec.balance = t.balance }
       }
     }
 
-    if (monthBalances.size === 0) {
-      // Fallback: cumulative net flow — all categories included
+    if (map.size === 0) {
+      // Fallback: cumulative net flow — all categories included, no peak tracking
       const netByMonth = new Map<string, number>()
       for (const t of transactions) {
         const k = monthKey(t.date)
@@ -369,13 +377,17 @@ export function BalanceTrendChart({
         .sort(([a], [b]) => a.localeCompare(b))
         .map(([k, net]) => {
           running += net
-          return { month: monthLabel(k), balance: Math.round(running) }
+          return { month: monthLabel(k), balance: Math.round(running), peak: Math.round(running) }
         })
     }
 
-    return Array.from(monthBalances.entries())
+    return Array.from(map.entries())
       .sort(([a], [b]) => a.localeCompare(b))
-      .map(([k, v]) => ({ month: monthLabel(k), balance: Math.round(v.balance) }))
+      .map(([k, v]) => ({
+        month:   monthLabel(k),
+        balance: Math.round(v.balance),
+        peak:    Math.round(v.peak),
+      }))
   }, [transactions])
 
   if (data.length === 0) return <EmptyChart label="Saldo acumulado" />
@@ -384,16 +396,31 @@ export function BalanceTrendChart({
 
   return (
     <div className="bg-white rounded-2xl shadow-sm p-6">
-      <p className="text-xs font-semibold uppercase tracking-widest text-zinc-400 mb-4">
-        Saldo acumulado · mensual
-      </p>
+      <div className="flex items-center justify-between mb-4">
+        <p className="text-xs font-semibold uppercase tracking-widest text-zinc-400">
+          Saldo acumulado · mensual
+        </p>
+        <div className="flex items-center gap-4">
+          <LegendLine color="#60a5fa" dashed label="Saldo máximo" />
+          <LegendLine color="#0071e3" label="Saldo final" />
+        </div>
+      </div>
       <ResponsiveContainer width="100%" height={200}>
         <LineChart data={data} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
           <CartesianGrid strokeDasharray="0" stroke="#f0f0f0" vertical={false} />
           <XAxis dataKey="month" tick={{ fontSize: 10, fill: '#a1a1aa' }} axisLine={false} tickLine={false} dy={4} />
           <YAxis tickFormatter={eurAxis} tick={{ fontSize: 10, fill: '#a1a1aa' }} axisLine={false} tickLine={false} dx={-4} width={62} />
-          <Tooltip content={<LineTooltip />} />
+          <Tooltip content={<BalanceTooltip />} />
           {hasNegative && <ReferenceLine y={0} stroke="#e4e4e7" strokeWidth={1} />}
+          <Line
+            type="monotone"
+            dataKey="peak"
+            stroke="#60a5fa"
+            strokeWidth={1.5}
+            strokeDasharray="4 3"
+            dot={false}
+            activeDot={{ r: 3, fill: '#60a5fa', strokeWidth: 0 }}
+          />
           <Line
             type="monotone"
             dataKey="balance"
@@ -425,6 +452,20 @@ function LegendDot({ color, label }: { color: string; label: string }) {
   return (
     <div className="flex items-center gap-1.5">
       <span className="w-2.5 h-2.5 rounded-sm inline-block" style={{ background: color }} />
+      <span className="text-xs text-zinc-400">{label}</span>
+    </div>
+  )
+}
+
+function LegendLine({ color, label, dashed }: { color: string; label: string; dashed?: boolean }) {
+  return (
+    <div className="flex items-center gap-1.5">
+      <svg width="18" height="10" viewBox="0 0 18 10">
+        {dashed
+          ? <line x1="0" y1="5" x2="18" y2="5" stroke={color} strokeWidth="1.5" strokeDasharray="4 3" />
+          : <line x1="0" y1="5" x2="18" y2="5" stroke={color} strokeWidth="2.5" />
+        }
+      </svg>
       <span className="text-xs text-zinc-400">{label}</span>
     </div>
   )
