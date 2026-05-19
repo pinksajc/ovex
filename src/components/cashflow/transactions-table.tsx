@@ -657,8 +657,15 @@ function TxRow({
       <td className="px-5 py-3 text-xs text-zinc-500 whitespace-nowrap font-mono">
         {formatDate(t.date)}
       </td>
-      <td className="px-5 py-3 text-xs text-zinc-700 max-w-xs truncate">
-        {t.description}
+      <td className="px-5 py-3 text-xs text-zinc-700 max-w-xs">
+        <div className="flex items-center gap-2 min-w-0">
+          <span className="truncate">{t.description}</span>
+          {t.category === 'Traspaso interno' && (
+            <span className="shrink-0 text-[9px] font-semibold uppercase tracking-wide text-zinc-400 bg-zinc-100 px-1.5 py-0.5 rounded">
+              Traspaso
+            </span>
+          )}
+        </div>
       </td>
       <td className={`px-5 py-3 text-xs font-semibold font-mono text-right whitespace-nowrap ${
         t.type === 'income' ? 'text-emerald-600' : 'text-red-500'
@@ -818,8 +825,10 @@ export function TransactionsTable({ transactions }: { transactions: CashflowTran
   const safePage   = Math.min(page, totalPages)
   const paged      = filtered.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE)
 
-  const sumIncome  = filtered.filter((t) => t.type === 'income').reduce((s, t) => s + t.amount, 0)
-  const sumExpense = filtered.filter((t) => t.type === 'expense').reduce((s, t) => s + t.amount, 0)
+  // Exclude internal transfers from the summary totals (they're still visible in the table)
+  const operational = filtered.filter((t) => t.category !== 'Traspaso interno')
+  const sumIncome  = operational.filter((t) => t.type === 'income').reduce((s, t) => s + t.amount, 0)
+  const sumExpense = operational.filter((t) => t.type === 'expense').reduce((s, t) => s + t.amount, 0)
 
   const allCategories = Array.from(new Set(transactions.map((t) => t.category))).sort()
 

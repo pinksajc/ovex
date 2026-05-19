@@ -74,6 +74,7 @@ export function IncomeExpenseChart({ transactions }: { transactions: CashflowTra
   const data = useMemo<MonthlyBarPoint[]>(() => {
     const map = new Map<string, { income: number; expense: number }>()
     for (const t of transactions) {
+      if (t.category === 'Traspaso interno') continue
       const k = monthKey(t.date)
       const rec = map.get(k) ?? { income: 0, expense: 0 }
       if (t.type === 'income') rec.income += t.amount
@@ -164,7 +165,7 @@ interface DonutHover { label: string; amount: number; pct: number; color: string
 export function ExpenseCategoryDonut({ transactions }: { transactions: CashflowTransaction[] }) {
   const [hovered, setHovered] = useState<DonutHover | null>(null)
 
-  const expenses = transactions.filter((t) => t.type === 'expense')
+  const expenses = transactions.filter((t) => t.type === 'expense' && t.category !== 'Traspaso interno')
   const catMap = new Map<string, number>()
   for (const t of expenses) {
     catMap.set(t.category, (catMap.get(t.category) ?? 0) + Math.abs(t.amount))
@@ -280,9 +281,10 @@ export function BalanceTrendChart({ transactions }: { transactions: CashflowTran
     }
 
     if (monthBalances.size === 0) {
-      // Fallback: cumulative net flow
+      // Fallback: cumulative net flow (exclude internal transfers)
       const netByMonth = new Map<string, number>()
       for (const t of transactions) {
+        if (t.category === 'Traspaso interno') continue
         const k = monthKey(t.date)
         netByMonth.set(k, (netByMonth.get(k) ?? 0) + t.amount)
       }
