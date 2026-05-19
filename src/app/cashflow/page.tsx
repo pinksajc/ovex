@@ -140,8 +140,13 @@ export default async function CashflowPage({
   const currentBalance = allTransactions.find((t) => t.balance != null)?.balance ?? 0
 
   // ── Transactions tab: date filtering + KPIs ───────────────────────────────────
-  const defaultFrom = `${now.getFullYear()}-01-01`
-  const defaultTo   = now.toISOString().split('T')[0]
+  // Default range = full span of available data (allTransactions sorted desc)
+  const defaultTo   = allTransactions.length > 0
+    ? allTransactions[0].date
+    : now.toISOString().split('T')[0]
+  const defaultFrom = allTransactions.length > 0
+    ? allTransactions[allTransactions.length - 1].date
+    : `${now.getFullYear()}-01-01`
   const dateFrom    = fromParam ?? defaultFrom
   const dateTo      = toParam   ?? defaultTo
 
@@ -224,13 +229,13 @@ export default async function CashflowPage({
           {/* Charts row 1 */}
           <div className="grid grid-cols-3 gap-5">
             <div className="col-span-2">
-              <IncomeExpenseChart transactions={transactions} />
+              <IncomeExpenseChart transactions={transactions} dateFrom={dateFrom} dateTo={dateTo} />
             </div>
             <ExpenseCategoryDonut transactions={transactions} />
           </div>
 
           {/* Charts row 2 */}
-          <BalanceTrendChart transactions={transactions} />
+          <BalanceTrendChart transactions={transactions} dateFrom={dateFrom} dateTo={dateTo} />
 
           {/* Transactions table */}
           <TransactionsTable transactions={transactions} />

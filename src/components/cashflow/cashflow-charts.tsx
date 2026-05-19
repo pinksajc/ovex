@@ -15,7 +15,7 @@ import type { CashflowTransaction } from '@/types'
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
-/** Returns "YYYY-MM" — always groups by year+month so Jan-25 ≠ Jan-26. */
+/** Returns "YYYY-MM" — groups by year+month. */
 function monthKey(date: string) { return date.slice(0, 7) }
 
 /** Hardcoded Spanish abbreviations — avoids locale variance across environments. */
@@ -25,6 +25,58 @@ const MONTH_ABBR = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct',
 function monthLabel(key: string): string {
   const [y, m] = key.split('-').map(Number)
   return `${MONTH_ABBR[m - 1]} ${String(y).slice(2)}`
+}
+
+/** Returns "YYYY-Www" for the Monday of the week containing `date`. */
+function weekStartKey(date: string): string {
+  const d = new Date(date + 'T00:00:00')
+  // Shift to Monday
+  const day = d.getDay() === 0 ? 6 : d.getDay() - 1
+  d.setDate(d.getDate() - day)
+  const y = d.getFullYear()
+  const m = String(d.getMonth() + 1).padStart(2, '0')
+  const dd = String(d.getDate()).padStart(2, '0')
+  return `${y}-${m}-${dd}`
+}
+
+/** "2026-05-19" → "19 may" */
+function shortDayLabel(date: string): string {
+  const [, m, d] = date.split('-').map(Number)
+  return `${d} ${MONTH_ABBR[m - 1].toLowerCase()}`
+}
+
+/** "2026-05-18" (week start) → "18 may" */
+function weekLabel(key: string): string {
+  return shortDayLabel(key)
+}
+
+type Granularity = 'monthly' | 'weekly' | 'daily'
+
+function getGranularity(dateFrom: string, dateTo: string): Granularity {
+  const from = new Date(dateFrom + 'T00:00:00')
+  const to   = new Date(dateTo   + 'T00:00:00')
+  const days = Math.round((to.getTime() - from.getTime()) / 86_400_000)
+  if (days > 90)  return 'monthly'
+  if (days >= 14) return 'weekly'
+  return 'daily'
+}
+
+function bucketKey(date: string, gran: Granularity): string {
+  if (gran === 'monthly') return monthKey(date)
+  if (gran === 'weekly')  return weekStartKey(date)
+  return date.slice(0, 10)
+}
+
+function bucketLabel(key: string, gran: Granularity): string {
+  if (gran === 'monthly') return monthLabel(key)
+  if (gran === 'weekly')  return weekLabel(key)
+  return shortDayLabel(key)
+}
+
+function granularityLabel(gran: Granularity): string {
+  if (gran === 'monthly') return 'mensual'
+  if (gran === 'weekly')  return 'semanal'
+  return 'diario'
 }
 
 const _EUR2 = new Intl.NumberFormat('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
@@ -72,16 +124,26 @@ function LineTooltip({ active, payload, label }: {
   )
 }
 
-// ── Line chart: ingresos vs gastos por mes ────────────────────────────────────
+// ── Line chart: ingresos vs gastos ────────────────────────────────────────────
 
-interface MonthlyBarPoint { month: string; income: number; expense: number }
+interface IncomeExpensePoint { period: string; income: number; expense: number }
 
-export function IncomeExpenseChart({ transactions }: { transactions: CashflowTransaction[] }) {
-  const data = useMemo<MonthlyBarPoint[]>(() => {
+export function IncomeExpenseChart({
+  transactions,
+  dateFrom,
+  dateTo,
+}: {
+  transactions: CashflowTransaction[]
+  dateFrom: string
+  dateTo: string
+}) {
+  const gran = useMemo(() => getGranularity(dateFrom, dateTo), [dateFrom, dateTo])
+
+  const data = useMemo<IncomeExpensePoint[]>(() => {
     const map = new Map<string, { income: number; expense: number }>()
     for (const t of transactions) {
       if (t.category === 'Traspaso interno' || t.category === 'Préstamos') continue
-      const k = monthKey(t.date)
+      const k = bucketKey(t.date, gran)
       const rec = map.get(k) ?? { income: 0, expense: 0 }
       if (t.type === 'income') rec.income += t.amount
       else rec.expense += Math.abs(t.amount)
@@ -90,19 +152,19 @@ export function IncomeExpenseChart({ transactions }: { transactions: CashflowTra
     return Array.from(map.entries())
       .sort(([a], [b]) => a.localeCompare(b))
       .map(([k, v]) => ({
-        month:   monthLabel(k),
+        period:  bucketLabel(k, gran),
         income:  Math.round(v.income),
         expense: Math.round(v.expense),
       }))
-  }, [transactions])
+  }, [transactions, gran])
 
-  if (data.length === 0) return <EmptyChart label="Ingresos vs Gastos por mes" />
+  if (data.length === 0) return <EmptyChart label="Ingresos vs Gastos" />
 
   return (
     <div className="bg-white rounded-2xl shadow-sm p-6">
       <div className="flex items-center justify-between mb-4">
         <p className="text-xs font-semibold uppercase tracking-widest text-zinc-400">
-          Ingresos vs Gastos · mensual
+          Ingresos vs Gastos · {granularityLabel(gran)}
         </p>
         <div className="flex items-center gap-4">
           <LegendDot color="#34c759" label="Ingresos" />
@@ -112,7 +174,7 @@ export function IncomeExpenseChart({ transactions }: { transactions: CashflowTra
       <ResponsiveContainer width="100%" height={200}>
         <LineChart data={data} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
           <CartesianGrid strokeDasharray="0" stroke="#f0f0f0" vertical={false} />
-          <XAxis dataKey="month" tick={{ fontSize: 10, fill: '#a1a1aa' }} axisLine={false} tickLine={false} dy={4} />
+          <XAxis dataKey="period" tick={{ fontSize: 10, fill: '#a1a1aa' }} axisLine={false} tickLine={false} dy={4} />
           <YAxis tickFormatter={eurAxis} tick={{ fontSize: 10, fill: '#a1a1aa' }} axisLine={false} tickLine={false} dx={-4} width={62} />
           <Tooltip content={<IncomeExpenseTooltip />} />
           <Line
@@ -183,7 +245,7 @@ export function ExpenseCategoryDonut({ transactions }: { transactions: CashflowT
     .map(([label, amount], i) => ({ label, amount, color: CAT_COLORS[i % CAT_COLORS.length] }))
 
   const total = segments.reduce((s, d) => s + d.amount, 0)
-  const cx = 72, cy = 72, r = 52, sw = 16
+  const cx = 60, cy = 60, r = 44, sw = 14
 
   let cumAngle = 0
   const arcs = segments.filter((d) => d.amount > 0).map((seg) => {
@@ -195,29 +257,30 @@ export function ExpenseCategoryDonut({ transactions }: { transactions: CashflowT
 
   return (
     <div className="bg-white rounded-2xl shadow-sm p-6 relative">
-      <p className="text-xs font-semibold uppercase tracking-widest text-zinc-400 mb-5">
+      <p className="text-xs font-semibold uppercase tracking-widest text-zinc-400 mb-4">
         Gastos por categoría
       </p>
       {total === 0 ? (
         <p className="text-sm text-zinc-400 py-8 text-center">Sin gastos</p>
       ) : (
         <>
-          {/* Hover tooltip — anchored top-right of the card */}
+          {/* Hover tooltip — anchored top-right */}
           {hovered && (
-            <div className="absolute top-5 right-5 z-10 pointer-events-none bg-white rounded-xl shadow-lg border border-zinc-100 px-3 py-2.5 text-xs" style={{ minWidth: 168 }}>
+            <div className="absolute top-5 right-5 z-10 pointer-events-none bg-white rounded-xl shadow-lg border border-zinc-100 px-3 py-2.5 text-xs" style={{ minWidth: 148 }}>
               <div className="flex items-center gap-1.5 mb-1.5">
                 <span className="w-2 h-2 rounded-full shrink-0" style={{ background: hovered.color }} />
-                <span className="font-semibold text-zinc-700 truncate max-w-[130px]">{hovered.label}</span>
+                <span className="font-semibold text-zinc-700 truncate max-w-[110px]">{hovered.label}</span>
               </div>
               <p className="font-mono text-zinc-600">{eur(hovered.amount)}</p>
               <p className="text-zinc-400 mt-0.5">{hovered.pct.toFixed(1)}% del total</p>
             </div>
           )}
 
-          <div className="flex items-start gap-6">
+          {/* Stacked layout: donut centered, legend below */}
+          <div className="flex flex-col items-center gap-4">
             {/* Donut */}
             <svg
-              width="144" height="144" viewBox="0 0 144 144"
+              width="120" height="120" viewBox="0 0 120 120"
               className="shrink-0"
               onMouseLeave={() => setHovered(null)}
             >
@@ -236,16 +299,16 @@ export function ExpenseCategoryDonut({ transactions }: { transactions: CashflowT
                   })}
                 />
               ))}
-              <text x={cx} y={cy + 1} textAnchor="middle" fontSize={13} fontWeight="700" fill="#18181b">
+              <text x={cx} y={cy + 1} textAnchor="middle" fontSize={12} fontWeight="700" fill="#18181b">
                 {eurAxis(total)}
               </text>
-              <text x={cx} y={cy + 16} textAnchor="middle" fontSize={9} fill="#a1a1aa" fontWeight="500">
+              <text x={cx} y={cy + 14} textAnchor="middle" fontSize={8} fill="#a1a1aa" fontWeight="500">
                 total gasto
               </text>
             </svg>
 
-            {/* Legend — all categories, scrollable */}
-            <div className="flex-1 min-w-0 max-h-36 overflow-y-auto space-y-1.5 pr-1">
+            {/* Legend — full width, no truncation */}
+            <div className="w-full max-h-40 overflow-y-auto space-y-1.5">
               {segments.map((seg) => (
                 <div
                   key={seg.label}
@@ -257,9 +320,9 @@ export function ExpenseCategoryDonut({ transactions }: { transactions: CashflowT
                 >
                   <div className="flex items-center gap-2 min-w-0">
                     <span className="w-2 h-2 rounded-full shrink-0" style={{ background: seg.color }} />
-                    <span className="text-xs text-zinc-600 truncate">{seg.label}</span>
+                    <span className="text-xs text-zinc-600 leading-tight">{seg.label}</span>
                   </div>
-                  <span className="text-xs font-mono text-zinc-400 shrink-0">{eur(seg.amount)}</span>
+                  <span className="text-xs font-mono text-zinc-400 shrink-0 ml-2">{eur(seg.amount)}</span>
                 </div>
               ))}
             </div>
@@ -272,43 +335,53 @@ export function ExpenseCategoryDonut({ transactions }: { transactions: CashflowT
 
 // ── Line chart: saldo acumulado mes a mes ─────────────────────────────────────
 
-interface BalancePoint { month: string; balance: number }
+interface BalancePoint { period: string; balance: number }
 
-export function BalanceTrendChart({ transactions }: { transactions: CashflowTransaction[] }) {
+export function BalanceTrendChart({
+  transactions,
+  dateFrom,
+  dateTo,
+}: {
+  transactions: CashflowTransaction[]
+  dateFrom: string
+  dateTo: string
+}) {
+  const gran = useMemo(() => getGranularity(dateFrom, dateTo), [dateFrom, dateTo])
+
   const data = useMemo<BalancePoint[]>(() => {
-    // Group by month, take last balance entry per month (Revolut balance is running)
-    const monthBalances = new Map<string, { balance: number; date: string }>()
+    // Group by bucket, take last balance entry per bucket (Revolut balance is running)
+    const bucketBalances = new Map<string, { balance: number; date: string }>()
     for (const t of transactions) {
       if (t.balance == null) continue
-      const k = monthKey(t.date)
-      const existing = monthBalances.get(k)
+      const k = bucketKey(t.date, gran)
+      const existing = bucketBalances.get(k)
       // Keep the most recent entry (transactions are sorted desc by date already)
       if (!existing || t.date > existing.date) {
-        monthBalances.set(k, { balance: t.balance, date: t.date })
+        bucketBalances.set(k, { balance: t.balance, date: t.date })
       }
     }
 
-    if (monthBalances.size === 0) {
+    if (bucketBalances.size === 0) {
       // Fallback: cumulative net flow (exclude internal transfers)
-      const netByMonth = new Map<string, number>()
+      const netByBucket = new Map<string, number>()
       for (const t of transactions) {
         if (t.category === 'Traspaso interno') continue
-        const k = monthKey(t.date)
-        netByMonth.set(k, (netByMonth.get(k) ?? 0) + t.amount)
+        const k = bucketKey(t.date, gran)
+        netByBucket.set(k, (netByBucket.get(k) ?? 0) + t.amount)
       }
       let running = 0
-      return Array.from(netByMonth.entries())
+      return Array.from(netByBucket.entries())
         .sort(([a], [b]) => a.localeCompare(b))
         .map(([k, net]) => {
           running += net
-          return { month: monthLabel(k), balance: Math.round(running) }
+          return { period: bucketLabel(k, gran), balance: Math.round(running) }
         })
     }
 
-    return Array.from(monthBalances.entries())
+    return Array.from(bucketBalances.entries())
       .sort(([a], [b]) => a.localeCompare(b))
-      .map(([k, v]) => ({ month: monthLabel(k), balance: Math.round(v.balance) }))
-  }, [transactions])
+      .map(([k, v]) => ({ period: bucketLabel(k, gran), balance: Math.round(v.balance) }))
+  }, [transactions, gran])
 
   if (data.length === 0) return <EmptyChart label="Saldo acumulado" />
 
@@ -317,12 +390,12 @@ export function BalanceTrendChart({ transactions }: { transactions: CashflowTran
   return (
     <div className="bg-white rounded-2xl shadow-sm p-6">
       <p className="text-xs font-semibold uppercase tracking-widest text-zinc-400 mb-4">
-        Saldo acumulado · mes a mes
+        Saldo acumulado · {granularityLabel(gran)}
       </p>
       <ResponsiveContainer width="100%" height={200}>
         <LineChart data={data} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
           <CartesianGrid strokeDasharray="0" stroke="#f0f0f0" vertical={false} />
-          <XAxis dataKey="month" tick={{ fontSize: 10, fill: '#a1a1aa' }} axisLine={false} tickLine={false} dy={4} />
+          <XAxis dataKey="period" tick={{ fontSize: 10, fill: '#a1a1aa' }} axisLine={false} tickLine={false} dy={4} />
           <YAxis tickFormatter={eurAxis} tick={{ fontSize: 10, fill: '#a1a1aa' }} axisLine={false} tickLine={false} dx={-4} width={62} />
           <Tooltip content={<LineTooltip />} />
           {hasNegative && <ReferenceLine y={0} stroke="#e4e4e7" strokeWidth={1} />}
