@@ -147,14 +147,18 @@ export default async function CashflowPage({
 
   const transactions = allTransactions.filter((t) => t.date >= dateFrom && t.date <= dateTo)
 
-  const operational  = transactions.filter((t) => t.category !== 'Traspaso interno')
+  // Operational = exclude internal transfers AND loans (loans are tracked separately)
+  const operational  = transactions.filter(
+    (t) => t.category !== 'Traspaso interno' && t.category !== 'Préstamos',
+  )
   const totalIncome  = operational.filter((t) => t.amount > 0).reduce((s, t) => s + t.amount, 0)
   const totalExpense = operational.filter((t) => t.amount < 0).reduce((s, t) => s + Math.abs(t.amount), 0)
   const netBalance   = totalIncome - totalExpense
 
-  const prestamosNet = transactions
-    .filter((t) => t.category === 'Préstamos')
-    .reduce((s, t) => s + t.amount, 0)
+  const prestamosRows     = transactions.filter((t) => t.category === 'Préstamos')
+  const prestamosRecibido = prestamosRows.filter((t) => t.amount > 0).reduce((s, t) => s + t.amount, 0)
+  const prestamosDevuelto = prestamosRows.filter((t) => t.amount < 0).reduce((s, t) => s + Math.abs(t.amount), 0)
+  const prestamosPendiente = prestamosRecibido - prestamosDevuelto
 
   const thisMonthKey    = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
   const thisMonthIncome = transactions
@@ -204,12 +208,10 @@ export default async function CashflowPage({
               prefix={netBalance >= 0 ? '+' : '−'}
               sub="Total ingresos − gastos del período"
             />
-            <CfKpi
-              label="Total préstamos"
-              value={formatCurrency(Math.abs(prestamosNet))}
-              color={prestamosNet >= 0 ? '#ff9f0a' : '#ff3b30'}
-              prefix={prestamosNet >= 0 ? '+' : '−'}
-              sub="Préstamos netos del período"
+            <CfLoansKpi
+              recibido={prestamosRecibido}
+              devuelto={prestamosDevuelto}
+              pendiente={prestamosPendiente}
             />
             <CfKpi
               label={`Ingresos ${now.toLocaleDateString('es-ES', { month: 'long' })}`}
@@ -239,6 +241,43 @@ export default async function CashflowPage({
 }
 
 // ── Sub-components ─────────────────────────────────────────────────────────────
+
+function CfLoansKpi({
+  recibido,
+  devuelto,
+  pendiente,
+}: {
+  recibido: number
+  devuelto: number
+  pendiente: number
+}) {
+  // Positive pendiente = outstanding debt (we owe money) → orange/red
+  // Zero or negative = fully repaid → green
+  const pendienteColor = pendiente > 0 ? '#ff9f0a' : '#34c759'
+
+  return (
+    <div className="bg-white rounded-2xl shadow-sm p-5">
+      <p className="text-xs font-semibold uppercase tracking-widest text-zinc-400 mb-3 leading-tight">
+        Total préstamos
+      </p>
+      <p className="text-2xl font-bold tracking-tight leading-none" style={{ color: pendienteColor }}>
+        {formatCurrency(pendiente)}
+      </p>
+      <p className="text-[10px] text-zinc-400 mt-1.5 leading-tight mb-4">Pendiente de devolver</p>
+      <div className="flex items-center gap-4 pt-3 border-t border-zinc-50">
+        <div>
+          <p className="text-[9px] font-semibold uppercase tracking-wider text-zinc-400 mb-0.5">Recibido</p>
+          <p className="text-xs font-semibold font-mono text-emerald-600">+{formatCurrency(recibido)}</p>
+        </div>
+        <div className="w-px h-7 bg-zinc-100" />
+        <div>
+          <p className="text-[9px] font-semibold uppercase tracking-wider text-zinc-400 mb-0.5">Devuelto</p>
+          <p className="text-xs font-semibold font-mono text-red-500">−{formatCurrency(devuelto)}</p>
+        </div>
+      </div>
+    </div>
+  )
+}
 
 function CfKpi({
   label,

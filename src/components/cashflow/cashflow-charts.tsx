@@ -165,7 +165,9 @@ interface DonutHover { label: string; amount: number; pct: number; color: string
 export function ExpenseCategoryDonut({ transactions }: { transactions: CashflowTransaction[] }) {
   const [hovered, setHovered] = useState<DonutHover | null>(null)
 
-  const expenses = transactions.filter((t) => t.type === 'expense' && t.category !== 'Traspaso interno')
+  const expenses = transactions.filter(
+    (t) => t.type === 'expense' && t.category !== 'Traspaso interno' && t.category !== 'Préstamos',
+  )
   const catMap = new Map<string, number>()
   for (const t of expenses) {
     catMap.set(t.category, (catMap.get(t.category) ?? 0) + Math.abs(t.amount))
