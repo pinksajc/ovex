@@ -762,9 +762,16 @@ function s11Economics(deal: Deal, cfg: DealConfiguration, sections: ProposalSect
       <div style="border:1px solid #dde6f0;border-radius:8px;padding:12px;">
         <div style="font-size:9px;font-weight:700;color:#1e3a5f;text-transform:uppercase;letter-spacing:1px;margin-bottom:8px;padding-bottom:6px;border-bottom:1px solid #e8eef6;">ROS</div>
         ${simpleRow('Plan', plan.label)}
-        ${simpleRow('Precio base', plan.priceMonthly === 0
-          ? 'Gratis'
-          : `${fmt(plan.priceMonthly)}/local/mes × ${cfg.locations} local${cfg.locations > 1 ? 'es' : ''}`)}
+        ${simpleRow('Precio base', (() => {
+          const planOverride = eco.itemPriceOverrides?.plan
+          if (planOverride != null) {
+            const perLoc = planOverride / cfg.locations
+            return `${fmt(perLoc)}/local/mes × ${cfg.locations} local${cfg.locations > 1 ? 'es' : ''}`
+          }
+          return plan.priceMonthly === 0
+            ? 'Gratis'
+            : `${fmt(plan.priceMonthly)}/local/mes × ${cfg.locations} local${cfg.locations > 1 ? 'es' : ''}`
+        })())}
         ${cfg.calculateVariable ? simpleRow('Fee variable', `${plan.variableFee}€/ticket`) : ''}
         ${activeAddons.length > 0 ? `
           <div style="margin-top:8px;padding-top:6px;border-top:1px solid #e8eef6;">
