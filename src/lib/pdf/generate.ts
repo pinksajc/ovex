@@ -390,13 +390,17 @@ function s5Plans(deal: Deal, cfg: DealConfiguration, logoUri: string): string {
     deliveryPlan?: string; deliveryPlanKey?: string
     deliveryFixedFee?: number; deliveryFixedMonthly?: number
     deliveryExtraFeePerOrder?: number; deliveryIncludedOrders?: number
+    itemPriceOverrides?: { plan?: number | null; delivery?: number | null }
   }
   const deliveryPlanId = (eco.deliveryPlanKey ?? eco.deliveryPlan ?? 'start') as DeliveryPlanId
   const deliveryPlanData = DELIVERY_PLANS[deliveryPlanId]
   // Prefer persisted catalog snapshot; fall back to live catalog lookup
   const s5ExtraFeePerOrder = eco.deliveryExtraFeePerOrder ?? deliveryPlanData.extraOrderFee
   const s5IncludedOrders = eco.deliveryIncludedOrders ?? deliveryPlanData.includedOrders
-  const s5FixedFeePerLoc = eco.deliveryFixedFee ?? deliveryPlanData.priceMonthly
+  // itemPriceOverrides.delivery is the total for all locations — convert to per-loc
+  const s5FixedFeePerLoc = eco.itemPriceOverrides?.delivery != null
+    ? eco.itemPriceOverrides.delivery / cfg.locations
+    : (eco.deliveryFixedFee ?? deliveryPlanData.priceMonthly)
   const renEnabled = eco.renEnabled === true
   const renFeePerOrder = eco.renFeePerOrder ?? 0.10
   const renVenues = eco.renVenues ?? 1
@@ -672,6 +676,7 @@ function s11Economics(deal: Deal, cfg: DealConfiguration, sections: ProposalSect
     deliveryFixedMonthly?: number   // total (fee × locations) — backward compat
     deliveryExtraFeePerOrder?: number
     deliveryIncludedOrders?: number
+    itemPriceOverrides?: { plan?: number | null; delivery?: number | null }
   }
   const s11DeliveryPlanId = (eco.deliveryPlanKey ?? eco.deliveryPlan ?? 'start') as DeliveryPlanId
   const s11DeliveryPlan = DELIVERY_PLANS[s11DeliveryPlanId]
@@ -690,20 +695,32 @@ function s11Economics(deal: Deal, cfg: DealConfiguration, sections: ProposalSect
   const kdsVenues = eco.kdsVenues ?? cfg.locations
   const kioskVenues = eco.kioskVenues ?? cfg.locations
 
+  // itemPriceOverrides.delivery is the total for all locations — convert to per-loc for totals fn
+  const s11DeliveryFeePerLoc = eco.itemPriceOverrides?.delivery != null
+    ? eco.itemPriceOverrides.delivery / cfg.locations
+    : eco.deliveryFixedFee
+
+  // itemPriceOverrides.plan replaces planFeeMonthly fed into calculateMonthlyTotals
+  const s11PlanFeeMonthly = eco.itemPriceOverrides?.plan != null
+    ? eco.itemPriceOverrides.plan
+    : eco.planFeeMonthly
+
   // Unified monthly totals (planFee ceiled, KDS/Kiosk venue adj, delivery from persisted fee)
   const totals = calculateMonthlyTotals({
-    economics: eco,
+    economics: { ...eco, planFeeMonthly: s11PlanFeeMonthly },
     locations: cfg.locations,
     activeAddons: cfg.activeAddons,
     deliveryPlan: s11DeliveryPlanId,
-    deliveryFixedFeePerLoc: eco.deliveryFixedFee,
+    deliveryFixedFeePerLoc: s11DeliveryFeePerLoc,
     kdsVenues,
     kioskVenues,
   })
 
   const discountPercent = eco.discountPercent ?? 0
-  // Fixed plan base only — excludes per-ticket variable component (shown separately in variable box)
-  const planFixedFee = Math.ceil(plan.priceMonthly * cfg.locations)
+  // Fixed plan base: use price override if set, otherwise catalog price × locations
+  const planFixedFee = eco.itemPriceOverrides?.plan != null
+    ? eco.itemPriceOverrides.plan
+    : Math.ceil(plan.priceMonthly * cfg.locations)
   // Discount base: fixed plan fee + addons (excl. delivery, hardware, variable)
   const softwareBase = planFixedFee + totals.addonFee + totals.datafonoFee
   const discountAmount = softwareBase * (discountPercent / 100)
