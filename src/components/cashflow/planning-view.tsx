@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useMemo, useTransition } from 'react'
+import { useState, useMemo, useTransition, useRef, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import {
   addPlannedItemAction,
@@ -679,10 +679,7 @@ function AddItemModal({
 
             <div>
               <label className="block text-[11px] font-semibold uppercase tracking-wider text-zinc-400 mb-1.5">Categoría</label>
-              <select value={category} onChange={(e) => setCategory(e.target.value)}
-                className="w-full text-sm bg-zinc-100 border-0 rounded-lg px-3 py-2 text-zinc-700 focus:outline-none focus:ring-2 focus:ring-zinc-300">
-                {CASHFLOW_CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
-              </select>
+              <CategoryCombobox value={category} onChange={setCategory} />
             </div>
 
             <label className="flex items-center gap-2.5 cursor-pointer select-none">
@@ -705,6 +702,73 @@ function AddItemModal({
           </form>
         )}
       </div>
+    </div>
+  )
+}
+
+// ── Category combobox (pure useState, no shadcn dependency) ───────────────────
+
+function CategoryCombobox({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  const [open, setOpen]     = useState(false)
+  const [search, setSearch] = useState('')
+  const ref = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (!open) return
+    function onMouse(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) { setOpen(false); setSearch('') }
+    }
+    document.addEventListener('mousedown', onMouse)
+    return () => document.removeEventListener('mousedown', onMouse)
+  }, [open])
+
+  const filtered = CASHFLOW_CATEGORIES.filter(
+    (c) => !search || c.toLowerCase().includes(search.toLowerCase()),
+  )
+
+  return (
+    <div ref={ref} className="relative">
+      <button
+        type="button"
+        onClick={() => { setOpen((o) => !o); setSearch('') }}
+        className="w-full text-sm bg-zinc-100 border-0 rounded-lg px-3 py-2 text-left text-zinc-700 focus:outline-none focus:ring-2 focus:ring-zinc-300 flex items-center justify-between gap-2"
+      >
+        <span className="truncate">{value}</span>
+        <ChevronIcon open={open} className="w-3 h-3 text-zinc-400 shrink-0" />
+      </button>
+      {open && (
+        <div className="absolute z-50 top-full mt-1 left-0 right-0 bg-white border border-zinc-200 rounded-xl shadow-xl overflow-hidden">
+          <div className="p-2 border-b border-zinc-100">
+            <input
+              autoFocus
+              type="text"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Buscar categoría…"
+              className="w-full text-xs bg-zinc-50 rounded-lg px-3 py-2 text-zinc-700 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-zinc-200"
+            />
+          </div>
+          <div className="max-h-48 overflow-y-auto py-1">
+            {filtered.map((c) => (
+              <button
+                key={c}
+                type="button"
+                onClick={() => { onChange(c); setOpen(false); setSearch('') }}
+                className={`w-full text-left text-xs px-3 py-2 transition-colors ${
+                  c === value
+                    ? 'bg-zinc-100 text-zinc-900 font-semibold'
+                    : 'text-zinc-600 hover:bg-zinc-50'
+                }`}
+              >
+                {c}
+              </button>
+            ))}
+            {filtered.length === 0 && (
+              <p className="text-xs text-zinc-400 px-3 py-3 text-center">Sin resultados</p>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   )
 }
@@ -961,60 +1025,168 @@ function ItemListPanel({
       </div>
 
       {/* List */}
-      <div className="divide-y divide-zinc-50 flex-1">
-        {items.length === 0 && (
-          <div className="px-6 py-10 text-center">
-            <p className="text-sm text-zinc-300">
-              {isIncome ? 'Sin cobros previstos' : 'Sin pagos comprometidos'}
-            </p>
-            <p className="text-xs text-zinc-300 mt-1">
-              {isIncome ? 'Añade facturas pendientes o cobros esperados' : 'Añade gastos recurrentes o pagos planificados'}
-            </p>
-          </div>
-        )}
-        {items.map((item) => (
-          <div key={item.id} className="px-6 py-3 flex items-center justify-between gap-4 hover:bg-zinc-50/50 transition-colors group">
-            <div className="min-w-0 flex-1">
-              <div className="flex items-center gap-2">
-                <p className="text-sm text-zinc-800 truncate font-medium">{item.label}</p>
-                {item.isRecurring && (
-                  <span className="shrink-0 text-[9px] font-semibold uppercase tracking-wide text-zinc-400 bg-zinc-100 px-1.5 py-0.5 rounded">
-                    mensual
-                  </span>
-                )}
-                {item.isInvoice && (
-                  <span className="shrink-0 text-[9px] font-semibold uppercase tracking-wide text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded">
-                    factura
-                  </span>
+      {items.length === 0 ? (
+        <div className="px-6 py-10 text-center flex-1">
+          <p className="text-sm text-zinc-300">
+            {isIncome ? 'Sin cobros previstos' : 'Sin pagos comprometidos'}
+          </p>
+          <p className="text-xs text-zinc-300 mt-1">
+            {isIncome ? 'Añade facturas pendientes o cobros esperados' : 'Añade gastos recurrentes o pagos planificados'}
+          </p>
+        </div>
+      ) : !isIncome ? (
+        /* Expense panel: grouped by category accordion */
+        <GroupedExpenseList items={items} onDelete={onDelete} />
+      ) : (
+        /* Income panel: flat list unchanged */
+        <div className="divide-y divide-zinc-50 flex-1">
+          {items.map((item) => (
+            <div key={item.id} className="px-6 py-3 flex items-center justify-between gap-4 hover:bg-zinc-50/50 transition-colors group">
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-2">
+                  <p className="text-sm text-zinc-800 truncate font-medium">{item.label}</p>
+                  {item.isRecurring && (
+                    <span className="shrink-0 text-[9px] font-semibold uppercase tracking-wide text-zinc-400 bg-zinc-100 px-1.5 py-0.5 rounded">
+                      mensual
+                    </span>
+                  )}
+                  {item.isInvoice && (
+                    <span className="shrink-0 text-[9px] font-semibold uppercase tracking-wide text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded">
+                      factura
+                    </span>
+                  )}
+                </div>
+                <p className="text-xs text-zinc-400 mt-0.5">
+                  {item.isRecurring
+                    ? `Día ${parseDateKey(item.date).getDate()} de cada mes`
+                    : formatFullDate(item.date)}
+                  {item.category ? ` · ${item.category}` : ''}
+                </p>
+              </div>
+              <div className="flex items-center gap-3 shrink-0">
+                <span className="text-sm font-bold font-mono text-emerald-600">
+                  +{eur(item.amount)}
+                </span>
+                {!item.isInvoice ? (
+                  <button
+                    onClick={() => onDelete(item.id)}
+                    className="opacity-0 group-hover:opacity-100 text-zinc-300 hover:text-red-400 transition-all"
+                  >
+                    <TrashIcon className="w-4 h-4" />
+                  </button>
+                ) : (
+                  <a href="/facturas" className="opacity-0 group-hover:opacity-100 text-zinc-300 hover:text-zinc-500 transition-all text-xs">
+                    ↗
+                  </a>
                 )}
               </div>
-              <p className="text-xs text-zinc-400 mt-0.5">
-                {item.isRecurring
-                  ? `Día ${parseDateKey(item.date).getDate()} de cada mes`
-                  : formatFullDate(item.date)}
-                {item.category ? ` · ${item.category}` : ''}
-              </p>
             </div>
-            <div className="flex items-center gap-3 shrink-0">
-              <span className={`text-sm font-bold font-mono ${isIncome ? 'text-emerald-600' : 'text-red-500'}`}>
-                {isIncome ? '+' : '−'}{eur(item.amount)}
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ── Grouped expense list ───────────────────────────────────────────────────────
+
+function GroupedExpenseList({ items, onDelete }: { items: PanelItem[]; onDelete: (id: string) => void }) {
+  // Build category groups
+  const groupMap = new Map<string, PanelItem[]>()
+  for (const item of items) {
+    const cat = item.category || 'Sin categoría'
+    if (!groupMap.has(cat)) groupMap.set(cat, [])
+    groupMap.get(cat)!.push(item)
+  }
+
+  const groups = Array.from(groupMap.entries())
+    .map(([category, its]) => ({ category, items: its, total: its.reduce((s, i) => s + i.amount, 0) }))
+    .sort((a, b) => {
+      if (a.category === 'Sin categoría') return 1
+      if (b.category === 'Sin categoría') return -1
+      return a.category.localeCompare(b.category, 'es')
+    })
+
+  // All expanded by default; collapsed set tracks closed groups
+  const [collapsed, setCollapsed] = useState<Set<string>>(new Set())
+
+  function toggleGroup(cat: string) {
+    setCollapsed((prev) => {
+      const next = new Set(prev)
+      if (next.has(cat)) next.delete(cat)
+      else next.add(cat)
+      return next
+    })
+  }
+
+  return (
+    <div className="divide-y divide-zinc-50 flex-1">
+      {groups.map((group) => {
+        const isOpen = !collapsed.has(group.category)
+        return (
+          <div key={group.category}>
+            {/* Group header */}
+            <button
+              type="button"
+              onClick={() => toggleGroup(group.category)}
+              className="w-full px-6 py-2.5 flex items-center justify-between gap-3 bg-zinc-50/80 hover:bg-zinc-100/70 transition-colors"
+            >
+              <div className="flex items-center gap-2 min-w-0">
+                <ChevronIcon open={isOpen} className="w-3 h-3 text-zinc-400 shrink-0" />
+                <span className="text-xs font-semibold text-zinc-600 truncate">{group.category}</span>
+                <span className="text-[10px] text-zinc-400 shrink-0">({group.items.length})</span>
+              </div>
+              <span className="text-xs font-bold font-mono text-red-500 shrink-0">
+                −{eur(group.total)}
               </span>
-              {!item.isInvoice ? (
-                <button
-                  onClick={() => onDelete(item.id)}
-                  className="opacity-0 group-hover:opacity-100 text-zinc-300 hover:text-red-400 transition-all"
-                >
-                  <TrashIcon className="w-4 h-4" />
-                </button>
-              ) : (
-                <a href="/facturas" className="opacity-0 group-hover:opacity-100 text-zinc-300 hover:text-zinc-500 transition-all text-xs">
-                  ↗
-                </a>
-              )}
-            </div>
+            </button>
+
+            {/* Group rows — same layout as current flat list */}
+            {isOpen && group.items.map((item) => (
+              <div
+                key={item.id}
+                className="px-6 py-3 flex items-center justify-between gap-4 hover:bg-zinc-50/50 transition-colors group"
+              >
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2">
+                    <p className="text-sm text-zinc-800 truncate font-medium">{item.label}</p>
+                    {item.isRecurring && (
+                      <span className="shrink-0 text-[9px] font-semibold uppercase tracking-wide text-zinc-400 bg-zinc-100 px-1.5 py-0.5 rounded">
+                        mensual
+                      </span>
+                    )}
+                    {item.isInvoice && (
+                      <span className="shrink-0 text-[9px] font-semibold uppercase tracking-wide text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded">
+                        factura
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-xs text-zinc-400 mt-0.5">
+                    {item.isRecurring
+                      ? `Día ${parseDateKey(item.date).getDate()} de cada mes`
+                      : formatFullDate(item.date)}
+                  </p>
+                </div>
+                <div className="flex items-center gap-3 shrink-0">
+                  <span className="text-sm font-bold font-mono text-red-500">
+                    −{eur(item.amount)}
+                  </span>
+                  {!item.isInvoice ? (
+                    <button
+                      onClick={() => onDelete(item.id)}
+                      className="opacity-0 group-hover:opacity-100 text-zinc-300 hover:text-red-400 transition-all"
+                    >
+                      <TrashIcon className="w-4 h-4" />
+                    </button>
+                  ) : (
+                    <a href="/facturas" className="opacity-0 group-hover:opacity-100 text-zinc-300 hover:text-zinc-500 transition-all text-xs">↗</a>
+                  )}
+                </div>
+              </div>
+            ))}
           </div>
-        ))}
-      </div>
+        )
+      })}
     </div>
   )
 }
