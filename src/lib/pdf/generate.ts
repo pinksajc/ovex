@@ -989,6 +989,9 @@ function s12Annex(deal: Deal, cfg: DealConfiguration, today: string, logoUri: st
       <strong style="color:#334155;">FACTURACIÓN.</strong> Los servicios contratados en virtud del presente acuerdo se facturarán de forma mensual, emitiéndose la correspondiente factura al inicio de cada mes natural. El cliente se obliga a abonar cada factura en un plazo máximo de treinta (30) días naturales desde su recepción.
     </div>
     <div style="margin-top:10px;background:#f8fafc;border:1px solid #e8eef6;border-radius:8px;padding:13px 15px;font-size:9.5px;color:#64748b;line-height:1.6;">
+      <strong style="color:#334155;">FORMA DE PAGO.</strong> El pago de las facturas se realizará mediante transferencia bancaria a la siguiente cuenta de Platomico, S.L.: IBAN: ES69 1583 0001 1993 4722 6761 · BIC: REVOESM2 · Titular: Platomico, S.L. El cliente deberá indicar el número de factura correspondiente en el concepto de la transferencia.
+    </div>
+    <div style="margin-top:10px;background:#f8fafc;border:1px solid #e8eef6;border-radius:8px;padding:13px 15px;font-size:9.5px;color:#64748b;line-height:1.6;">
       <strong style="color:#334155;">PROTECCIÓN DE DATOS.</strong> En cumplimiento del Reglamento (UE) 2016/679 (RGPD) y la Ley Orgánica 3/2018 (LOPDGDD), Platomico, S.L. tratará los datos de carácter personal facilitados por el Cliente exclusivamente para la gestión, prestación y facturación de los servicios contratados. Los datos no serán cedidos a terceros salvo obligación legal. El Cliente podrá ejercer sus derechos de acceso, rectificación, supresión, portabilidad y oposición dirigiéndose a hola@platomico.com. El responsable del tratamiento es Platomico, S.L., NIF B22741094.
     </div>`
   return pg(logoUri, content)
