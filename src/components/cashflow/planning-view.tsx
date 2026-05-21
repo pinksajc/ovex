@@ -350,7 +350,7 @@ function AddItemModal({
     const q = search.toLowerCase()
     return transactionHistory
       .filter((t) => t.type === type)
-      .filter((t) => !q || t.description.toLowerCase().includes(q))
+      .filter((t) => !q || t.description.toLowerCase().includes(q) || t.category.toLowerCase().includes(q))
   }, [transactionHistory, type, search])
 
   const filteredInvoices = useMemo(() => {
