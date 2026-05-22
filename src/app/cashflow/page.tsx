@@ -1,8 +1,7 @@
 import { redirect } from 'next/navigation'
 import { getCurrentUser } from '@/lib/auth'
 import { getCashflowTransactions, backfillManualBalances } from '@/lib/supabase/cashflow'
-import { getCashflowPlanned } from '@/lib/supabase/cashflow-planned'
-import { getInvoices } from '@/lib/supabase/invoices'
+import { getCashflowPresupuesto } from '@/lib/supabase/cashflow-presupuesto'
 import { formatCurrency } from '@/lib/format'
 import { RecategorizeButton } from '@/components/cashflow/recategorize-button'
 import { MoreActionsDropdown } from '@/components/cashflow/more-actions-dropdown'
@@ -16,75 +15,6 @@ import {
   ExpenseCategoryDonut,
   BalanceTrendChart,
 } from '@/components/cashflow/cashflow-charts'
-import type { CashflowTransaction } from '@/types'
-import type { SuggestedRecurring } from '@/lib/supabase/cashflow-planned'
-import type { TxHistoryItem } from '@/components/cashflow/planning-view'
-
-// ── Recurring-expense detector (server-side) ──────────────────────────────────
-
-function detectRecurring(transactions: CashflowTransaction[]): SuggestedRecurring[] {
-  const now = new Date()
-  const thisMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
-  const prev = new Date(now.getFullYear(), now.getMonth() - 1, 1)
-  const prevMonth = `${prev.getFullYear()}-${String(prev.getMonth() + 1).padStart(2, '0')}`
-
-  const thisMap = new Map<string, { amount: number; category: string }>()
-  const prevMap = new Map<string, { amount: number; category: string }>()
-
-  for (const t of transactions) {
-    if (t.type !== 'expense') continue
-    const m = t.date.slice(0, 7)
-    if (m === thisMonth) thisMap.set(t.description, { amount: Math.abs(t.amount), category: t.category })
-    else if (m === prevMonth) prevMap.set(t.description, { amount: Math.abs(t.amount), category: t.category })
-  }
-
-  const results: SuggestedRecurring[] = []
-  for (const [desc, thisData] of thisMap) {
-    const prevData = prevMap.get(desc)
-    if (!prevData) continue
-    const diff = Math.abs(thisData.amount - prevData.amount) / Math.max(thisData.amount, prevData.amount)
-    if (diff <= 0.2) {
-      results.push({
-        description: desc,
-        averageAmount: (thisData.amount + prevData.amount) / 2,
-        category: thisData.category,
-      })
-    }
-  }
-
-  return results.sort((a, b) => b.averageAmount - a.averageAmount).slice(0, 15)
-}
-
-// ── Transaction history builder (for planning-view modal) ────────────────────
-
-function computeTxHistory(transactions: CashflowTransaction[]): TxHistoryItem[] {
-  type Acc = { amounts: number[]; type: 'income' | 'expense'; category: string; lastDate: string }
-  const map = new Map<string, Acc>()
-
-  for (const t of transactions) {
-    if (t.category === 'Traspaso interno') continue
-    const type = t.amount >= 0 ? 'income' : 'expense'
-    const abs = Math.abs(t.amount)
-    const existing = map.get(t.description)
-    if (!existing) {
-      map.set(t.description, { amounts: [abs], type, category: t.category, lastDate: t.date })
-    } else {
-      existing.amounts.push(abs)
-      if (t.date > existing.lastDate) existing.lastDate = t.date
-    }
-  }
-
-  return Array.from(map.entries())
-    .map(([description, data]) => ({
-      description,
-      category: data.category,
-      avgAmount: data.amounts.reduce((s, a) => s + a, 0) / data.amounts.length,
-      type: data.type,
-      count: data.amounts.length,
-      lastDate: data.lastDate,
-    }))
-    .sort((a, b) => b.count - a.count)
-}
 
 // ── Page ──────────────────────────────────────────────────────────────────────
 
@@ -120,23 +50,7 @@ export default async function CashflowPage({
   }
 
   // ── Planning tab: additional fetches ─────────────────────────────────────────
-  const [plannedItems, allInvoices] =
-    activeTab === 'planning'
-      ? await Promise.all([getCashflowPlanned(), getInvoices()])
-      : [[], [] as Awaited<ReturnType<typeof getInvoices>>]
-
-  const pendingInvoices = allInvoices
-    .filter((inv) => inv.status === 'issued')
-    .map((inv) => ({
-      id: inv.id,
-      number: inv.number,
-      clientName: inv.clientName,
-      amountTotal: inv.amountTotal,
-      dueAt: inv.dueAt,
-    }))
-
-  const suggestedRecurring = activeTab === 'planning' ? detectRecurring(allTransactions) : []
-  const txHistory = activeTab === 'planning' ? computeTxHistory(allTransactions) : []
+  const presupuestos = activeTab === 'planning' ? await getCashflowPresupuesto() : []
   const currentBalance = allTransactions.find((t) => t.balance != null)?.balance ?? 0
 
   // ── Transactions tab: date filtering + KPIs ───────────────────────────────────
@@ -196,11 +110,9 @@ export default async function CashflowPage({
       {/* ── Tab content ────────────────────────────────────────────────────── */}
       {activeTab === 'planning' ? (
         <PlanningView
-          plannedItems={plannedItems}
-          pendingInvoices={pendingInvoices}
-          suggestedRecurring={suggestedRecurring}
           currentBalance={currentBalance}
-          transactionHistory={txHistory}
+          presupuestos={presupuestos}
+          allTransactions={allTransactions}
         />
       ) : (
         <>
