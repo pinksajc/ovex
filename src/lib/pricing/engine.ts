@@ -24,6 +24,8 @@ export interface CalculateInput {
   plan: PlanTier | null
   activeAddons: AddonId[]
   hardware: HardwareLineItem[]
+  /** Delivery orders per venue per month — included in the plan variable fee (ROS charges all orders) */
+  deliveryOrdersPerVenue?: number
 }
 
 export function calculateEconomics(input: CalculateInput): DealEconomics {
@@ -35,18 +37,22 @@ export function calculateEconomics(input: CalculateInput): DealEconomics {
     activeAddons,
     hardware,
   } = input
+  const deliveryOrdersPerVenue = input.deliveryOrdersPerVenue ?? 0
 
   // ---- Volumen ----
   const monthlyVolumePerLocation = dailyOrdersPerLocation  // input is already monthly
   const totalMonthlyVolume = monthlyVolumePerLocation * locations
 
-  // ---- GMV ----
+  // ---- GMV (regular orders only — delivery GMV not tracked separately) ----
   const monthlyGMVPerLocation = monthlyVolumePerLocation * averageTicket
   const totalMonthlyGMV = monthlyGMVPerLocation * locations
 
   // ---- Fee del plan ----
+  // ROS charges the variable fee on ALL orders: regular + delivery.
+  // GMV / datafono calculations remain based on regular orders only.
+  const billableOrdersPerLocation = monthlyVolumePerLocation + deliveryOrdersPerVenue
   const planFeeMonthly = plan
-    ? (PLANS[plan].priceMonthly + PLANS[plan].variableFee * monthlyVolumePerLocation) * locations
+    ? (PLANS[plan].priceMonthly + PLANS[plan].variableFee * billableOrdersPerLocation) * locations
     : 0
 
   // ---- Add-ons ----
