@@ -17,7 +17,7 @@ const ADMIN_NAV = [
   { href: '/admin/users', label: 'Usuarios', icon: IconUsers },
 ]
 
-export function Sidebar({ user }: { user: AuthUser }) {
+export function Sidebar({ user, pendingBillingCount = 0 }: { user: AuthUser; pendingBillingCount?: number }) {
   const pathname = usePathname()
   const router = useRouter()
 
@@ -47,6 +47,8 @@ export function Sidebar({ user }: { user: AuthUser }) {
               ? pathname.startsWith('/deals')
               : pathname.startsWith(href)
 
+          const showBadge = href === '/facturas' && pendingBillingCount > 0
+
           return (
             <Link
               key={href}
@@ -58,7 +60,12 @@ export function Sidebar({ user }: { user: AuthUser }) {
               }`}
             >
               <Icon className="w-4 h-4 shrink-0" />
-              {label}
+              <span className="flex-1">{label}</span>
+              {showBadge && (
+                <span className="ml-auto min-w-[18px] h-[18px] flex items-center justify-center rounded-full bg-red-500 text-white text-[9px] font-bold px-1">
+                  {pendingBillingCount}
+                </span>
+              )}
             </Link>
           )
         })}

@@ -237,6 +237,20 @@ export default async function DealPage({
                   <span className={`text-[10px] font-semibold uppercase tracking-wide px-2 py-0.5 rounded-full ${PRESUPUESTO_STATUS_COLORS[p.status]}`}>
                     {PRESUPUESTO_STATUS_LABELS[p.status]}
                   </span>
+                  {/* Contract indicator — only shown for accepted offers */}
+                  {p.status === 'accepted' && (
+                    <span
+                      title={p.signedContractUrl
+                        ? `Contrato firmado · inicio ${p.contractStartDate ?? '—'}`
+                        : 'Sin contrato firmado'}
+                      className={`w-2 h-2 rounded-full shrink-0 ${p.signedContractUrl ? 'bg-emerald-500' : 'bg-zinc-300'}`}
+                    />
+                  )}
+                  {p.status === 'accepted' && p.contractStartDate && (
+                    <span className="text-[10px] text-zinc-400 font-mono">
+                      desde {p.contractStartDate}
+                    </span>
+                  )}
                 </div>
                 <span className="text-xs font-mono text-zinc-600">
                   {new Intl.NumberFormat('es-ES', { style: 'currency', currency: 'EUR' }).format(p.amountTotal)}

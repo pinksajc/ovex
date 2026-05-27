@@ -48,6 +48,10 @@ interface PresupuestoRow {
   valid_until: string | null
   notes: string | null
   requires_signature?: boolean | null
+  contract_start_date?: string | null
+  signed_contract_url?: string | null
+  signed_contract_filename?: string | null
+  signed_at?: string | null
   created_at: string
   updated_at: string
 }
@@ -81,6 +85,10 @@ function rowToPresupuesto(row: PresupuestoRow): Presupuesto {
     validUntil: row.valid_until,
     notes: row.notes,
     requiresSignature: row.requires_signature === true,
+    contractStartDate: row.contract_start_date ?? null,
+    signedContractUrl: row.signed_contract_url ?? null,
+    signedContractFilename: row.signed_contract_filename ?? null,
+    signedAt: row.signed_at ?? null,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   }
@@ -211,4 +219,78 @@ export async function updatePresupuestoSignatureRequired(id: string, value: bool
     .eq('id', id)
 
   if (error) throw error
+}
+
+export async function updatePresupuestoContractStartDate(id: string, date: string | null): Promise<void> {
+  const db = getSupabaseClient()
+  const { error } = await presupuestosTable(db)
+    .update({ contract_start_date: date })
+    .eq('id', id)
+
+  if (error) throw error
+}
+
+export interface ContractUpload {
+  url: string
+  filename: string
+  signedAt: string
+}
+
+export async function updatePresupuestoContract(id: string, upload: ContractUpload | null): Promise<void> {
+  const db = getSupabaseClient()
+  const { error } = await presupuestosTable(db)
+    .update(
+      upload === null
+        ? { signed_contract_url: null, signed_contract_filename: null, signed_at: null }
+        : { signed_contract_url: upload.url, signed_contract_filename: upload.filename, signed_at: upload.signedAt }
+    )
+    .eq('id', id)
+
+  if (error) throw error
+}
+
+/** Returns accepted presupuestos that have a contract_start_date but whose deal
+ *  has not been invoiced in the current calendar month. Used for billing reminders. */
+export async function getPendingBillingPresupuestos(): Promise<Presupuesto[]> {
+  const db = getSupabaseClient()
+
+  // Fetch accepted presupuestos with a contract start date
+  const { data: rows, error } = await presupuestosTable(db)
+    .select('*')
+    .eq('status', 'accepted')
+    .not('contract_start_date', 'is', null)
+    .not('deal_id', 'is', null)
+    .order('created_at', { ascending: false })
+
+  if (error) {
+    console.warn('[presupuestos] getPendingBillingPresupuestos error:', error.message)
+    return []
+  }
+
+  const candidates = (rows as PresupuestoRow[]).map(rowToPresupuesto)
+  if (candidates.length === 0) return []
+
+  // Collect unique deal_ids
+  const dealIds = [...new Set(candidates.map((p) => p.dealId).filter(Boolean))] as string[]
+
+  // Fetch invoices for current month for those deals
+  const now = new Date()
+  const monthStart = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const invoicesDb = (db as unknown as { from(t: string): any }).from('invoices')
+  const { data: invRows, error: invErr } = await invoicesDb
+    .select('deal_id')
+    .in('deal_id', dealIds)
+    .gte('issued_at', monthStart)
+    .not('status', 'eq', 'draft')
+
+  if (invErr) {
+    console.warn('[presupuestos] getPendingBillingPresupuestos invoice query error:', invErr.message)
+    return candidates // conservative: show all
+  }
+
+  const billedDealIds = new Set((invRows as { deal_id: string }[]).map((r) => r.deal_id))
+
+  // Return only presupuestos whose deal has NOT been invoiced this month
+  return candidates.filter((p) => p.dealId && !billedDealIds.has(p.dealId))
 }
