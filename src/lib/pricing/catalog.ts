@@ -120,8 +120,10 @@ export interface DeliveryPlanConfig {
   id: DeliveryPlanId
   label: string
   priceMonthly: number       // € fijo por local/mes
-  includedOrders: number     // pedidos incluidos por local/mes
-  extraOrderFee: number      // € por pedido adicional (variable)
+  includedOrders: number     // pedidos incluidos por local/mes (use Infinity for unlimited)
+  extraOrderFee: number      // € por pedido adicional (variable); 0 when unlimited
+  /** true = pedidos ilimitados, no excess fee applies */
+  unlimited?: boolean
 }
 
 export const DELIVERY_PLANS: Record<DeliveryPlanId, DeliveryPlanConfig> = {
@@ -146,9 +148,17 @@ export const DELIVERY_PLANS: Record<DeliveryPlanId, DeliveryPlanConfig> = {
     includedOrders: 1250,
     extraOrderFee: 0.15,
   },
+  enterprise: {
+    id: 'enterprise',
+    label: 'Order Hub Enterprise',
+    priceMonthly: 169,
+    includedOrders: Infinity,
+    extraOrderFee: 0,
+    unlimited: true,
+  },
 }
 
-export const DELIVERY_PLAN_ORDER: DeliveryPlanId[] = ['start', 'go', 'pro']
+export const DELIVERY_PLAN_ORDER: DeliveryPlanId[] = ['start', 'go', 'pro', 'enterprise']
 
 // ---- HARDWARE ----
 // Precios reales confirmados.

@@ -459,7 +459,9 @@ function s5Plans(deal: Deal, cfg: DealConfiguration, logoUri: string): string {
               <span style="font-size:10px;font-weight:600;color:#0f172a;">${addon.label}</span>
               <span style="font-size:9px;color:#94a3b8;margin-left:7px;">${deliveryPlanData.label}</span>
               <div style="font-size:8.5px;color:#94a3b8;margin-top:3px;">
-                ${s5IncludedOrders} pedidos incl. · Pedidos adic.: ${s5ExtraFeePerOrder.toFixed(2).replace('.', ',')}€/pedido (variable · mes vencido)
+                ${deliveryPlanData.unlimited
+                  ? 'Pedidos ilimitados'
+                  : `${s5IncludedOrders} pedidos incl. · Pedidos adic.: ${s5ExtraFeePerOrder.toFixed(2).replace('.', ',')}€/pedido (variable · mes vencido)`}
               </div>
             </div>
             <div style="text-align:right;flex-shrink:0;margin-left:10px;">
@@ -787,7 +789,7 @@ function s11Economics(deal: Deal, cfg: DealConfiguration, sections: ProposalSect
                 : a.perConsumption ? 'Por consumo'
                 : addonNet != null ? `${fmt(addonNet)}/mes` : '—'
               const addonSub = a.id === 'delivery_integrations'
-                ? `<div style="font-size:7.5px;color:#94a3b8;">${s11DeliveryPlan.label} · ${s11ExtraFeePerOrder.toFixed(2).replace('.', ',')}€/ped. adic. (variable)</div>`
+                ? `<div style="font-size:7.5px;color:#94a3b8;">${s11DeliveryPlan.label} · ${s11DeliveryPlan.unlimited ? 'Pedidos ilimitados' : `${s11ExtraFeePerOrder.toFixed(2).replace('.', ',')}€/ped. adic. (variable)`}</div>`
                 : ''
               return `<div style="padding:2px 0;">
                 <div style="display:flex;justify-content:space-between;gap:4px;">

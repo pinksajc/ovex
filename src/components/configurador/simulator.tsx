@@ -906,7 +906,9 @@ export function Simulator({ deal, initialConfig, loadedConfigId }: SimulatorProp
                           >
                             <span className={`text-xs font-semibold ${sel ? 'text-white' : 'text-zinc-900'}`}>{p.label}</span>
                             <span className={`ml-2 text-xs font-mono ${sel ? 'text-zinc-300' : 'text-zinc-500'}`}>
-                              {p.priceMonthly}€/local/mes · {p.includedOrders} ped. incl. · {p.extraOrderFee.toFixed(2).replace('.', ',')}€/ped. adic.
+                              {p.unlimited
+                                ? `${p.priceMonthly}€/local/mes · Pedidos ilimitados`
+                                : `${p.priceMonthly}€/local/mes · ${p.includedOrders} ped. incl. · ${p.extraOrderFee.toFixed(2).replace('.', ',')}€/ped. adic.`}
                             </span>
                           </button>
                         )

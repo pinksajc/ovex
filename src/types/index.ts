@@ -4,7 +4,7 @@
 
 export type PlanTier = 'starter' | 'growth' | 'pro'
 
-export type DeliveryPlanId = 'start' | 'go' | 'pro'
+export type DeliveryPlanId = 'start' | 'go' | 'pro' | 'enterprise'
 
 export type AddonId =
   | 'kds'
