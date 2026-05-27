@@ -3,6 +3,7 @@ import { Geist, Geist_Mono } from 'next/font/google'
 import './globals.css'
 import { Sidebar } from '@/components/layout/sidebar'
 import { getCurrentUser } from '@/lib/auth'
+import { getPendingBillingPresupuestos } from '@/lib/supabase/presupuestos'
 
 const geistSans = Geist({
   variable: '--font-geist-sans',
@@ -28,13 +29,24 @@ export default async function RootLayout({
   // Don't show the sidebar while the user is forced to change their password
   const showShell = user && !user.mustChangePassword
 
+  // Billing badge — only for owner/admin; fail silently so layout never breaks
+  let pendingBillingCount = 0
+  if (showShell && (user.role === 'owner' || user.role === 'admin')) {
+    try {
+      const pending = await getPendingBillingPresupuestos()
+      pendingBillingCount = pending.length
+    } catch {
+      // ignore
+    }
+  }
+
   return (
     <html
       lang="es"
       className={`${geistSans.variable} ${geistMono.variable} h-full`}
     >
       <body className={`h-full antialiased bg-zinc-50 ${showShell ? 'flex' : ''}`}>
-        {showShell && <Sidebar user={user} />}
+        {showShell && <Sidebar user={user} pendingBillingCount={pendingBillingCount} />}
         <main className={showShell ? 'flex-1 overflow-y-auto' : 'min-h-screen'}>
           {children}
         </main>

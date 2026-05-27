@@ -3,6 +3,7 @@ import Link from 'next/link'
 import { getPresupuesto } from '@/lib/supabase/presupuestos'
 import { OfertaActions } from './actions'
 import { RequiresSignatureToggle } from './requires-signature-toggle'
+import { ContractSection } from './contract-section'
 import type { PresupuestoStatus } from '@/types'
 
 const STATUS_LABELS: Record<PresupuestoStatus, string> = {
@@ -163,6 +164,17 @@ export default async function OfertaDetailPage({ params }: { params: Promise<{ i
               initialValue={presupuesto.requiresSignature}
             />
           </div>
+
+          {/* Contract management — only for accepted offers */}
+          {presupuesto.status === 'accepted' && (
+            <ContractSection
+              presupuestoId={presupuesto.id}
+              initialContractStartDate={presupuesto.contractStartDate}
+              initialSignedContractUrl={presupuesto.signedContractUrl}
+              initialSignedContractFilename={presupuesto.signedContractFilename}
+              initialSignedAt={presupuesto.signedAt}
+            />
+          )}
 
           {presupuesto.dealId && (
             <div className="bg-white border border-zinc-200 rounded-xl p-5">

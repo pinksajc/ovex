@@ -1,9 +1,10 @@
 import { getCurrentUser } from '@/lib/auth'
 import { getDeals, getActiveConfig } from '@/lib/deals'
 import { getInvoices } from '@/lib/supabase/invoices'
-import { getPresupuestos } from '@/lib/supabase/presupuestos'
+import { getPresupuestos, getPendingBillingPresupuestos } from '@/lib/supabase/presupuestos'
 import { formatCurrency } from '@/lib/format'
 import { BillingChart } from './billing-chart'
+import Link from 'next/link'
 import type { Deal } from '@/types'
 
 // ── Stage config ──────────────────────────────────────────────────────────────
@@ -39,10 +40,11 @@ export default async function DashboardPage() {
   const user = await getCurrentUser()
   if (!user) return null
 
-  const [deals, invoices, presupuestos] = await Promise.all([
+  const [deals, invoices, presupuestos, pendingBilling] = await Promise.all([
     getDeals(user),
     getInvoices(),
     getPresupuestos(),
+    getPendingBillingPresupuestos(),
   ])
 
   // ── Section 1: KPIs ────────────────────────────────────────────────────────
@@ -214,6 +216,53 @@ export default async function DashboardPage() {
           </div>
         </div>
       </div>
+
+      {/* ── Section 3b: Billing reminders ── */}
+      {pendingBilling.length > 0 && (
+        <div className="bg-white rounded-2xl shadow-sm p-7">
+          <div className="flex items-center justify-between mb-5">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-widest text-zinc-400 mb-1">
+                Facturación pendiente
+              </p>
+              <p className="text-[10px] text-zinc-400">
+                Ofertas aceptadas con contrato activo sin factura este mes
+              </p>
+            </div>
+            <span className="text-xs font-bold bg-red-100 text-red-700 px-2.5 py-1 rounded-full">
+              {pendingBilling.length} pendiente{pendingBilling.length !== 1 ? 's' : ''}
+            </span>
+          </div>
+          <div className="divide-y divide-zinc-50">
+            {pendingBilling.map((p) => (
+              <div key={p.id} className="flex items-center justify-between py-3">
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className="w-2 h-2 rounded-full bg-amber-500 shrink-0" />
+                  <div className="min-w-0">
+                    <p className="text-xs font-semibold text-zinc-800 truncate">{p.clientName}</p>
+                    <p className="text-[10px] text-zinc-400 font-mono">
+                      {p.number} · desde {p.contractStartDate}
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-3 shrink-0">
+                  <span className="text-xs font-mono text-zinc-600">
+                    {new Intl.NumberFormat('es-ES', { style: 'currency', currency: 'EUR' }).format(p.amountTotal)}
+                  </span>
+                  {p.dealId && (
+                    <Link
+                      href={`/facturas/nueva?deal_id=${p.dealId}`}
+                      className="text-[10px] font-semibold text-blue-700 hover:text-blue-900 border border-blue-200 hover:border-blue-400 px-2.5 py-1 rounded-lg transition-colors"
+                    >
+                      Generar factura →
+                    </Link>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* ── Section 4: Propuestas + Leaderboard ── */}
       <div className="grid grid-cols-2 gap-5">

@@ -344,6 +344,11 @@ export interface Presupuesto {
   validUntil: string | null
   notes: string | null
   requiresSignature: boolean
+  // Contract management
+  contractStartDate: string | null    // "YYYY-MM-DD" — billing cycle start
+  signedContractUrl: string | null    // Supabase Storage public/signed URL
+  signedContractFilename: string | null
+  signedAt: string | null             // ISO timestamp when uploaded
   createdAt: string
   updatedAt: string
 }
