@@ -856,8 +856,9 @@ function s11Economics(deal: Deal, cfg: DealConfiguration, sections: ProposalSect
       const fixedHwFee = (eco.hardwareRevenueMonthly as number | undefined) ?? 0
       const subtotalFijo = planFixedFee + fixedAddonFee + fixedDeliveryFee + fixedHwFee
 
-      // Variable components
-      const rosTotal = plan.variableFee * eco.totalMonthlyVolume
+      // Variable components — ROS charges all orders (regular + delivery)
+      const totalBillableOrders = eco.totalMonthlyVolume + deliveryPerVenue * cfg.locations
+      const rosTotal = plan.variableFee * totalBillableOrders
       const renTotal = renEnabled && renVenues > 0 ? renFeePerOrder * deliveryPerVenue * renVenues : 0
       const subtotalVariable = rosTotal + renTotal
 
@@ -880,8 +881,8 @@ function s11Economics(deal: Deal, cfg: DealConfiguration, sections: ProposalSect
       <!-- Variable rows -->
       <div style="font-size:7.5px;font-weight:700;color:#1e3a5f;text-transform:uppercase;letter-spacing:1px;margin-bottom:6px;">Costes variables (estimado)</div>
       <div style="display:flex;flex-direction:column;gap:3px;margin-bottom:8px;padding-bottom:8px;border-bottom:1px solid #dde6f0;">
-        ${simpleRow(`ROS variable · ${plan.variableFee.toFixed(2).replace('.', ',')} €/ticket × ${fmtN(eco.totalMonthlyVolume)} pedidos`, `${fmt(rosTotal)}/mes`)}
-        ${renTotal > 0 ? simpleRow(`REN variable · ${renFeePerOrder.toFixed(2).replace('.', ',')} €/pedido × ${fmtN(deliveryPerVenue * renVenues)} pedidos`, `${fmt(renTotal)}/mes`) : ''}
+        ${simpleRow(`Fee por pedido ROS: ${plan.variableFee.toFixed(2).replace('.', ',')}€ × ${fmtN(totalBillableOrders)} pedidos`, `${fmt(rosTotal)}/mes`)}
+        ${renTotal > 0 ? simpleRow(`REN — Logística propia: ${renFeePerOrder.toFixed(2).replace('.', ',')}€ × ${fmtN(deliveryPerVenue)} ped. × ${renVenues} local${renVenues > 1 ? 'es' : ''}`, `${fmt(renTotal)}/mes`) : ''}
         ${simpleRow('Subtotal variable', `${fmt(subtotalVariable)}/mes`)}
       </div>
       <!-- Totals -->

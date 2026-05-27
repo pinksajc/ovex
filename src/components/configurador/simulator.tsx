@@ -396,8 +396,9 @@ export function Simulator({ deal, initialConfig, loadedConfigId }: SimulatorProp
         plan: activePlan,
         activeAddons: Array.from(activeAddons),
         hardware: hardwareLineItems,
+        deliveryOrdersPerVenue: deliveryOrders,
       }),
-    [dailyOrders, locations, avgTicket, activePlan, activeAddons, hardwareLineItems]
+    [dailyOrders, deliveryOrders, locations, avgTicket, activePlan, activeAddons, hardwareLineItems]
   )
 
   // ---- Handlers ----
@@ -1695,11 +1696,35 @@ function EconomicsPanel({
           Desglose ingresos
         </p>
         <div className="space-y-2">
-          <BreakdownRow
-            label="Plan"
-            value={formatCurrency(planFeeEffective)}
-            strikeValue={planFeeEffective < totals.planFee ? formatCurrency(totals.planFee) : undefined}
-          />
+          {/* Plan row — split into fixed + variable when delivery orders exist and no price override */}
+          {deliveryOrders > 0 && activePlan && !itemPriceOverrides.plan ? (() => {
+            const planDisc = 1 - (itemDiscounts.plan || 0) / 100
+            const planFixed = Math.ceil(PLANS[activePlan].priceMonthly * locations)
+            const totalBillable = totalMonthlyVolume + deliveryOrders * locations
+            const rosVariable = Math.round(PLANS[activePlan].variableFee * totalBillable * 100) / 100
+            const planFixedEff = planFixed * planDisc
+            const rosVarEff = rosVariable * planDisc
+            return (
+              <>
+                <BreakdownRow
+                  label={`Plan (fijo) · ${PLANS[activePlan].priceMonthly}€ × ${locations} local${locations > 1 ? 'es' : ''}`}
+                  value={formatCurrency(planFixedEff)}
+                  strikeValue={planDisc < 1 ? formatCurrency(planFixed) : undefined}
+                />
+                <BreakdownRow
+                  label={`Fee pedidos ROS · ${PLANS[activePlan].variableFee.toFixed(2).replace('.', ',')}€ × ${formatNumber(totalBillable)} ped.`}
+                  value={formatCurrency(rosVarEff)}
+                  strikeValue={planDisc < 1 ? formatCurrency(rosVariable) : undefined}
+                />
+              </>
+            )
+          })() : (
+            <BreakdownRow
+              label="Plan"
+              value={formatCurrency(planFeeEffective)}
+              strikeValue={planFeeEffective < totals.planFee ? formatCurrency(totals.planFee) : undefined}
+            />
+          )}
           {totals.addonFee > 0 && (
             <BreakdownRow
               label="Add-ons"
@@ -1765,12 +1790,22 @@ function EconomicsPanel({
             {calculateVariable && activePlan && (
               <div className="mt-2 rounded-lg bg-zinc-50 border border-zinc-200 px-3 py-2">
                 <p className="text-[10px] font-semibold text-zinc-400 uppercase tracking-widest mb-1">Fee variable estimado</p>
-                <p className="text-xs font-mono text-zinc-700">
-                  {formatCurrency(totalMonthlyVolume * PLANS[activePlan].variableFee)}/mes
-                </p>
-                <p className="text-[10px] text-zinc-400 mt-0.5">
-                  {totalMonthlyVolume.toLocaleString('es-ES')} pedidos × {PLANS[activePlan].variableFee.toFixed(2).replace('.', ',')}€/ticket
-                </p>
+                {(() => {
+                  const totalBillable = totalMonthlyVolume + deliveryOrders * locations
+                  return (
+                    <>
+                      <p className="text-xs font-mono text-zinc-700">
+                        {formatCurrency(totalBillable * PLANS[activePlan].variableFee)}/mes
+                      </p>
+                      <p className="text-[10px] text-zinc-400 mt-0.5">
+                        {totalBillable.toLocaleString('es-ES')} pedidos × {PLANS[activePlan].variableFee.toFixed(2).replace('.', ',')}€/ticket
+                        {deliveryOrders > 0 && (
+                          <span className="ml-1">(incl. {formatNumber(deliveryOrders * locations)} delivery)</span>
+                        )}
+                      </p>
+                    </>
+                  )
+                })()}
               </div>
             )}
           </div>
