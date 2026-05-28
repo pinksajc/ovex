@@ -762,6 +762,11 @@ function s11Economics(deal: Deal, cfg: DealConfiguration, sections: ProposalSect
       <span style="font-size:9.5px;font-weight:700;color:#1e3a5f;font-family:'Courier New',monospace;">${fmt(net)}${suffix}</span>
     </div>`
 
+  // Billable orders = POS orders + delivery orders (all locations).
+  // Pre-computed here so both the ROS info card and the variable pricing block can use them.
+  const varBillableOrders = eco.totalMonthlyVolume + deliveryPerVenue * cfg.locations
+  const varRosTotal = plan.variableFee * varBillableOrders
+
   const content = `
     ${sectionTitle('Resumen económico', `${deal.company.name} · Plan ${plan.label}`)}
 
@@ -780,7 +785,10 @@ function s11Economics(deal: Deal, cfg: DealConfiguration, sections: ProposalSect
             ? 'Gratis'
             : `${fmt(plan.priceMonthly)}/local/mes × ${cfg.locations} local${cfg.locations > 1 ? 'es' : ''}`
         })())}
-        ${cfg.calculateVariable ? simpleRow('Fee variable', `${plan.variableFee}€/ticket`) : ''}
+        ${cfg.calculateVariable
+          ? simpleRow('Fee variable ROS', `${plan.variableFee.toFixed(2).replace('.', ',')}€ × ${fmtN(varBillableOrders)} ped. = ${fmt(varRosTotal)}/mes`)
+          : simpleRow('Fee variable ROS', `${plan.variableFee.toFixed(2).replace('.', ',')}€/pedido`)
+        }
         ${activeAddons.length > 0 ? `
           <div style="margin-top:8px;padding-top:6px;border-top:1px solid #e8eef6;">
             <div style="font-size:7.5px;color:#94a3b8;text-transform:uppercase;letter-spacing:1px;margin-bottom:4px;">Detalle add-ons</div>
