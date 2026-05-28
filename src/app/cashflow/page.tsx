@@ -10,6 +10,7 @@ import { AddTransactionButton } from '@/components/cashflow/add-transaction-butt
 import { CashflowTabs } from '@/components/cashflow/cashflow-tabs'
 import { PlanningView } from '@/components/cashflow/planning-view'
 import { TransactionsTable } from '@/components/cashflow/transactions-table'
+import { ExportPdfButton } from '@/components/cashflow/export-pdf-button'
 import {
   IncomeExpenseChart,
   ExpenseCategoryDonut,
@@ -100,6 +101,7 @@ export default async function CashflowPage({
               <DateRangeFilter from={dateFrom} to={dateTo} />
               <AddTransactionButton />
               <RecategorizeButton />
+              <ExportPdfButton dateFrom={dateFrom} dateTo={dateTo} />
               <MoreActionsDropdown />
             </>
           )}
