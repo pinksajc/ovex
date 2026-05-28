@@ -86,6 +86,7 @@ export function ProposalEditor({ deal, cfg, today, initialSections }: ProposalEd
     deliveryIncludedOrders?: number
     deliveryPlanKey?: string
     deliveryPlan?: string
+    discountScope?: 'fixed' | 'all'
   }
   const plan = PLANS[cfg.plan]
   const hardwareItems = cfg.hardware.filter((h) => h.quantity > 0)
@@ -108,16 +109,37 @@ export function ProposalEditor({ deal, cfg, today, initialSections }: ProposalEd
     .filter(item => item.mode === 'financed' && Number(item.financeMonths ?? 0) > 0)
     .reduce((sum, item) => sum + Math.ceil(Number(item.unitPrice) / Number(item.financeMonths)) * Number(item.quantity), 0)
 
+  // Plan fee breakdown (raw catalog, no item-level discounts)
+  const planFixedMonthly = Math.ceil(plan.priceMonthly * cfg.locations)
+  const totalDeliveryOrders = deliveryPerVenue * cfg.locations
+  const planVariableFeeRegular = plan.variableFee * eco.totalMonthlyVolume
+  const planVariableFeeDelivery = plan.variableFee * totalDeliveryOrders
+  // Variable total derived from snapshot for rounding accuracy
+  const planVariableMonthly = eco.planFeeMonthly - planFixedMonthly
+  const addonFeeMonthly = eco.addonFeeMonthly ?? 0
+  const datafonoFeeMonthly = eco.datafonoFeeMonthly ?? 0
+
   // Plan fee = full software revenue (plan + addons + datafono) from economics snapshot
   const planFee = eco.softwareRevenueMonthly || 0
 
-  // Totals — no calculateMonthlyTotals, computed directly from cfg fields
+  // Discount
   const discountPercent = cfg.discountPercent ?? 0
-  const totalNet = planFee + deliveryFee + hardwareMonthly + renMonthly
-  const discountAmount = totalNet * (discountPercent / 100)
-  const netAfterDiscount = totalNet - discountAmount
+  const discountScope = (eco.discountScope ?? cfg.discountScope ?? 'fixed') as 'fixed' | 'all'
+  const subtotalBeforeDiscount = planFee + deliveryFee + hardwareMonthly + renMonthly
+  const discountBase = discountScope === 'all' ? subtotalBeforeDiscount : planFixedMonthly
+  const discountAmount = discountBase * (discountPercent / 100)
+  const netAfterDiscount = subtotalBeforeDiscount - discountAmount
   const ivaAmount = netAfterDiscount * 0.21
   const totalWithIva = netAfterDiscount * 1.21
+
+  // KPI metrics — always net (no IVA), discount-adjusted
+  const kpiMrr = netAfterDiscount
+  const kpiArr = netAfterDiscount * 12
+  const kpiGrossMarginMonthly = eco.grossMarginMonthly - discountAmount
+  const kpiGrossMarginPercent = netAfterDiscount > 0 ? (kpiGrossMarginMonthly / netAfterDiscount) * 100 : 0
+  const kpiPaybackMonths = (eco.hardwareNetInvestment ?? 0) > 0 && kpiGrossMarginMonthly > 0
+    ? Math.ceil((eco.hardwareNetInvestment ?? 0) / kpiGrossMarginMonthly)
+    : (eco.hardwareNetInvestment ?? 0) <= 0 ? null : eco.paybackMonths
 
   return (
     <>
@@ -147,7 +169,7 @@ export function ProposalEditor({ deal, cfg, today, initialSections }: ProposalEd
       </div>
 
       {/* ── Document ── */}
-      <div className="bg-white rounded-2xl border border-zinc-200 overflow-hidden shadow-sm">
+      <div className="bg-white rounded-2xl border border-zinc-200 shadow-sm">
 
         {/* Document Header — static */}
         <div className="px-10 pt-10 pb-8 border-b border-zinc-100">
@@ -232,7 +254,29 @@ export function ProposalEditor({ deal, cfg, today, initialSections }: ProposalEd
               <ConfigRow label="Locales" value={String(cfg.locations)} />
               <ConfigRow label="Pedidos/mes/local" value={formatNumber(cfg.dailyOrdersPerLocation)} />
               <ConfigRow label="Ticket medio" value={formatCurrency(cfg.averageTicket)} mono />
-              <ConfigRow label="Fee plan/mes" value={formatCurrency(eco.planFeeMonthly)} mono />
+              {plan.variableFee > 0 ? (
+                <>
+                  <ConfigRow
+                    label="Precio fijo"
+                    value={`${plan.priceMonthly}€ × ${cfg.locations} loc. = ${formatCurrency(planFixedMonthly)}/mes`}
+                    mono
+                  />
+                  <ConfigRow
+                    label="Fee variable"
+                    value={`${plan.variableFee}€ × ${formatNumber(eco.totalMonthlyVolume)} ped. = ${formatCurrency(planVariableFeeRegular)}/mes`}
+                    mono
+                  />
+                  {deliveryPerVenue > 0 && (
+                    <ConfigRow
+                      label="Fee delivery ROS"
+                      value={`${plan.variableFee}€ × ${formatNumber(totalDeliveryOrders)} ped. = ${formatCurrency(planVariableFeeDelivery)}/mes`}
+                      mono
+                    />
+                  )}
+                </>
+              ) : (
+                <ConfigRow label="Fee plan/mes" value={formatCurrency(eco.planFeeMonthly)} mono />
+              )}
             </tbody>
           </table>
         </div>
@@ -255,9 +299,13 @@ export function ProposalEditor({ deal, cfg, today, initialSections }: ProposalEd
                   <div key={id} className="flex items-center justify-between py-1.5 border-b border-zinc-100 last:border-0">
                     <div>
                       <span className="text-sm text-zinc-800">{addon.label}</span>
-                      {addon.description && (
+                      {id === 'delivery_integrations' ? (
+                        <span className="ml-2 text-xs text-zinc-400">
+                          {DELIVERY_PLANS[deliveryPlanId]?.label} · {DELIVERY_PLANS[deliveryPlanId]?.priceMonthly}€ × {cfg.locations} locales
+                        </span>
+                      ) : addon.description ? (
                         <span className="ml-2 text-xs text-zinc-400">{addon.description}</span>
-                      )}
+                      ) : null}
                     </div>
                     <span className="text-sm font-mono text-zinc-600">
                       {id === 'datafono'
@@ -364,7 +412,16 @@ export function ProposalEditor({ deal, cfg, today, initialSections }: ProposalEd
         <div className="px-10 py-8 border-b border-zinc-100">
           <SectionLabel>Resumen económico</SectionLabel>
           <div className="mt-4 space-y-0 divide-y divide-zinc-100 border border-zinc-100 rounded-xl overflow-hidden">
-            <SummaryRow label="Plan + Add-ons" value={`${formatCurrency(planFee)}/mes`} />
+            <SummaryRow label="Plan fijo" value={`${formatCurrency(planFixedMonthly)}/mes`} />
+            {planVariableMonthly > 0 && (
+              <SummaryRow label="Fee variable ROS" value={`${formatCurrency(planVariableMonthly)}/mes`} />
+            )}
+            {addonFeeMonthly > 0 && (
+              <SummaryRow label="Add-ons" value={`${formatCurrency(addonFeeMonthly)}/mes`} />
+            )}
+            {datafonoFeeMonthly > 0 && (
+              <SummaryRow label="Datafono" value={`${formatCurrency(datafonoFeeMonthly)}/mes`} />
+            )}
             {deliveryFee > 0 && (
               <SummaryRow label="Integración delivery" value={`${formatCurrency(deliveryFee)}/mes`} />
             )}
@@ -374,17 +431,14 @@ export function ProposalEditor({ deal, cfg, today, initialSections }: ProposalEd
             {renEnabled && (
               <SummaryRow label="REN — Logística propia" value={`${formatCurrency(renMonthly)}/mes`} />
             )}
-            <SummaryRow label="Total NETO" value={`${formatCurrency(totalNet)}/mes`} bold />
             {discountPercent > 0 && (
               <SummaryRow
-                label={`Descuento aplicado: ${discountPercent}%`}
+                label={`Descuento${cfg.discountName ? ` "${cfg.discountName}"` : ''} ${discountPercent}%${discountScope === 'all' ? ' (sobre total)' : ' (sobre tarifa fija)'}`}
                 value={`−${formatCurrency(discountAmount)}/mes`}
                 red
               />
             )}
-            {discountPercent > 0 && (
-              <SummaryRow label="NETO con descuento" value={`${formatCurrency(netAfterDiscount)}/mes`} bold />
-            )}
+            <SummaryRow label="Total NETO" value={`${formatCurrency(netAfterDiscount)}/mes`} bold />
             <SummaryRow label="IVA 21%" value={`${formatCurrency(ivaAmount)}/mes`} muted />
             <div className="flex items-center justify-between px-4 py-3.5 bg-zinc-900">
               <span className="text-sm font-semibold text-white">TOTAL / MES</span>
@@ -398,22 +452,22 @@ export function ProposalEditor({ deal, cfg, today, initialSections }: ProposalEd
           <SectionLabel>Impacto económico</SectionLabel>
 
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-px bg-zinc-100 rounded-xl overflow-hidden mt-4">
-            <EcoMetric label="MRR" value={formatCurrency(totalWithIva)} sub="ingresos recurrentes/mes" primary />
-            <EcoMetric label="ARR" value={formatCurrency(totalWithIva * 12)} sub="ingresos recurrentes/año" />
+            <EcoMetric label="MRR" value={formatCurrency(kpiMrr)} sub="ingresos recurrentes/mes (neto)" primary />
+            <EcoMetric label="ARR" value={formatCurrency(kpiArr)} sub="ingresos recurrentes/año (neto)" />
             <EcoMetric label="GMV mensual" value={formatCurrency(eco.totalMonthlyGMV)} sub="volumen de negocio gestionado" />
             <EcoMetric
               label="Margen bruto"
-              value={`${eco.grossMarginPercent.toFixed(0)}%`}
-              sub={`${formatCurrency(eco.grossMarginMonthly)}/mes`}
+              value={`${Math.max(0, kpiGrossMarginPercent).toFixed(0)}%`}
+              sub={`${formatCurrency(Math.max(0, kpiGrossMarginMonthly))}/mes`}
             />
             <EcoMetric
               label="Payback"
-              value={eco.paybackMonths !== null ? `${eco.paybackMonths} meses` : '—'}
-              sub={eco.paybackMonths !== null ? 'recuperación inversión' : 'sin inversión neta'}
+              value={kpiPaybackMonths !== null ? `${kpiPaybackMonths} meses` : '—'}
+              sub={kpiPaybackMonths !== null ? 'recuperación inversión' : 'sin inversión neta'}
               color={
-                eco.paybackMonths === null ? undefined :
-                eco.paybackMonths <= 12 ? 'green' :
-                eco.paybackMonths <= 24 ? 'amber' : 'red'
+                kpiPaybackMonths === null ? undefined :
+                kpiPaybackMonths <= 12 ? 'green' :
+                kpiPaybackMonths <= 24 ? 'amber' : 'red'
               }
             />
             <EcoMetric
