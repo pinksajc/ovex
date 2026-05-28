@@ -64,6 +64,7 @@ export interface DealConfiguration {
   billingNotes?: string            // optional billing clause text for Anexo A
   calculateVariable?: boolean      // show variable fee estimate in proposal PDF
   discountName?: string            // optional label for the ROS discount (default '')
+  discountScope?: 'fixed' | 'all' // 'fixed' = discount on plan fixed fee only; 'all' = entire MRR
   deliveryPlan?: DeliveryPlanId    // selected Integración delivery sub-plan (default 'start')
 
   // Add-ons

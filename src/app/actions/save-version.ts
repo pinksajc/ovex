@@ -25,6 +25,7 @@ export interface SaveVersionPayload {
   kioskVenues: number
   calculateVariable?: boolean
   discountName?: string
+  discountScope?: 'fixed' | 'all'
   deliveryPlan?: DeliveryPlanId
   label?: string
   itemDiscounts?: { plan?: number; delivery?: number; addons?: Record<string, number>; hardware?: Record<string, number> }
@@ -61,6 +62,7 @@ export async function saveNewVersionAction(
       kioskVenues: payload.kioskVenues,
       calculateVariable: payload.calculateVariable ?? false,
       discountName: payload.discountName ?? '',
+      discountScope: payload.discountScope ?? 'fixed',
       // Delivery sub-plan — canonical persisted fields (read by PDF & preview)
       deliveryPlan: payload.deliveryPlan ?? 'start',                     // backward compat
       deliveryPlanKey: payload.deliveryPlan ?? 'start',
@@ -86,6 +88,7 @@ export async function saveNewVersionAction(
       kioskVenues: payload.kioskVenues,
       calculateVariable: payload.calculateVariable ?? false,
       discountName: payload.discountName ?? '',
+      discountScope: payload.discountScope ?? 'fixed',
       deliveryPlan: payload.deliveryPlan ?? 'start',
       locations: payload.locations,
       averageTicket: payload.averageTicket,
