@@ -672,6 +672,7 @@ function s11Economics(deal: Deal, cfg: DealConfiguration, sections: ProposalSect
     kdsVenues?: number
     kioskVenues?: number
     discountName?: string
+    discountScope?: 'fixed' | 'all'
     deliveryPlan?: string
     deliveryPlanKey?: string
     deliveryFixedFee?: number       // per local/mes — canonical persisted field
@@ -719,17 +720,22 @@ function s11Economics(deal: Deal, cfg: DealConfiguration, sections: ProposalSect
   })
 
   const discountPercent = eco.discountPercent ?? 0
+  const discountScope = eco.discountScope ?? 'fixed'
   // Fixed plan base: use price override if set, otherwise catalog price × locations
   const planFixedFee = eco.itemPriceOverrides?.plan != null
     ? eco.itemPriceOverrides.plan
     : Math.ceil(plan.priceMonthly * cfg.locations)
-  // Discount base: fixed plan fee + addons (excl. delivery, hardware, variable)
   const softwareBase = planFixedFee + totals.addonFee + totals.datafonoFee
-  const discountAmount = softwareBase * (discountPercent / 100)
-  // Fixed subtotal = fixed software + delivery (undiscounted) + hardware monthly + REN estimate
+  // Discount base depends on scope:
+  //   'fixed' → plan fixed fee only
+  //   'all'   → plan fixed + addons + delivery + hardware + REN
   const subtotalFixed = softwareBase + totals.deliveryFee + (eco.hardwareRevenueMonthly ?? 0) + renMonthly
-  // Fixed monthly net excludes variable plan component only
+  const discountBase = discountScope === 'all' ? subtotalFixed : planFixedFee
+  const discountAmount = discountBase * (discountPercent / 100)
+  // Net = full fixed subtotal minus discount
   const fixedMonthlyNet = subtotalFixed - discountAmount
+  // Scope label used in row descriptions
+  const discountScopeLabel = discountScope === 'all' ? ' (sobre total)' : ' (sobre tarifa fija)'
 
   const execSummary = sections.executiveSummary
     ? sections.executiveSummary +
@@ -864,8 +870,10 @@ function s11Economics(deal: Deal, cfg: DealConfiguration, sections: ProposalSect
       const renTotal = renEnabled && renVenues > 0 ? renFeePerOrder * deliveryPerVenue * renVenues : 0
       const subtotalVariable = rosTotal + renTotal
 
-      // Discount on software base (plan + addons), then net + IVA + total
-      const netoTotal = subtotalFijo + subtotalVariable - discountAmount
+      // Discount: recompute for variable block so scope='all' covers full variable total
+      const varDiscountBase = discountScope === 'all' ? subtotalFijo + subtotalVariable : planFixedFee
+      const varDiscountAmount = varDiscountBase * (discountPercent / 100)
+      const netoTotal = subtotalFijo + subtotalVariable - varDiscountAmount
       const ivaTotal  = netoTotal * 0.21
       const totalEst  = netoTotal * 1.21
 
@@ -889,7 +897,7 @@ function s11Economics(deal: Deal, cfg: DealConfiguration, sections: ProposalSect
       </div>
       <!-- Totals -->
       <div style="display:flex;flex-direction:column;gap:3px;margin-bottom:12px;">
-        ${discountPercent > 0 ? simpleRow(eco.discountName ? `Descuento ${eco.discountName}` : 'Descuento', `−${fmt(discountAmount)}/mes`, true) : ''}
+        ${discountPercent > 0 ? simpleRow(eco.discountName ? `Descuento ${eco.discountName}${discountScopeLabel}` : `Descuento${discountScopeLabel}`, `−${fmt(varDiscountAmount)}/mes`, true) : ''}
         ${simpleRow('Neto total', `${fmt(netoTotal)}/mes`)}
         ${simpleRow('IVA 21%', `${fmt(ivaTotal)}/mes`)}
       </div>
@@ -899,7 +907,7 @@ function s11Economics(deal: Deal, cfg: DealConfiguration, sections: ProposalSect
         <span style="font-size:24px;font-weight:900;color:#fff;font-family:'Courier New',monospace;line-height:1;">${fmt(totalEst)}</span>
       </div>
       <div style="font-size:8px;color:#64748b;margin-top:8px;line-height:1.5;">
-        Estimación basada en volumen configurado. La parte variable se factura a mes vencido según pedidos reales.${discountPercent > 0 ? ' Descuento aplicado sobre costes fijos de software.' : ''}
+        Estimación basada en volumen configurado. La parte variable se factura a mes vencido según pedidos reales.${discountPercent > 0 ? ` Descuento aplicado${discountScopeLabel.replace(' (', ' ').replace(')', '')}.` : ''}
       </div>
     </div>`
     })() : (() => {
@@ -915,7 +923,7 @@ function s11Economics(deal: Deal, cfg: DealConfiguration, sections: ProposalSect
       <!-- Subtotal → discount → neto → IVA → total -->
       <div style="display:flex;flex-direction:column;gap:3px;margin-bottom:12px;">
         ${simpleRow('Subtotal', `${fmt(subtotalFixed)}/mes`)}
-        ${discountPercent > 0 ? simpleRow(eco.discountName ? `Descuento ${eco.discountName}` : 'Descuento', `−${fmt(discountAmount)}/mes`, true) : ''}
+        ${discountPercent > 0 ? simpleRow(eco.discountName ? `Descuento ${eco.discountName}${discountScopeLabel}` : `Descuento${discountScopeLabel}`, `−${fmt(discountAmount)}/mes`, true) : ''}
         ${simpleRow('Neto', `${fmt(fixedMonthlyNet)}/mes`)}
         ${simpleRow('IVA 21%', `${fmt(fixedMonthlyNet * 0.21)}/mes`)}
       </div>

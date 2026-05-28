@@ -188,6 +188,7 @@ function serializeSimState(
   deliveryPlan: DeliveryPlanId,
   itemDiscounts: ItemDiscounts,
   itemPriceOverrides: ItemPriceOverrides,
+  discountScope: 'fixed' | 'all',
 ): string {
   return JSON.stringify({
     dailyOrders,
@@ -209,6 +210,7 @@ function serializeSimState(
     deliveryPlan,
     itemDiscounts,
     itemPriceOverrides,
+    discountScope,
   })
 }
 
@@ -246,6 +248,7 @@ export function Simulator({ deal, initialConfig, loadedConfigId }: SimulatorProp
   const [kioskVenues, setKioskVenues] = useState(init?.kioskVenues ?? (init?.locations ?? 1))
   const [discountPercent, setDiscountPercent] = useState(init?.discountPercent ?? 0)
   const [discountName, setDiscountName] = useState(init?.discountName ?? '')
+  const [discountScope, setDiscountScope] = useState<'fixed' | 'all'>(init?.discountScope ?? 'fixed')
   const [calculateVariable, setCalculateVariable] = useState(init?.calculateVariable ?? false)
   const [deliveryPlan, setDeliveryPlan] = useState<DeliveryPlanId>(init?.deliveryPlan ?? 'start')
   const [starterIncluded, setStarterIncluded] = useState<StarterIncluded>(() =>
@@ -339,12 +342,13 @@ export function Simulator({ deal, initialConfig, loadedConfigId }: SimulatorProp
       init?.deliveryPlan ?? 'start',
       initItemDiscounts,
       initItemOverrides,
+      init?.discountScope ?? 'fixed',
     )
   })
 
   const hasUnsavedChanges = useMemo(
-    () => serializeSimState(dailyOrders, deliveryOrders, locations, avgTicket, planOverride, activeAddons, hardware, renEnabled, renFeePerOrder, renVenues, kdsVenues, kioskVenues, discountPercent, starterIncluded, calculateVariable, discountName, deliveryPlan, itemDiscounts, itemPriceOverrides) !== savedSnapshot,
-    [dailyOrders, deliveryOrders, locations, avgTicket, planOverride, activeAddons, hardware, renEnabled, renFeePerOrder, renVenues, kdsVenues, kioskVenues, discountPercent, starterIncluded, calculateVariable, discountName, deliveryPlan, itemDiscounts, itemPriceOverrides, savedSnapshot]
+    () => serializeSimState(dailyOrders, deliveryOrders, locations, avgTicket, planOverride, activeAddons, hardware, renEnabled, renFeePerOrder, renVenues, kdsVenues, kioskVenues, discountPercent, starterIncluded, calculateVariable, discountName, deliveryPlan, itemDiscounts, itemPriceOverrides, discountScope) !== savedSnapshot,
+    [dailyOrders, deliveryOrders, locations, avgTicket, planOverride, activeAddons, hardware, renEnabled, renFeePerOrder, renVenues, kdsVenues, kioskVenues, discountPercent, starterIncluded, calculateVariable, discountName, deliveryPlan, itemDiscounts, itemPriceOverrides, discountScope, savedSnapshot]
   )
 
   useEffect(() => {
@@ -443,6 +447,7 @@ export function Simulator({ deal, initialConfig, loadedConfigId }: SimulatorProp
         kioskVenues,
         calculateVariable,
         discountName,
+        discountScope,
         deliveryPlan,
         itemDiscounts,
         itemPriceOverrides,
@@ -450,7 +455,7 @@ export function Simulator({ deal, initialConfig, loadedConfigId }: SimulatorProp
       if (result.ok) {
         setSaveState('saved')
         setLastSavePersisted(result.persisted)
-        setSavedSnapshot(serializeSimState(dailyOrders, deliveryOrders, locations, avgTicket, planOverride, activeAddons, hardware, renEnabled, renFeePerOrder, renVenues, kdsVenues, kioskVenues, discountPercent, starterIncluded, calculateVariable, discountName, deliveryPlan, itemDiscounts, itemPriceOverrides))
+        setSavedSnapshot(serializeSimState(dailyOrders, deliveryOrders, locations, avgTicket, planOverride, activeAddons, hardware, renEnabled, renFeePerOrder, renVenues, kdsVenues, kioskVenues, discountPercent, starterIncluded, calculateVariable, discountName, deliveryPlan, itemDiscounts, itemPriceOverrides, discountScope))
         router.refresh()
       } else {
         setSaveState('error')
@@ -479,6 +484,7 @@ export function Simulator({ deal, initialConfig, loadedConfigId }: SimulatorProp
         kioskVenues,
         calculateVariable,
         discountName,
+        discountScope,
         deliveryPlan,
         itemDiscounts,
         itemPriceOverrides,
@@ -487,7 +493,7 @@ export function Simulator({ deal, initialConfig, loadedConfigId }: SimulatorProp
         setSaveNewState('saved')
         setLastNewVersion(result.version)
         setLastNewVersionPersisted(result.persisted)
-        setSavedSnapshot(serializeSimState(dailyOrders, deliveryOrders, locations, avgTicket, planOverride, activeAddons, hardware, renEnabled, renFeePerOrder, renVenues, kdsVenues, kioskVenues, discountPercent, starterIncluded, calculateVariable, discountName, deliveryPlan, itemDiscounts, itemPriceOverrides))
+        setSavedSnapshot(serializeSimState(dailyOrders, deliveryOrders, locations, avgTicket, planOverride, activeAddons, hardware, renEnabled, renFeePerOrder, renVenues, kdsVenues, kioskVenues, discountPercent, starterIncluded, calculateVariable, discountName, deliveryPlan, itemDiscounts, itemPriceOverrides, discountScope))
         router.refresh()
       } else {
         setSaveNewState('error')
@@ -746,8 +752,6 @@ export function Simulator({ deal, initialConfig, loadedConfigId }: SimulatorProp
 
         {/* —— Add-ons + REN —— */}
         <Section title="Add-ons">
-          {/* ADD-ONS subsection */}
-          <p className="text-[10px] font-semibold text-zinc-400 uppercase tracking-widest mb-3">Add-ons</p>
           <div className="grid grid-cols-2 gap-2.5">
             {ADDON_ORDER.filter((id) => id !== 'kds' && id !== 'delivery_integrations').map((id) => {
               const addon = ADDONS[id]
@@ -1537,6 +1541,8 @@ export function Simulator({ deal, initialConfig, loadedConfigId }: SimulatorProp
           kioskVenues={kioskVenues}
           discountPercent={discountPercent}
           onDiscountChange={setDiscountPercent}
+          discountScope={discountScope}
+          onDiscountScopeChange={setDiscountScope}
           activeAddons={activeAddons}
           hardware={hardware}
           hasUnsavedChanges={hasUnsavedChanges}
@@ -1578,6 +1584,8 @@ function EconomicsPanel({
   kioskVenues,
   discountPercent,
   onDiscountChange,
+  discountScope,
+  onDiscountScopeChange,
   activeAddons,
   hardware,
   hasUnsavedChanges,
@@ -1608,6 +1616,8 @@ function EconomicsPanel({
   kioskVenues: number
   discountPercent: number
   onDiscountChange: (v: number) => void
+  discountScope: 'fixed' | 'all'
+  onDiscountScopeChange: (v: 'fixed' | 'all') => void
   activeAddons: Set<AddonId>
   hardware: HardwareState
   hasUnsavedChanges: boolean
@@ -1664,10 +1674,17 @@ function EconomicsPanel({
     }
     // sold: no monthly charge, ignore
   }
-  // Global discount applies to the item-effective (plan + addons + datafono) base
-  const discountableBase = planFeeEffective + addonFeeEffective + datafonoFeeEffective
-  const discountAmount = discountableBase * (discountPercent / 100)
-  const adjustedMRR = discountableBase - discountAmount + deliveryFeeEffective + renMonthly + hwMonthlyEffective
+  // Global discount base depends on scope:
+  //  'fixed' → plan fixed fee only (pre-variable component, after per-item discount)
+  //  'all'   → plan (fixed+variable) + addons + datafono + delivery + REN
+  const planFixedOnly = activePlan && !itemPriceOverrides.plan
+    ? Math.ceil(PLANS[activePlan].priceMonthly * locations) * (1 - (itemDiscounts.plan || 0) / 100)
+    : planFeeEffective  // override or no plan: treat whole planFeeEffective as "fixed"
+  const discountBase = discountScope === 'all'
+    ? planFeeEffective + addonFeeEffective + datafonoFeeEffective + deliveryFeeEffective + renMonthly
+    : planFixedOnly
+  const discountAmount = discountBase * (discountPercent / 100)
+  const adjustedMRR = planFeeEffective + addonFeeEffective + datafonoFeeEffective + deliveryFeeEffective + renMonthly + hwMonthlyEffective - discountAmount
   const rentedMonthly = HARDWARE_ORDER.reduce((sum, id) => {
     const s = hardware[id]
     return s.mode === 'rented' ? sum + (HARDWARE[id].rentalMonthlyPrice ?? RENTAL_MONTHLY_PRICE) * s.quantity : sum
@@ -1744,6 +1761,16 @@ function EconomicsPanel({
           {hasDatafono && economics.datafonoFeeMonthly > 0 && (
             <BreakdownRow label="Datáfono (0.8% GMV)" value={formatCurrency(economics.datafonoFeeMonthly)} />
           )}
+          {renMonthly > 0 && (
+            <BreakdownRow label="REN — Logística propia" value={formatCurrency(renMonthly)} />
+          )}
+          {hwMonthlyEffective > 0 && (
+            <BreakdownRow
+              label="Hardware (mensual)"
+              value={formatCurrency(hwMonthlyEffective)}
+              strikeValue={hwMonthlyEffective < totals.hardwareMonthly ? formatCurrency(totals.hardwareMonthly) : undefined}
+            />
+          )}
           {/* Discount input */}
           <div className="pt-2 border-t border-zinc-100">
             <div className="flex items-center justify-between gap-2">
@@ -1761,6 +1788,26 @@ function EconomicsPanel({
                 <span className="px-2 text-xs text-zinc-400 bg-zinc-50 border-l border-zinc-200 py-1">%</span>
               </div>
             </div>
+            {/* Scope selector */}
+            <div className="flex items-center gap-1 mt-1.5">
+              {(['fixed', 'all'] as const).map((s) => (
+                <button
+                  key={s}
+                  type="button"
+                  onClick={() => onDiscountScopeChange(s)}
+                  className={`text-[10px] font-medium px-2 py-0.5 rounded-full border transition-colors ${
+                    discountScope === s
+                      ? 'bg-zinc-900 border-zinc-900 text-white'
+                      : 'bg-white border-zinc-200 text-zinc-500 hover:border-zinc-400'
+                  }`}
+                >
+                  {s === 'fixed' ? 'Solo fijo' : 'Todo'}
+                </button>
+              ))}
+              <span className="text-[10px] text-zinc-400 ml-1">
+                {discountScope === 'fixed' ? 'sobre tarifa fija del plan' : 'sobre MRR total'}
+              </span>
+            </div>
             {discountAmount > 0 && (
               <div className="flex justify-between items-baseline mt-1">
                 <span className="text-xs text-red-500">Descuento</span>
@@ -1777,62 +1824,51 @@ function EconomicsPanel({
               />
             </div>
           </div>
-          {/* Calculate variable toggle */}
-          <div className="pt-2 border-t border-zinc-100">
-            <button
-              type="button"
-              onClick={() => onCalculateVariableChange(!calculateVariable)}
-              className="flex items-center justify-between w-full gap-2 group"
-            >
-              <span className="text-xs text-zinc-600">Calcular variable en propuesta</span>
-              <span className={`relative inline-flex h-4 w-7 flex-shrink-0 rounded-full border-2 border-transparent transition-colors duration-200 ${calculateVariable ? 'bg-zinc-900' : 'bg-zinc-200'}`}>
-                <span className={`inline-block h-3 w-3 transform rounded-full bg-white shadow transition-transform duration-200 ${calculateVariable ? 'translate-x-3' : 'translate-x-0'}`} />
-              </span>
-            </button>
-            {calculateVariable && activePlan && (
-              <div className="mt-2 rounded-lg bg-zinc-50 border border-zinc-200 px-3 py-2">
-                <p className="text-[10px] font-semibold text-zinc-400 uppercase tracking-widest mb-1">Fee variable estimado</p>
-                {(() => {
-                  const totalBillable = totalMonthlyVolume + deliveryOrders * locations
-                  return (
-                    <>
-                      <p className="text-xs font-mono text-zinc-700">
-                        {formatCurrency(totalBillable * PLANS[activePlan].variableFee)}/mes
-                      </p>
-                      <p className="text-[10px] text-zinc-400 mt-0.5">
-                        {totalBillable.toLocaleString('es-ES')} pedidos × {PLANS[activePlan].variableFee.toFixed(2).replace('.', ',')}€/ticket
-                        {deliveryOrders > 0 && (
-                          <span className="ml-1">(incl. {formatNumber(deliveryOrders * locations)} delivery)</span>
-                        )}
-                      </p>
-                    </>
-                  )
-                })()}
-              </div>
-            )}
-          </div>
-          {renMonthly > 0 && (
-            <BreakdownRow label="REN" value={`+${formatCurrency(renMonthly)}/mes`} />
-          )}
-          {hwMonthlyEffective > 0 && (
-            <BreakdownRow
-              label="Hardware (mensual)"
-              value={formatCurrency(hwMonthlyEffective)}
-              strikeValue={hwMonthlyEffective < totals.hardwareMonthly ? formatCurrency(totals.hardwareMonthly) : undefined}
-            />
-          )}
           <div className="pt-2 border-t border-zinc-100">
             <BreakdownRow label="Total mensual" value={formatCurrency(adjustedMRR)} bold />
+            {locations > 1 && (
+              <div className="mt-1.5">
+                <BreakdownRow label="MRR por local" value={formatCurrency(adjustedMRR / locations)} />
+              </div>
+            )}
           </div>
         </div>
       </div>
 
-      {/* Per location */}
-      {locations > 1 && (
-        <div className="px-5 py-4 border-b border-zinc-100">
-          <BreakdownRow label="MRR por local" value={formatCurrency(economics.revenuePerLocation)} />
-        </div>
-      )}
+      {/* calculateVariable toggle — separate section below breakdown */}
+      <div className="px-5 py-4 border-b border-zinc-100">
+        <button
+          type="button"
+          onClick={() => onCalculateVariableChange(!calculateVariable)}
+          className="flex items-center justify-between w-full gap-2 group"
+        >
+          <span className="text-xs text-zinc-600">Calcular variable en propuesta</span>
+          <span className={`relative inline-flex h-4 w-7 flex-shrink-0 rounded-full border-2 border-transparent transition-colors duration-200 ${calculateVariable ? 'bg-zinc-900' : 'bg-zinc-200'}`}>
+            <span className={`inline-block h-3 w-3 transform rounded-full bg-white shadow transition-transform duration-200 ${calculateVariable ? 'translate-x-3' : 'translate-x-0'}`} />
+          </span>
+        </button>
+        {calculateVariable && activePlan && (
+          <div className="mt-2 rounded-lg bg-zinc-50 border border-zinc-200 px-3 py-2">
+            <p className="text-[10px] font-semibold text-zinc-400 uppercase tracking-widest mb-1">Fee variable estimado</p>
+            {(() => {
+              const totalBillable = totalMonthlyVolume + deliveryOrders * locations
+              return (
+                <>
+                  <p className="text-xs font-mono text-zinc-700">
+                    {formatCurrency(totalBillable * PLANS[activePlan].variableFee)}/mes
+                  </p>
+                  <p className="text-[10px] text-zinc-400 mt-0.5">
+                    {totalBillable.toLocaleString('es-ES')} pedidos × {PLANS[activePlan].variableFee.toFixed(2).replace('.', ',')}€/ticket
+                    {deliveryOrders > 0 && (
+                      <span className="ml-1">(incl. {formatNumber(deliveryOrders * locations)} delivery)</span>
+                    )}
+                  </p>
+                </>
+              )
+            })()}
+          </div>
+        )}
+      </div>
 
       {/* GMV */}
       {hasDatafono && (
