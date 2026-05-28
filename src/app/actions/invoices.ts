@@ -48,7 +48,7 @@ export async function updateInvoiceStatusAction(
       await insertCashflowTransactions([{
         date: today,
         description: `Factura ${invoice.number} · ${invoice.clientName}`,
-        amount: invoice.amountTotal,
+        amount: invoice.amountNet,
         type: 'income',
         category: 'Ingreso cliente',
         currency: 'EUR',
