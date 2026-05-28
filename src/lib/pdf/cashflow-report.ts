@@ -3,7 +3,7 @@
 // server-only
 // Two pages:
 //  1. Overview — KPIs + monthly bar chart
-//  2. Where the money goes — expense donut + category table
+//  2. Where the money goes — expense donut + unified category table
 // =========================================
 
 import fs from 'fs'
@@ -37,14 +37,14 @@ function fmt(n: number): string {
 
 function fmtK(n: number): string {
   if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1).replace('.', ',')}M`
-  if (n >= 1000) return `${(n / 1000).toFixed(0)}K`
+  if (n >= 1000)      return `${(n / 1000).toFixed(0)}K`
   return String(Math.round(n))
 }
 
-const MONTH_NAMES = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio',
-  'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre']
-const MONTH_SHORT = ['ene', 'feb', 'mar', 'abr', 'may', 'jun',
-  'jul', 'ago', 'sep', 'oct', 'nov', 'dic']
+const MONTH_NAMES = ['enero','febrero','marzo','abril','mayo','junio',
+  'julio','agosto','septiembre','octubre','noviembre','diciembre']
+const MONTH_SHORT = ['ene','feb','mar','abr','may','jun',
+  'jul','ago','sep','oct','nov','dic']
 
 function fmtDateLong(iso: string): string {
   const [y, m, d] = iso.split('-')
@@ -83,6 +83,7 @@ const CAT_COLORS: Record<string, string> = {
   'Otros':               '#94a3b8',
   'Sin categoría':       '#cbd5e1',
   'Ingreso cliente':     '#22c55e',
+  'Refunds':             '#fb923c',
 }
 
 function catColor(name: string): string {
@@ -96,7 +97,6 @@ function donutSlice(
   outerR: number, innerR: number,
   startAngle: number, endAngle: number,
 ): string {
-  // Clamp to avoid full-circle edge case (gap of 0.001 radians)
   const end = endAngle - startAngle >= 2 * Math.PI - 0.001
     ? startAngle + 2 * Math.PI - 0.001
     : endAngle
@@ -123,107 +123,130 @@ function donutSlice(
 interface CatSlice { name: string; amount: number; pct: number; color: string }
 
 function buildDonutSvg(slices: CatSlice[], totalExpense: number): string {
-  const cx = 110, cy = 110, outerR = 90, innerR = 56
-  const vw = 220, vh = 220
+  // Larger donut to fill the 40% left column
+  const cx = 140, cy = 140, outerR = 118, innerR = 74
+  const vw = 280, vh = 280
 
   if (slices.length === 0) {
-    return `<svg viewBox="0 0 ${vw} ${vh}" xmlns="http://www.w3.org/2000/svg" style="width:${vw}px;height:${vh}px;">
-      <text x="${cx}" y="${cy}" text-anchor="middle" font-size="10" fill="#94a3b8" font-family="Helvetica,Arial,sans-serif">Sin datos</text>
+    return `<svg viewBox="0 0 ${vw} ${vh}" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:auto;">
+      <text x="${cx}" y="${cy}" text-anchor="middle" font-size="11" fill="#94a3b8" font-family="Helvetica,Arial,sans-serif">Sin datos</text>
     </svg>`
   }
 
-  let angle = -Math.PI / 2  // start at top
+  let angle = -Math.PI / 2
   let paths = ''
   for (const s of slices) {
     const sweep = (s.amount / totalExpense) * 2 * Math.PI
     if (sweep < 0.01) { angle += sweep; continue }
-    paths += `<path d="${donutSlice(cx, cy, outerR, innerR, angle, angle + sweep)}" fill="${s.color}" stroke="white" stroke-width="1.5"/>\n`
+    paths += `<path d="${donutSlice(cx, cy, outerR, innerR, angle, angle + sweep)}" fill="${s.color}" stroke="white" stroke-width="2"/>\n`
     angle += sweep
   }
 
-  // Centre text
   const totalLabel = fmtK(totalExpense)
   const centerText = `
-    <text x="${cx}" y="${cy - 7}" text-anchor="middle" font-size="10" font-weight="700" fill="#1e2d4a" font-family="Helvetica,Arial,sans-serif">${totalLabel} €</text>
-    <text x="${cx}" y="${cy + 8}" text-anchor="middle" font-size="8" fill="#94a3b8" font-family="Helvetica,Arial,sans-serif">Total gastos</text>`
+    <text x="${cx}" y="${cy - 10}" text-anchor="middle" font-size="13" font-weight="800" fill="#1e2d4a" font-family="Helvetica,Arial,sans-serif">${totalLabel} €</text>
+    <text x="${cx}" y="${cy + 8}" text-anchor="middle" font-size="9.5" fill="#94a3b8" font-family="Helvetica,Arial,sans-serif">Total gastos</text>
+    <text x="${cx}" y="${cy + 21}" text-anchor="middle" font-size="8.5" fill="#cbd5e1" font-family="Helvetica,Arial,sans-serif">operativos</text>`
 
-  return `<svg viewBox="0 0 ${vw} ${vh}" xmlns="http://www.w3.org/2000/svg" style="width:${vw}px;height:${vh}px;">${paths}${centerText}</svg>`
+  return `<svg viewBox="0 0 ${vw} ${vh}" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:auto;">${paths}${centerText}</svg>`
 }
 
-// ── SVG: Monthly bar chart ────────────────────────────────────────────────────
+// ── SVG: Monthly bar chart (with optional dual Y-axis) ────────────────────────
 
 interface MonthBars { label: string; income: number; expense: number }
 
+// Threshold: use dual axis when one side < 20% of the other
+const DUAL_AXIS_RATIO = 0.2
+
 function buildBarChartSvg(months: MonthBars[]): string {
-  const vw = 570, vh = 190
-  const ml = 52, mr = 10, mt = 12, mb = 40
+  const vw = 600, vh = 340
+  const ml = 60, mr = 60, mt = 16, mb = 42
   const cw = vw - ml - mr
   const ch = vh - mt - mb
 
   if (months.length === 0) {
-    return `<svg viewBox="0 0 ${vw} ${vh}" xmlns="http://www.w3.org/2000/svg" style="width:100%;"></svg>`
+    return `<svg viewBox="0 0 ${vw} ${vh}" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:auto;"></svg>`
   }
 
   const maxIncome  = Math.max(...months.map(m => m.income), 0)
   const maxExpense = Math.max(...months.map(m => m.expense), 0)
-  const rawMax = Math.max(maxIncome, maxExpense, 1)
-  const axisMax = niceMax(rawMax)
+
+  const dualAxis = maxIncome > 0 && maxExpense > 0 && (
+    maxIncome / maxExpense < DUAL_AXIS_RATIO ||
+    maxExpense / maxIncome < DUAL_AXIS_RATIO
+  )
+
+  // Left axis = expenses, Right axis = income (when dual)
+  const axisMaxExp = niceMax(dualAxis ? maxExpense : Math.max(maxIncome, maxExpense, 1))
+  const axisMaxInc = dualAxis ? niceMax(maxIncome) : axisMaxExp
 
   const n = months.length
   const groupW = cw / n
-  const barW = Math.max(4, Math.min(Math.floor(groupW * 0.36), 20))
-  const gap = 3
+  const barW = Math.max(6, Math.min(Math.floor(groupW * 0.45), 36))
+  const gap = 5
 
-  // Grid lines at 0, 33%, 67%, 100% of axisMax
-  const ticks = [0, axisMax / 3, (axisMax * 2) / 3, axisMax]
+  // 4 grid lines at 0%, 33%, 67%, 100% of left axis
+  const ticks = [0, axisMaxExp / 3, (axisMaxExp * 2) / 3, axisMaxExp]
 
   let svg = `<svg viewBox="0 0 ${vw} ${vh}" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:auto;">`
 
   // Background
-  svg += `<rect x="${ml}" y="${mt}" width="${cw}" height="${ch}" fill="#f8fafc" rx="4"/>`
+  svg += `<rect x="${ml}" y="${mt}" width="${cw}" height="${ch}" fill="#f8fafc" rx="6"/>`
 
-  // Grid lines + Y labels
+  // Grid lines + left Y labels (expense axis)
   for (const tick of ticks) {
-    const y = (mt + ch - (tick / axisMax) * ch).toFixed(1)
-    svg += `<line x1="${ml}" y1="${y}" x2="${ml + cw}" y2="${y}" stroke="#e8eef6" stroke-width="1"/>`
-    svg += `<text x="${ml - 4}" y="${Number(y) + 3}" text-anchor="end" font-size="7" fill="#94a3b8" font-family="Helvetica,Arial,sans-serif">${fmtK(tick)}</text>`
+    const y = (mt + ch - (tick / axisMaxExp) * ch).toFixed(1)
+    svg += `<line x1="${ml}" y1="${y}" x2="${ml + cw}" y2="${y}" stroke="#e2e8f0" stroke-width="1" stroke-dasharray="${tick === 0 ? 'none' : '4,3'}"/>`
+    svg += `<text x="${ml - 5}" y="${Number(y) + 3.5}" text-anchor="end" font-size="8" fill="#94a3b8" font-family="Helvetica,Arial,sans-serif">${fmtK(tick)}</text>`
   }
 
-  // Bars + X labels
+  // Right Y labels (income axis, only when dual)
+  if (dualAxis) {
+    const ticksInc = [0, axisMaxInc / 3, (axisMaxInc * 2) / 3, axisMaxInc]
+    for (const tick of ticksInc) {
+      const y = (mt + ch - (tick / axisMaxInc) * ch).toFixed(1)
+      svg += `<text x="${ml + cw + 5}" y="${Number(y) + 3.5}" text-anchor="start" font-size="8" fill="#22c55e" font-family="Helvetica,Arial,sans-serif">${fmtK(tick)}</text>`
+    }
+    // Right axis label
+    svg += `<text x="${ml + cw + 55}" y="${mt + ch / 2}" text-anchor="middle" font-size="7.5" fill="#22c55e" font-family="Helvetica,Arial,sans-serif" transform="rotate(-90,${ml + cw + 55},${mt + ch / 2})">Ingresos</text>`
+  }
+
+  // Bars
   for (let i = 0; i < n; i++) {
     const { label, income, expense } = months[i]
     const cx = ml + i * groupW + groupW / 2
     const pairW = 2 * barW + gap
     const x0 = cx - pairW / 2
 
-    // Income bar
-    const incH = income > 0 ? Math.max(2, (income / axisMax) * ch) : 0
+    // Income bar — scale by income axis
+    const incScale = dualAxis ? axisMaxInc : axisMaxExp
+    const incH = income > 0 ? Math.max(3, (income / incScale) * ch) : 0
     if (incH > 0) {
       const iy = (mt + ch - incH).toFixed(1)
-      svg += `<rect x="${x0.toFixed(1)}" y="${iy}" width="${barW}" height="${incH.toFixed(1)}" fill="#22c55e" rx="2"/>`
+      svg += `<rect x="${x0.toFixed(1)}" y="${iy}" width="${barW}" height="${incH.toFixed(1)}" fill="#22c55e" rx="3"/>`
     }
 
-    // Expense bar
-    const expH = expense > 0 ? Math.max(2, (expense / axisMax) * ch) : 0
+    // Expense bar — scale by expense axis
+    const expH = expense > 0 ? Math.max(3, (expense / axisMaxExp) * ch) : 0
     if (expH > 0) {
       const ey = (mt + ch - expH).toFixed(1)
-      svg += `<rect x="${(x0 + barW + gap).toFixed(1)}" y="${ey}" width="${barW}" height="${expH.toFixed(1)}" fill="#ef4444" rx="2"/>`
+      svg += `<rect x="${(x0 + barW + gap).toFixed(1)}" y="${ey}" width="${barW}" height="${expH.toFixed(1)}" fill="#ef4444" rx="3"/>`
     }
 
     // X label
-    svg += `<text x="${cx.toFixed(1)}" y="${mt + ch + 14}" text-anchor="middle" font-size="7.5" fill="#94a3b8" font-family="Helvetica,Arial,sans-serif">${label}</text>`
+    svg += `<text x="${cx.toFixed(1)}" y="${mt + ch + 16}" text-anchor="middle" font-size="8.5" fill="#94a3b8" font-family="Helvetica,Arial,sans-serif">${label}</text>`
   }
 
   // Bottom axis line
-  svg += `<line x1="${ml}" y1="${mt + ch}" x2="${ml + cw}" y2="${mt + ch}" stroke="#dde6f0" stroke-width="1"/>`
+  svg += `<line x1="${ml}" y1="${mt + ch}" x2="${ml + cw}" y2="${mt + ch}" stroke="#cbd5e1" stroke-width="1.5"/>`
 
   // Legend
-  const lx = vw / 2 - 55
-  const ly = vh - 7
-  svg += `<rect x="${lx}" y="${ly - 7}" width="8" height="8" fill="#22c55e" rx="1"/>`
-  svg += `<text x="${lx + 11}" y="${ly}" font-size="8" fill="#64748b" font-family="Helvetica,Arial,sans-serif">Ingresos</text>`
-  svg += `<rect x="${lx + 68}" y="${ly - 7}" width="8" height="8" fill="#ef4444" rx="1"/>`
-  svg += `<text x="${lx + 79}" y="${ly}" font-size="8" fill="#64748b" font-family="Helvetica,Arial,sans-serif">Gastos</text>`
+  const lx = vw / 2 - 62
+  const ly = vh - 10
+  svg += `<rect x="${lx}" y="${ly - 8}" width="10" height="10" fill="#22c55e" rx="2"/>`
+  svg += `<text x="${lx + 14}" y="${ly}" font-size="9" fill="#64748b" font-family="Helvetica,Arial,sans-serif">Ingresos${dualAxis ? ' (eje dcho.)' : ''}</text>`
+  svg += `<rect x="${lx + 90}" y="${ly - 8}" width="10" height="10" fill="#ef4444" rx="2"/>`
+  svg += `<text x="${lx + 104}" y="${ly}" font-size="9" fill="#64748b" font-family="Helvetica,Arial,sans-serif">Gastos</text>`
 
   svg += '</svg>'
   return svg
@@ -245,10 +268,10 @@ function pageHeader(logoUri: string, dateFrom: string, dateTo: string, today: st
   const periodFrom = fmtDateLong(dateFrom)
   const periodTo   = fmtDateLong(dateTo)
   const imgOrText  = logoUri
-    ? `<img src="${logoUri}" style="height:24px;width:auto;display:block;" alt="Platomico"/>`
+    ? `<img src="${logoUri}" style="height:26px;width:auto;display:block;" alt="Platomico"/>`
     : `<span style="font-size:15px;font-weight:800;color:#0f172a;">Platomico.</span>`
   return `
-    <div style="display:flex;align-items:flex-start;justify-content:space-between;padding-bottom:10px;margin-bottom:18px;border-bottom:2px solid #1e2d4a;">
+    <div style="display:flex;align-items:flex-start;justify-content:space-between;padding-bottom:12px;margin-bottom:20px;border-bottom:2.5px solid #1e2d4a;">
       ${imgOrText}
       <div style="text-align:right;">
         <div style="font-size:15px;font-weight:800;color:#1e2d4a;letter-spacing:-0.3px;">Informe Financiero Ejecutivo</div>
@@ -258,24 +281,14 @@ function pageHeader(logoUri: string, dateFrom: string, dateTo: string, today: st
     </div>`
 }
 
-// ── KPI card ──────────────────────────────────────────────────────────────────
+// ── KPI card — no subtitle, large number ─────────────────────────────────────
 
-function kpiCard(label: string, value: string, sub: string, color: string, prefix = ''): string {
+function kpiCard(label: string, value: string, color: string, prefix = ''): string {
+  const fontSize = value.length > 12 ? '14' : value.length > 9 ? '16' : '19'
   return `
-    <div style="border:1px solid #e8eef6;border-radius:10px;padding:14px 13px;background:#fff;">
-      <div style="font-size:7.5px;text-transform:uppercase;letter-spacing:1px;color:#94a3b8;margin-bottom:7px;font-weight:600;">${label}</div>
-      <div style="font-size:${value.length > 10 ? '13' : '15'}px;font-weight:800;color:${color};font-family:'Courier New',monospace;line-height:1.1;">${prefix}${value}</div>
-      <div style="font-size:8px;color:#94a3b8;margin-top:5px;line-height:1.4;">${sub}</div>
-    </div>`
-}
-
-// ── simpleRow helper (shared with page 2) ─────────────────────────────────────
-
-function simpleRow(label: string, value: string): string {
-  return `
-    <div style="display:flex;justify-content:space-between;padding:3px 0;border-bottom:1px solid #f1f5f9;">
-      <span style="font-size:9.5px;color:#64748b;">${label}</span>
-      <span style="font-size:9.5px;font-weight:600;color:#0f172a;font-family:'Courier New',monospace;">${value}</span>
+    <div style="border:1.5px solid #e8eef6;border-radius:12px;padding:18px 16px 16px;background:#fff;">
+      <div style="font-size:7.5px;text-transform:uppercase;letter-spacing:1.2px;color:#94a3b8;margin-bottom:10px;font-weight:700;">${label}</div>
+      <div style="font-size:${fontSize}px;font-weight:800;color:${color};font-family:'Courier New',monospace;line-height:1.1;letter-spacing:-0.5px;">${prefix}${value}</div>
     </div>`
 }
 
@@ -296,16 +309,16 @@ function buildPage1(
   const totalExpense = operational.filter(t => t.amount < 0).reduce((s, t) => s + Math.abs(t.amount), 0)
   const netBalance   = totalIncome - totalExpense
 
-  const loanRows     = transactions.filter(t => t.category === 'Préstamos')
-  const loanIn       = loanRows.filter(t => t.amount > 0).reduce((s, t) => s + t.amount, 0)
-  const loanOut      = loanRows.filter(t => t.amount < 0).reduce((s, t) => s + Math.abs(t.amount), 0)
-  const loanPending  = loanIn - loanOut
+  const loanRows    = transactions.filter(t => t.category === 'Préstamos')
+  const loanIn      = loanRows.filter(t => t.amount > 0).reduce((s, t) => s + t.amount, 0)
+  const loanOut     = loanRows.filter(t => t.amount < 0).reduce((s, t) => s + Math.abs(t.amount), 0)
+  const loanPending = loanIn - loanOut
 
   const facturasPendientes = invoices
     .filter(i => i.status === 'issued' || i.status === 'overdue')
     .reduce((s, i) => s + i.amountTotal, 0)
 
-  // Monthly bar chart data
+  // Monthly bar chart data (operational only)
   const monthMap = new Map<string, { income: number; expense: number }>()
   for (const t of operational) {
     const mk = t.date.substring(0, 7)
@@ -324,48 +337,30 @@ function buildPage1(
 
   const netColor  = netBalance >= 0 ? '#22c55e' : '#ef4444'
   const netPrefix = netBalance >= 0 ? '+' : '−'
+  const NAVY = '#1e2d4a'
 
   const content = `
     ${pageHeader(logoUri, dateFrom, dateTo, today)}
 
-    <!-- KPI strip -->
-    <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:9px;margin-bottom:22px;">
-      ${kpiCard('Saldo neto', fmt(Math.abs(netBalance)), 'Ingresos − gastos del período', netColor, netPrefix)}
-      ${kpiCard('Ingresos', fmt(totalIncome), 'Transacciones positivas (sin traspasos)', '#22c55e', '+')}
-      ${kpiCard('Gastos', fmt(totalExpense), 'Gastos operativos (sin traspasos ni préstamos)', '#ef4444', '')}
-      ${kpiCard('Fact. por cobrar', fmt(facturasPendientes), 'Facturas emitidas + vencidas pendientes', '#1e2d4a', '')}
-      ${kpiCard('Préstamos pendientes', fmt(Math.max(0, loanPending)), loanPending <= 0 ? 'Completamente devueltos' : `Recibido ${fmt(loanIn)} · Devuelto ${fmt(loanOut)}`, loanPending > 0 ? '#f97316' : '#22c55e', '')}
+    <!-- KPI strip — 5 cards, no subtitles -->
+    <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-bottom:24px;">
+      ${kpiCard('Saldo neto',          fmt(Math.abs(netBalance)), netColor, netPrefix)}
+      ${kpiCard('Ingresos',            fmt(totalIncome),          '#22c55e', '+')}
+      ${kpiCard('Gastos',              fmt(totalExpense),         '#ef4444')}
+      ${kpiCard('Fact. por cobrar',    fmt(facturasPendientes),   NAVY)}
+      ${kpiCard('Préstamos pendientes',fmt(Math.max(0, loanPending)), loanPending > 0 ? '#f97316' : NAVY)}
     </div>
 
-    <!-- Monthly bar chart -->
-    <div style="margin-bottom:8px;">
-      <div style="font-size:9px;font-weight:700;color:#1e2d4a;text-transform:uppercase;letter-spacing:1px;margin-bottom:10px;">Evolución mensual · ingresos vs gastos</div>
-      <div style="background:#fff;border:1px solid #e8eef6;border-radius:10px;padding:14px 12px;">
+    <!-- Monthly bar chart — ~55-60% of page height -->
+    <div>
+      <div style="font-size:8.5px;font-weight:700;color:#1e2d4a;text-transform:uppercase;letter-spacing:1.2px;margin-bottom:10px;">Evolución mensual · ingresos vs gastos</div>
+      <div style="background:#fff;border:1.5px solid #e8eef6;border-radius:12px;padding:16px 14px;">
         ${buildBarChartSvg(monthBars)}
-      </div>
-    </div>
-
-    <!-- Period summary -->
-    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-top:14px;">
-      <div style="background:#f8fafc;border:1px solid #e8eef6;border-radius:8px;padding:12px 14px;">
-        ${simpleRow('Ingresos totales',   fmt(totalIncome))}
-        ${simpleRow('Gastos totales',     fmt(totalExpense))}
-        ${simpleRow('Saldo neto',         fmt(Math.abs(netBalance)))}
-      </div>
-      <div style="background:#f8fafc;border:1px solid #e8eef6;border-radius:8px;padding:12px 14px;">
-        ${simpleRow('Transacciones',      String(transactions.length))}
-        ${simpleRow('Meses analizados',   String(sortedMonths.length))}
-        ${simpleRow('Fact. por cobrar',   fmt(facturasPendientes))}
-      </div>
-      <div style="background:#f8fafc;border:1px solid #e8eef6;border-radius:8px;padding:12px 14px;">
-        ${simpleRow('Préstamos recibidos',  fmt(loanIn))}
-        ${simpleRow('Préstamos devueltos',  fmt(loanOut))}
-        ${simpleRow('Pendiente devolver',   fmt(Math.max(0, loanPending)))}
       </div>
     </div>`
 
   return `
-<div style="break-after:page;position:relative;min-height:220mm;font-family:Helvetica,Arial,sans-serif;font-size:11px;color:#0f172a;">
+<div style="break-after:page;position:relative;font-family:Helvetica,Arial,sans-serif;font-size:11px;color:#0f172a;padding:0;">
   <div style="position:relative;">${content}</div>
   ${WATERMARK}
 </div>`
@@ -380,54 +375,49 @@ function buildPage2(
   today: string,
   logoUri: string,
 ): string {
-  // Expense transactions — exclude Traspaso interno, Préstamos, Refunds
-  const EXCLUDE_CATS = new Set(['Traspaso interno', 'Préstamos', 'Refunds'])
+  // Operational expenses: exclude Traspaso interno and Préstamos
+  const EXCLUDE_CATS = new Set(['Traspaso interno', 'Préstamos'])
   const expenseTxs = transactions.filter(
     t => t.amount < 0 && !EXCLUDE_CATS.has(t.category),
   )
 
-  // Group by category
+  // Group by category, sorted desc
   const catMap = new Map<string, number>()
   for (const t of expenseTxs) {
     catMap.set(t.category, (catMap.get(t.category) ?? 0) + Math.abs(t.amount))
   }
-  const totalExpense = Array.from(catMap.values()).reduce((s, v) => s + v, 0)
+  const totalOperational = Array.from(catMap.values()).reduce((s, v) => s + v, 0)
 
   const slices: CatSlice[] = Array.from(catMap.entries())
     .sort((a, b) => b[1] - a[1])
     .map(([name, amount]) => ({
-      name,
-      amount,
-      pct: totalExpense > 0 ? (amount / totalExpense) * 100 : 0,
+      name, amount,
+      pct: totalOperational > 0 ? (amount / totalOperational) * 100 : 0,
       color: catColor(name),
     }))
 
-  const donutSvg = buildDonutSvg(slices, totalExpense)
+  // Loans
+  const loanRows    = transactions.filter(t => t.category === 'Préstamos')
+  const loanIn      = loanRows.filter(t => t.amount > 0).reduce((s, t) => s + t.amount, 0)
+  const loanOut     = loanRows.filter(t => t.amount < 0).reduce((s, t) => s + Math.abs(t.amount), 0)
+  const loanPending = loanIn - loanOut
 
-  // Legend entries (right of donut)
-  const legendItems = slices.map(s => `
-    <div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid #f8fafc;">
-      <div style="width:10px;height:10px;border-radius:2px;background:${s.color};flex-shrink:0;"></div>
-      <span style="font-size:9px;color:#334155;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${s.name}</span>
-      <span style="font-size:9px;font-weight:600;color:#0f172a;font-family:'Courier New',monospace;white-space:nowrap;">${fmt(s.amount)}</span>
-      <span style="font-size:8px;color:#94a3b8;width:32px;text-align:right;flex-shrink:0;">${s.pct.toFixed(1)}%</span>
-    </div>`).join('')
+  const donutSvg = buildDonutSvg(slices, totalOperational)
 
-  // Category table rows
-  const tableRows = slices.map((s, i) => {
-    const bg = i % 2 === 0 ? '#fff' : '#f8fafc'
+  // ── Operational expense rows
+  const opRows = slices.map(s => {
     const barPct = Math.max(2, Math.round(s.pct))
     return `
       <tr>
-        <td style="padding:6px 10px;background:${bg};border:1px solid #f0f4f8;">
-          <div style="display:flex;align-items:center;gap:6px;">
-            <div style="width:8px;height:8px;border-radius:1px;background:${s.color};flex-shrink:0;"></div>
-            <span style="font-size:9.5px;color:#334155;">${s.name}</span>
+        <td style="padding:6px 10px;border-bottom:1px solid #f1f5f9;">
+          <div style="display:flex;align-items:center;gap:7px;">
+            <div style="width:9px;height:9px;border-radius:2px;background:${s.color};flex-shrink:0;"></div>
+            <span style="font-size:9px;color:#334155;">${s.name}</span>
           </div>
         </td>
-        <td style="padding:6px 10px;background:${bg};border:1px solid #f0f4f8;text-align:right;font-family:'Courier New',monospace;font-size:9.5px;font-weight:600;color:#0f172a;white-space:nowrap;">${fmt(s.amount)}</td>
-        <td style="padding:6px 10px;background:${bg};border:1px solid #f0f4f8;text-align:right;font-size:9px;color:#64748b;">${s.pct.toFixed(1)}%</td>
-        <td style="padding:6px 10px;background:${bg};border:1px solid #f0f4f8;width:110px;">
+        <td style="padding:6px 10px;border-bottom:1px solid #f1f5f9;text-align:right;font-family:'Courier New',monospace;font-size:9px;font-weight:700;color:#0f172a;white-space:nowrap;">${fmt(s.amount)}</td>
+        <td style="padding:6px 10px;border-bottom:1px solid #f1f5f9;text-align:right;font-size:8.5px;color:#94a3b8;white-space:nowrap;">${s.pct.toFixed(1)}%</td>
+        <td style="padding:6px 10px;border-bottom:1px solid #f1f5f9;width:90px;">
           <div style="height:8px;background:#f1f5f9;border-radius:4px;overflow:hidden;">
             <div style="height:100%;width:${barPct}%;background:${s.color};border-radius:4px;"></div>
           </div>
@@ -435,45 +425,79 @@ function buildPage2(
       </tr>`
   }).join('')
 
+  // ── Loans section rows (no bar column)
+  const hasLoans = loanIn > 0 || loanOut > 0
+  const loanSectionRows = hasLoans ? `
+    <tr>
+      <td colspan="4" style="padding:14px 10px 6px;background:#fff;">
+        <div style="font-size:7.5px;font-weight:700;text-transform:uppercase;letter-spacing:1.2px;color:#94a3b8;border-bottom:1.5px solid #e8eef6;padding-bottom:6px;">Préstamos</div>
+      </td>
+    </tr>
+    <tr>
+      <td style="padding:6px 10px;border-bottom:1px solid #f1f5f9;" colspan="2">
+        <span style="font-size:9px;color:#334155;">Préstamos recibidos</span>
+      </td>
+      <td colspan="2" style="padding:6px 10px;border-bottom:1px solid #f1f5f9;text-align:right;font-family:'Courier New',monospace;font-size:9px;font-weight:700;color:#22c55e;white-space:nowrap;">+${fmt(loanIn)}</td>
+    </tr>
+    <tr>
+      <td style="padding:6px 10px;border-bottom:1px solid #f1f5f9;" colspan="2">
+        <span style="font-size:9px;color:#334155;">Préstamos devueltos</span>
+      </td>
+      <td colspan="2" style="padding:6px 10px;border-bottom:1px solid #f1f5f9;text-align:right;font-family:'Courier New',monospace;font-size:9px;font-weight:700;color:#ef4444;white-space:nowrap;">−${fmt(loanOut)}</td>
+    </tr>
+    <tr>
+      <td style="padding:6px 10px;" colspan="2">
+        <span style="font-size:9px;color:#334155;font-weight:600;">Pendiente devolver</span>
+      </td>
+      <td colspan="2" style="padding:6px 10px;text-align:right;font-family:'Courier New',monospace;font-size:9px;font-weight:700;color:#f97316;white-space:nowrap;">${fmt(Math.max(0, loanPending))}</td>
+    </tr>` : ''
+
+  const tableHeader = `
+    <tr>
+      <th style="padding:7px 10px;background:#1e2d4a;color:#fff;font-size:7.5px;font-weight:700;text-transform:uppercase;letter-spacing:1px;text-align:left;border-radius:0;">Categoría</th>
+      <th style="padding:7px 10px;background:#1e2d4a;color:#fff;font-size:7.5px;font-weight:700;text-transform:uppercase;letter-spacing:1px;text-align:right;">Importe</th>
+      <th style="padding:7px 10px;background:#1e2d4a;color:#fff;font-size:7.5px;font-weight:700;text-transform:uppercase;letter-spacing:1px;text-align:right;">%</th>
+      <th style="padding:7px 10px;background:#1e2d4a;color:#fff;font-size:7.5px;font-weight:700;text-transform:uppercase;letter-spacing:1px;text-align:left;width:90px;">Proporción</th>
+    </tr>`
+
+  const opSectionHeader = `
+    <tr>
+      <td colspan="4" style="padding:0 10px 6px;background:#fff;">
+        <div style="font-size:7.5px;font-weight:700;text-transform:uppercase;letter-spacing:1.2px;color:#94a3b8;border-bottom:1.5px solid #e8eef6;padding-bottom:6px;">Gastos operativos</div>
+      </td>
+    </tr>`
+
   const content = `
     ${pageHeader(logoUri, dateFrom, dateTo, today)}
 
-    <div style="font-size:15px;font-weight:800;color:#1e2d4a;letter-spacing:-0.3px;margin-bottom:16px;padding-bottom:8px;border-bottom:1px solid #e8eef6;">
-      ¿Dónde va el dinero?
-    </div>
+    <!-- Donut (40%) + table (60%) -->
+    <div style="display:grid;grid-template-columns:40% 60%;gap:28px;align-items:start;">
 
-    <!-- Donut + legend side by side -->
-    <div style="display:grid;grid-template-columns:240px 1fr;gap:24px;align-items:start;margin-bottom:22px;">
-      <div style="display:flex;flex-direction:column;align-items:center;">
+      <!-- LEFT: donut -->
+      <div style="display:flex;flex-direction:column;align-items:center;padding-top:4px;">
         ${donutSvg}
-        <div style="font-size:8px;color:#94a3b8;margin-top:6px;text-align:center;">Gastos por categoría<br/>(excl. traspasos, préstamos, refunds)</div>
-      </div>
-      <div style="padding-top:8px;">
-        <div style="font-size:7.5px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:#94a3b8;margin-bottom:8px;display:grid;grid-template-columns:1fr auto auto;gap:0 8px;">
-          <span>Categoría</span><span style="text-align:right;">Importe</span><span style="width:32px;text-align:right;">%</span>
+        <div style="font-size:8px;color:#94a3b8;margin-top:8px;text-align:center;line-height:1.5;">
+          Gastos operativos por categoría<br/>
+          <span style="color:#cbd5e1;">(excl. traspasos y préstamos)</span>
         </div>
-        ${legendItems || '<div style="font-size:9px;color:#94a3b8;padding:8px 0;">Sin gastos en el período.</div>'}
       </div>
-    </div>
 
-    <!-- Category breakdown table -->
-    ${slices.length > 0 ? `
-    <div style="font-size:9px;font-weight:700;color:#1e2d4a;text-transform:uppercase;letter-spacing:1px;margin-bottom:8px;">Detalle por categoría</div>
-    <table style="width:100%;border-collapse:collapse;">
-      <thead>
-        <tr>
-          <th style="padding:6px 10px;background:#1e2d4a;color:#fff;font-size:8px;font-weight:700;text-transform:uppercase;letter-spacing:0.8px;text-align:left;border:1px solid #1e2d4a;">Categoría</th>
-          <th style="padding:6px 10px;background:#1e2d4a;color:#fff;font-size:8px;font-weight:700;text-transform:uppercase;letter-spacing:0.8px;text-align:right;border:1px solid #1e2d4a;">Importe</th>
-          <th style="padding:6px 10px;background:#1e2d4a;color:#fff;font-size:8px;font-weight:700;text-transform:uppercase;letter-spacing:0.8px;text-align:right;border:1px solid #1e2d4a;">%</th>
-          <th style="padding:6px 10px;background:#1e2d4a;color:#fff;font-size:8px;font-weight:700;text-transform:uppercase;letter-spacing:0.8px;text-align:left;border:1px solid #1e2d4a;width:110px;">Proporción</th>
-        </tr>
-      </thead>
-      <tbody>${tableRows}</tbody>
-    </table>` : ''}
-  `
+      <!-- RIGHT: unified table -->
+      <div>
+        ${slices.length > 0 || hasLoans ? `
+        <table style="width:100%;border-collapse:collapse;border-radius:10px;overflow:hidden;">
+          <thead>${tableHeader}</thead>
+          <tbody>
+            ${slices.length > 0 ? opSectionHeader + opRows : ''}
+            ${loanSectionRows}
+          </tbody>
+        </table>` : '<div style="font-size:9px;color:#94a3b8;padding:12px 0;">Sin datos en el período.</div>'}
+      </div>
+
+    </div>`
 
   return `
-<div style="position:relative;min-height:220mm;font-family:Helvetica,Arial,sans-serif;font-size:11px;color:#0f172a;">
+<div style="position:relative;font-family:Helvetica,Arial,sans-serif;font-size:11px;color:#0f172a;padding:0;">
   <div style="position:relative;">${content}</div>
   ${WATERMARK}
 </div>`
