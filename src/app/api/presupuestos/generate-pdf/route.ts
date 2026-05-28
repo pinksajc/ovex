@@ -16,8 +16,18 @@ export async function GET(req: Request) {
     const presupuesto = await getPresupuesto(id)
     if (!presupuesto) return NextResponse.json({ error: 'Oferta not found' }, { status: 404 })
 
+    // Fetch deal contact name for the signature block pre-fill
+    let contactName: string | undefined
+    if (presupuesto.dealId) {
+      try {
+        const { getDeal } = await import('@/lib/deals')
+        const deal = await getDeal(presupuesto.dealId)
+        contactName = deal?.contact?.name ?? undefined
+      } catch { /* non-fatal — signature block will leave Nombre blank */ }
+    }
+
     const { generatePresupuestoPdf } = await import('@/lib/pdf/presupuesto')
-    const pdfBuffer = await generatePresupuestoPdf(presupuesto)
+    const pdfBuffer = await generatePresupuestoPdf(presupuesto, { contactName })
 
     const slug = presupuesto.number.replace(/[^A-Za-z0-9-]/g, '-').toLowerCase()
     const filename = `oferta-${slug}.pdf`
