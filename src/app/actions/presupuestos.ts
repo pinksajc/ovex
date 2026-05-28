@@ -4,7 +4,6 @@ import { redirect } from 'next/navigation'
 import { revalidatePath } from 'next/cache'
 import { isRedirectError } from 'next/dist/client/components/redirect-error'
 import { createPresupuesto, updatePresupuesto, updatePresupuestoStatus, updatePresupuestoSignatureRequired, getPresupuesto } from '@/lib/supabase/presupuestos'
-import { insertCashflowTransactions } from '@/lib/supabase/cashflow'
 import type { CreatePresupuestoInput, UpdatePresupuestoInput, PresupuestoStatus } from '@/types'
 
 export async function createPresupuestoAction(input: CreatePresupuestoInput): Promise<{ error?: string }> {
@@ -41,26 +40,7 @@ export async function updatePresupuestoStatusAction(
   status: PresupuestoStatus
 ): Promise<{ ok: boolean; error?: string }> {
   try {
-    // Fetch before updating to check previous status and requiresSignature
-    const pq = await getPresupuesto(id)
     await updatePresupuestoStatus(id, status)
-
-    // Auto-create cashflow income entry when a signed oferta is first accepted
-    if (status === 'accepted' && pq?.status !== 'accepted' && pq?.requiresSignature === true) {
-      const today = new Date().toISOString().split('T')[0]
-      await insertCashflowTransactions([{
-        date: today,
-        description: `Oferta ${pq.number} · ${pq.clientName}`,
-        amount: pq.amountTotal,
-        type: 'income',
-        category: 'Ingreso cliente',
-        currency: 'EUR',
-        state: null,
-        balance: null,
-        sourceFile: 'orvex-ofertas',
-      }])
-      revalidatePath('/cashflow')
-    }
 
     revalidatePath('/ofertas')
     revalidatePath(`/ofertas/${id}`)
@@ -116,23 +96,6 @@ export async function acceptContratoAction(
       notes: newNotes,
     })
     await updatePresupuestoStatus(id, 'accepted')
-
-    // Auto-create cashflow income entry when accepting a contract (requires_signature = true)
-    if (pq.requiresSignature && pq.status !== 'accepted') {
-      const today = new Date().toISOString().split('T')[0]
-      await insertCashflowTransactions([{
-        date: today,
-        description: `Oferta ${pq.number} · ${pq.clientName}`,
-        amount: pq.amountTotal,
-        type: 'income',
-        category: 'Ingreso cliente',
-        currency: 'EUR',
-        state: null,
-        balance: null,
-        sourceFile: 'orvex-ofertas',
-      }])
-      revalidatePath('/cashflow')
-    }
 
     revalidatePath('/ofertas')
     revalidatePath(`/ofertas/${id}`)
