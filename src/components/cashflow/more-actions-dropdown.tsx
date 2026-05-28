@@ -5,9 +5,16 @@ import { UploadZoneContent } from './upload-zone'
 
 // ── More Actions Dropdown ──────────────────────────────────────────────────────
 
-export function MoreActionsDropdown() {
+interface MoreActionsDropdownProps {
+  dateFrom: string
+  dateTo: string
+}
+
+export function MoreActionsDropdown({ dateFrom, dateTo }: MoreActionsDropdownProps) {
   const [dropdownOpen, setDropdownOpen] = useState(false)
   const [modalOpen, setModalOpen]       = useState(false)
+  const [pdfLoading, setPdfLoading]     = useState(false)
+  const [pdfError, setPdfError]         = useState(false)
   const buttonRef = useRef<HTMLButtonElement>(null)
   const dropdownRef = useRef<HTMLDivElement>(null)
 
@@ -40,6 +47,32 @@ export function MoreActionsDropdown() {
     setModalOpen(true)
   }
 
+  async function handleExportPdf() {
+    setDropdownOpen(false)
+    setPdfLoading(true)
+    setPdfError(false)
+    try {
+      const url = `/api/cashflow/report/pdf?from=${dateFrom}&to=${dateTo}`
+      const res = await fetch(url)
+      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+      const blob = await res.blob()
+      const objUrl = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = objUrl
+      a.download = `informe-cashflow-${dateFrom}-${dateTo}.pdf`
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      setTimeout(() => URL.revokeObjectURL(objUrl), 1000)
+    } catch (err) {
+      console.error('[MoreActionsDropdown] export PDF', err)
+      setPdfError(true)
+      setTimeout(() => setPdfError(false), 4000)
+    } finally {
+      setPdfLoading(false)
+    }
+  }
+
   return (
     <>
       {/* Trigger button */}
@@ -68,14 +101,23 @@ export function MoreActionsDropdown() {
               Importar CSV
             </button>
 
-            {/* Exportar — disabled / coming soon */}
-            <div className="flex items-center gap-2.5 px-3.5 py-2 text-xs text-zinc-300 cursor-not-allowed select-none">
-              <IconDownload className="w-3.5 h-3.5 shrink-0" />
-              <span>Exportar</span>
-              <span className="ml-auto text-[9px] font-semibold uppercase tracking-wide text-zinc-300">
-                Próximamente
+            {/* Exportar informe PDF */}
+            <button
+              onClick={handleExportPdf}
+              disabled={pdfLoading}
+              className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs text-zinc-700 hover:bg-zinc-50 transition-colors text-left disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {pdfLoading ? (
+                <svg className="w-3.5 h-3.5 text-zinc-400 shrink-0 animate-spin" viewBox="0 0 16 16" fill="none">
+                  <circle cx="8" cy="8" r="6" stroke="currentColor" strokeWidth="2" strokeDasharray="28" strokeDashoffset="10" />
+                </svg>
+              ) : (
+                <IconDownload className={`w-3.5 h-3.5 shrink-0 ${pdfError ? 'text-red-400' : 'text-zinc-400'}`} />
+              )}
+              <span className={pdfError ? 'text-red-600' : ''}>
+                {pdfLoading ? 'Generando…' : pdfError ? 'Error · Reintentar' : 'Exportar informe PDF'}
               </span>
-            </div>
+            </button>
           </div>
         )}
       </div>
