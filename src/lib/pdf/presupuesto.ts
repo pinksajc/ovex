@@ -73,7 +73,10 @@ function renderLineRows(items: InvoiceLineItem[]): string {
 }
 
 // ---- Presupuesto HTML ----
-export async function generatePresupuestoPdf(presupuesto: Presupuesto): Promise<Buffer> {
+export async function generatePresupuestoPdf(
+  presupuesto: Presupuesto,
+  opts?: { contactName?: string }
+): Promise<Buffer> {
   const logo = readLogoDataUri()
   const today = new Date().toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' })
 
@@ -516,7 +519,9 @@ ${presupuesto.requiresSignature ? `
       </div>
       <div class="sig-field">
         <span class="sig-label">Nombre:</span>
-        <div class="sig-blank"></div>
+        ${opts?.contactName
+          ? `<div class="sig-blank--prefilled">${esc(opts.contactName)}</div>`
+          : `<div class="sig-blank"></div>`}
       </div>
       <div class="sig-field">
         <span class="sig-label">Fecha:</span>
@@ -524,7 +529,9 @@ ${presupuesto.requiresSignature ? `
       </div>
       <div class="sig-field">
         <span class="sig-label">DNI/NIF:</span>
-        <div class="sig-blank"></div>
+        ${presupuesto.clientCif
+          ? `<div class="sig-blank--prefilled">${esc(presupuesto.clientCif)}</div>`
+          : `<div class="sig-blank"></div>`}
       </div>
     </div>
 
@@ -539,6 +546,10 @@ ${presupuesto.requiresSignature ? `
       <div class="sig-field">
         <span class="sig-label">Nombre:</span>
         <div class="sig-blank--prefilled">César Augusto Castro Sáder</div>
+      </div>
+      <div class="sig-field">
+        <span class="sig-label">Cargo:</span>
+        <div class="sig-blank--prefilled">Administrador Único</div>
       </div>
       <div class="sig-field">
         <span class="sig-label">Fecha:</span>
