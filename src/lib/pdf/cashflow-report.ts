@@ -15,7 +15,6 @@
 import fs from 'fs'
 import path from 'path'
 import type { CashflowTransaction, Invoice, Presupuesto, Deal } from '@/types'
-import { PLANS } from '@/lib/pricing/catalog'
 import { renderHtmlToPdf } from './generate'
 
 // ── Logo ─────────────────────────────────────────────────────────────────────
@@ -534,22 +533,37 @@ function emptyState(msg: string): string {
 }
 
 /**
- * Given a presupuesto + dealById map, returns { fixed, feeRate }.
- * fixed   = p.amountTotal (presupuestos.amount_total) — the actual offer total, no recalculation
- * feeRate = plan.variableFee (€/order), or null when no deal/plan is configured
+ * Derives plan tier from presupuesto line items via serviceId convention:
+ *   ros_pro_*     → 'pro'     → 0.03 €/ped.
+ *   ros_growth_*  → 'growth'  → 0.05 €/ped.
+ *   ros_starter_* → 'starter' → 0.08 €/ped.
+ * Returns null when no ROS plan line item is found.
+ */
+function planTierFromLineItems(p: Presupuesto): string | null {
+  for (const item of p.lineItems) {
+    const sid = item.serviceId ?? ''
+    if (sid.startsWith('ros_pro'))     return 'pro'
+    if (sid.startsWith('ros_growth'))  return 'growth'
+    if (sid.startsWith('ros_starter')) return 'starter'
+  }
+  return null
+}
+
+const FEE_RATE: Record<string, number> = { pro: 0.03, growth: 0.05, starter: 0.08 }
+
+/**
+ * Returns { fixed, feeRate } for an offer.
+ * fixed   = p.amountTotal (presupuestos.amount_total) — no recalculation
+ * feeRate = derived from line_items serviceId (no JOIN with deal_configurations)
  */
 function getOfferBreakdown(
   p: Presupuesto,
-  dealById: Map<string, Deal>,
+  _dealById: Map<string, Deal>,  // kept for signature compat; not used
 ): { fixed: number; feeRate: number | null } {
-  const fixed = p.amountTotal  // use DB value directly
-
-  if (!p.dealId) return { fixed, feeRate: null }
-  const deal = dealById.get(p.dealId)
-  const cfg  = deal?.configurations[0]
-  if (!cfg) return { fixed, feeRate: null }
-
-  return { fixed, feeRate: PLANS[cfg.plan]?.variableFee ?? null }
+  const fixed   = p.amountTotal
+  const tier    = planTierFromLineItems(p)
+  const feeRate = tier !== null ? (FEE_RATE[tier] ?? null) : null
+  return { fixed, feeRate }
 }
 
 function buildPage3(
