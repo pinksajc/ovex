@@ -328,8 +328,8 @@ function buildPage1(
   const NAVY = '#1e2d4a'
 
   return `
-<div style="break-after:page;position:relative;font-family:Helvetica,Arial,sans-serif;font-size:11px;color:#0f172a;">
-  <div style="position:relative;">
+<div style="break-after:page;position:relative;font-family:Helvetica,Arial,sans-serif;font-size:11px;color:#0f172a;min-height:100vh;display:flex;flex-direction:column;">
+  <div style="position:relative;flex:1;display:flex;flex-direction:column;">
     ${pageHeader(logoUri, dateFrom, dateTo, today)}
 
     <!-- KPI strip: 5 cards, big number, no uppercase tracking -->
@@ -341,16 +341,28 @@ function buildPage1(
       ${kpiCard('Préstamos pendientes', fmt(Math.max(0, loanPending)), loanPending > 0 ? '#f97316' : NAVY)}
     </div>
 
-    <!-- Bar chart — fills remaining page space -->
-    <div>
+    <!-- Bar chart — flex:1 fills all remaining page height -->
+    <div style="flex:1;display:flex;flex-direction:column;">
       <div style="font-size:9px;font-weight:600;color:#94a3b8;margin-bottom:10px;letter-spacing:0.3px;">Evolución mensual · ingresos vs gastos operativos</div>
-      <div style="background:#fff;border:1.5px solid #e8eef6;border-radius:12px;padding:16px 14px;">
+      <div style="flex:1;background:#fff;border:1.5px solid #e8eef6;border-radius:12px;padding:16px 14px;min-height:320px;">
         ${buildBarChartSvg(monthBars)}
       </div>
     </div>
   </div>
   ${WATERMARK}
 </div>`
+}
+
+// ── Loan counterparty extraction ─────────────────────────────────────────────
+// Parses common Revolut description patterns to extract the counterparty name.
+// Patterns handled: "Money added from X", "To X", "From X", "Intercompany Loan"
+
+function extractCounterparty(description: string): string {
+  let m: RegExpMatchArray | null
+  if ((m = description.match(/^Money added from\s+(.+)$/i))) return m[1].trim()
+  if ((m = description.match(/^To\s+(.+)$/i))) return m[1].trim()
+  if ((m = description.match(/^From\s+(.+)$/i))) return m[1].trim()
+  return description.trim() || 'Desconocido'
 }
 
 // ── Page 2: Expense breakdown ─────────────────────────────────────────────────
@@ -413,34 +425,50 @@ function buildPage2(
       </tr>`
   }).join('')
 
-  // ── Loans section — label in col 1, amount in col 2, cols 3-4 empty ──────────
+  // ── Loans section — one row per counterparty: Contraparte | Recibido | Dado | Neto
   const hasLoans = loanIn > 0 || loanOut > 0
+
+  // Build counterparty map from all loan transactions
+  const cpMap = new Map<string, { recibido: number; dado: number }>()
+  for (const t of transactions) {
+    if (t.category !== 'Préstamos recibidos' && t.category !== 'Préstamos dados') continue
+    const cp = extractCounterparty(t.description ?? '')
+    const entry = cpMap.get(cp) ?? { recibido: 0, dado: 0 }
+    if (t.category === 'Préstamos recibidos') entry.recibido += t.amount
+    else entry.dado += Math.abs(t.amount)
+    cpMap.set(cp, entry)
+  }
+
+  const cpRows = Array.from(cpMap.entries()).map(([name, { recibido, dado }]) => {
+    const neto = recibido - dado
+    const netoColor = neto > 0 ? '#f97316' : neto < 0 ? '#22c55e' : '#64748b'
+    return `
+      <tr>
+        <td style="padding:5px 10px;border-bottom:1px solid #f1f5f9;font-size:8.5px;color:#334155;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${esc(name)}</td>
+        <td style="padding:5px 12px;border-bottom:1px solid #f1f5f9;text-align:right;font-family:'Courier New',monospace;font-size:8.5px;color:#22c55e;white-space:nowrap;">${recibido > 0 ? '+' + fmt(recibido) : '—'}</td>
+        <td style="padding:5px 8px;border-bottom:1px solid #f1f5f9;text-align:right;font-family:'Courier New',monospace;font-size:8.5px;color:#ef4444;white-space:nowrap;">${dado > 0 ? '−' + fmt(dado) : '—'}</td>
+        <td style="padding:5px 10px;border-bottom:1px solid #f1f5f9;text-align:right;font-family:'Courier New',monospace;font-size:8.5px;font-weight:700;color:${netoColor};white-space:nowrap;">${fmt(neto)}</td>
+      </tr>`
+  }).join('')
+
   const loanSectionRows = hasLoans ? `
     <tr>
       <td colspan="4" style="padding:14px 10px 4px;background:#fff;">
         <div style="font-size:8px;font-weight:700;color:#94a3b8;border-bottom:1.5px solid #e8eef6;padding-bottom:6px;">PRÉSTAMOS</div>
       </td>
     </tr>
-    <tr>
-      <td style="padding:7px 10px;border-bottom:1px solid #f1f5f9;">
-        <span style="font-size:9px;color:#334155;">Préstamos recibidos</span>
-      </td>
-      <td style="padding:7px 12px;border-bottom:1px solid #f1f5f9;text-align:right;font-family:'Courier New',monospace;font-size:9px;font-weight:700;color:#22c55e;white-space:nowrap;min-width:90px;">+${fmt(loanIn)}</td>
-      <td colspan="2" style="border-bottom:1px solid #f1f5f9;"></td>
+    <tr style="background:#f8fafc;">
+      <td style="padding:5px 10px;font-size:7.5px;font-weight:700;color:#64748b;">Contraparte</td>
+      <td style="padding:5px 12px;font-size:7.5px;font-weight:700;color:#22c55e;text-align:right;">Recibido</td>
+      <td style="padding:5px 8px;font-size:7.5px;font-weight:700;color:#ef4444;text-align:right;">Dado</td>
+      <td style="padding:5px 10px;font-size:7.5px;font-weight:700;color:#64748b;text-align:right;">Neto</td>
     </tr>
-    <tr>
-      <td style="padding:7px 10px;border-bottom:1px solid #f1f5f9;">
-        <span style="font-size:9px;color:#334155;">Préstamos dados</span>
-      </td>
-      <td style="padding:7px 12px;border-bottom:1px solid #f1f5f9;text-align:right;font-family:'Courier New',monospace;font-size:9px;font-weight:700;color:#ef4444;white-space:nowrap;min-width:90px;">−${fmt(loanOut)}</td>
-      <td colspan="2" style="border-bottom:1px solid #f1f5f9;"></td>
-    </tr>
-    <tr>
-      <td style="padding:7px 10px;">
-        <span style="font-size:9px;font-weight:600;color:#334155;">Neto</span>
-      </td>
-      <td style="padding:7px 12px;text-align:right;font-family:'Courier New',monospace;font-size:9px;font-weight:700;color:#f97316;white-space:nowrap;min-width:90px;">${fmt(loanPending)}</td>
-      <td colspan="2"></td>
+    ${cpRows}
+    <tr style="background:#f0f4f8;">
+      <td style="padding:6px 10px;font-size:8.5px;font-weight:700;color:#334155;">Total</td>
+      <td style="padding:6px 12px;text-align:right;font-family:'Courier New',monospace;font-size:8.5px;font-weight:700;color:#22c55e;white-space:nowrap;">+${fmt(loanIn)}</td>
+      <td style="padding:6px 8px;text-align:right;font-family:'Courier New',monospace;font-size:8.5px;font-weight:700;color:#ef4444;white-space:nowrap;">−${fmt(loanOut)}</td>
+      <td style="padding:6px 10px;text-align:right;font-family:'Courier New',monospace;font-size:8.5px;font-weight:700;color:${loanPending > 0 ? '#f97316' : '#22c55e'};white-space:nowrap;">${fmt(loanPending)}</td>
     </tr>` : ''
 
   const tableHeader = `
@@ -579,9 +607,10 @@ function buildPage3(
   const dealById = new Map<string, Deal>(deals.map(d => [d.id, d]))
 
   /**
-   * Display name for a client: use brandName when it's distinct from company.name,
-   * otherwise use company.name. Falls back to the invoice/presupuesto clientName
-   * when there is no linked deal.
+   * Display name for a client: use brandName when it exists and is distinct from
+   * company.name; otherwise fall back to the invoice/presupuesto clientName.
+   * Never returns d.company.name directly — that field can contain stale suffixes
+   * like "(Pink's!!)" that must not appear in reports.
    */
   function displayNameFor(dealId: string | null, fallback: string): string {
     if (!dealId) return fallback
@@ -589,7 +618,7 @@ function buildPage3(
     if (!d) return fallback
     const brand = d.company.brandName
     if (brand && brand.trim() !== d.company.name.trim()) return brand.trim()
-    return d.company.name
+    return fallback  // safe: always inv.clientName / offer.clientName
   }
 
   // ── 1. Facturas vencidas ──────────────────────────────────────────────────────
@@ -673,7 +702,10 @@ function buildPage3(
     const fs  = tight ? '7.5px' : '8px'
     return offers.map((offer, i) => {
       const { fixed, feeRate } = breakdowns[i]
-      const client   = displayNameFor(offer.dealId, offer.clientName)
+      // Use offer.clientName directly — the presupuesto's own client name is
+      // authoritative; displayNameFor would fall through to the deal's company.name
+      // which can differ (e.g. "Culto GmbH" vs "Enrollao KB SL").
+      const client   = offer.clientName
       const rateText = feeRate !== null
         ? feeRate.toLocaleString('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' €/ped.'
         : '—'
