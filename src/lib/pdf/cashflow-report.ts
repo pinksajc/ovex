@@ -575,18 +575,18 @@ function buildPage3(
   // ── Deal lookup ───────────────────────────────────────────────────────────────
   const dealById = new Map<string, Deal>(deals.map(d => [d.id, d]))
 
-  // Brand: show brandName only when distinct from company.name
-  function brandFor(dealId: string | null): string {
-    if (!dealId) return ''
+  /**
+   * Display name for a client: use brandName when it's distinct from company.name,
+   * otherwise use company.name. Falls back to the invoice/presupuesto clientName
+   * when there is no linked deal.
+   */
+  function displayNameFor(dealId: string | null, fallback: string): string {
+    if (!dealId) return fallback
     const d = dealById.get(dealId)
-    if (!d) return ''
+    if (!d) return fallback
     const brand = d.company.brandName
     if (brand && brand.trim() !== d.company.name.trim()) return brand.trim()
-    return ''
-  }
-  function clientFor(dealId: string | null, fallback: string): string {
-    if (!dealId) return fallback
-    return dealById.get(dealId)?.company.name ?? fallback
+    return d.company.name
   }
 
   // ── 1. Facturas vencidas ──────────────────────────────────────────────────────
@@ -627,13 +627,11 @@ function buildPage3(
 
   // ── Invoice row renderer ──────────────────────────────────────────────────────
   function invoiceRow(inv: Invoice, extraCol: string): string {
-    const brand  = brandFor(inv.dealId)
-    const client = clientFor(inv.dealId, inv.clientName)
+    const client = displayNameFor(inv.dealId, inv.clientName)
     return `
       <tr style="${AV}">
         <td style="padding:4px 8px;border-bottom:1px solid #f1f5f9;font-family:'Courier New',monospace;font-size:8px;white-space:nowrap;">${esc(inv.number)}</td>
         <td style="padding:4px 8px;border-bottom:1px solid #f1f5f9;font-size:8px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${esc(client)}</td>
-        <td style="padding:4px 8px;border-bottom:1px solid #f1f5f9;font-size:8px;color:#64748b;white-space:nowrap;">${esc(brand)}</td>
         <td style="padding:4px 8px;border-bottom:1px solid #f1f5f9;text-align:right;font-family:'Courier New',monospace;font-size:8px;font-weight:700;color:#0f172a;white-space:nowrap;">${fmt(inv.amountTotal)}</td>
         <td style="padding:4px 8px;border-bottom:1px solid #f1f5f9;font-size:8px;white-space:nowrap;">${extraCol}</td>
       </tr>`
@@ -652,8 +650,7 @@ function buildPage3(
     const fs = tight ? '7.5px' : '8px'
     return offers.map((offer, i) => {
       const { fixed, variable } = breakdowns[i]
-      const brand   = brandFor(offer.dealId)
-      const client  = clientFor(offer.dealId, offer.clientName)
+      const client  = displayNameFor(offer.dealId, offer.clientName)
       const varCell = variable !== null
         ? `<span style="font-family:'Courier New',monospace;font-size:${fs};font-weight:600;color:#64748b;">${fmt(variable)}</span>`
         : `<span style="color:#cbd5e1;">—</span>`
@@ -664,7 +661,6 @@ function buildPage3(
         <tr style="${AV}">
           <td style="padding:${p};border-bottom:1px solid #f1f5f9;font-family:'Courier New',monospace;font-size:${fs};white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${esc(offer.number)}</td>
           <td style="padding:${p};border-bottom:1px solid #f1f5f9;font-size:${fs};overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${esc(client)}</td>
-          <td style="padding:${p};border-bottom:1px solid #f1f5f9;font-size:${fs};color:#64748b;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${esc(brand)}</td>
           <td style="padding:${p};border-bottom:1px solid #f1f5f9;text-align:right;font-family:'Courier New',monospace;font-size:${fs};font-weight:700;color:#0f172a;white-space:nowrap;">${fmt(fixed)}</td>
           <td style="padding:${p};border-bottom:1px solid #f1f5f9;text-align:right;white-space:nowrap;">${varCell}</td>
           ${expiryCell}
@@ -684,7 +680,7 @@ function buildPage3(
       ${overdueInvoices.length === 0
         ? emptyState('Sin facturas vencidas')
         : `<table style="width:100%;border-collapse:collapse;table-layout:auto;">
-          <thead>${thRow(['Nº', 'Cliente', 'Marca', 'Importe', 'Vencida'])}</thead>
+          <thead>${thRow(['Nº', 'Cliente', 'Importe', 'Vencida'])}</thead>
           <tbody>${overdueInvoices.map(inv => {
             const days = inv.dueAt ? daysBetween(inv.dueAt, today) : 0
             return invoiceRow(inv, `<span style="color:#ef4444;font-weight:700;">${days}d</span>`)
@@ -704,7 +700,7 @@ function buildPage3(
       ${issuedInvoices.length === 0
         ? emptyState('Sin facturas emitidas pendientes')
         : `<table style="width:100%;border-collapse:collapse;table-layout:auto;">
-          <thead>${thRow(['Nº', 'Cliente', 'Marca', 'Importe', 'Vence el'])}</thead>
+          <thead>${thRow(['Nº', 'Cliente', 'Importe', 'Vence el'])}</thead>
           <tbody>${issuedInvoices.map(inv => {
             const dueLabel = inv.dueAt ? fmtDateCompact(inv.dueAt.substring(0, 10)) : '—'
             return invoiceRow(inv, dueLabel)
@@ -728,11 +724,10 @@ function buildPage3(
           <colgroup>
             <col style="width:70px;"/>
             <col/>
-            <col style="width:50px;"/>
-            <col style="width:72px;"/>
-            <col style="width:72px;"/>
+            <col style="width:80px;"/>
+            <col style="width:80px;"/>
           </colgroup>
-          <thead>${thRow(['Nº oferta', 'Cliente', 'Marca', 'Fijo', 'Variable est.*'])}</thead>
+          <thead>${thRow(['Nº oferta', 'Cliente', 'Fijo', 'Variable est.*'])}</thead>
           <tbody>${offerRows(acceptedOffers, acceptedBreakdowns, false, false)}</tbody>
         </table>
         ${FOOTNOTE}`}
@@ -753,12 +748,11 @@ function buildPage3(
           <colgroup>
             <col style="width:64px;"/>
             <col/>
-            <col style="width:44px;"/>
-            <col style="width:66px;"/>
-            <col style="width:66px;"/>
+            <col style="width:72px;"/>
+            <col style="width:72px;"/>
             <col style="width:52px;"/>
           </colgroup>
-          <thead>${thRow(['Nº oferta', 'Cliente', 'Marca', 'Fijo', 'Variable est.*', 'Expira'], true)}</thead>
+          <thead>${thRow(['Nº oferta', 'Cliente', 'Fijo', 'Variable est.*', 'Expira'], true)}</thead>
           <tbody>${offerRows(sentOffers, sentBreakdowns, true, true)}</tbody>
         </table>
         ${FOOTNOTE}`}
