@@ -1,5 +1,5 @@
 // GET /api/cashflow/report/pdf?from=YYYY-MM-DD&to=YYYY-MM-DD
-// Generates a 2-page executive cashflow report PDF.
+// Generates a 3-page executive cashflow report PDF.
 
 import { NextResponse } from 'next/server'
 import { getCurrentUser } from '@/lib/auth'
@@ -24,13 +24,17 @@ export async function GET(req: Request) {
       return NextResponse.json({ error: 'Params from y to son obligatorios' }, { status: 400 })
     }
 
-    // ── Fetch data ────────────────────────────────────────────────────────────
+    // ── Fetch data in parallel ────────────────────────────────────────────────
     const { getCashflowTransactions } = await import('@/lib/supabase/cashflow')
     const { getInvoices }             = await import('@/lib/supabase/invoices')
+    const { getPresupuestos }         = await import('@/lib/supabase/presupuestos')
+    const { getDeals }                = await import('@/lib/deals')
 
-    const [allTransactions, allInvoices] = await Promise.all([
+    const [allTransactions, allInvoices, allPresupuestos, allDeals] = await Promise.all([
       getCashflowTransactions(),
       getInvoices(),
+      getPresupuestos(),
+      getDeals(),
     ])
 
     // Filter transactions to the requested date range
@@ -43,6 +47,8 @@ export async function GET(req: Request) {
     const pdfBuffer = await generateCashflowReportPdf({
       transactions,
       invoices: allInvoices,
+      presupuestos: allPresupuestos,
+      deals: allDeals,
       dateFrom,
       dateTo,
     })
