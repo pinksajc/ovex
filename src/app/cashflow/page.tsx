@@ -3,6 +3,7 @@ import { getCurrentUser } from '@/lib/auth'
 import { getCashflowTransactions, backfillManualBalances } from '@/lib/supabase/cashflow'
 import { getCashflowPresupuesto } from '@/lib/supabase/cashflow-presupuesto'
 import { formatCurrency } from '@/lib/format'
+import { buildCounterpartyMap } from '@/lib/cashflow-counterparty'
 import { RecategorizeButton } from '@/components/cashflow/recategorize-button'
 import { MoreActionsDropdown } from '@/components/cashflow/more-actions-dropdown'
 import { DateRangeFilter } from '@/components/cashflow/date-range-filter'
@@ -78,6 +79,9 @@ export default async function CashflowPage({
   const prestamosDevuelto  = transactions.filter((t) => t.category === 'Préstamos dados'     && t.amount < 0).reduce((s, t) => s + Math.abs(t.amount), 0)
   const prestamosPendiente = prestamosRecibido - prestamosDevuelto
 
+  // Counterparty breakdown (uses allTransactions so it's always complete, not date-filtered)
+  const loanCounterparties = buildCounterpartyMap(allTransactions)
+
   const thisMonthKey    = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
   // Use allTransactions so the KPI is always the current month regardless of the selected date range
   const thisMonthIncome = allTransactions
@@ -121,8 +125,8 @@ export default async function CashflowPage({
         />
       ) : (
         <>
-          {/* KPI strip */}
-          <div className="grid grid-cols-3 gap-4">
+          {/* KPI strip — 4-col: Saldo neto | Préstamos (span-2) | Ingresos mes */}
+          <div className="grid grid-cols-4 gap-4">
             <CfKpi
               label="Saldo neto"
               value={formatCurrency(Math.abs(netBalance))}
@@ -130,10 +134,11 @@ export default async function CashflowPage({
               prefix={netBalance >= 0 ? '+' : '−'}
               sub="Total ingresos − gastos del período"
             />
-            <CfLoansKpi
-              recibido={prestamosRecibido}
-              devuelto={prestamosDevuelto}
-              pendiente={prestamosPendiente}
+            <CfLoansTableKpi
+              counterparties={loanCounterparties}
+              totalRecibido={prestamosRecibido}
+              totalDado={prestamosDevuelto}
+              totalNeto={prestamosPendiente}
             />
             <CfKpi
               label={`Ingresos ${now.toLocaleDateString('es-ES', { month: 'long' })}`}
@@ -164,41 +169,68 @@ export default async function CashflowPage({
 
 // ── Sub-components ─────────────────────────────────────────────────────────────
 
-function CfLoansKpi({
-  recibido,
-  devuelto,
-  pendiente,
+function CfLoansTableKpi({
+  counterparties,
+  totalRecibido,
+  totalDado,
+  totalNeto,
 }: {
-  recibido: number
-  devuelto: number
-  pendiente: number
+  counterparties: { name: string; recibido: number; dado: number; neto: number }[]
+  totalRecibido: number
+  totalDado: number
+  totalNeto: number
 }) {
-  // Positive pendiente = outstanding debt (we owe money) → orange/red
-  // Zero or negative = fully repaid → green
-  const pendienteColor = pendiente > 0 ? '#ff9f0a' : '#34c759'
-
   return (
-    <div className="bg-white rounded-2xl shadow-sm p-5">
+    <div className="col-span-2 bg-white rounded-2xl shadow-sm p-5">
       <p className="text-xs font-semibold uppercase tracking-widest text-zinc-400 mb-3 leading-tight">
         Préstamos
       </p>
-      <p className="text-2xl font-bold tracking-tight leading-none" style={{ color: pendienteColor }}>
-        {formatCurrency(Math.abs(pendiente))}
-      </p>
-      <p className="text-[10px] text-zinc-400 mt-1.5 leading-tight mb-4">
-        {pendiente >= 0 ? 'Neto pendiente de devolver' : 'Neto a favor'}
-      </p>
-      <div className="flex items-center gap-4 pt-3 border-t border-zinc-50">
-        <div>
-          <p className="text-[9px] font-semibold uppercase tracking-wider text-zinc-400 mb-0.5">Recibidos</p>
-          <p className="text-xs font-semibold font-mono text-emerald-600">+{formatCurrency(recibido)}</p>
-        </div>
-        <div className="w-px h-7 bg-zinc-100" />
-        <div>
-          <p className="text-[9px] font-semibold uppercase tracking-wider text-zinc-400 mb-0.5">Dados</p>
-          <p className="text-xs font-semibold font-mono text-red-500">−{formatCurrency(devuelto)}</p>
-        </div>
-      </div>
+      <table className="w-full text-xs border-collapse">
+        <thead>
+          <tr className="border-b border-zinc-100">
+            <th className="text-left pb-1.5 text-[10px] font-semibold text-zinc-400 pr-3">Contraparte</th>
+            <th className="text-right pb-1.5 text-[10px] font-semibold text-emerald-600 pr-2">Recibido</th>
+            <th className="text-right pb-1.5 text-[10px] font-semibold text-red-500 pr-2">Dado</th>
+            <th className="text-right pb-1.5 text-[10px] font-semibold text-zinc-500">Neto</th>
+          </tr>
+        </thead>
+        <tbody>
+          {counterparties.map((cp) => (
+            <tr key={cp.name} className="border-b border-zinc-50">
+              <td className="py-1 pr-3 text-zinc-700 font-medium whitespace-nowrap">{cp.name}</td>
+              <td className="py-1 pr-2 text-right font-mono text-emerald-600 whitespace-nowrap">
+                {cp.recibido > 0 ? `+${formatCurrency(cp.recibido)}` : '—'}
+              </td>
+              <td className="py-1 pr-2 text-right font-mono text-red-500 whitespace-nowrap">
+                {cp.dado > 0 ? `−${formatCurrency(cp.dado)}` : '—'}
+              </td>
+              <td
+                className="py-1 text-right font-mono font-bold whitespace-nowrap"
+                style={{ color: cp.neto > 0 ? '#ff9f0a' : cp.neto < 0 ? '#34c759' : '#71717a' }}
+              >
+                {formatCurrency(cp.neto)}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+        <tfoot>
+          <tr className="bg-zinc-50 rounded">
+            <td className="pt-2 pr-3 text-[10px] font-bold text-zinc-500 uppercase tracking-wide">Total</td>
+            <td className="pt-2 pr-2 text-right font-mono font-bold text-emerald-600 whitespace-nowrap text-[11px]">
+              +{formatCurrency(totalRecibido)}
+            </td>
+            <td className="pt-2 pr-2 text-right font-mono font-bold text-red-500 whitespace-nowrap text-[11px]">
+              −{formatCurrency(totalDado)}
+            </td>
+            <td
+              className="pt-2 text-right font-mono font-bold whitespace-nowrap text-[11px]"
+              style={{ color: totalNeto > 0 ? '#ff9f0a' : totalNeto < 0 ? '#34c759' : '#71717a' }}
+            >
+              {formatCurrency(Math.abs(totalNeto))}
+            </td>
+          </tr>
+        </tfoot>
+      </table>
     </div>
   )
 }

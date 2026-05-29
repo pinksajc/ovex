@@ -16,6 +16,7 @@ import fs from 'fs'
 import path from 'path'
 import type { CashflowTransaction, Invoice, Presupuesto, Deal } from '@/types'
 import { renderHtmlToPdf } from './generate'
+import { buildCounterpartyMap } from '@/lib/cashflow-counterparty'
 
 // ── Logo ─────────────────────────────────────────────────────────────────────
 
@@ -353,18 +354,6 @@ function buildPage1(
 </div>`
 }
 
-// ── Loan counterparty extraction ─────────────────────────────────────────────
-// Parses common Revolut description patterns to extract the counterparty name.
-// Patterns handled: "Money added from X", "To X", "From X", "Intercompany Loan"
-
-function extractCounterparty(description: string): string {
-  let m: RegExpMatchArray | null
-  if ((m = description.match(/^Money added from\s+(.+)$/i))) return m[1].trim()
-  if ((m = description.match(/^To\s+(.+)$/i))) return m[1].trim()
-  if ((m = description.match(/^From\s+(.+)$/i))) return m[1].trim()
-  return description.trim() || 'Desconocido'
-}
-
 // ── Page 2: Expense breakdown ─────────────────────────────────────────────────
 
 function buildPage2(
@@ -425,50 +414,55 @@ function buildPage2(
       </tr>`
   }).join('')
 
-  // ── Loans section — one row per counterparty: Contraparte | Recibido | Dado | Neto
+  // ── Loans section — one row per normalised counterparty: Contraparte | Recibido | Dado | Neto
   const hasLoans = loanIn > 0 || loanOut > 0
+  const cpEntries = buildCounterpartyMap(transactions)
 
-  // Build counterparty map from all loan transactions
-  const cpMap = new Map<string, { recibido: number; dado: number }>()
-  for (const t of transactions) {
-    if (t.category !== 'Préstamos recibidos' && t.category !== 'Préstamos dados') continue
-    const cp = extractCounterparty(t.description ?? '')
-    const entry = cpMap.get(cp) ?? { recibido: 0, dado: 0 }
-    if (t.category === 'Préstamos recibidos') entry.recibido += t.amount
-    else entry.dado += Math.abs(t.amount)
-    cpMap.set(cp, entry)
-  }
-
-  const cpRows = Array.from(cpMap.entries()).map(([name, { recibido, dado }]) => {
-    const neto = recibido - dado
-    const netoColor = neto > 0 ? '#f97316' : neto < 0 ? '#22c55e' : '#64748b'
-    return `
-      <tr>
-        <td style="padding:5px 10px;border-bottom:1px solid #f1f5f9;font-size:8.5px;color:#334155;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${esc(name)}</td>
-        <td style="padding:5px 12px;border-bottom:1px solid #f1f5f9;text-align:right;font-family:'Courier New',monospace;font-size:8.5px;color:#22c55e;white-space:nowrap;">${recibido > 0 ? '+' + fmt(recibido) : '—'}</td>
-        <td style="padding:5px 8px;border-bottom:1px solid #f1f5f9;text-align:right;font-family:'Courier New',monospace;font-size:8.5px;color:#ef4444;white-space:nowrap;">${dado > 0 ? '−' + fmt(dado) : '—'}</td>
-        <td style="padding:5px 10px;border-bottom:1px solid #f1f5f9;text-align:right;font-family:'Courier New',monospace;font-size:8.5px;font-weight:700;color:${netoColor};white-space:nowrap;">${fmt(neto)}</td>
-      </tr>`
-  }).join('')
-
+  // The PRÉSTAMOS section is rendered as its own full-width sub-table so that
+  // column widths are independent from the operational expense table above it.
   const loanSectionRows = hasLoans ? `
     <tr>
       <td colspan="4" style="padding:14px 10px 4px;background:#fff;">
         <div style="font-size:8px;font-weight:700;color:#94a3b8;border-bottom:1.5px solid #e8eef6;padding-bottom:6px;">PRÉSTAMOS</div>
       </td>
     </tr>
-    <tr style="background:#f8fafc;">
-      <td style="padding:5px 10px;font-size:7.5px;font-weight:700;color:#64748b;">Contraparte</td>
-      <td style="padding:5px 12px;font-size:7.5px;font-weight:700;color:#22c55e;text-align:right;">Recibido</td>
-      <td style="padding:5px 8px;font-size:7.5px;font-weight:700;color:#ef4444;text-align:right;">Dado</td>
-      <td style="padding:5px 10px;font-size:7.5px;font-weight:700;color:#64748b;text-align:right;">Neto</td>
-    </tr>
-    ${cpRows}
-    <tr style="background:#f0f4f8;">
-      <td style="padding:6px 10px;font-size:8.5px;font-weight:700;color:#334155;">Total</td>
-      <td style="padding:6px 12px;text-align:right;font-family:'Courier New',monospace;font-size:8.5px;font-weight:700;color:#22c55e;white-space:nowrap;">+${fmt(loanIn)}</td>
-      <td style="padding:6px 8px;text-align:right;font-family:'Courier New',monospace;font-size:8.5px;font-weight:700;color:#ef4444;white-space:nowrap;">−${fmt(loanOut)}</td>
-      <td style="padding:6px 10px;text-align:right;font-family:'Courier New',monospace;font-size:8.5px;font-weight:700;color:${loanPending > 0 ? '#f97316' : '#22c55e'};white-space:nowrap;">${fmt(loanPending)}</td>
+    <tr>
+      <td colspan="4" style="padding:0 0 2px;">
+        <table style="width:100%;border-collapse:collapse;table-layout:fixed;">
+          <colgroup>
+            <col style="width:34%;"/>
+            <col style="width:22%;"/>
+            <col style="width:22%;"/>
+            <col style="width:22%;"/>
+          </colgroup>
+          <thead>
+            <tr style="background:#f8fafc;">
+              <th style="padding:5px 8px;font-size:7.5px;font-weight:700;color:#64748b;text-align:left;">Contraparte</th>
+              <th style="padding:5px 8px;font-size:7.5px;font-weight:700;color:#22c55e;text-align:right;">Recibido</th>
+              <th style="padding:5px 8px;font-size:7.5px;font-weight:700;color:#ef4444;text-align:right;">Dado</th>
+              <th style="padding:5px 8px;font-size:7.5px;font-weight:700;color:#64748b;text-align:right;">Neto</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${cpEntries.map(({ name, recibido, dado, neto }) => {
+              const netoColor = neto > 0 ? '#f97316' : neto < 0 ? '#22c55e' : '#64748b'
+              return `
+              <tr>
+                <td style="padding:5px 8px;border-bottom:1px solid #f1f5f9;font-size:8.5px;color:#334155;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${esc(name)}</td>
+                <td style="padding:5px 8px;border-bottom:1px solid #f1f5f9;text-align:right;font-family:'Courier New',monospace;font-size:8.5px;color:#22c55e;white-space:nowrap;">${recibido > 0 ? '+' + fmt(recibido) : '—'}</td>
+                <td style="padding:5px 8px;border-bottom:1px solid #f1f5f9;text-align:right;font-family:'Courier New',monospace;font-size:8.5px;color:#ef4444;white-space:nowrap;">${dado > 0 ? '−' + fmt(dado) : '—'}</td>
+                <td style="padding:5px 8px;border-bottom:1px solid #f1f5f9;text-align:right;font-family:'Courier New',monospace;font-size:8.5px;font-weight:700;color:${netoColor};white-space:nowrap;">${fmt(neto)}</td>
+              </tr>`
+            }).join('')}
+            <tr style="background:#f0f4f8;">
+              <td style="padding:6px 8px;font-size:8.5px;font-weight:700;color:#334155;">Total</td>
+              <td style="padding:6px 8px;text-align:right;font-family:'Courier New',monospace;font-size:8.5px;font-weight:700;color:#22c55e;white-space:nowrap;">+${fmt(loanIn)}</td>
+              <td style="padding:6px 8px;text-align:right;font-family:'Courier New',monospace;font-size:8.5px;font-weight:700;color:#ef4444;white-space:nowrap;">−${fmt(loanOut)}</td>
+              <td style="padding:6px 8px;text-align:right;font-family:'Courier New',monospace;font-size:8.5px;font-weight:700;color:${loanPending > 0 ? '#f97316' : '#22c55e'};white-space:nowrap;">${fmt(loanPending)}</td>
+            </tr>
+          </tbody>
+        </table>
+      </td>
     </tr>` : ''
 
   const tableHeader = `
