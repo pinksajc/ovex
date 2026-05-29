@@ -439,7 +439,7 @@ function buildPage2(
             <tr style="background:#f8fafc;">
               <th style="padding:5px 8px;font-size:7.5px;font-weight:700;color:#64748b;text-align:left;">Contraparte</th>
               <th style="padding:5px 8px;font-size:7.5px;font-weight:700;color:#22c55e;text-align:right;">Recibido</th>
-              <th style="padding:5px 8px;font-size:7.5px;font-weight:700;color:#ef4444;text-align:right;">Dado</th>
+              <th style="padding:5px 8px;font-size:7.5px;font-weight:700;color:#ef4444;text-align:right;">Prestado</th>
               <th style="padding:5px 8px;font-size:7.5px;font-weight:700;color:#64748b;text-align:right;">Neto</th>
             </tr>
           </thead>
