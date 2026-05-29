@@ -15,6 +15,7 @@
 import fs from 'fs'
 import path from 'path'
 import type { CashflowTransaction, Invoice, Presupuesto, Deal } from '@/types'
+import { PLANS } from '@/lib/pricing/catalog'
 import { renderHtmlToPdf } from './generate'
 
 // ── Logo ─────────────────────────────────────────────────────────────────────
@@ -509,15 +510,6 @@ function fmtDateCompact(iso: string): string {
   return `${String(Number(d)).padStart(2, '0')} ${MONTH_SHORT[Number(m) - 1].toLowerCase()} ${y.slice(2)}`
 }
 
-function nextMonthLabel(today: string): string {
-  const MONTHS = ['enero','febrero','marzo','abril','mayo','junio',
-    'julio','agosto','septiembre','octubre','noviembre','diciembre']
-  const d = new Date(today + 'T00:00:00')
-  const m = (d.getMonth() + 1) % 12
-  const y = d.getMonth() === 11 ? d.getFullYear() + 1 : d.getFullYear()
-  return `${MONTHS[m]} ${y}`
-}
-
 // Avoid-break wrapper — prevents any block from being sliced across pages
 const AV = 'break-inside:avoid;page-break-inside:avoid;'
 
@@ -529,7 +521,7 @@ function sectionHeader(label: string, color: string): string {
   </div>`
 }
 
-// Table header row (dark navy), tighter padding variant for narrow columns
+// Table header row (dark navy), optional tight padding for narrow columns
 function thRow(cols: string[], tight = false): string {
   const p = tight ? '6px 5px' : '7px 9px'
   return `<tr style="background:#1e2d4a;">${
@@ -537,9 +529,38 @@ function thRow(cols: string[], tight = false): string {
   }</tr>`
 }
 
-// Empty state for a block
 function emptyState(msg: string): string {
   return `<div style="padding:16px 12px;font-size:8.5px;color:#94a3b8;font-style:italic;">${msg}</div>`
+}
+
+/** Variable fee rate for each plan tier */
+const VARIABLE_RATE: Record<string, number> = { starter: 0.08, growth: 0.05, pro: 0.03 }
+
+/**
+ * Given a presupuesto + dealById map, returns { fixed, variable }.
+ * fixed  = plan fixed fee × locations + addons + datafono (from economics snapshot)
+ * variable = variableFee × (totalMonthlyVolume + deliveryOrdersPerVenue × locations)
+ * Returns null variable when no volume is configured.
+ */
+function getOfferBreakdown(
+  p: Presupuesto,
+  dealById: Map<string, Deal>,
+): { fixed: number; variable: number | null } {
+  if (!p.dealId) return { fixed: p.amountNet, variable: null }
+  const deal = dealById.get(p.dealId)
+  const cfg  = deal?.configurations[0]
+  if (!cfg) return { fixed: p.amountNet, variable: null }
+
+  const plan      = PLANS[cfg.plan]
+  const eco       = cfg.economics
+  const fixedBase = Math.ceil(plan.priceMonthly * cfg.locations)
+  const fixed     = fixedBase + eco.addonFeeMonthly + eco.datafonoFeeMonthly
+
+  const deliveryPerVenue  = cfg.deliveryOrdersPerVenue ?? 0
+  const totalOrders       = eco.totalMonthlyVolume + deliveryPerVenue * cfg.locations
+  const variable          = totalOrders > 0 ? plan.variableFee * totalOrders : null
+
+  return { fixed, variable }
 }
 
 function buildPage3(
@@ -554,16 +575,14 @@ function buildPage3(
   // ── Deal lookup ───────────────────────────────────────────────────────────────
   const dealById = new Map<string, Deal>(deals.map(d => [d.id, d]))
 
-  // Fix #4: brandFor returns brandName ONLY when distinct from company.name.
-  // Falls back to company.name so the column is never blank.
+  // Brand: show brandName only when distinct from company.name
   function brandFor(dealId: string | null): string {
     if (!dealId) return ''
     const d = dealById.get(dealId)
     if (!d) return ''
     const brand = d.company.brandName
-    // Show brand only when it differs from the company/client name
     if (brand && brand.trim() !== d.company.name.trim()) return brand.trim()
-    return ''   // same as client → show nothing in Marca column
+    return ''
   }
   function clientFor(dealId: string | null, fallback: string): string {
     if (!dealId) return fallback
@@ -580,46 +599,31 @@ function buildPage3(
     .filter(i => i.status === 'issued')
     .sort((a, b) => (a.dueAt ?? '').localeCompare(b.dueAt ?? ''))
 
-  // ── 3. Próximas facturas estimadas ────────────────────────────────────────────
-  // Fix #5: group by company.name and sum MRR — prevents duplicate rows per client
-  const nextPeriod = nextMonthLabel(today)
-  const mrrByClient = new Map<string, { client: string; brand: string; mrr: number }>()
-  for (const d of deals.filter(dd => dd.stage === 'closed_won')) {
-    const mrr = d.configurations[0]?.economics.softwareRevenueMonthly ?? 0
-    if (mrr <= 0) continue
-    const key = d.company.name
-    const existing = mrrByClient.get(key)
-    const brand = (d.company.brandName && d.company.brandName.trim() !== d.company.name.trim())
-      ? d.company.brandName.trim() : ''
-    if (existing) {
-      existing.mrr += mrr
-    } else {
-      mrrByClient.set(key, { client: d.company.name, brand, mrr })
-    }
-  }
-  const estimatedRows = Array.from(mrrByClient.values()).sort((a, b) => b.mrr - a.mrr)
-
-  // ── 4. Ofertas aceptadas ──────────────────────────────────────────────────────
-  // Show all accepted presupuestos so totalConfirmed is always meaningful
+  // ── 3. Ofertas aceptadas ──────────────────────────────────────────────────────
   const acceptedOffers = presupuestos
     .filter(p => p.status === 'accepted')
     .sort((a, b) => b.amountTotal - a.amountTotal)
 
-  // ── 5. Ofertas enviadas ───────────────────────────────────────────────────────
+  // ── 4. Ofertas enviadas ───────────────────────────────────────────────────────
   const sentOffers = presupuestos
     .filter(p => p.status === 'sent')
     .sort((a, b) => b.amountTotal - a.amountTotal)
 
-  // ── Totals ────────────────────────────────────────────────────────────────────
-  const totalOverdue   = overdueInvoices.reduce((s, i) => s + i.amountTotal, 0)
-  const totalIssued    = issuedInvoices.reduce((s, i) => s + i.amountTotal, 0)
-  const totalEstimated = estimatedRows.reduce((s, r) => s + r.mrr, 0)
-  const totalAccepted  = acceptedOffers.reduce((s, p) => s + p.amountTotal, 0)
-  const totalSent      = sentOffers.reduce((s, p) => s + p.amountTotal, 0)
+  // ── Pre-compute offer breakdowns ──────────────────────────────────────────────
+  const acceptedBreakdowns = acceptedOffers.map(p => getOfferBreakdown(p, dealById))
+  const sentBreakdowns     = sentOffers.map(p => getOfferBreakdown(p, dealById))
 
-  // Fix #3: totalConfirmed = vencidas + emitidas + aceptadas
-  const totalConfirmed = totalOverdue + totalIssued + totalAccepted
-  const totalPotential = totalConfirmed + totalEstimated + totalSent
+  // ── Totals ────────────────────────────────────────────────────────────────────
+  const totalOverdue        = overdueInvoices.reduce((s, i) => s + i.amountTotal, 0)
+  const totalIssued         = issuedInvoices.reduce((s, i) => s + i.amountTotal, 0)
+  const totalAcceptedFixed  = acceptedBreakdowns.reduce((s, b) => s + b.fixed, 0)
+  const totalAcceptedVar    = acceptedBreakdowns.reduce((s, b) => s + (b.variable ?? 0), 0)
+  const totalSentFixed      = sentBreakdowns.reduce((s, b) => s + b.fixed, 0)
+  const totalSentVar        = sentBreakdowns.reduce((s, b) => s + (b.variable ?? 0), 0)
+
+  // totalConfirmed = facturas + aceptadas fijo + aceptadas variable
+  const totalConfirmed = totalOverdue + totalIssued + totalAcceptedFixed + totalAcceptedVar
+  const totalPotential = totalConfirmed + totalSentFixed + totalSentVar
 
   // ── Invoice row renderer ──────────────────────────────────────────────────────
   function invoiceRow(inv: Invoice, extraCol: string): string {
@@ -633,6 +637,39 @@ function buildPage3(
         <td style="padding:4px 8px;border-bottom:1px solid #f1f5f9;text-align:right;font-family:'Courier New',monospace;font-size:8px;font-weight:700;color:#0f172a;white-space:nowrap;">${fmt(inv.amountTotal)}</td>
         <td style="padding:4px 8px;border-bottom:1px solid #f1f5f9;font-size:8px;white-space:nowrap;">${extraCol}</td>
       </tr>`
+  }
+
+  // ── Offer row renderer (Fijo + Variable est.) ─────────────────────────────────
+  const FOOTNOTE = `<div style="font-size:7px;color:#94a3b8;padding:6px 10px;font-style:italic;">* Variable est. basado en volumen configurado en el simulador</div>`
+
+  function offerRows(
+    offers: Presupuesto[],
+    breakdowns: ReturnType<typeof getOfferBreakdown>[],
+    tight: boolean,
+    withExpiry: boolean,
+  ): string {
+    const p = tight ? '4px 5px' : '4px 8px'
+    const fs = tight ? '7.5px' : '8px'
+    return offers.map((offer, i) => {
+      const { fixed, variable } = breakdowns[i]
+      const brand   = brandFor(offer.dealId)
+      const client  = clientFor(offer.dealId, offer.clientName)
+      const varCell = variable !== null
+        ? `<span style="font-family:'Courier New',monospace;font-size:${fs};font-weight:600;color:#64748b;">${fmt(variable)}</span>`
+        : `<span style="color:#cbd5e1;">—</span>`
+      const expiryCell = withExpiry
+        ? `<td style="padding:${p};border-bottom:1px solid #f1f5f9;font-size:${fs};color:#94a3b8;white-space:nowrap;">${offer.validUntil ? fmtDateCompact(offer.validUntil.substring(0, 10)) : '—'}</td>`
+        : ''
+      return `
+        <tr style="${AV}">
+          <td style="padding:${p};border-bottom:1px solid #f1f5f9;font-family:'Courier New',monospace;font-size:${fs};white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${esc(offer.number)}</td>
+          <td style="padding:${p};border-bottom:1px solid #f1f5f9;font-size:${fs};overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${esc(client)}</td>
+          <td style="padding:${p};border-bottom:1px solid #f1f5f9;font-size:${fs};color:#64748b;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${esc(brand)}</td>
+          <td style="padding:${p};border-bottom:1px solid #f1f5f9;text-align:right;font-family:'Courier New',monospace;font-size:${fs};font-weight:700;color:#0f172a;white-space:nowrap;">${fmt(fixed)}</td>
+          <td style="padding:${p};border-bottom:1px solid #f1f5f9;text-align:right;white-space:nowrap;">${varCell}</td>
+          ${expiryCell}
+        </tr>`
+    }).join('')
   }
 
   // ── Overdue invoices block ────────────────────────────────────────────────────
@@ -650,8 +687,7 @@ function buildPage3(
           <thead>${thRow(['Nº', 'Cliente', 'Marca', 'Importe', 'Vencida'])}</thead>
           <tbody>${overdueInvoices.map(inv => {
             const days = inv.dueAt ? daysBetween(inv.dueAt, today) : 0
-            const daysLabel = `<span style="color:#ef4444;font-weight:700;">${days}d</span>`
-            return invoiceRow(inv, daysLabel)
+            return invoiceRow(inv, `<span style="color:#ef4444;font-weight:700;">${days}d</span>`)
           }).join('')}</tbody>
         </table>`}
     </div>`
@@ -676,96 +712,64 @@ function buildPage3(
         </table>`}
     </div>`
 
-  // ── Estimated next invoices block ─────────────────────────────────────────────
-  const estimatedBlock = `
-    <div style="${AV}border:1.5px solid #e8eef6;border-radius:10px;overflow:hidden;">
-      ${estimatedRows.length === 0
-        ? emptyState('Sin contratos activos registrados')
-        : `<table style="width:100%;border-collapse:collapse;table-layout:auto;">
-          <thead>${thRow(['Cliente', 'Marca', 'MRR estimado', 'Período'])}</thead>
-          <tbody>${estimatedRows.map((r, i) => {
-            const bg = i % 2 === 1 ? 'background:#f8fafc;' : ''
-            return `
-              <tr style="${AV}">
-                <td style="padding:4px 9px;border-bottom:1px solid #f1f5f9;font-size:8.5px;${bg}">${esc(r.client)}</td>
-                <td style="padding:4px 9px;border-bottom:1px solid #f1f5f9;font-size:8.5px;color:#64748b;${bg}">${esc(r.brand)}</td>
-                <td style="padding:4px 9px;border-bottom:1px solid #f1f5f9;text-align:right;font-family:'Courier New',monospace;font-size:8.5px;font-weight:700;color:#22c55e;${bg}">${fmt(r.mrr)}</td>
-                <td style="padding:4px 9px;border-bottom:1px solid #f1f5f9;font-size:8.5px;color:#64748b;${bg}">${nextPeriod}</td>
-              </tr>`
-          }).join('')}</tbody>
-        </table>`}
-    </div>
-    <div style="font-size:7.5px;color:#94a3b8;margin-top:6px;font-style:italic;">Basado en contratos activos (stage: closed_won). MRR agrupado por cliente. Estimación mensual; excluye IVA.</div>`
-
   // ── Accepted offers block ─────────────────────────────────────────────────────
+  // Columns: Nº | Cliente | Marca | Fijo | Variable est.
   const acceptedBlock = `
     <div style="${AV}border:1.5px solid #22c55e;border-radius:10px;overflow:hidden;">
       <div style="background:#f0fdf4;padding:10px 12px;border-bottom:1px solid #bbf7d0;">
         <div style="font-size:8.5px;font-weight:700;color:#15803d;">Aceptadas · pendientes de facturar</div>
         ${acceptedOffers.length > 0
-          ? `<div style="font-size:8px;color:#16a34a;margin-top:2px;">${acceptedOffers.length} oferta${acceptedOffers.length > 1 ? 's' : ''} · ${fmt(totalAccepted)}</div>`
+          ? `<div style="font-size:8px;color:#16a34a;margin-top:2px;">${acceptedOffers.length} oferta${acceptedOffers.length > 1 ? 's' : ''} · fijo ${fmt(totalAcceptedFixed)}${totalAcceptedVar > 0 ? ` + var. est. ${fmt(totalAcceptedVar)}` : ''}</div>`
           : ''}
       </div>
       ${acceptedOffers.length === 0
         ? emptyState('Sin ofertas aceptadas')
-        : `<table style="width:100%;border-collapse:collapse;table-layout:auto;">
-          <thead>${thRow(['Nº oferta', 'Cliente', 'Marca', 'Importe'])}</thead>
-          <tbody>${acceptedOffers.map(p => {
-            const brand  = brandFor(p.dealId)
-            const client = clientFor(p.dealId, p.clientName)
-            return `
-              <tr style="${AV}">
-                <td style="padding:4px 8px;border-bottom:1px solid #f1f5f9;font-family:'Courier New',monospace;font-size:8px;white-space:nowrap;">${esc(p.number)}</td>
-                <td style="padding:4px 8px;border-bottom:1px solid #f1f5f9;font-size:8px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${esc(client)}</td>
-                <td style="padding:4px 8px;border-bottom:1px solid #f1f5f9;font-size:8px;color:#64748b;white-space:nowrap;">${esc(brand)}</td>
-                <td style="padding:4px 8px;border-bottom:1px solid #f1f5f9;text-align:right;font-family:'Courier New',monospace;font-size:8px;font-weight:700;color:#0f172a;white-space:nowrap;">${fmt(p.amountTotal)}</td>
-              </tr>`
-          }).join('')}</tbody>
-        </table>`}
+        : `<table style="width:100%;border-collapse:collapse;table-layout:fixed;">
+          <colgroup>
+            <col style="width:70px;"/>
+            <col/>
+            <col style="width:50px;"/>
+            <col style="width:72px;"/>
+            <col style="width:72px;"/>
+          </colgroup>
+          <thead>${thRow(['Nº oferta', 'Cliente', 'Marca', 'Fijo', 'Variable est.*'])}</thead>
+          <tbody>${offerRows(acceptedOffers, acceptedBreakdowns, false, false)}</tbody>
+        </table>
+        ${FOOTNOTE}`}
     </div>`
 
-  // ── Sent offers block — Fix #2: tight padding + compact date ─────────────────
+  // ── Sent offers block — Columns: Nº | Cliente | Marca | Fijo | Variable est. | Expira ──
   const sentBlock = `
     <div style="${AV}border:1.5px solid #cbd5e1;border-radius:10px;overflow:hidden;">
       <div style="background:#f8fafc;padding:10px 12px;border-bottom:1px solid #e2e8f0;">
         <div style="font-size:8.5px;font-weight:700;color:#475569;">En negociación</div>
         ${sentOffers.length > 0
-          ? `<div style="font-size:8px;color:#94a3b8;margin-top:2px;">${sentOffers.length} oferta${sentOffers.length > 1 ? 's' : ''} · ${fmt(totalSent)}</div>`
+          ? `<div style="font-size:8px;color:#94a3b8;margin-top:2px;">${sentOffers.length} oferta${sentOffers.length > 1 ? 's' : ''} · fijo ${fmt(totalSentFixed)}${totalSentVar > 0 ? ` + var. est. ${fmt(totalSentVar)}` : ''}</div>`
           : ''}
       </div>
       ${sentOffers.length === 0
         ? emptyState('Sin ofertas enviadas activas')
         : `<table style="width:100%;border-collapse:collapse;table-layout:fixed;">
           <colgroup>
-            <col style="width:72px;"/>
+            <col style="width:64px;"/>
             <col/>
+            <col style="width:44px;"/>
+            <col style="width:66px;"/>
+            <col style="width:66px;"/>
             <col style="width:52px;"/>
-            <col style="width:74px;"/>
-            <col style="width:54px;"/>
           </colgroup>
-          <thead>${thRow(['Nº oferta', 'Cliente', 'Marca', 'Importe', 'Expira'], true)}</thead>
-          <tbody>${sentOffers.map(p => {
-            const brand   = brandFor(p.dealId)
-            const client  = clientFor(p.dealId, p.clientName)
-            const expires = p.validUntil ? fmtDateCompact(p.validUntil.substring(0, 10)) : '—'
-            return `
-              <tr style="${AV}">
-                <td style="padding:4px 5px;border-bottom:1px solid #f1f5f9;font-family:'Courier New',monospace;font-size:7.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${esc(p.number)}</td>
-                <td style="padding:4px 5px;border-bottom:1px solid #f1f5f9;font-size:7.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${esc(client)}</td>
-                <td style="padding:4px 5px;border-bottom:1px solid #f1f5f9;font-size:7.5px;color:#64748b;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${esc(brand)}</td>
-                <td style="padding:4px 5px;border-bottom:1px solid #f1f5f9;text-align:right;font-family:'Courier New',monospace;font-size:7.5px;font-weight:700;color:#0f172a;white-space:nowrap;">${fmt(p.amountTotal)}</td>
-                <td style="padding:4px 5px;border-bottom:1px solid #f1f5f9;font-size:7.5px;color:#94a3b8;white-space:nowrap;">${expires}</td>
-              </tr>`
-          }).join('')}</tbody>
-        </table>`}
+          <thead>${thRow(['Nº oferta', 'Cliente', 'Marca', 'Fijo', 'Variable est.*', 'Expira'], true)}</thead>
+          <tbody>${offerRows(sentOffers, sentBreakdowns, true, true)}</tbody>
+        </table>
+        ${FOOTNOTE}`}
     </div>`
 
   // ── Total Previsto summary card ───────────────────────────────────────────────
-  function totalRow(label: string, value: number, color: string): string {
+  function totalRow(label: string, value: number, color: string, indent = false): string {
     return `
-      <div style="display:flex;justify-content:space-between;align-items:baseline;padding:5px 0;border-bottom:1px solid #f1f5f9;">
-        <span style="font-size:9px;color:#64748b;">${label}</span>
-        <span style="font-family:'Courier New',monospace;font-size:9.5px;font-weight:600;color:${color};">${fmt(value)}</span>
+      <div style="display:flex;justify-content:space-between;align-items:baseline;padding:${indent ? '3px 0 3px 12px' : '5px 0'};border-bottom:1px solid #f1f5f9;">
+        <span style="font-size:${indent ? '8' : '9'}px;color:${indent ? '#94a3b8' : '#64748b'};">${label}</span>
+        <span style="font-family:'Courier New',monospace;font-size:${indent ? '8.5' : '9.5'}px;font-weight:600;color:${color};">${fmt(value)}</span>
       </div>`
   }
 
@@ -774,22 +778,23 @@ function buildPage3(
       <div style="font-size:9px;font-weight:700;color:#1e2d4a;letter-spacing:0.3px;margin-bottom:12px;padding-bottom:8px;border-bottom:1.5px solid #e8eef6;">TOTAL PREVISTO</div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:0 32px;">
         <div>
-          ${totalRow('Facturas vencidas',       totalOverdue,   '#ef4444')}
-          ${totalRow('Facturas emitidas',        totalIssued,    '#1e2d4a')}
-          ${totalRow('Próximas facturas (est.)', totalEstimated, '#22c55e')}
-          ${totalRow('Ofertas aceptadas',        totalAccepted,  '#22c55e')}
-          ${totalRow('Ofertas en negociación',   totalSent,      '#94a3b8')}
+          ${totalRow('Facturas vencidas',                totalOverdue,       '#ef4444')}
+          ${totalRow('Facturas emitidas',                totalIssued,        '#1e2d4a')}
+          ${totalRow('Ofertas aceptadas (fijo)',         totalAcceptedFixed, '#22c55e')}
+          ${totalRow('Ofertas aceptadas (variable est.)',totalAcceptedVar,   '#22c55e', true)}
+          ${totalRow('Ofertas en negociación (fijo)',    totalSentFixed,     '#94a3b8')}
+          ${totalRow('Ofertas en negociación (var. est.)',totalSentVar,      '#94a3b8', true)}
         </div>
         <div>
           <div style="padding:10px 14px;background:#f0f4f8;border-radius:8px;margin-bottom:10px;">
             <div style="font-size:8px;color:#64748b;margin-bottom:4px;">Total confirmado</div>
             <div style="font-size:16px;font-weight:800;color:#1e2d4a;font-family:'Courier New',monospace;">${fmt(totalConfirmed)}</div>
-            <div style="font-size:7.5px;color:#94a3b8;margin-top:3px;">Vencidas + emitidas + aceptadas</div>
+            <div style="font-size:7.5px;color:#94a3b8;margin-top:3px;">Facturas + aceptadas (fijo + var.)</div>
           </div>
           <div style="padding:10px 14px;background:#1e2d4a;border-radius:8px;">
             <div style="font-size:8px;color:#94a3b8;margin-bottom:4px;">Total potencial</div>
             <div style="font-size:16px;font-weight:800;color:#fff;font-family:'Courier New',monospace;">${fmt(totalPotential)}</div>
-            <div style="font-size:7.5px;color:#64748b;margin-top:3px;">Todo incluido</div>
+            <div style="font-size:7.5px;color:#64748b;margin-top:3px;">Confirmado + en negociación</div>
           </div>
         </div>
       </div>
@@ -812,12 +817,6 @@ function buildPage3(
         ${overdueBlock}
         ${issuedBlock}
       </div>
-    </div>
-
-    <!-- PRÓXIMAS FACTURAS ESTIMADAS -->
-    <div style="${AV}">
-      ${sectionHeader('PRÓXIMAS FACTURAS ESTIMADAS', '#22c55e')}
-      ${estimatedBlock}
     </div>
 
     <!-- OFERTAS -->
