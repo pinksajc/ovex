@@ -67,10 +67,10 @@ function parseRevolutCSV(text: string): ParsedRow[] {
     const state = idx.state >= 0 ? (cols[idx.state] || '').toUpperCase() : ''
     if (state && state !== 'COMPLETED') continue
 
-    // Date: use "Date completed (UTC)", fall back to "Date started (UTC)"
+    // Date: use "Date started (UTC)", fall back to "Date completed (UTC)"
     const rawDate =
-      (idx.completedDate >= 0 ? cols[idx.completedDate] : '') ||
       (idx.startedDate   >= 0 ? cols[idx.startedDate]   : '') ||
+      (idx.completedDate >= 0 ? cols[idx.completedDate] : '') ||
       ''
     const date = rawDate.split(' ')[0] // "YYYY-MM-DD"
     if (!date || !/^\d{4}-\d{2}-\d{2}$/.test(date)) continue
