@@ -190,8 +190,8 @@ function CfLoansTableKpi({
           <tr className="border-b border-zinc-100">
             <th className="text-left pb-1.5 text-[10px] font-semibold text-zinc-400 pr-3">Contraparte</th>
             <th className="text-right pb-1.5 text-[10px] font-semibold text-emerald-600 pr-2">Recibido</th>
-            <th className="text-right pb-1.5 text-[10px] font-semibold text-red-500 pr-2">Prestado</th>
-            <th className="text-right pb-1.5 text-[10px] font-semibold text-zinc-500">Neto</th>
+            <th className="text-right pb-1.5 text-[10px] font-semibold text-red-500 pr-2">Pagado de vuelta</th>
+            <th className="text-right pb-1.5 text-[10px] font-semibold text-zinc-500">Deuda neta</th>
           </tr>
         </thead>
         <tbody>
