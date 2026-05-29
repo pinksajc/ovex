@@ -503,27 +503,37 @@ function daysBetween(isoA: string, isoB: string): number {
   return Math.round((new Date(isoB).getTime() - new Date(isoA).getTime()) / 86_400_000)
 }
 
+/** "YYYY-MM-DD" → "15 may 26" (compact for tight columns) */
+function fmtDateCompact(iso: string): string {
+  const [y, m, d] = iso.split('-')
+  return `${String(Number(d)).padStart(2, '0')} ${MONTH_SHORT[Number(m) - 1].toLowerCase()} ${y.slice(2)}`
+}
+
 function nextMonthLabel(today: string): string {
   const MONTHS = ['enero','febrero','marzo','abril','mayo','junio',
     'julio','agosto','septiembre','octubre','noviembre','diciembre']
   const d = new Date(today + 'T00:00:00')
-  const m = (d.getMonth() + 1) % 12     // 0-based month of next month
+  const m = (d.getMonth() + 1) % 12
   const y = d.getMonth() === 11 ? d.getFullYear() + 1 : d.getFullYear()
   return `${MONTHS[m]} ${y}`
 }
 
-// Section header (coloured left border)
+// Avoid-break wrapper — prevents any block from being sliced across pages
+const AV = 'break-inside:avoid;page-break-inside:avoid;'
+
+// Section header (coloured left border) wrapped in break-avoid
 function sectionHeader(label: string, color: string): string {
-  return `<div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;margin-top:20px;">
+  return `<div style="${AV}display:flex;align-items:center;gap:8px;margin-bottom:10px;margin-top:20px;">
     <div style="width:3px;height:14px;background:${color};border-radius:2px;flex-shrink:0;"></div>
     <div style="font-size:8.5px;font-weight:700;color:#1e2d4a;letter-spacing:0.5px;">${label}</div>
   </div>`
 }
 
-// Table header row (dark navy)
-function thRow(cols: string[]): string {
+// Table header row (dark navy), tighter padding variant for narrow columns
+function thRow(cols: string[], tight = false): string {
+  const p = tight ? '6px 5px' : '7px 9px'
   return `<tr style="background:#1e2d4a;">${
-    cols.map(c => `<th style="padding:7px 9px;color:#fff;font-size:7.5px;font-weight:700;text-align:left;white-space:nowrap;">${c}</th>`).join('')
+    cols.map(c => `<th style="padding:${p};color:#fff;font-size:7.5px;font-weight:700;text-align:left;white-space:nowrap;">${c}</th>`).join('')
   }</tr>`
 }
 
@@ -541,18 +551,19 @@ function buildPage3(
   today: string,
   logoUri: string,
 ): string {
-  // ── Deal lookup maps ──────────────────────────────────────────────────────────
+  // ── Deal lookup ───────────────────────────────────────────────────────────────
   const dealById = new Map<string, Deal>(deals.map(d => [d.id, d]))
-  const invoicedDealIds = new Set(
-    invoices
-      .filter(i => i.status !== 'draft' && i.dealId)
-      .map(i => i.dealId as string),
-  )
 
+  // Fix #4: brandFor returns brandName ONLY when distinct from company.name.
+  // Falls back to company.name so the column is never blank.
   function brandFor(dealId: string | null): string {
     if (!dealId) return ''
     const d = dealById.get(dealId)
-    return d?.company.brandName ?? d?.company.name ?? ''
+    if (!d) return ''
+    const brand = d.company.brandName
+    // Show brand only when it differs from the company/client name
+    if (brand && brand.trim() !== d.company.name.trim()) return brand.trim()
+    return ''   // same as client → show nothing in Marca column
   }
   function clientFor(dealId: string | null, fallback: string): string {
     if (!dealId) return fallback
@@ -570,20 +581,28 @@ function buildPage3(
     .sort((a, b) => (a.dueAt ?? '').localeCompare(b.dueAt ?? ''))
 
   // ── 3. Próximas facturas estimadas ────────────────────────────────────────────
-  // Deals with stage closed_won + active config + MRR > 0
+  // Fix #5: group by company.name and sum MRR — prevents duplicate rows per client
   const nextPeriod = nextMonthLabel(today)
-  const estimatedRows = deals
-    .filter(d => d.stage === 'closed_won')
-    .map(d => {
-      const mrr = d.configurations[0]?.economics.softwareRevenueMonthly ?? 0
-      return { client: d.company.name, brand: d.company.brandName ?? '', mrr }
-    })
-    .filter(r => r.mrr > 0)
-    .sort((a, b) => b.mrr - a.mrr)
+  const mrrByClient = new Map<string, { client: string; brand: string; mrr: number }>()
+  for (const d of deals.filter(dd => dd.stage === 'closed_won')) {
+    const mrr = d.configurations[0]?.economics.softwareRevenueMonthly ?? 0
+    if (mrr <= 0) continue
+    const key = d.company.name
+    const existing = mrrByClient.get(key)
+    const brand = (d.company.brandName && d.company.brandName.trim() !== d.company.name.trim())
+      ? d.company.brandName.trim() : ''
+    if (existing) {
+      existing.mrr += mrr
+    } else {
+      mrrByClient.set(key, { client: d.company.name, brand, mrr })
+    }
+  }
+  const estimatedRows = Array.from(mrrByClient.values()).sort((a, b) => b.mrr - a.mrr)
 
-  // ── 4. Ofertas aceptadas sin factura ──────────────────────────────────────────
+  // ── 4. Ofertas aceptadas ──────────────────────────────────────────────────────
+  // Show all accepted presupuestos so totalConfirmed is always meaningful
   const acceptedOffers = presupuestos
-    .filter(p => p.status === 'accepted' && !invoicedDealIds.has(p.dealId ?? ''))
+    .filter(p => p.status === 'accepted')
     .sort((a, b) => b.amountTotal - a.amountTotal)
 
   // ── 5. Ofertas enviadas ───────────────────────────────────────────────────────
@@ -592,33 +611,33 @@ function buildPage3(
     .sort((a, b) => b.amountTotal - a.amountTotal)
 
   // ── Totals ────────────────────────────────────────────────────────────────────
-  const totalOverdue    = overdueInvoices.reduce((s, i) => s + i.amountTotal, 0)
-  const totalIssued     = issuedInvoices.reduce((s, i) => s + i.amountTotal, 0)
-  const totalEstimated  = estimatedRows.reduce((s, r) => s + r.mrr, 0)
-  const totalAccepted   = acceptedOffers.reduce((s, p) => s + p.amountTotal, 0)
-  const totalSent       = sentOffers.reduce((s, p) => s + p.amountTotal, 0)
+  const totalOverdue   = overdueInvoices.reduce((s, i) => s + i.amountTotal, 0)
+  const totalIssued    = issuedInvoices.reduce((s, i) => s + i.amountTotal, 0)
+  const totalEstimated = estimatedRows.reduce((s, r) => s + r.mrr, 0)
+  const totalAccepted  = acceptedOffers.reduce((s, p) => s + p.amountTotal, 0)
+  const totalSent      = sentOffers.reduce((s, p) => s + p.amountTotal, 0)
 
-  const totalFacturas   = totalOverdue + totalIssued
-  const totalConfirmed  = totalFacturas + totalAccepted
-  const totalPotential  = totalConfirmed + totalEstimated + totalSent
+  // Fix #3: totalConfirmed = vencidas + emitidas + aceptadas
+  const totalConfirmed = totalOverdue + totalIssued + totalAccepted
+  const totalPotential = totalConfirmed + totalEstimated + totalSent
 
   // ── Invoice row renderer ──────────────────────────────────────────────────────
   function invoiceRow(inv: Invoice, extraCol: string): string {
     const brand  = brandFor(inv.dealId)
     const client = clientFor(inv.dealId, inv.clientName)
     return `
-      <tr>
-        <td style="padding:5px 9px;border-bottom:1px solid #f1f5f9;font-family:'Courier New',monospace;font-size:8.5px;white-space:nowrap;">${esc(inv.number)}</td>
-        <td style="padding:5px 9px;border-bottom:1px solid #f1f5f9;font-size:8.5px;max-width:110px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${esc(client)}</td>
-        <td style="padding:5px 9px;border-bottom:1px solid #f1f5f9;font-size:8.5px;color:#64748b;white-space:nowrap;">${esc(brand)}</td>
-        <td style="padding:5px 9px;border-bottom:1px solid #f1f5f9;text-align:right;font-family:'Courier New',monospace;font-size:8.5px;font-weight:700;color:#0f172a;white-space:nowrap;">${fmt(inv.amountTotal)}</td>
-        <td style="padding:5px 9px;border-bottom:1px solid #f1f5f9;font-size:8.5px;white-space:nowrap;">${extraCol}</td>
+      <tr style="${AV}">
+        <td style="padding:4px 8px;border-bottom:1px solid #f1f5f9;font-family:'Courier New',monospace;font-size:8px;white-space:nowrap;">${esc(inv.number)}</td>
+        <td style="padding:4px 8px;border-bottom:1px solid #f1f5f9;font-size:8px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${esc(client)}</td>
+        <td style="padding:4px 8px;border-bottom:1px solid #f1f5f9;font-size:8px;color:#64748b;white-space:nowrap;">${esc(brand)}</td>
+        <td style="padding:4px 8px;border-bottom:1px solid #f1f5f9;text-align:right;font-family:'Courier New',monospace;font-size:8px;font-weight:700;color:#0f172a;white-space:nowrap;">${fmt(inv.amountTotal)}</td>
+        <td style="padding:4px 8px;border-bottom:1px solid #f1f5f9;font-size:8px;white-space:nowrap;">${extraCol}</td>
       </tr>`
   }
 
   // ── Overdue invoices block ────────────────────────────────────────────────────
   const overdueBlock = `
-    <div style="border:1.5px solid #ef4444;border-radius:10px;overflow:hidden;">
+    <div style="${AV}border:1.5px solid #ef4444;border-radius:10px;overflow:hidden;">
       <div style="background:#fef2f2;padding:10px 12px;border-bottom:1px solid #fecaca;">
         <div style="font-size:8.5px;font-weight:700;color:#dc2626;">Facturas vencidas</div>
         ${overdueInvoices.length > 0
@@ -627,8 +646,8 @@ function buildPage3(
       </div>
       ${overdueInvoices.length === 0
         ? emptyState('Sin facturas vencidas')
-        : `<table style="width:100%;border-collapse:collapse;">
-          <thead>${thRow(['Nº', 'Cliente', 'Marca', 'Importe', 'Días vencida'])}</thead>
+        : `<table style="width:100%;border-collapse:collapse;table-layout:auto;">
+          <thead>${thRow(['Nº', 'Cliente', 'Marca', 'Importe', 'Vencida'])}</thead>
           <tbody>${overdueInvoices.map(inv => {
             const days = inv.dueAt ? daysBetween(inv.dueAt, today) : 0
             const daysLabel = `<span style="color:#ef4444;font-weight:700;">${days}d</span>`
@@ -639,7 +658,7 @@ function buildPage3(
 
   // ── Issued invoices block ─────────────────────────────────────────────────────
   const issuedBlock = `
-    <div style="border:1.5px solid #1e2d4a;border-radius:10px;overflow:hidden;">
+    <div style="${AV}border:1.5px solid #1e2d4a;border-radius:10px;overflow:hidden;">
       <div style="background:#f0f4f8;padding:10px 12px;border-bottom:1px solid #cbd5e1;">
         <div style="font-size:8.5px;font-weight:700;color:#1e2d4a;">Facturas emitidas</div>
         ${issuedInvoices.length > 0
@@ -648,10 +667,10 @@ function buildPage3(
       </div>
       ${issuedInvoices.length === 0
         ? emptyState('Sin facturas emitidas pendientes')
-        : `<table style="width:100%;border-collapse:collapse;">
+        : `<table style="width:100%;border-collapse:collapse;table-layout:auto;">
           <thead>${thRow(['Nº', 'Cliente', 'Marca', 'Importe', 'Vence el'])}</thead>
           <tbody>${issuedInvoices.map(inv => {
-            const dueLabel = inv.dueAt ? fmtDateLong(inv.dueAt.substring(0, 10)) : '—'
+            const dueLabel = inv.dueAt ? fmtDateCompact(inv.dueAt.substring(0, 10)) : '—'
             return invoiceRow(inv, dueLabel)
           }).join('')}</tbody>
         </table>`}
@@ -659,28 +678,28 @@ function buildPage3(
 
   // ── Estimated next invoices block ─────────────────────────────────────────────
   const estimatedBlock = `
-    <div style="border:1.5px solid #e8eef6;border-radius:10px;overflow:hidden;">
+    <div style="${AV}border:1.5px solid #e8eef6;border-radius:10px;overflow:hidden;">
       ${estimatedRows.length === 0
         ? emptyState('Sin contratos activos registrados')
-        : `<table style="width:100%;border-collapse:collapse;">
+        : `<table style="width:100%;border-collapse:collapse;table-layout:auto;">
           <thead>${thRow(['Cliente', 'Marca', 'MRR estimado', 'Período'])}</thead>
           <tbody>${estimatedRows.map((r, i) => {
             const bg = i % 2 === 1 ? 'background:#f8fafc;' : ''
             return `
-              <tr>
-                <td style="padding:5px 9px;border-bottom:1px solid #f1f5f9;font-size:8.5px;${bg}">${esc(r.client)}</td>
-                <td style="padding:5px 9px;border-bottom:1px solid #f1f5f9;font-size:8.5px;color:#64748b;${bg}">${esc(r.brand)}</td>
-                <td style="padding:5px 9px;border-bottom:1px solid #f1f5f9;text-align:right;font-family:'Courier New',monospace;font-size:8.5px;font-weight:700;color:#22c55e;${bg}">${fmt(r.mrr)}</td>
-                <td style="padding:5px 9px;border-bottom:1px solid #f1f5f9;font-size:8.5px;color:#64748b;${bg}">${nextPeriod}</td>
+              <tr style="${AV}">
+                <td style="padding:4px 9px;border-bottom:1px solid #f1f5f9;font-size:8.5px;${bg}">${esc(r.client)}</td>
+                <td style="padding:4px 9px;border-bottom:1px solid #f1f5f9;font-size:8.5px;color:#64748b;${bg}">${esc(r.brand)}</td>
+                <td style="padding:4px 9px;border-bottom:1px solid #f1f5f9;text-align:right;font-family:'Courier New',monospace;font-size:8.5px;font-weight:700;color:#22c55e;${bg}">${fmt(r.mrr)}</td>
+                <td style="padding:4px 9px;border-bottom:1px solid #f1f5f9;font-size:8.5px;color:#64748b;${bg}">${nextPeriod}</td>
               </tr>`
           }).join('')}</tbody>
         </table>`}
     </div>
-    <div style="font-size:7.5px;color:#94a3b8;margin-top:6px;font-style:italic;">Basado en contratos activos (stage: closed_won). Estimación mensual; excluye IVA.</div>`
+    <div style="font-size:7.5px;color:#94a3b8;margin-top:6px;font-style:italic;">Basado en contratos activos (stage: closed_won). MRR agrupado por cliente. Estimación mensual; excluye IVA.</div>`
 
   // ── Accepted offers block ─────────────────────────────────────────────────────
   const acceptedBlock = `
-    <div style="border:1.5px solid #22c55e;border-radius:10px;overflow:hidden;">
+    <div style="${AV}border:1.5px solid #22c55e;border-radius:10px;overflow:hidden;">
       <div style="background:#f0fdf4;padding:10px 12px;border-bottom:1px solid #bbf7d0;">
         <div style="font-size:8.5px;font-weight:700;color:#15803d;">Aceptadas · pendientes de facturar</div>
         ${acceptedOffers.length > 0
@@ -688,26 +707,26 @@ function buildPage3(
           : ''}
       </div>
       ${acceptedOffers.length === 0
-        ? emptyState('Sin ofertas aceptadas pendientes')
-        : `<table style="width:100%;border-collapse:collapse;">
+        ? emptyState('Sin ofertas aceptadas')
+        : `<table style="width:100%;border-collapse:collapse;table-layout:auto;">
           <thead>${thRow(['Nº oferta', 'Cliente', 'Marca', 'Importe'])}</thead>
           <tbody>${acceptedOffers.map(p => {
             const brand  = brandFor(p.dealId)
             const client = clientFor(p.dealId, p.clientName)
             return `
-              <tr>
-                <td style="padding:5px 9px;border-bottom:1px solid #f1f5f9;font-family:'Courier New',monospace;font-size:8.5px;">${esc(p.number)}</td>
-                <td style="padding:5px 9px;border-bottom:1px solid #f1f5f9;font-size:8.5px;max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${esc(client)}</td>
-                <td style="padding:5px 9px;border-bottom:1px solid #f1f5f9;font-size:8.5px;color:#64748b;">${esc(brand)}</td>
-                <td style="padding:5px 9px;border-bottom:1px solid #f1f5f9;text-align:right;font-family:'Courier New',monospace;font-size:8.5px;font-weight:700;color:#0f172a;">${fmt(p.amountTotal)}</td>
+              <tr style="${AV}">
+                <td style="padding:4px 8px;border-bottom:1px solid #f1f5f9;font-family:'Courier New',monospace;font-size:8px;white-space:nowrap;">${esc(p.number)}</td>
+                <td style="padding:4px 8px;border-bottom:1px solid #f1f5f9;font-size:8px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${esc(client)}</td>
+                <td style="padding:4px 8px;border-bottom:1px solid #f1f5f9;font-size:8px;color:#64748b;white-space:nowrap;">${esc(brand)}</td>
+                <td style="padding:4px 8px;border-bottom:1px solid #f1f5f9;text-align:right;font-family:'Courier New',monospace;font-size:8px;font-weight:700;color:#0f172a;white-space:nowrap;">${fmt(p.amountTotal)}</td>
               </tr>`
           }).join('')}</tbody>
         </table>`}
     </div>`
 
-  // ── Sent offers block ─────────────────────────────────────────────────────────
+  // ── Sent offers block — Fix #2: tight padding + compact date ─────────────────
   const sentBlock = `
-    <div style="border:1.5px solid #cbd5e1;border-radius:10px;overflow:hidden;">
+    <div style="${AV}border:1.5px solid #cbd5e1;border-radius:10px;overflow:hidden;">
       <div style="background:#f8fafc;padding:10px 12px;border-bottom:1px solid #e2e8f0;">
         <div style="font-size:8.5px;font-weight:700;color:#475569;">En negociación</div>
         ${sentOffers.length > 0
@@ -716,49 +735,56 @@ function buildPage3(
       </div>
       ${sentOffers.length === 0
         ? emptyState('Sin ofertas enviadas activas')
-        : `<table style="width:100%;border-collapse:collapse;">
-          <thead>${thRow(['Nº oferta', 'Cliente', 'Marca', 'Importe', 'Expira'])}</thead>
+        : `<table style="width:100%;border-collapse:collapse;table-layout:fixed;">
+          <colgroup>
+            <col style="width:72px;"/>
+            <col/>
+            <col style="width:52px;"/>
+            <col style="width:74px;"/>
+            <col style="width:54px;"/>
+          </colgroup>
+          <thead>${thRow(['Nº oferta', 'Cliente', 'Marca', 'Importe', 'Expira'], true)}</thead>
           <tbody>${sentOffers.map(p => {
             const brand   = brandFor(p.dealId)
             const client  = clientFor(p.dealId, p.clientName)
-            const expires = p.validUntil ? fmtDateLong(p.validUntil.substring(0, 10)) : '—'
+            const expires = p.validUntil ? fmtDateCompact(p.validUntil.substring(0, 10)) : '—'
             return `
-              <tr>
-                <td style="padding:5px 9px;border-bottom:1px solid #f1f5f9;font-family:'Courier New',monospace;font-size:8.5px;">${esc(p.number)}</td>
-                <td style="padding:5px 9px;border-bottom:1px solid #f1f5f9;font-size:8.5px;max-width:110px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${esc(client)}</td>
-                <td style="padding:5px 9px;border-bottom:1px solid #f1f5f9;font-size:8.5px;color:#64748b;">${esc(brand)}</td>
-                <td style="padding:5px 9px;border-bottom:1px solid #f1f5f9;text-align:right;font-family:'Courier New',monospace;font-size:8.5px;font-weight:700;color:#0f172a;">${fmt(p.amountTotal)}</td>
-                <td style="padding:5px 9px;border-bottom:1px solid #f1f5f9;font-size:8.5px;color:#94a3b8;">${expires}</td>
+              <tr style="${AV}">
+                <td style="padding:4px 5px;border-bottom:1px solid #f1f5f9;font-family:'Courier New',monospace;font-size:7.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${esc(p.number)}</td>
+                <td style="padding:4px 5px;border-bottom:1px solid #f1f5f9;font-size:7.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${esc(client)}</td>
+                <td style="padding:4px 5px;border-bottom:1px solid #f1f5f9;font-size:7.5px;color:#64748b;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${esc(brand)}</td>
+                <td style="padding:4px 5px;border-bottom:1px solid #f1f5f9;text-align:right;font-family:'Courier New',monospace;font-size:7.5px;font-weight:700;color:#0f172a;white-space:nowrap;">${fmt(p.amountTotal)}</td>
+                <td style="padding:4px 5px;border-bottom:1px solid #f1f5f9;font-size:7.5px;color:#94a3b8;white-space:nowrap;">${expires}</td>
               </tr>`
           }).join('')}</tbody>
         </table>`}
     </div>`
 
   // ── Total Previsto summary card ───────────────────────────────────────────────
-  function totalRow(label: string, value: number, color: string, bold = false): string {
+  function totalRow(label: string, value: number, color: string): string {
     return `
       <div style="display:flex;justify-content:space-between;align-items:baseline;padding:5px 0;border-bottom:1px solid #f1f5f9;">
-        <span style="font-size:${bold ? '9.5' : '9'}px;color:${bold ? '#1e2d4a' : '#64748b'};font-weight:${bold ? '700' : '400'};">${label}</span>
-        <span style="font-family:'Courier New',monospace;font-size:${bold ? '10.5' : '9.5'}px;font-weight:${bold ? '800' : '600'};color:${color};">${fmt(value)}</span>
+        <span style="font-size:9px;color:#64748b;">${label}</span>
+        <span style="font-family:'Courier New',monospace;font-size:9.5px;font-weight:600;color:${color};">${fmt(value)}</span>
       </div>`
   }
 
   const totalCard = `
-    <div style="background:#fff;border:1.5px solid #1e2d4a;border-radius:12px;padding:16px 18px;margin-top:20px;">
+    <div style="${AV}background:#fff;border:1.5px solid #1e2d4a;border-radius:12px;padding:16px 18px;margin-top:20px;">
       <div style="font-size:9px;font-weight:700;color:#1e2d4a;letter-spacing:0.3px;margin-bottom:12px;padding-bottom:8px;border-bottom:1.5px solid #e8eef6;">TOTAL PREVISTO</div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:0 32px;">
         <div>
-          ${totalRow('Facturas vencidas',        totalOverdue,   '#ef4444')}
-          ${totalRow('Facturas emitidas',         totalIssued,    '#1e2d4a')}
-          ${totalRow('Próximas facturas (est.)',  totalEstimated, '#22c55e')}
-          ${totalRow('Ofertas aceptadas',         totalAccepted,  '#22c55e')}
-          ${totalRow('Ofertas en negociación',    totalSent,      '#94a3b8')}
+          ${totalRow('Facturas vencidas',       totalOverdue,   '#ef4444')}
+          ${totalRow('Facturas emitidas',        totalIssued,    '#1e2d4a')}
+          ${totalRow('Próximas facturas (est.)', totalEstimated, '#22c55e')}
+          ${totalRow('Ofertas aceptadas',        totalAccepted,  '#22c55e')}
+          ${totalRow('Ofertas en negociación',   totalSent,      '#94a3b8')}
         </div>
         <div>
           <div style="padding:10px 14px;background:#f0f4f8;border-radius:8px;margin-bottom:10px;">
             <div style="font-size:8px;color:#64748b;margin-bottom:4px;">Total confirmado</div>
             <div style="font-size:16px;font-weight:800;color:#1e2d4a;font-family:'Courier New',monospace;">${fmt(totalConfirmed)}</div>
-            <div style="font-size:7.5px;color:#94a3b8;margin-top:3px;">Facturas + ofertas aceptadas</div>
+            <div style="font-size:7.5px;color:#94a3b8;margin-top:3px;">Vencidas + emitidas + aceptadas</div>
           </div>
           <div style="padding:10px 14px;background:#1e2d4a;border-radius:8px;">
             <div style="font-size:8px;color:#94a3b8;margin-bottom:4px;">Total potencial</div>
@@ -780,21 +806,27 @@ function buildPage3(
     </div>
 
     <!-- COBROS PENDIENTES -->
-    ${sectionHeader('COBROS PENDIENTES', '#ef4444')}
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:4px;">
-      ${overdueBlock}
-      ${issuedBlock}
+    <div style="${AV}">
+      ${sectionHeader('COBROS PENDIENTES', '#ef4444')}
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;">
+        ${overdueBlock}
+        ${issuedBlock}
+      </div>
     </div>
 
     <!-- PRÓXIMAS FACTURAS ESTIMADAS -->
-    ${sectionHeader('PRÓXIMAS FACTURAS ESTIMADAS', '#22c55e')}
-    ${estimatedBlock}
+    <div style="${AV}">
+      ${sectionHeader('PRÓXIMAS FACTURAS ESTIMADAS', '#22c55e')}
+      ${estimatedBlock}
+    </div>
 
     <!-- OFERTAS -->
-    ${sectionHeader('OFERTAS', '#3b82f6')}
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:4px;">
-      ${acceptedBlock}
-      ${sentBlock}
+    <div style="${AV}">
+      ${sectionHeader('OFERTAS', '#3b82f6')}
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;">
+        ${acceptedBlock}
+        ${sentBlock}
+      </div>
     </div>
 
     <!-- TOTAL PREVISTO -->
