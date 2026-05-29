@@ -79,8 +79,14 @@ export default async function CashflowPage({
   const prestamosPendiente = prestamosRecibido - prestamosDevuelto
 
   const thisMonthKey    = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
-  const thisMonthIncome = transactions
-    .filter((t) => t.date.startsWith(thisMonthKey) && t.amount > 0 && t.category !== 'Traspaso interno')
+  // Use allTransactions so the KPI is always the current month regardless of the selected date range
+  const thisMonthIncome = allTransactions
+    .filter((t) =>
+      t.date.startsWith(thisMonthKey) &&
+      t.amount > 0 &&
+      t.category !== 'Traspaso interno' &&
+      t.category !== 'Préstamos recibidos',
+    )
     .reduce((s, t) => s + t.amount, 0)
 
   return (

@@ -622,6 +622,19 @@ function buildPage3(
   console.log('[cashflow-pdf p3] offers sample (number / clientName / dealId / amountNet / amountTotal):', [
     ...acceptedOffers, ...sentOffers,
   ].slice(0, 5).map(p => ({ number: p.number, clientName: p.clientName, dealId: p.dealId ?? '(none)', amountNet: p.amountNet, amountTotal: p.amountTotal })))
+  // Invoice brand JOIN diagnostic — logs what displayNameFor resolves for each invoice
+  console.log('[cashflow-pdf p3] invoice brand lookup:', [...overdueInvoices, ...issuedInvoices].map(i => {
+    const d = i.dealId ? dealById.get(i.dealId) : undefined
+    return {
+      number: i.number,
+      clientName: i.clientName,
+      dealId: i.dealId ?? '(none)',
+      dealFound: !!d,
+      companyName: d?.company.name ?? '—',
+      brandName: d?.company.brandName ?? '(none)',
+      resolved: displayNameFor(i.dealId, i.clientName),
+    }
+  }))
 
   // ── Pre-compute offer breakdowns ──────────────────────────────────────────────
   const acceptedBreakdowns = acceptedOffers.map(p => getOfferBreakdown(p, dealById))

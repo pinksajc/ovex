@@ -277,9 +277,9 @@ export function ExpenseCategoryDonut({ transactions }: { transactions: CashflowT
           )}
 
           <div className="flex items-start gap-6">
-            {/* Donut */}
+            {/* Donut — rendered at 110px (viewBox stays 144×144) to give legend more room */}
             <svg
-              width="144" height="144" viewBox="0 0 144 144"
+              width="110" height="110" viewBox="0 0 144 144"
               className="shrink-0"
               onMouseLeave={() => setHovered(null)}
             >
@@ -306,22 +306,22 @@ export function ExpenseCategoryDonut({ transactions }: { transactions: CashflowT
               </text>
             </svg>
 
-            {/* Legend — side-by-side, names wrap (no truncate) */}
-            <div className="flex-1 min-w-0 max-h-36 overflow-y-auto space-y-1.5 pr-1">
+            {/* Legend — compact font so long category names don't overflow */}
+            <div className="flex-1 min-w-0 max-h-36 overflow-y-auto space-y-1 pr-1">
               {segments.map((seg) => (
                 <div
                   key={seg.label}
-                  className="flex items-start justify-between gap-2"
+                  className="flex items-start justify-between gap-1.5"
                   style={{
                     opacity: hovered && hovered.label !== seg.label ? 0.4 : 1,
                     transition: 'opacity 0.12s',
                   }}
                 >
-                  <div className="flex items-start gap-2">
+                  <div className="flex items-start gap-1.5 min-w-0">
                     <span className="w-2 h-2 rounded-full shrink-0 mt-0.5" style={{ background: seg.color }} />
-                    <span className="text-xs text-zinc-600 leading-tight">{seg.label}</span>
+                    <span className="text-[10px] text-zinc-600 leading-tight break-words">{seg.label}</span>
                   </div>
-                  <span className="text-xs font-mono text-zinc-400 shrink-0">{eur(seg.amount)}</span>
+                  <span className="text-[10px] font-mono text-zinc-400 shrink-0 pl-0.5">{eur(seg.amount)}</span>
                 </div>
               ))}
             </div>
@@ -346,18 +346,36 @@ export function BalanceTrendChart({
   const data = useMemo<BalancePoint[]>(() => {
     // Group by week (Mon–Sun) — track last (end) and max (peak) balance per week.
     // All categories included: every transaction affects the real bank balance.
+    // Manual transactions (sourceFile === 'manual') that have no bank-reported balance
+    // are estimated as: lastKnownBalance + amount, so they appear on the chart.
     type WeekAcc = { balance: number; peak: number; lastDate: string }
     const map = new Map<string, WeekAcc>()
 
-    for (const t of transactions) {
-      if (t.balance == null) continue
+    // Sort ascending by date so balance estimation runs forward in time
+    const sorted = [...transactions].sort((a, b) =>
+      a.date < b.date ? -1 : a.date > b.date ? 1 : 0,
+    )
+    let lastKnownBalance = 0
+
+    for (const t of sorted) {
+      let effectiveBalance: number | null = null
+      if (t.balance != null) {
+        effectiveBalance  = t.balance
+        lastKnownBalance  = t.balance
+      } else if (t.sourceFile === 'manual') {
+        // Estimate running balance for manually-added transactions
+        lastKnownBalance  = lastKnownBalance + t.amount
+        effectiveBalance  = lastKnownBalance
+      }
+      if (effectiveBalance == null) continue
+
       const k = weekStartKey(t.date)
       const rec = map.get(k)
       if (!rec) {
-        map.set(k, { balance: t.balance, peak: t.balance, lastDate: t.date })
+        map.set(k, { balance: effectiveBalance, peak: effectiveBalance, lastDate: t.date })
       } else {
-        if (t.balance > rec.peak) rec.peak = t.balance
-        if (t.date > rec.lastDate) { rec.lastDate = t.date; rec.balance = t.balance }
+        if (effectiveBalance > rec.peak) rec.peak = effectiveBalance
+        if (t.date > rec.lastDate) { rec.lastDate = t.date; rec.balance = effectiveBalance }
       }
     }
 
