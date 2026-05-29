@@ -142,7 +142,7 @@ export function IncomeExpenseChart({
   const data = useMemo<IncomeExpensePoint[]>(() => {
     const map = new Map<string, { income: number; expense: number }>()
     for (const t of transactions) {
-      if (t.category === 'Traspaso interno' || t.category === 'Préstamos') continue
+      if (t.category === 'Traspaso interno' || t.category === 'Préstamos recibidos' || t.category === 'Préstamos dados') continue
       const k = weekStartKey(t.date)
       const rec = map.get(k) ?? { income: 0, expense: 0 }
       if (t.type === 'income') rec.income += t.amount
@@ -234,7 +234,7 @@ export function ExpenseCategoryDonut({ transactions }: { transactions: CashflowT
   const [hovered, setHovered] = useState<DonutHover | null>(null)
 
   const expenses = transactions.filter(
-    (t) => t.type === 'expense' && t.category !== 'Traspaso interno' && t.category !== 'Préstamos',
+    (t) => t.type === 'expense' && t.category !== 'Traspaso interno' && t.category !== 'Préstamos recibidos' && t.category !== 'Préstamos dados',
   )
   const catMap = new Map<string, number>()
   for (const t of expenses) {

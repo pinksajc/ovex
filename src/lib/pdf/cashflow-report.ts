@@ -9,7 +9,7 @@
 // Filtering logic mirrors cashflow-charts.tsx exactly:
 //   income  → t.type === 'income'
 //   expense → t.type === 'expense'
-//   operational = exclude 'Traspaso interno' and 'Préstamos'
+//   operational = exclude 'Traspaso interno', 'Préstamos recibidos', 'Préstamos dados'
 // =========================================
 
 import fs from 'fs'
@@ -285,9 +285,10 @@ function buildPage1(
   logoUri: string,
 ): string {
   // ── Mirror IncomeExpenseChart filtering exactly ───────────────────────────────
-  // Skip 'Traspaso interno' and 'Préstamos'; use t.type for income/expense
+  // Skip 'Traspaso interno', 'Préstamos recibidos', 'Préstamos dados'; use t.type
+  const isLoanCat = (c: string) => c === 'Préstamos recibidos' || c === 'Préstamos dados'
   const operational = transactions.filter(
-    t => t.category !== 'Traspaso interno' && t.category !== 'Préstamos',
+    t => t.category !== 'Traspaso interno' && !isLoanCat(t.category),
   )
   const totalIncome  = operational
     .filter(t => t.type === 'income')
@@ -297,9 +298,8 @@ function buildPage1(
     .reduce((s, t) => s + Math.abs(t.amount), 0)
   const netBalance = totalIncome - totalExpense
 
-  const loanRows    = transactions.filter(t => t.category === 'Préstamos')
-  const loanIn      = loanRows.filter(t => t.type === 'income').reduce((s, t) => s + t.amount, 0)
-  const loanOut     = loanRows.filter(t => t.type === 'expense').reduce((s, t) => s + Math.abs(t.amount), 0)
+  const loanIn      = transactions.filter(t => t.category === 'Préstamos recibidos' && t.type === 'income').reduce((s, t) => s + t.amount, 0)
+  const loanOut     = transactions.filter(t => t.category === 'Préstamos dados'     && t.type === 'expense').reduce((s, t) => s + Math.abs(t.amount), 0)
   const loanPending = loanIn - loanOut
 
   const facturasPendientes = invoices
@@ -363,11 +363,12 @@ function buildPage2(
   logoUri: string,
 ): string {
   // ── Mirror ExpenseCategoryDonut filtering exactly ─────────────────────────────
-  // t.type === 'expense', exclude 'Traspaso interno' and 'Préstamos'
+  // t.type === 'expense', exclude 'Traspaso interno', 'Préstamos recibidos', 'Préstamos dados'
+  const isLoanCat = (c: string) => c === 'Préstamos recibidos' || c === 'Préstamos dados'
   const expenseTxs = transactions.filter(
     t => t.type === 'expense' &&
          t.category !== 'Traspaso interno' &&
-         t.category !== 'Préstamos',
+         !isLoanCat(t.category),
   )
 
   const catMap = new Map<string, number>()
@@ -384,10 +385,9 @@ function buildPage2(
       color: catColor(name),
     }))
 
-  // Loans — use t.type for correct sign
-  const loanRows    = transactions.filter(t => t.category === 'Préstamos')
-  const loanIn      = loanRows.filter(t => t.type === 'income').reduce((s, t) => s + t.amount, 0)
-  const loanOut     = loanRows.filter(t => t.type === 'expense').reduce((s, t) => s + Math.abs(t.amount), 0)
+  // Loans — split into 'Préstamos recibidos' and 'Préstamos dados'
+  const loanIn      = transactions.filter(t => t.category === 'Préstamos recibidos' && t.type === 'income').reduce((s, t) => s + t.amount, 0)
+  const loanOut     = transactions.filter(t => t.category === 'Préstamos dados'     && t.type === 'expense').reduce((s, t) => s + Math.abs(t.amount), 0)
   const loanPending = loanIn - loanOut
 
   const donutSvg = buildDonutSvg(slices, totalOperational)
@@ -430,16 +430,16 @@ function buildPage2(
     </tr>
     <tr>
       <td style="padding:7px 10px;border-bottom:1px solid #f1f5f9;">
-        <span style="font-size:9px;color:#334155;">Préstamos devueltos</span>
+        <span style="font-size:9px;color:#334155;">Préstamos dados</span>
       </td>
       <td style="padding:7px 12px;border-bottom:1px solid #f1f5f9;text-align:right;font-family:'Courier New',monospace;font-size:9px;font-weight:700;color:#ef4444;white-space:nowrap;min-width:90px;">−${fmt(loanOut)}</td>
       <td colspan="2" style="border-bottom:1px solid #f1f5f9;"></td>
     </tr>
     <tr>
       <td style="padding:7px 10px;">
-        <span style="font-size:9px;font-weight:600;color:#334155;">Pendiente devolver</span>
+        <span style="font-size:9px;font-weight:600;color:#334155;">Neto</span>
       </td>
-      <td style="padding:7px 12px;text-align:right;font-family:'Courier New',monospace;font-size:9px;font-weight:700;color:#f97316;white-space:nowrap;min-width:90px;">${fmt(Math.max(0, loanPending))}</td>
+      <td style="padding:7px 12px;text-align:right;font-family:'Courier New',monospace;font-size:9px;font-weight:700;color:#f97316;white-space:nowrap;min-width:90px;">${fmt(loanPending)}</td>
       <td colspan="2"></td>
     </tr>` : ''
 
