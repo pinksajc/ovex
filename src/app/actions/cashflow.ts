@@ -98,6 +98,7 @@ export interface ImportCashflowPayload {
   rows: Array<{
     date: string        // "YYYY-MM-DD"
     description: string
+    reference: string | null
     amount: number      // positive = income, negative = expense
     currency: string
     state: string | null
@@ -154,6 +155,7 @@ export async function importCashflowAction(
     const toInsert: InsertCashflowTransaction[] = newRows.map((r) => ({
       date: r.date,
       description: r.description,
+      reference: r.reference ?? null,
       amount: r.amount,
       type: r.amount >= 0 ? 'income' : 'expense',
       category: rulesMap.get(r.description) ?? aiMap.get(r.description) ?? 'Sin categoría',

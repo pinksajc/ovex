@@ -1,15 +1,20 @@
 -- =============================================================================
--- apply_cashflow_wildcards()
--- Applies wildcard ILIKE rules to cashflow_transactions rows that are still
--- categorised as 'Sin categoría'.  Returns total rows updated.
--- Run in Supabase SQL editor before using the recategorize button.
---
--- Re-running is safe: every UPDATE is filtered by category = 'Sin categoría'
--- so already-categorised rows are never touched.
---
--- v2: also checks the `reference` column (ADD COLUMN migration must run first).
+-- Migration: add reference column + update apply_cashflow_wildcards()
+-- Run in Supabase Dashboard → SQL Editor
 -- =============================================================================
 
+-- 1. Add reference column (stores the Revolut "Reference" CSV field)
+ALTER TABLE cashflow_transactions
+  ADD COLUMN IF NOT EXISTS reference text;
+
+-- 2. Add new devolución/reembolso rules (idempotent)
+INSERT INTO cashflow_category_rules (description_pattern, category) VALUES
+  ('%reembolso%prestamo%', 'Préstamos dados'),
+  ('%reembolso sergio%',   'Préstamos dados')
+ON CONFLICT (description_pattern) DO NOTHING;
+
+-- 3. Recreate apply_cashflow_wildcards() to also match on reference
+-- (full function body — safe to re-run)
 CREATE OR REPLACE FUNCTION apply_cashflow_wildcards()
 RETURNS integer
 LANGUAGE plpgsql
@@ -20,7 +25,6 @@ DECLARE
   n     integer := 0;
 BEGIN
 
-  -- ── Nómina ──────────────────────────────────────────────────────────────────
   UPDATE cashflow_transactions SET category = 'Nómina'
   WHERE category = 'Sin categoría' AND (
     description ILIKE '%casanova%'          OR reference ILIKE '%casanova%'          OR
@@ -47,7 +51,6 @@ BEGIN
   );
   GET DIAGNOSTICS n = ROW_COUNT; total := total + n;
 
-  -- ── Hardware ─────────────────────────────────────────────────────────────────
   UPDATE cashflow_transactions SET category = 'Hardware'
   WHERE category = 'Sin categoría' AND (
     description ILIKE '%humberto%fernandez%'  OR reference ILIKE '%humberto%fernandez%'  OR
@@ -65,7 +68,6 @@ BEGIN
   );
   GET DIAGNOSTICS n = ROW_COUNT; total := total + n;
 
-  -- ── Préstamos dados (loan repayments out) ────────────────────────────────────
   UPDATE cashflow_transactions SET category = 'Préstamos dados'
   WHERE category = 'Sin categoría' AND (
     description ILIKE '%smashburger%'         OR reference ILIKE '%smashburger%'         OR
@@ -76,7 +78,6 @@ BEGIN
   );
   GET DIAGNOSTICS n = ROW_COUNT; total := total + n;
 
-  -- ── Administrativo ───────────────────────────────────────────────────────────
   UPDATE cashflow_transactions SET category = 'Administrativo'
   WHERE category = 'Sin categoría' AND (
     description ILIKE '%inversiones%toribio%' OR reference ILIKE '%inversiones%toribio%' OR
@@ -91,14 +92,12 @@ BEGIN
   );
   GET DIAGNOSTICS n = ROW_COUNT; total := total + n;
 
-  -- ── Impuestos ────────────────────────────────────────────────────────────────
   UPDATE cashflow_transactions SET category = 'Impuestos'
   WHERE category = 'Sin categoría' AND (
     description ILIKE '%tesoreria%general%' OR reference ILIKE '%tesoreria%general%'
   );
   GET DIAGNOSTICS n = ROW_COUNT; total := total + n;
 
-  -- ── Oficina ──────────────────────────────────────────────────────────────────
   UPDATE cashflow_transactions SET category = 'Oficina'
   WHERE category = 'Sin categoría' AND (
     description ILIKE '%inmobiliaria%lares%'  OR reference ILIKE '%inmobiliaria%lares%'  OR
@@ -114,7 +113,6 @@ BEGIN
   );
   GET DIAGNOSTICS n = ROW_COUNT; total := total + n;
 
-  -- ── Viajes ───────────────────────────────────────────────────────────────────
   UPDATE cashflow_transactions SET category = 'Viajes'
   WHERE category = 'Sin categoría' AND (
     description ILIKE '%licencia%'        OR reference ILIKE '%licencia%'        OR
@@ -128,7 +126,6 @@ BEGIN
   );
   GET DIAGNOSTICS n = ROW_COUNT; total := total + n;
 
-  -- ── Ingreso cliente ──────────────────────────────────────────────────────────
   UPDATE cashflow_transactions SET category = 'Ingreso cliente'
   WHERE category = 'Sin categoría' AND (
     description ILIKE '%red ops%'   OR reference ILIKE '%red ops%'   OR
@@ -136,7 +133,6 @@ BEGIN
   );
   GET DIAGNOSTICS n = ROW_COUNT; total := total + n;
 
-  -- ── Traspaso interno ─────────────────────────────────────────────────────────
   UPDATE cashflow_transactions SET category = 'Traspaso interno'
   WHERE category = 'Sin categoría' AND (
     description ILIKE '%platomico%'   OR reference ILIKE '%platomico%'   OR
@@ -145,7 +141,6 @@ BEGIN
   );
   GET DIAGNOSTICS n = ROW_COUNT; total := total + n;
 
-  -- ── Herramientas IA ──────────────────────────────────────────────────────────
   UPDATE cashflow_transactions SET category = 'Herramientas IA'
   WHERE category = 'Sin categoría' AND (
     description ILIKE '%openai%'      OR reference ILIKE '%openai%'      OR
@@ -155,7 +150,6 @@ BEGIN
   );
   GET DIAGNOSTICS n = ROW_COUNT; total := total + n;
 
-  -- ── Comunicaciones ───────────────────────────────────────────────────────────
   UPDATE cashflow_transactions SET category = 'Comunicaciones'
   WHERE category = 'Sin categoría' AND (
     description ILIKE '%telefonica%' OR reference ILIKE '%telefonica%' OR
@@ -165,7 +159,6 @@ BEGIN
   );
   GET DIAGNOSTICS n = ROW_COUNT; total := total + n;
 
-  -- ── Base de datos (compound pattern before broad vercel) ─────────────────────
   UPDATE cashflow_transactions SET category = 'Base de datos'
   WHERE category = 'Sin categoría' AND (
     description ILIKE '%vercel%supabase%' OR reference ILIKE '%vercel%supabase%' OR
@@ -174,7 +167,6 @@ BEGIN
   );
   GET DIAGNOSTICS n = ROW_COUNT; total := total + n;
 
-  -- ── Servidores/Hosting ───────────────────────────────────────────────────────
   UPDATE cashflow_transactions SET category = 'Servidores/Hosting'
   WHERE category = 'Sin categoría' AND (
     description ILIKE '%vercel%'  OR reference ILIKE '%vercel%'  OR
@@ -183,14 +175,12 @@ BEGIN
   );
   GET DIAGNOSTICS n = ROW_COUNT; total := total + n;
 
-  -- ── Refunds ──────────────────────────────────────────────────────────────────
   UPDATE cashflow_transactions SET category = 'Refunds'
   WHERE category = 'Sin categoría' AND (
     description ILIKE '%refund%' OR reference ILIKE '%refund%'
   );
   GET DIAGNOSTICS n = ROW_COUNT; total := total + n;
 
-  -- ── Otros ────────────────────────────────────────────────────────────────────
   UPDATE cashflow_transactions SET category = 'Otros'
   WHERE category = 'Sin categoría' AND (
     description ILIKE '%amazon%'         OR reference ILIKE '%amazon%'         OR

@@ -173,6 +173,7 @@ export async function insertCashflowTransactions(
     rows.map((r) => ({
       date: r.date,
       description: r.description,
+      reference: r.reference ?? null,
       amount: r.amount,
       type: r.type,
       category: r.category,

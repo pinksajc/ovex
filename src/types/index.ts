@@ -393,6 +393,7 @@ export interface CashflowTransaction {
 export interface InsertCashflowTransaction {
   date: string
   description: string
+  reference?: string | null
   amount: number
   type: CashflowTxType
   category: string

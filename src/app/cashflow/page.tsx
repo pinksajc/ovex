@@ -204,11 +204,16 @@ function CfLoansTableKpi({
               <td className="py-1 pr-2 text-right font-mono text-red-500 whitespace-nowrap">
                 {cp.dado > 0 ? `−${formatCurrency(cp.dado)}` : '—'}
               </td>
-              <td
-                className="py-1 text-right font-mono font-bold whitespace-nowrap"
-                style={{ color: cp.neto > 0 ? '#ff9f0a' : cp.neto < 0 ? '#34c759' : '#71717a' }}
-              >
-                {formatCurrency(cp.neto)}
+              <td className="py-1 text-right whitespace-nowrap">
+                {cp.neto <= 0 ? (
+                  <span className="inline-block px-1.5 py-0.5 rounded text-[9px] font-bold bg-emerald-50 text-emerald-600 border border-emerald-200">
+                    Saldado
+                  </span>
+                ) : (
+                  <span className="font-mono font-bold" style={{ color: '#ff9f0a' }}>
+                    {formatCurrency(cp.neto)}
+                  </span>
+                )}
               </td>
             </tr>
           ))}

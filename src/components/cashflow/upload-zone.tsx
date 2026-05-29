@@ -26,6 +26,7 @@ function parseCSVLine(line: string): string[] {
 interface ParsedRow {
   date: string
   description: string
+  reference: string | null
   amount: number
   currency: string
   state: string | null
@@ -52,6 +53,7 @@ function parseRevolutCSV(text: string): ParsedRow[] {
     completedDate: header.indexOf('date completed (utc)'),
     startedDate:   header.indexOf('date started (utc)'),
     description:   header.indexOf('description'),
+    reference:     header.indexOf('reference'),
     amount:        header.indexOf('amount'),
     currency:      header.indexOf('payment currency'),
     state:         header.indexOf('state'),
@@ -78,6 +80,8 @@ function parseRevolutCSV(text: string): ParsedRow[] {
     const description = idx.description >= 0 ? cols[idx.description] || '' : ''
     if (!description) continue
 
+    const reference = idx.reference >= 0 ? (cols[idx.reference] || null) : null
+
     // Amount: already signed in Revolut CSVs (negative = expense, positive = income)
     // Strip unicode minus (−) and thousands separators; keep ASCII minus and decimal
     const rawAmount = idx.amount >= 0 ? cols[idx.amount] : '0'
@@ -98,6 +102,7 @@ function parseRevolutCSV(text: string): ParsedRow[] {
     rows.push({
       date,
       description,
+      reference,
       amount,
       currency,
       state: state || null,
