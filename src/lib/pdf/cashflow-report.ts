@@ -535,24 +535,21 @@ function emptyState(msg: string): string {
 
 /**
  * Given a presupuesto + dealById map, returns { fixed, feeRate }.
- * fixed   = plan fixed fee × locations + addons + datafono (from economics snapshot)
+ * fixed   = p.amountTotal (presupuestos.amount_total) — the actual offer total, no recalculation
  * feeRate = plan.variableFee (€/order), or null when no deal/plan is configured
  */
 function getOfferBreakdown(
   p: Presupuesto,
   dealById: Map<string, Deal>,
 ): { fixed: number; feeRate: number | null } {
-  if (!p.dealId) return { fixed: p.amountNet, feeRate: null }
+  const fixed = p.amountTotal  // use DB value directly
+
+  if (!p.dealId) return { fixed, feeRate: null }
   const deal = dealById.get(p.dealId)
   const cfg  = deal?.configurations[0]
-  if (!cfg) return { fixed: p.amountNet, feeRate: null }
+  if (!cfg) return { fixed, feeRate: null }
 
-  const plan      = PLANS[cfg.plan]
-  const eco       = cfg.economics
-  const fixedBase = Math.ceil(plan.priceMonthly * cfg.locations)
-  const fixed     = fixedBase + eco.addonFeeMonthly + eco.datafonoFeeMonthly
-
-  return { fixed, feeRate: plan.variableFee ?? null }
+  return { fixed, feeRate: PLANS[cfg.plan]?.variableFee ?? null }
 }
 
 function buildPage3(
@@ -600,6 +597,17 @@ function buildPage3(
   const sentOffers = presupuestos
     .filter(p => p.status === 'sent')
     .sort((a, b) => b.amountTotal - a.amountTotal)
+
+  // ── Debug: log raw values to server console ───────────────────────────────────
+  console.log('[cashflow-pdf p3] deals sample (id / name / brand):', deals.slice(0, 5).map(d => ({
+    id: d.id, name: d.company.name, brand: d.company.brandName ?? '(none)',
+  })))
+  console.log('[cashflow-pdf p3] invoices sample (number / clientName / dealId / amountTotal):', [
+    ...overdueInvoices, ...issuedInvoices,
+  ].slice(0, 5).map(i => ({ number: i.number, clientName: i.clientName, dealId: i.dealId ?? '(none)', amountTotal: i.amountTotal })))
+  console.log('[cashflow-pdf p3] offers sample (number / clientName / dealId / amountNet / amountTotal):', [
+    ...acceptedOffers, ...sentOffers,
+  ].slice(0, 5).map(p => ({ number: p.number, clientName: p.clientName, dealId: p.dealId ?? '(none)', amountNet: p.amountNet, amountTotal: p.amountTotal })))
 
   // ── Pre-compute offer breakdowns ──────────────────────────────────────────────
   const acceptedBreakdowns = acceptedOffers.map(p => getOfferBreakdown(p, dealById))
