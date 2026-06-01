@@ -427,20 +427,20 @@ function buildPage2(
       </td>
     </tr>
     <tr>
-      <td colspan="4" style="padding:0 0 2px;">
+      <td colspan="4" style="padding:0;overflow:hidden;">
         <table style="width:100%;border-collapse:collapse;table-layout:fixed;">
           <colgroup>
-            <col style="width:34%;"/>
+            <col style="width:35%;"/>
             <col style="width:22%;"/>
             <col style="width:22%;"/>
-            <col style="width:22%;"/>
+            <col style="width:21%;"/>
           </colgroup>
           <thead>
             <tr style="background:#f8fafc;">
-              <th style="padding:5px 8px;font-size:7.5px;font-weight:700;color:#64748b;text-align:left;">Contraparte</th>
-              <th style="padding:5px 8px;font-size:7.5px;font-weight:700;color:#22c55e;text-align:right;">Recibido</th>
-              <th style="padding:5px 8px;font-size:7.5px;font-weight:700;color:#ef4444;text-align:right;">Pagado de vuelta</th>
-              <th style="padding:5px 8px;font-size:7.5px;font-weight:700;color:#64748b;text-align:right;">Deuda neta</th>
+              <th style="padding:5px 6px;font-size:7.5px;font-weight:700;color:#64748b;text-align:left;">Contraparte</th>
+              <th style="padding:5px 6px;font-size:7.5px;font-weight:700;color:#22c55e;text-align:right;">Recibido</th>
+              <th style="padding:5px 6px;font-size:7.5px;font-weight:700;color:#ef4444;text-align:right;">Pagado de vuelta</th>
+              <th style="padding:5px 6px;font-size:7.5px;font-weight:700;color:#64748b;text-align:right;">Deuda neta</th>
             </tr>
           </thead>
           <tbody>
@@ -448,17 +448,17 @@ function buildPage2(
               const netoColor = neto > 0 ? '#f97316' : neto < 0 ? '#22c55e' : '#64748b'
               return `
               <tr>
-                <td style="padding:5px 8px;border-bottom:1px solid #f1f5f9;font-size:8.5px;color:#334155;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${esc(name)}</td>
-                <td style="padding:5px 8px;border-bottom:1px solid #f1f5f9;text-align:right;font-family:'Courier New',monospace;font-size:8.5px;color:#22c55e;white-space:nowrap;">${recibido > 0 ? '+' + fmt(recibido) : '—'}</td>
-                <td style="padding:5px 8px;border-bottom:1px solid #f1f5f9;text-align:right;font-family:'Courier New',monospace;font-size:8.5px;color:#ef4444;white-space:nowrap;">${dado > 0 ? '−' + fmt(dado) : '—'}</td>
-                <td style="padding:5px 8px;border-bottom:1px solid #f1f5f9;text-align:right;font-family:'Courier New',monospace;font-size:8.5px;font-weight:700;color:${netoColor};white-space:nowrap;">${fmt(neto)}</td>
+                <td style="padding:5px 6px;border-bottom:1px solid #f1f5f9;font-size:8.5px;color:#334155;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${esc(name)}</td>
+                <td style="padding:5px 6px;border-bottom:1px solid #f1f5f9;text-align:right;font-family:'Courier New',monospace;font-size:8.5px;color:#22c55e;white-space:nowrap;">${recibido > 0 ? '+' + fmt(recibido) : '—'}</td>
+                <td style="padding:5px 6px;border-bottom:1px solid #f1f5f9;text-align:right;font-family:'Courier New',monospace;font-size:8.5px;color:#ef4444;white-space:nowrap;">${dado > 0 ? '−' + fmt(dado) : '—'}</td>
+                <td style="padding:5px 6px;border-bottom:1px solid #f1f5f9;text-align:right;font-family:'Courier New',monospace;font-size:8.5px;font-weight:700;color:${netoColor};white-space:nowrap;">${fmt(neto)}</td>
               </tr>`
             }).join('')}
             <tr style="background:#f0f4f8;">
-              <td style="padding:6px 8px;font-size:8.5px;font-weight:700;color:#334155;">Total</td>
-              <td style="padding:6px 8px;text-align:right;font-family:'Courier New',monospace;font-size:8.5px;font-weight:700;color:#22c55e;white-space:nowrap;">+${fmt(loanIn)}</td>
-              <td style="padding:6px 8px;text-align:right;font-family:'Courier New',monospace;font-size:8.5px;font-weight:700;color:#ef4444;white-space:nowrap;">−${fmt(loanOut)}</td>
-              <td style="padding:6px 8px;text-align:right;font-family:'Courier New',monospace;font-size:8.5px;font-weight:700;color:${loanPending > 0 ? '#f97316' : '#22c55e'};white-space:nowrap;">${fmt(loanPending)}</td>
+              <td style="padding:6px 6px;font-size:8.5px;font-weight:700;color:#334155;">Total</td>
+              <td style="padding:6px 6px;text-align:right;font-family:'Courier New',monospace;font-size:8.5px;font-weight:700;color:#22c55e;white-space:nowrap;">+${fmt(loanIn)}</td>
+              <td style="padding:6px 6px;text-align:right;font-family:'Courier New',monospace;font-size:8.5px;font-weight:700;color:#ef4444;white-space:nowrap;">−${fmt(loanOut)}</td>
+              <td style="padding:6px 6px;text-align:right;font-family:'Courier New',monospace;font-size:8.5px;font-weight:700;color:${loanPending > 0 ? '#f97316' : '#22c55e'};white-space:nowrap;">${fmt(loanPending)}</td>
             </tr>
           </tbody>
         </table>
