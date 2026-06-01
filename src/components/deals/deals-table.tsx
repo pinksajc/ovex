@@ -1,11 +1,12 @@
 'use client'
 
-import { useState, useTransition } from 'react'
+import { useState, useTransition, useCallback } from 'react'
 import { useRouter, usePathname } from 'next/navigation'
 import Link from 'next/link'
 import { getActiveConfig } from '@/lib/deals'
 import { formatCurrency } from '@/lib/format'
 import { assignDealOwnerAction } from '@/app/actions/assign-owner'
+import { bulkDeleteDealsAction } from '@/app/actions/deals'
 import type { Deal, DealCommercialStatus, DealStage } from '@/types'
 import type { AuthUser } from '@/lib/auth'
 
@@ -155,9 +156,20 @@ export function DealsTable({
   )
   const [query, setQuery] = useState('')
 
+  // ── Selection state ───────────────────────────────────────────────────────────
+  const [selected, setSelected] = useState<Set<string>>(new Set())
+  const [showConfirm, setShowConfirm] = useState(false)
+  const [toast, setToast] = useState<{ msg: string; type: 'success' | 'error' } | null>(null)
+  const [isPending, startTransition] = useTransition()
+
+  const showToast = useCallback((msg: string, type: 'success' | 'error') => {
+    setToast({ msg, type })
+    setTimeout(() => setToast(null), 3500)
+  }, [])
+
   function handleFilter(key: FilterKey) {
     setFilter(key)
-    // Preserve existing params (e.g. scope) when changing status filter
+    setSelected(new Set())
     const params = new URLSearchParams(
       typeof window !== 'undefined' ? window.location.search : ''
     )
@@ -184,7 +196,119 @@ export function DealsTable({
     no_config:        queryFiltered.filter((d) => d.commercialStatus === 'no_config').length,
   }
 
+  // Checkbox helpers
+  const visibleIds = visible.map((d) => d.id)
+  const allVisibleSelected = visibleIds.length > 0 && visibleIds.every((id) => selected.has(id))
+  const someSelected = selected.size > 0
+
+  function toggleAll() {
+    if (allVisibleSelected) {
+      setSelected((prev) => {
+        const next = new Set(prev)
+        visibleIds.forEach((id) => next.delete(id))
+        return next
+      })
+    } else {
+      setSelected((prev) => new Set([...prev, ...visibleIds]))
+    }
+  }
+
+  function toggleOne(id: string) {
+    setSelected((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
+
+  function handleDeleteConfirmed() {
+    const ids = Array.from(selected)
+    startTransition(async () => {
+      const res = await bulkDeleteDealsAction(ids)
+      setShowConfirm(false)
+      setSelected(new Set())
+      if (res.ok) {
+        showToast(`${res.deleted} deal${(res.deleted ?? 0) > 1 ? 's eliminados' : ' eliminado'} correctamente`, 'success')
+        router.refresh()
+      } else {
+        showToast(res.error ?? 'Error al eliminar', 'error')
+      }
+    })
+  }
+
   return (
+    <div className="relative">
+      {/* ── Toast ─────────────────────────────────────────────────────────────── */}
+      {toast && (
+        <div className={`fixed bottom-6 left-1/2 -translate-x-1/2 z-50 px-4 py-2.5 rounded-xl shadow-lg text-sm font-medium flex items-center gap-2 transition-all ${
+          toast.type === 'success'
+            ? 'bg-zinc-900 text-white'
+            : 'bg-red-600 text-white'
+        }`}>
+          {toast.type === 'success' ? (
+            <svg className="w-4 h-4 shrink-0" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M2.5 8l4 4 7-7" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          ) : (
+            <svg className="w-4 h-4 shrink-0" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M8 5v4M8 11.5v.5" strokeLinecap="round" />
+              <circle cx="8" cy="8" r="6.5" />
+            </svg>
+          )}
+          {toast.msg}
+        </div>
+      )}
+
+      {/* ── Confirmation modal ────────────────────────────────────────────────── */}
+      {showConfirm && (
+        <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/40 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl shadow-2xl p-6 max-w-sm w-full mx-4">
+            <div className="flex items-start gap-3 mb-4">
+              <div className="w-9 h-9 rounded-full bg-red-100 flex items-center justify-center shrink-0">
+                <svg className="w-4.5 h-4.5 text-red-600" viewBox="0 0 20 20" fill="currentColor">
+                  <path fillRule="evenodd" d="M8.485 2.495c.673-1.167 2.357-1.167 3.03 0l6.28 10.875c.673 1.167-.17 2.625-1.516 2.625H3.72c-1.347 0-2.189-1.458-1.515-2.625L8.485 2.495zM10 5a.75.75 0 01.75.75v3.5a.75.75 0 01-1.5 0v-3.5A.75.75 0 0110 5zm0 9a1 1 0 100-2 1 1 0 000 2z" clipRule="evenodd" />
+                </svg>
+              </div>
+              <div>
+                <h3 className="text-sm font-semibold text-zinc-900">
+                  Eliminar {selected.size} deal{selected.size > 1 ? 's' : ''}
+                </h3>
+                <p className="text-sm text-zinc-500 mt-1">
+                  Se eliminarán también las configuraciones, propuestas y eventos asociados. Las facturas e ingresos vinculados se desasociarán pero no se borrarán.
+                </p>
+                <p className="text-xs font-semibold text-red-600 mt-2">Esta acción no se puede deshacer.</p>
+              </div>
+            </div>
+            <div className="flex justify-end gap-2 mt-5">
+              <button
+                onClick={() => setShowConfirm(false)}
+                disabled={isPending}
+                className="px-4 py-2 text-sm font-medium text-zinc-600 bg-zinc-100 hover:bg-zinc-200 rounded-lg transition-colors disabled:opacity-50"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleDeleteConfirmed}
+                disabled={isPending}
+                className="px-4 py-2 text-sm font-semibold text-white bg-red-600 hover:bg-red-700 rounded-lg transition-colors disabled:opacity-50 flex items-center gap-1.5"
+              >
+                {isPending ? (
+                  <>
+                    <svg className="w-3.5 h-3.5 animate-spin" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2">
+                      <path d="M8 1.5A6.5 6.5 0 1114.5 8" strokeLinecap="round" />
+                    </svg>
+                    Eliminando…
+                  </>
+                ) : (
+                  `Eliminar ${selected.size} deal${selected.size > 1 ? 's' : ''}`
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
     <div className="bg-white border border-zinc-200 rounded-xl overflow-hidden">
       {/* Search + filter bar — hidden in focus mode */}
       {!focusMode && (
@@ -240,11 +364,50 @@ export function DealsTable({
         </>
       )}
 
+      {/* ── Selection action bar ─────────────────────────────────────────────── */}
+      {someSelected && (
+        <div className="px-4 py-2.5 bg-zinc-900 flex items-center justify-between gap-4">
+          <span className="text-sm text-white font-medium">
+            {selected.size} deal{selected.size > 1 ? 's' : ''} seleccionado{selected.size > 1 ? 's' : ''}
+          </span>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setSelected(new Set())}
+              className="text-xs text-zinc-400 hover:text-white transition-colors"
+            >
+              Deseleccionar todo
+            </button>
+            <button
+              onClick={() => setShowConfirm(true)}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-red-600 hover:bg-red-500 text-white transition-colors"
+            >
+              <svg className="w-3.5 h-3.5" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.75">
+                <path d="M2 4h12M5.5 4V2.5h5V4M6.5 7v5M9.5 7v5M3.5 4l.5 9.5h8L13 4" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+              Eliminar seleccionados
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Responsive scroll wrapper */}
       <div className="overflow-x-auto">
-        <table className="w-full text-sm min-w-[900px]">
+        <table className="w-full text-sm min-w-[940px]">
           <thead>
             <tr className="border-b border-zinc-100 bg-zinc-50">
+              {/* Checkbox column */}
+              <th className="px-3 py-3 w-8">
+                <input
+                  type="checkbox"
+                  checked={allVisibleSelected}
+                  ref={(el) => {
+                    if (el) el.indeterminate = !allVisibleSelected && visibleIds.some((id) => selected.has(id))
+                  }}
+                  onChange={toggleAll}
+                  className="w-3.5 h-3.5 rounded border-zinc-300 text-zinc-900 focus:ring-zinc-500 cursor-pointer"
+                  aria-label="Seleccionar todos"
+                />
+              </th>
               <th className="text-left px-3 py-3 text-xs font-medium text-zinc-400 uppercase tracking-wide whitespace-nowrap w-[200px]">Empresa</th>
               <th className="text-left px-3 py-3 text-xs font-medium text-zinc-400 uppercase tracking-wide whitespace-nowrap hidden md:table-cell">Contacto</th>
               <th className="text-left px-3 py-3 text-xs font-medium text-zinc-400 uppercase tracking-wide whitespace-nowrap hidden lg:table-cell">Stage</th>
@@ -260,7 +423,7 @@ export function DealsTable({
           <tbody className="divide-y divide-zinc-100">
             {visible.length === 0 ? (
               <tr>
-                <td colSpan={10} className="px-4 py-10 text-center text-sm text-zinc-400">
+                <td colSpan={11} className="px-4 py-10 text-center text-sm text-zinc-400">
                   {query ? 'Sin resultados para esa búsqueda.' : 'No hay deals con ese estado.'}
                 </td>
               </tr>
@@ -271,6 +434,8 @@ export function DealsTable({
                   deal={deal}
                   isAdmin={currentUser?.role === 'admin'}
                   members={members}
+                  isSelected={selected.has(deal.id)}
+                  onToggle={toggleOne}
                 />
               ))
             )}
@@ -282,6 +447,7 @@ export function DealsTable({
         <p className="text-[11px] text-zinc-400">MRR y ARR basados en la versión activa de cada deal</p>
       </div>
     </div>
+    </div>
   )
 }
 
@@ -291,10 +457,14 @@ function DealRow({
   deal,
   isAdmin = false,
   members = [],
+  isSelected = false,
+  onToggle,
 }: {
   deal: Deal
   isAdmin?: boolean
   members?: AuthUser[]
+  isSelected?: boolean
+  onToggle?: (id: string) => void
 }) {
   const cfg = getActiveConfig(deal)
   const mrr = cfg?.economics.totalMonthlyRevenue ?? 0
@@ -312,11 +482,23 @@ function DealRow({
 
   return (
     <tr className={`transition-colors group align-middle ${
+      isSelected ? 'bg-blue-50/40' :
       deal.commercialStatus === 'signed' ? 'bg-emerald-50/30 hover:bg-emerald-50/50' :
       hot ? 'hover:bg-zinc-50/60' :
       stale ? 'hover:bg-orange-50/20' :
       'hover:bg-zinc-50/60'
     }`}>
+
+      {/* Checkbox */}
+      <td className="px-3 py-3 w-8" onClick={(e) => e.stopPropagation()}>
+        <input
+          type="checkbox"
+          checked={isSelected}
+          onChange={() => onToggle?.(deal.id)}
+          className="w-3.5 h-3.5 rounded border-zinc-300 text-zinc-900 focus:ring-zinc-500 cursor-pointer"
+          aria-label={`Seleccionar ${deal.company.name}`}
+        />
+      </td>
 
       {/* Empresa */}
       <td className={`py-3 ${borderCls}`}>

@@ -169,3 +169,34 @@ export async function createDeal(input: CreateDealInput): Promise<Deal> {
   if (error) throw new Error(`Supabase createDeal: ${error.message}`)
   return rowToDeal(data as DealRow)
 }
+
+/**
+ * Deletes deals and all related records in dependency order.
+ * - deal_configurations, proposals, deal_events, contact_overrides, deal_owners → hard delete
+ * - invoices.deal_id, presupuestos.deal_id → set NULL (preserve financial records)
+ * - deals → hard delete last
+ */
+export async function deleteDeals(ids: string[]): Promise<void> {
+  if (ids.length === 0) return
+  const db = getSupabaseClient()
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const from = (t: string) => (db as any).from(t)
+
+  const steps: Array<() => Promise<{ error: { message: string } | null }>> = [
+    () => from('proposals').delete().in('attio_deal_id', ids),
+    () => from('deal_configurations').delete().in('attio_deal_id', ids),
+    () => from('deal_events').delete().in('deal_id', ids),
+    () => from('contact_overrides').delete().in('attio_deal_id', ids),
+    () => from('deal_owners').delete().in('attio_deal_id', ids),
+    // Unlink (not delete) financial records
+    () => from('invoices').update({ deal_id: null }).in('deal_id', ids),
+    () => from('presupuestos').update({ deal_id: null }).in('deal_id', ids),
+    // Finally delete the deals themselves
+    () => from('deals').delete().in('id', ids),
+  ]
+
+  for (const step of steps) {
+    const { error } = await step()
+    if (error) throw new Error(`deleteDeals: ${error.message}`)
+  }
+}
