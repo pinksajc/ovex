@@ -418,52 +418,46 @@ function buildPage2(
   const hasLoans = loanIn > 0 || loanOut > 0
   const cpEntries = buildCounterpartyMap(transactions)
 
-  // The PRÉSTAMOS section is rendered as its own full-width sub-table so that
-  // column widths are independent from the operational expense table above it.
-  const loanSectionRows = hasLoans ? `
-    <tr>
-      <td colspan="4" style="padding:14px 10px 4px;background:#fff;">
-        <div style="font-size:8px;font-weight:700;color:#94a3b8;border-bottom:1.5px solid #e8eef6;padding-bottom:6px;">PRÉSTAMOS</div>
-      </td>
-    </tr>
-    <tr>
-      <td colspan="4" style="padding:0;overflow:hidden;">
-        <table style="width:100%;border-collapse:collapse;table-layout:fixed;">
-          <colgroup>
-            <col style="width:35%;"/>
-            <col style="width:22%;"/>
-            <col style="width:22%;"/>
-            <col style="width:21%;"/>
-          </colgroup>
-          <thead>
-            <tr style="background:#f8fafc;">
-              <th style="padding:5px 6px;font-size:7.5px;font-weight:700;color:#64748b;text-align:left;">Contraparte</th>
-              <th style="padding:5px 6px;font-size:7.5px;font-weight:700;color:#22c55e;text-align:right;">Recibido</th>
-              <th style="padding:5px 6px;font-size:7.5px;font-weight:700;color:#ef4444;text-align:right;">Pagado de vuelta</th>
-              <th style="padding:5px 6px;font-size:7.5px;font-weight:700;color:#64748b;text-align:right;">Deuda neta</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${cpEntries.map(({ name, recibido, dado, neto }) => {
-              const netoColor = neto > 0 ? '#f97316' : neto < 0 ? '#22c55e' : '#64748b'
-              return `
-              <tr>
-                <td style="padding:5px 6px;border-bottom:1px solid #f1f5f9;font-size:8.5px;color:#334155;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${esc(name)}</td>
-                <td style="padding:5px 6px;border-bottom:1px solid #f1f5f9;text-align:right;font-family:'Courier New',monospace;font-size:8.5px;color:#22c55e;white-space:nowrap;">${recibido > 0 ? '+' + fmt(recibido) : '—'}</td>
-                <td style="padding:5px 6px;border-bottom:1px solid #f1f5f9;text-align:right;font-family:'Courier New',monospace;font-size:8.5px;color:#ef4444;white-space:nowrap;">${dado > 0 ? '−' + fmt(dado) : '—'}</td>
-                <td style="padding:5px 6px;border-bottom:1px solid #f1f5f9;text-align:right;font-family:'Courier New',monospace;font-size:8.5px;font-weight:700;color:${netoColor};white-space:nowrap;">${fmt(neto)}</td>
-              </tr>`
-            }).join('')}
-            <tr style="background:#f0f4f8;">
-              <td style="padding:6px 6px;font-size:8.5px;font-weight:700;color:#334155;">Total</td>
-              <td style="padding:6px 6px;text-align:right;font-family:'Courier New',monospace;font-size:8.5px;font-weight:700;color:#22c55e;white-space:nowrap;">+${fmt(loanIn)}</td>
-              <td style="padding:6px 6px;text-align:right;font-family:'Courier New',monospace;font-size:8.5px;font-weight:700;color:#ef4444;white-space:nowrap;">−${fmt(loanOut)}</td>
-              <td style="padding:6px 6px;text-align:right;font-family:'Courier New',monospace;font-size:8.5px;font-weight:700;color:${loanPending > 0 ? '#f97316' : '#22c55e'};white-space:nowrap;">${fmt(loanPending)}</td>
-            </tr>
-          </tbody>
-        </table>
-      </td>
-    </tr>` : ''
+  // The PRÉSTAMOS section renders OUTSIDE the two-column grid (see return below),
+  // occupying 100% page width so amounts never clip.
+  const loanBlock = hasLoans ? `
+    <div style="margin-top:20px;">
+      <div style="font-size:8px;font-weight:700;color:#94a3b8;border-bottom:1.5px solid #e8eef6;padding-bottom:6px;margin-bottom:4px;">PRÉSTAMOS</div>
+      <table style="width:100%;border-collapse:collapse;table-layout:fixed;">
+        <colgroup>
+          <col style="width:35%;"/>
+          <col style="width:22%;"/>
+          <col style="width:22%;"/>
+          <col style="width:21%;"/>
+        </colgroup>
+        <thead>
+          <tr style="background:#f8fafc;">
+            <th style="padding:5px 6px;font-size:7.5px;font-weight:700;color:#64748b;text-align:left;">Contraparte</th>
+            <th style="padding:5px 6px;font-size:7.5px;font-weight:700;color:#22c55e;text-align:right;">Recibido</th>
+            <th style="padding:5px 6px;font-size:7.5px;font-weight:700;color:#ef4444;text-align:right;">Pagado de vuelta</th>
+            <th style="padding:5px 6px;font-size:7.5px;font-weight:700;color:#64748b;text-align:right;">Deuda neta</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${cpEntries.map(({ name, recibido, dado, neto }) => {
+            const netoColor = neto > 0 ? '#f97316' : neto < 0 ? '#22c55e' : '#64748b'
+            return `
+          <tr>
+            <td style="padding:5px 6px;border-bottom:1px solid #f1f5f9;font-size:8.5px;color:#334155;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${esc(name)}</td>
+            <td style="padding:5px 6px;border-bottom:1px solid #f1f5f9;text-align:right;font-family:'Courier New',monospace;font-size:8.5px;color:#22c55e;white-space:nowrap;">${recibido > 0 ? '+' + fmt(recibido) : '—'}</td>
+            <td style="padding:5px 6px;border-bottom:1px solid #f1f5f9;text-align:right;font-family:'Courier New',monospace;font-size:8.5px;color:#ef4444;white-space:nowrap;">${dado > 0 ? '−' + fmt(dado) : '—'}</td>
+            <td style="padding:5px 6px;border-bottom:1px solid #f1f5f9;text-align:right;font-family:'Courier New',monospace;font-size:8.5px;font-weight:700;color:${netoColor};white-space:nowrap;">${fmt(neto)}</td>
+          </tr>`
+          }).join('')}
+          <tr style="background:#f0f4f8;">
+            <td style="padding:6px 6px;font-size:8.5px;font-weight:700;color:#334155;">Total</td>
+            <td style="padding:6px 6px;text-align:right;font-family:'Courier New',monospace;font-size:8.5px;font-weight:700;color:#22c55e;white-space:nowrap;">+${fmt(loanIn)}</td>
+            <td style="padding:6px 6px;text-align:right;font-family:'Courier New',monospace;font-size:8.5px;font-weight:700;color:#ef4444;white-space:nowrap;">−${fmt(loanOut)}</td>
+            <td style="padding:6px 6px;text-align:right;font-family:'Courier New',monospace;font-size:8.5px;font-weight:700;color:${loanPending > 0 ? '#f97316' : '#22c55e'};white-space:nowrap;">${fmt(loanPending)}</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>` : ''
 
   const tableHeader = `
     <tr style="background:#1e2d4a;">
@@ -497,19 +491,23 @@ function buildPage2(
         </div>
       </div>
 
-      <!-- RIGHT: unified table -->
+      <!-- RIGHT: gastos operativos only -->
       <div>
-        ${slices.length > 0 || hasLoans ? `
+        ${slices.length > 0 ? `
         <table style="width:100%;border-collapse:collapse;table-layout:auto;">
           <thead>${tableHeader}</thead>
           <tbody>
-            ${slices.length > 0 ? opSectionHeader + opRows : ''}
-            ${loanSectionRows}
+            ${opSectionHeader}
+            ${opRows}
           </tbody>
         </table>` : '<div style="font-size:9px;color:#94a3b8;padding:12px 0;">Sin datos en el período.</div>'}
       </div>
 
     </div>
+
+    <!-- PRÉSTAMOS — full page width, outside the two-column grid -->
+    ${loanBlock}
+
   </div>
   ${WATERMARK}
 </div>`
