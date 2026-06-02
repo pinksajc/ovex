@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { UploadZoneContent } from './upload-zone'
+import { ManageCategoriesModal } from './manage-categories-modal'
 
 // ── More Actions Dropdown ──────────────────────────────────────────────────────
 
@@ -11,10 +12,11 @@ interface MoreActionsDropdownProps {
 }
 
 export function MoreActionsDropdown({ dateFrom, dateTo }: MoreActionsDropdownProps) {
-  const [dropdownOpen, setDropdownOpen] = useState(false)
-  const [modalOpen, setModalOpen]       = useState(false)
-  const [pdfLoading, setPdfLoading]     = useState(false)
-  const [pdfError, setPdfError]         = useState(false)
+  const [dropdownOpen, setDropdownOpen]     = useState(false)
+  const [modalOpen, setModalOpen]           = useState(false)
+  const [catModalOpen, setCatModalOpen]     = useState(false)
+  const [pdfLoading, setPdfLoading]         = useState(false)
+  const [pdfError, setPdfError]             = useState(false)
   const buttonRef = useRef<HTMLButtonElement>(null)
   const dropdownRef = useRef<HTMLDivElement>(null)
 
@@ -45,6 +47,11 @@ export function MoreActionsDropdown({ dateFrom, dateTo }: MoreActionsDropdownPro
   function openImportModal() {
     setDropdownOpen(false)
     setModalOpen(true)
+  }
+
+  function openCatModal() {
+    setDropdownOpen(false)
+    setCatModalOpen(true)
   }
 
   async function handleExportPdf() {
@@ -101,6 +108,15 @@ export function MoreActionsDropdown({ dateFrom, dateTo }: MoreActionsDropdownPro
               Importar CSV
             </button>
 
+            {/* Gestionar categorías */}
+            <button
+              onClick={openCatModal}
+              className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs text-zinc-700 hover:bg-zinc-50 transition-colors text-left"
+            >
+              <IconTag className="w-3.5 h-3.5 text-zinc-400 shrink-0" />
+              Gestionar categorías
+            </button>
+
             {/* Exportar informe PDF */}
             <button
               onClick={handleExportPdf}
@@ -121,6 +137,11 @@ export function MoreActionsDropdown({ dateFrom, dateTo }: MoreActionsDropdownPro
           </div>
         )}
       </div>
+
+      {/* Manage Categories Modal */}
+      {catModalOpen && (
+        <ManageCategoriesModal onClose={() => setCatModalOpen(false)} />
+      )}
 
       {/* Import CSV Modal */}
       {modalOpen && (
@@ -191,6 +212,15 @@ function XIcon({ className }: { className?: string }) {
   return (
     <svg className={className} viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
       <path d="M1 1l10 10M11 1L1 11" />
+    </svg>
+  )
+}
+
+function IconTag({ className }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M9.5 2H13.5V6L8 11.5a1.5 1.5 0 01-2.1 0l-3.4-3.4a1.5 1.5 0 010-2.1L9.5 2Z" />
+      <circle cx="11.5" cy="4.5" r="0.75" fill="currentColor" stroke="none" />
     </svg>
   )
 }
