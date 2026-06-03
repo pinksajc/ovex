@@ -291,6 +291,7 @@ export interface Invoice {
   dueDateEnabled: boolean
   locationId: string | null
   locationName: string | null
+  locationAddress: string | null
   locationCostCenter: string | null
   rectifiesId: string | null
   convertedFromId: string | null

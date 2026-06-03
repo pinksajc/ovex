@@ -32,6 +32,7 @@ interface InvoiceRow {
   // joined fields from company_locations (when selected with join)
   company_locations?: {
     name: string | null
+    address: string | null
     cost_center: string | null
   } | null
 }
@@ -65,6 +66,7 @@ function rowToInvoice(row: InvoiceRow): Invoice {
     dueDateEnabled: row.due_date_enabled !== false, // default true if null
     locationId: row.location_id,
     locationName: loc?.name ?? null,
+    locationAddress: loc?.address ?? null,
     locationCostCenter: loc?.cost_center ?? null,
     rectifiesId: row.rectifies_id,
     convertedFromId: row.converted_from_id,
@@ -96,7 +98,7 @@ async function generateInvoiceNumber(type: InvoiceType): Promise<string> {
 // READS
 // =========================================
 
-const SELECT_WITH_LOCATION = '*, company_locations(name, cost_center)'
+const SELECT_WITH_LOCATION = '*, company_locations(name, address, cost_center)'
 
 export async function getInvoices(): Promise<Invoice[]> {
   const db = getSupabaseClient()
@@ -147,6 +149,7 @@ export async function getInvoicesByDeal(dealId: string): Promise<Invoice[]> {
       dueDateEnabled: true,
       locationId: null,
       locationName: null,
+      locationAddress: null,
       locationCostCenter: null,
       rectifiesId: null,
       convertedFromId: null,

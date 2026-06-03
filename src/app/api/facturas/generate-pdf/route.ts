@@ -19,9 +19,13 @@ export async function GET(req: Request) {
     const { generateInvoicePdf } = await import('@/lib/pdf/invoice')
     const pdfBuffer = await generateInvoicePdf(invoice)
 
-    // Use the invoice number directly as filename (e.g. PF-2026-0001.pdf, F-2026-0001.pdf)
-    const slug = invoice.number.replace(/[^A-Za-z0-9-]/g, '-')
-    const filename = `${slug}.pdf`
+    // Filename: {number}-{locationName}.pdf if location exists, else {number}.pdf
+    // e.g. PF-2026-0001-Alcobendas.pdf or F-2026-0001.pdf
+    const numberSlug = invoice.number.replace(/[^A-Za-z0-9-]/g, '-')
+    const locationSlug = invoice.locationName
+      ? '-' + invoice.locationName.trim().replace(/[^A-Za-z0-9À-ÿ]/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '')
+      : ''
+    const filename = `${numberSlug}${locationSlug}.pdf`
 
     return new Response(pdfBuffer.buffer as ArrayBuffer, {
       headers: {

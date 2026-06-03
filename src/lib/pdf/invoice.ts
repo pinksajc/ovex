@@ -309,6 +309,7 @@ ${invoice.type === 'rectificativa' && invoice.rectifiesId ? `
     ${invoice.clientCif ? `NIF/CIF: ${esc(invoice.clientCif)}<br/>` : ''}
     ${invoice.clientAddress ? `${esc(invoice.clientAddress)}<br/>` : ''}
     ${invoice.locationName ? `${esc(invoice.locationName)}<br/>` : ''}
+    ${invoice.locationAddress ? `${esc(invoice.locationAddress)}<br/>` : ''}
     ${invoice.locationCostCenter ? `${esc(invoice.locationCostCenter)}` : ''}
   </div>
 </div>
