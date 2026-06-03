@@ -100,11 +100,22 @@ const SELECT_WITH_LOCATION = '*, company_locations(name, cost_center)'
 
 export async function getInvoices(): Promise<Invoice[]> {
   const db = getSupabaseClient()
+
+  // Try with location join first; fall back to plain select if company_locations
+  // table hasn't been migrated yet — prevents a crash on the invoice list page.
   const { data, error } = await invoicesTable(db)
     .select(SELECT_WITH_LOCATION)
     .order('created_at', { ascending: false })
 
-  if (error) throw error
+  if (error) {
+    console.error('[getInvoices] location join failed, falling back to plain select:', error.message)
+    const { data: fallback, error: fallbackError } = await invoicesTable(db)
+      .select('*')
+      .order('created_at', { ascending: false })
+    if (fallbackError) throw fallbackError
+    return (fallback as InvoiceRow[]).map(rowToInvoice)
+  }
+
   return (data as InvoiceRow[]).map(rowToInvoice)
 }
 
@@ -146,12 +157,23 @@ export async function getInvoicesByDeal(dealId: string): Promise<Invoice[]> {
 
 export async function getInvoice(id: string): Promise<Invoice | null> {
   const db = getSupabaseClient()
+
   const { data, error } = await invoicesTable(db)
     .select(SELECT_WITH_LOCATION)
     .eq('id', id)
     .maybeSingle()
 
-  if (error) throw error
+  if (error) {
+    console.error('[getInvoice] location join failed, falling back to plain select:', error.message)
+    const { data: fallback, error: fallbackError } = await invoicesTable(db)
+      .select('*')
+      .eq('id', id)
+      .maybeSingle()
+    if (fallbackError) throw fallbackError
+    if (!fallback) return null
+    return rowToInvoice(fallback as InvoiceRow)
+  }
+
   if (!data) return null
   return rowToInvoice(data as InvoiceRow)
 }

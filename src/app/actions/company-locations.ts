@@ -19,10 +19,13 @@ export async function listLocationsAction(
 ): Promise<{ ok: boolean; data?: CompanyLocation[]; error?: string }> {
   try {
     await requireAuth()
+    if (!dealId) return { ok: true, data: [] }
     const data = await listLocationsByDeal(dealId)
     return { ok: true, data }
   } catch (err) {
-    return { ok: false, error: err instanceof Error ? err.message : 'Error' }
+    const msg = err instanceof Error ? err.message : String(err)
+    console.error('[listLocationsAction] error:', msg, { dealId })
+    return { ok: false, error: msg }
   }
 }
 
@@ -31,11 +34,22 @@ export async function createLocationAction(
 ): Promise<{ ok: boolean; data?: CompanyLocation; error?: string }> {
   try {
     await requireAuth()
+
+    // Validate required fields before hitting the DB
+    if (!input.dealId || !input.dealId.trim()) {
+      return { ok: false, error: 'deal_id es obligatorio' }
+    }
+    if (!input.name || !input.name.trim()) {
+      return { ok: false, error: 'El nombre es obligatorio' }
+    }
+
     const data = await createLocation(input)
     revalidatePath(`/deals/${input.dealId}`)
     return { ok: true, data }
   } catch (err) {
-    return { ok: false, error: err instanceof Error ? err.message : 'Error' }
+    const msg = err instanceof Error ? err.message : String(err)
+    console.error('[createLocationAction] error:', msg, { dealId: input.dealId, name: input.name })
+    return { ok: false, error: msg }
   }
 }
 
