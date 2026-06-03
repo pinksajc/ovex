@@ -10,7 +10,10 @@ import {
 } from '@/lib/supabase/company-locations'
 import type { CompanyLocation, CreateLocationInput } from '@/types'
 
-export type { CompanyLocation }
+// NOTE: Do NOT re-export types from 'use server' files.
+// Next.js 16 / Turbopack compiles `export type { X }` as a value export in the
+// SSR bundle, causing "ReferenceError: X is not defined" at module evaluation.
+// Consumers should import CompanyLocation directly from '@/types'.
 
 interface ActionResult { ok: boolean; error?: string }
 
