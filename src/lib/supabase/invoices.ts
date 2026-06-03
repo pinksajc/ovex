@@ -24,8 +24,16 @@ interface InvoiceRow {
   status: string
   issued_at: string | null
   due_at: string | null
+  due_date_enabled: boolean | null
+  location_id: string | null
   rectifies_id: string | null
+  converted_from_id: string | null
   created_at: string
+  // joined fields from company_locations (when selected with join)
+  company_locations?: {
+    name: string | null
+    cost_center: string | null
+  } | null
 }
 
 function parseLineItems(raw: unknown): InvoiceLineItem[] {
@@ -37,6 +45,7 @@ function parseLineItems(raw: unknown): InvoiceLineItem[] {
 }
 
 function rowToInvoice(row: InvoiceRow): Invoice {
+  const loc = row.company_locations
   return {
     id: row.id,
     number: row.number,
@@ -53,7 +62,12 @@ function rowToInvoice(row: InvoiceRow): Invoice {
     status: row.status as InvoiceStatus,
     issuedAt: row.issued_at,
     dueAt: row.due_at,
+    dueDateEnabled: row.due_date_enabled !== false, // default true if null
+    locationId: row.location_id,
+    locationName: loc?.name ?? null,
+    locationCostCenter: loc?.cost_center ?? null,
     rectifiesId: row.rectifies_id,
+    convertedFromId: row.converted_from_id,
     createdAt: row.created_at,
   }
 }
@@ -68,7 +82,7 @@ function invoicesTable(db: ReturnType<typeof getSupabaseClient>) {
 async function generateInvoiceNumber(type: InvoiceType): Promise<string> {
   const db = getSupabaseClient()
   const year = new Date().getFullYear()
-  const prefix = type === 'rectificativa' ? 'R' : 'F'
+  const prefix = type === 'rectificativa' ? 'R' : type === 'proforma' ? 'PF' : 'F'
 
   const { count } = await invoicesTable(db)
     .select('id', { count: 'exact', head: true })
@@ -82,10 +96,12 @@ async function generateInvoiceNumber(type: InvoiceType): Promise<string> {
 // READS
 // =========================================
 
+const SELECT_WITH_LOCATION = '*, company_locations(name, cost_center)'
+
 export async function getInvoices(): Promise<Invoice[]> {
   const db = getSupabaseClient()
   const { data, error } = await invoicesTable(db)
-    .select('*')
+    .select(SELECT_WITH_LOCATION)
     .order('created_at', { ascending: false })
 
   if (error) throw error
@@ -95,17 +111,16 @@ export async function getInvoices(): Promise<Invoice[]> {
 export async function getInvoicesByDeal(dealId: string): Promise<Invoice[]> {
   const db = getSupabaseClient()
   const { data, error } = await invoicesTable(db)
-    .select('id, number, status, amount_total, issued_at')
+    .select('id, number, type, status, amount_total, issued_at')
     .eq('deal_id', dealId)
     .order('created_at', { ascending: false })
 
   if (error) throw error
-  // Partial row — only fields needed for the deal detail card
-  return (data as Array<Pick<InvoiceRow, 'id' | 'number' | 'status' | 'amount_total' | 'issued_at'>>).map(
+  return (data as Array<Pick<InvoiceRow, 'id' | 'number' | 'type' | 'status' | 'amount_total' | 'issued_at'>>).map(
     (row) => ({
       id: row.id,
       number: row.number,
-      type: 'ordinary' as InvoiceType,
+      type: (row.type ?? 'ordinary') as InvoiceType,
       dealId,
       clientName: '',
       clientCif: null,
@@ -118,7 +133,12 @@ export async function getInvoicesByDeal(dealId: string): Promise<Invoice[]> {
       status: row.status as InvoiceStatus,
       issuedAt: row.issued_at,
       dueAt: null,
+      dueDateEnabled: true,
+      locationId: null,
+      locationName: null,
+      locationCostCenter: null,
       rectifiesId: null,
+      convertedFromId: null,
       createdAt: row.issued_at ?? '',
     })
   )
@@ -127,7 +147,7 @@ export async function getInvoicesByDeal(dealId: string): Promise<Invoice[]> {
 export async function getInvoice(id: string): Promise<Invoice | null> {
   const db = getSupabaseClient()
   const { data, error } = await invoicesTable(db)
-    .select('*')
+    .select(SELECT_WITH_LOCATION)
     .eq('id', id)
     .maybeSingle()
 
@@ -159,10 +179,13 @@ export async function createInvoice(input: CreateInvoiceInput): Promise<Invoice>
       amount_total: input.amountTotal,
       status: 'draft',
       issued_at: input.issuedAt ?? null,
-      due_at: input.dueAt ?? null,
+      due_at: (input.dueDateEnabled !== false) ? (input.dueAt ?? null) : null,
+      due_date_enabled: input.dueDateEnabled !== false,
+      location_id: input.locationId ?? null,
       rectifies_id: input.rectifiesId ?? null,
+      converted_from_id: null,
     })
-    .select()
+    .select(SELECT_WITH_LOCATION)
     .single()
 
   if (error) throw error
@@ -183,11 +206,13 @@ export async function updateInvoice(id: string, input: UpdateInvoiceInput): Prom
       vat_rate: input.vatRate,
       amount_total: input.amountTotal,
       issued_at: input.issuedAt ?? null,
-      due_at: input.dueAt ?? null,
+      due_at: (input.dueDateEnabled !== false) ? (input.dueAt ?? null) : null,
+      due_date_enabled: input.dueDateEnabled !== false,
+      location_id: input.locationId ?? null,
       rectifies_id: input.rectifiesId ?? null,
     })
     .eq('id', id)
-    .select()
+    .select(SELECT_WITH_LOCATION)
     .single()
 
   if (error) throw error
@@ -201,4 +226,57 @@ export async function updateInvoiceStatus(id: string, status: InvoiceStatus): Pr
     .eq('id', id)
 
   if (error) throw error
+}
+
+/**
+ * Converts a proforma into a real ordinary invoice.
+ * - Creates a new invoice (type='ordinary') with the same data, status='draft', new F-YYYY number
+ * - Marks the proforma status = 'converted'
+ * Returns the new invoice.
+ */
+export async function convertProformaToInvoice(proformaId: string): Promise<Invoice> {
+  const db = getSupabaseClient()
+
+  // 1 — fetch the proforma
+  const proforma = await getInvoice(proformaId)
+  if (!proforma) throw new Error('Proforma no encontrada')
+  if (proforma.type !== 'proforma') throw new Error('Esta factura no es una proforma')
+
+  // 2 — generate new ordinary number
+  const number = await generateInvoiceNumber('ordinary')
+
+  // 3 — insert new invoice
+  const { data, error } = await invoicesTable(db)
+    .insert({
+      number,
+      type: 'ordinary',
+      deal_id: proforma.dealId,
+      client_name: proforma.clientName,
+      client_cif: proforma.clientCif,
+      client_address: proforma.clientAddress,
+      concept: proforma.concept,
+      line_items: JSON.stringify(proforma.lineItems),
+      amount_net: proforma.amountNet,
+      vat_rate: proforma.vatRate,
+      amount_total: proforma.amountTotal,
+      status: 'draft',
+      issued_at: proforma.issuedAt,
+      due_at: proforma.dueAt,
+      due_date_enabled: proforma.dueDateEnabled,
+      location_id: proforma.locationId,
+      rectifies_id: null,
+      converted_from_id: proformaId,
+    })
+    .select(SELECT_WITH_LOCATION)
+    .single()
+
+  if (error) throw new Error(`convertProforma insert: ${error.message}`)
+
+  // 4 — mark proforma as converted
+  const { error: statusErr } = await invoicesTable(db)
+    .update({ status: 'converted' })
+    .eq('id', proformaId)
+  if (statusErr) throw new Error(`convertProforma status update: ${statusErr.message}`)
+
+  return rowToInvoice(data as InvoiceRow)
 }

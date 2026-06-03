@@ -238,9 +238,9 @@ export interface ProposalSummary {
 // INVOICES
 // =========================================
 
-export type InvoiceType = 'ordinary' | 'rectificativa'
+export type InvoiceType = 'ordinary' | 'rectificativa' | 'proforma'
 
-export type InvoiceStatus = 'draft' | 'issued' | 'paid' | 'overdue'
+export type InvoiceStatus = 'draft' | 'issued' | 'paid' | 'overdue' | 'converted'
 
 export type InvoiceLineItemType = 'line' | 'discount'
 export type DiscountMode = 'percent' | 'amount'
@@ -288,7 +288,12 @@ export interface Invoice {
   status: InvoiceStatus
   issuedAt: string | null
   dueAt: string | null
+  dueDateEnabled: boolean
+  locationId: string | null
+  locationName: string | null
+  locationCostCenter: string | null
   rectifiesId: string | null
+  convertedFromId: string | null
   createdAt: string
 }
 
@@ -305,6 +310,8 @@ export interface CreateInvoiceInput {
   amountTotal: number
   issuedAt?: string | null
   dueAt?: string | null
+  dueDateEnabled?: boolean
+  locationId?: string | null
   rectifiesId?: string | null
 }
 
@@ -320,7 +327,29 @@ export interface UpdateInvoiceInput {
   amountTotal: number
   issuedAt?: string | null
   dueAt?: string | null
+  dueDateEnabled?: boolean
+  locationId?: string | null
   rectifiesId?: string | null
+}
+
+// =========================================
+// COMPANY LOCATIONS
+// =========================================
+
+export interface CompanyLocation {
+  id: string
+  dealId: string
+  name: string
+  address: string | null
+  costCenter: string | null
+  createdAt: string
+}
+
+export interface CreateLocationInput {
+  dealId: string
+  name: string
+  address?: string | null
+  costCenter?: string | null
 }
 
 // =========================================

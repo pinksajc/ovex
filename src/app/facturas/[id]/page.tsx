@@ -1,7 +1,7 @@
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import { getInvoice } from '@/lib/supabase/invoices'
-import { InvoiceActions } from './actions'
+import { InvoiceActions, ConvertProformaButton } from './actions'
 import type { Invoice, InvoiceStatus } from '@/types'
 
 const STATUS_LABELS: Record<InvoiceStatus, string> = {
@@ -9,6 +9,7 @@ const STATUS_LABELS: Record<InvoiceStatus, string> = {
   issued: 'Emitida',
   paid: 'Pagada',
   overdue: 'Vencida',
+  converted: 'Convertida',
 }
 
 const STATUS_COLORS: Record<InvoiceStatus, string> = {
@@ -16,6 +17,7 @@ const STATUS_COLORS: Record<InvoiceStatus, string> = {
   issued: 'bg-blue-50 text-blue-700',
   paid: 'bg-emerald-50 text-emerald-700',
   overdue: 'bg-red-50 text-red-700',
+  converted: 'bg-zinc-100 text-zinc-500',
 }
 
 function formatEur(n: number) {
@@ -71,6 +73,11 @@ export default async function FacturaDetailPage({ params }: { params: Promise<{ 
                 Rectificativa
               </span>
             )}
+            {invoice.type === 'proforma' && (
+              <span className="text-[10px] font-semibold uppercase tracking-wide px-2.5 py-1 rounded-full bg-violet-50 text-violet-700">
+                Proforma
+              </span>
+            )}
           </div>
           <p className="text-sm text-zinc-500">{invoice.clientName}</p>
         </div>
@@ -114,6 +121,14 @@ export default async function FacturaDetailPage({ params }: { params: Promise<{ 
             <p className="text-sm font-semibold text-zinc-900">{invoice.clientName}</p>
             {invoice.clientCif && <p className="text-xs text-zinc-500 mt-0.5">NIF/CIF: {invoice.clientCif}</p>}
             {invoice.clientAddress && <p className="text-xs text-zinc-500 mt-0.5">{invoice.clientAddress}</p>}
+            {invoice.locationName && (
+              <p className="text-xs text-zinc-400 mt-1.5 pt-1.5 border-t border-zinc-100">
+                📍 {invoice.locationName}
+                {invoice.locationCostCenter && (
+                  <span className="ml-1.5 text-zinc-300">· Centro de coste: {invoice.locationCostCenter}</span>
+                )}
+              </p>
+            )}
           </div>
 
           {/* Concept */}
@@ -126,7 +141,9 @@ export default async function FacturaDetailPage({ params }: { params: Promise<{ 
           <div className="bg-white border border-zinc-200 rounded-xl p-5">
             <h2 className="text-[10px] font-semibold text-zinc-400 uppercase tracking-widest mb-3">Fechas</h2>
             <Row label="Fecha emisión" value={formatDate(invoice.issuedAt)} />
-            <Row label="Fecha vencimiento" value={formatDate(invoice.dueAt)} />
+            {invoice.dueDateEnabled && (
+              <Row label="Fecha vencimiento" value={formatDate(invoice.dueAt)} />
+            )}
             <Row label="Creada" value={formatDate(invoice.createdAt)} />
           </div>
 
@@ -162,8 +179,17 @@ export default async function FacturaDetailPage({ params }: { params: Promise<{ 
 
           {/* Actions */}
           <div className="bg-white border border-zinc-200 rounded-xl p-5">
-            <h2 className="text-[10px] font-semibold text-zinc-400 uppercase tracking-widest mb-3">Cambiar estado</h2>
-            <InvoiceActions invoiceId={invoice.id} currentStatus={invoice.status} />
+            <h2 className="text-[10px] font-semibold text-zinc-400 uppercase tracking-widest mb-3">Acciones</h2>
+            {invoice.type === 'proforma' && invoice.status !== 'converted' && (
+              <div className="mb-3">
+                <ConvertProformaButton invoiceId={invoice.id} />
+              </div>
+            )}
+            {invoice.status === 'converted' ? (
+              <p className="text-xs text-zinc-400">Esta proforma ya fue convertida a factura.</p>
+            ) : (
+              <InvoiceActions invoiceId={invoice.id} currentStatus={invoice.status} />
+            )}
           </div>
 
           {/* Deal link */}

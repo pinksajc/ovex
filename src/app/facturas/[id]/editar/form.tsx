@@ -1,11 +1,14 @@
 'use client'
 
-import { useState, useTransition, useCallback } from 'react'
+import { useState, useTransition, useCallback, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { updateInvoiceAction } from '@/app/actions/invoices'
+import { listLocationsAction, createLocationAction } from '@/app/actions/company-locations'
 import { SERVICES, SERVICE_MAP, SERVICE_GROUPS } from '@/lib/invoice-catalog'
 import { DELIVERY_PLANS } from '@/lib/pricing/catalog'
-import type { Invoice, InvoiceLineItem, DiscountMode } from '@/types'
+import type { Invoice, InvoiceLineItem, DiscountMode, CompanyLocation } from '@/types'
+
+const COST_CENTERS = ['Operaciones', 'Administración', 'Tecnología', 'Marketing', 'RRHH', 'Otro']
 
 // ---- helpers (identical to nueva/form.tsx) ----
 
@@ -68,7 +71,20 @@ export function EditInvoiceForm({ invoice, deals }: Props) {
   const [vatRate, setVatRate] = useState(String(invoice.vatRate))
   const [issuedAt, setIssuedAt] = useState(invoice.issuedAt?.split('T')[0] ?? '')
   const [dueAt, setDueAt] = useState(invoice.dueAt?.split('T')[0] ?? '')
+  const [dueDateEnabled, setDueDateEnabled] = useState(invoice.dueDateEnabled !== false)
   const [rectifiesId, setRectifiesId] = useState(invoice.rectifiesId ?? '')
+
+  // Location
+  const [locations, setLocations]       = useState<CompanyLocation[]>([])
+  const [locationId, setLocationId]     = useState(invoice.locationId ?? '')
+  const [showLocModal, setShowLocModal] = useState(false)
+
+  useEffect(() => {
+    if (!dealId) { setLocations([]); return }
+    listLocationsAction(dealId).then((res) => {
+      if (res.ok && res.data) setLocations(res.data)
+    })
+  }, [dealId])
 
   const [lines, setLines] = useState<FormLine[]>(() =>
     invoice.lineItems.length > 0
@@ -154,7 +170,9 @@ export function EditInvoiceForm({ invoice, deals }: Props) {
         vatRate: vat,
         amountTotal: total,
         issuedAt: issuedAt || null,
-        dueAt: dueAt || null,
+        dueAt: dueDateEnabled ? (dueAt || null) : null,
+        dueDateEnabled,
+        locationId: locationId || null,
         rectifiesId: rectifiesId || null,
       })
       if (result?.error) setError(result.error)
@@ -197,6 +215,35 @@ export function EditInvoiceForm({ invoice, deals }: Props) {
             </select>
           </div>
         )}
+
+        {/* Localización */}
+        {dealId && (
+          <div>
+            <label className="block text-xs font-medium text-zinc-700 mb-1">Localización</label>
+            <div className="flex items-center gap-2">
+              <select
+                value={locationId}
+                onChange={(e) => setLocationId(e.target.value)}
+                className="flex-1 border border-zinc-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-zinc-300 bg-white"
+              >
+                <option value="">— Sin localización —</option>
+                {locations.map((loc) => (
+                  <option key={loc.id} value={loc.id}>
+                    {loc.name}{loc.costCenter ? ` · ${loc.costCenter}` : ''}
+                  </option>
+                ))}
+              </select>
+              <button
+                type="button"
+                onClick={() => setShowLocModal(true)}
+                className="shrink-0 text-xs border border-zinc-200 text-zinc-600 hover:border-zinc-400 px-3 py-2 rounded-lg transition-colors"
+              >
+                + Nueva
+              </button>
+            </div>
+          </div>
+        )}
+
         <div>
           <label className="block text-xs font-medium text-zinc-700 mb-1">
             Nombre / Razón social <span className="text-red-500">*</span>
@@ -269,9 +316,26 @@ export function EditInvoiceForm({ invoice, deals }: Props) {
               className="w-full border border-zinc-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-zinc-300" />
           </div>
           <div>
-            <label className="block text-xs font-medium text-zinc-700 mb-1">Fecha de vencimiento</label>
-            <input type="date" value={dueAt} onChange={(e) => setDueAt(e.target.value)}
-              className="w-full border border-zinc-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-zinc-300" />
+            <div className="flex items-center justify-between mb-1">
+              <label className="text-xs font-medium text-zinc-700">Fecha de vencimiento</label>
+              <label className="flex items-center gap-1.5 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={dueDateEnabled}
+                  onChange={(e) => setDueDateEnabled(e.target.checked)}
+                  className="w-3.5 h-3.5 rounded border-zinc-300 text-zinc-900 focus:ring-zinc-500"
+                />
+                <span className="text-[10px] text-zinc-400">Activar</span>
+              </label>
+            </div>
+            {dueDateEnabled ? (
+              <input type="date" value={dueAt} onChange={(e) => setDueAt(e.target.value)}
+                className="w-full border border-zinc-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-zinc-300" />
+            ) : (
+              <div className="w-full border border-zinc-100 bg-zinc-50 rounded-lg px-3 py-2 text-sm text-zinc-300">
+                Sin fecha de vencimiento
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -287,7 +351,98 @@ export function EditInvoiceForm({ invoice, deals }: Props) {
           {isPending ? 'Guardando...' : 'Guardar cambios'}
         </button>
       </div>
+
+      {/* New location mini-modal */}
+      {showLocModal && (
+        <NewLocationModal
+          dealId={dealId}
+          onCreated={(loc) => {
+            setLocations((prev) => [...prev, loc])
+            setLocationId(loc.id)
+            setShowLocModal(false)
+          }}
+          onClose={() => setShowLocModal(false)}
+        />
+      )}
     </form>
+  )
+}
+
+// ---- NewLocationModal ----
+
+function NewLocationModal({
+  dealId,
+  onCreated,
+  onClose,
+}: {
+  dealId: string
+  onCreated: (loc: CompanyLocation) => void
+  onClose: () => void
+}) {
+  const [name, setName]           = useState('')
+  const [address, setAddress]     = useState('')
+  const [costCenter, setCc]       = useState('')
+  const [customCc, setCustomCc]   = useState('')
+  const [error, setError]         = useState<string | null>(null)
+  const [isPending, startTx]      = useTransition()
+
+  function handleSubmit(e: React.FormEvent) {
+    e.preventDefault()
+    if (!name.trim()) { setError('El nombre es obligatorio'); return }
+    const finalCc = costCenter === 'Otro' ? customCc.trim() : costCenter
+    startTx(async () => {
+      const res = await createLocationAction({ dealId, name: name.trim(), address: address.trim() || null, costCenter: finalCc || null })
+      if (res.ok && res.data) onCreated(res.data)
+      else setError(res.error ?? 'Error al crear')
+    })
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
+      style={{ background: 'rgba(0,0,0,0.4)', backdropFilter: 'blur(4px)' }}
+      onClick={(e) => { if (e.target === e.currentTarget) onClose() }}>
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm">
+        <div className="px-6 py-4 border-b border-zinc-100 flex items-center justify-between">
+          <h2 className="text-sm font-semibold text-zinc-900">Nueva localización</h2>
+          <button onClick={onClose} className="text-zinc-400 hover:text-zinc-700">✕</button>
+        </div>
+        <form onSubmit={handleSubmit} className="px-6 py-5 space-y-4">
+          <div>
+            <label className="block text-[11px] font-semibold uppercase tracking-wider text-zinc-400 mb-1">Nombre <span className="text-red-500">*</span></label>
+            <input autoFocus type="text" value={name} onChange={(e) => { setName(e.target.value); setError(null) }}
+              placeholder="Local Madrid Centro"
+              className="w-full text-sm bg-zinc-100 border-0 rounded-lg px-3 py-2 text-zinc-700 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-zinc-300" />
+          </div>
+          <div>
+            <label className="block text-[11px] font-semibold uppercase tracking-wider text-zinc-400 mb-1">Dirección</label>
+            <input type="text" value={address} onChange={(e) => setAddress(e.target.value)}
+              placeholder="C/ Ejemplo 1, Madrid"
+              className="w-full text-sm bg-zinc-100 border-0 rounded-lg px-3 py-2 text-zinc-700 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-zinc-300" />
+          </div>
+          <div>
+            <label className="block text-[11px] font-semibold uppercase tracking-wider text-zinc-400 mb-1">Centro de coste</label>
+            <select value={costCenter} onChange={(e) => setCc(e.target.value)}
+              className="w-full text-sm bg-zinc-100 border-0 rounded-lg px-3 py-2 text-zinc-700 focus:outline-none focus:ring-2 focus:ring-zinc-300">
+              <option value="">— Sin centro de coste —</option>
+              {COST_CENTERS.map((c) => <option key={c} value={c}>{c}</option>)}
+            </select>
+            {costCenter === 'Otro' && (
+              <input type="text" value={customCc} onChange={(e) => setCustomCc(e.target.value)}
+                placeholder="Centro de coste personalizado"
+                className="mt-2 w-full text-sm bg-zinc-100 border-0 rounded-lg px-3 py-2 text-zinc-700 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-zinc-300" />
+            )}
+          </div>
+          {error && <p className="text-xs text-red-500">{error}</p>}
+          <div className="flex items-center justify-end gap-3 pt-1">
+            <button type="button" onClick={onClose} disabled={isPending} className="text-sm text-zinc-500 hover:text-zinc-700">Cancelar</button>
+            <button type="submit" disabled={isPending}
+              className="px-4 py-2 text-sm font-medium bg-zinc-900 text-white hover:bg-zinc-700 rounded-lg disabled:opacity-50">
+              {isPending ? 'Guardando…' : 'Crear localización'}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
   )
 }
 

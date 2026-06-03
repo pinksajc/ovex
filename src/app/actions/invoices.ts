@@ -2,7 +2,7 @@
 
 import { redirect } from 'next/navigation'
 import { revalidatePath } from 'next/cache'
-import { createInvoice, updateInvoice, updateInvoiceStatus, getInvoice } from '@/lib/supabase/invoices'
+import { createInvoice, updateInvoice, updateInvoiceStatus, getInvoice, convertProformaToInvoice } from '@/lib/supabase/invoices'
 import { insertCashflowTransactions } from '@/lib/supabase/cashflow'
 import type { CreateInvoiceInput, UpdateInvoiceInput, InvoiceStatus } from '@/types'
 
@@ -33,6 +33,19 @@ export async function updateInvoiceAction(
   }
 }
 
+export async function convertProformaAction(
+  proformaId: string,
+): Promise<{ ok: boolean; invoiceId?: string; error?: string }> {
+  try {
+    const invoice = await convertProformaToInvoice(proformaId)
+    revalidatePath('/facturas')
+    revalidatePath(`/facturas/${proformaId}`)
+    return { ok: true, invoiceId: invoice.id }
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : 'Error desconocido' }
+  }
+}
+
 export async function updateInvoiceStatusAction(
   id: string,
   status: InvoiceStatus
@@ -42,8 +55,8 @@ export async function updateInvoiceStatusAction(
     const invoice = await getInvoice(id)
     await updateInvoiceStatus(id, status)
 
-    // Auto-create cashflow income entry the first time a factura is marked paid
-    if (status === 'paid' && invoice?.status !== 'paid' && invoice) {
+    // Auto-create cashflow income entry the first time a factura (non-proforma) is marked paid
+    if (status === 'paid' && invoice?.status !== 'paid' && invoice && invoice.type !== 'proforma') {
       const today = new Date().toISOString().split('T')[0]
       await insertCashflowTransactions([{
         date: today,

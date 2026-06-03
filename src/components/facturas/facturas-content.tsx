@@ -10,6 +10,7 @@ const INVOICE_STATUS_LABELS: Record<InvoiceStatus, string> = {
   issued: 'Emitida',
   paid: 'Pagada',
   overdue: 'Vencida',
+  converted: 'Convertida',
 }
 
 const INVOICE_STATUS_COLORS: Record<InvoiceStatus, string> = {
@@ -17,6 +18,7 @@ const INVOICE_STATUS_COLORS: Record<InvoiceStatus, string> = {
   issued: 'bg-blue-50 text-blue-700',
   paid: 'bg-emerald-50 text-emerald-700',
   overdue: 'bg-red-50 text-red-700',
+  converted: 'bg-zinc-100 text-zinc-500',
 }
 
 function formatEur(n: number) {
@@ -48,6 +50,8 @@ function inDateRange(isoDate: string | null, desde: string, hasta: string): bool
   return true
 }
 
+type TabKey = InvoiceStatus | 'all' | 'proforma'
+
 export function FacturasContent({
   invoices,
   invoiceFetchError,
@@ -55,20 +59,24 @@ export function FacturasContent({
   invoices: Invoice[]
   invoiceFetchError: string | null
 }) {
-  const [invStatus, setInvStatus] = useState<InvoiceStatus | 'all'>('all')
+  const [tab, setTab] = useState<TabKey>('all')
   const [invQuery, setInvQuery] = useState('')
   const [invDesde, setInvDesde] = useState('')
   const [invHasta, setInvHasta] = useState('')
 
   const filteredInvoices = invoices.filter((inv) => {
-    if (invStatus !== 'all' && inv.status !== invStatus) return false
+    if (tab === 'proforma' && inv.type !== 'proforma') return false
+    if (tab !== 'all' && tab !== 'proforma' && inv.status !== tab) return false
     if (invQuery && !matchesText(invQuery, inv.number, inv.clientName, inv.clientCif)) return false
     if (!inDateRange(inv.issuedAt, invDesde, invHasta)) return false
     return true
   })
 
-  const invCount = (s: InvoiceStatus | 'all') =>
-    s === 'all' ? invoices.length : invoices.filter((i) => i.status === s).length
+  const invCount = (t: TabKey) => {
+    if (t === 'all') return invoices.length
+    if (t === 'proforma') return invoices.filter((i) => i.type === 'proforma').length
+    return invoices.filter((i) => i.status === t).length
+  }
 
   return (
     <div>
@@ -93,16 +101,23 @@ export function FacturasContent({
         hasta={invHasta} onHasta={setInvHasta}
       />
 
-      <div className="flex items-center gap-1 mb-6 bg-zinc-100 rounded-lg p-0.5 w-fit">
-        {(['all', 'draft', 'issued', 'paid', 'overdue'] as (InvoiceStatus | 'all')[]).map((s) => (
+      <div className="flex items-center gap-1 mb-6 bg-zinc-100 rounded-lg p-0.5 w-fit flex-wrap">
+        {([
+          ['all', 'Todas'],
+          ['proforma', 'Proforma'],
+          ['draft', 'Borrador'],
+          ['issued', 'Emitida'],
+          ['paid', 'Pagada'],
+          ['overdue', 'Vencida'],
+        ] as [TabKey, string][]).map(([key, label]) => (
           <button
-            key={s}
-            onClick={() => setInvStatus(s)}
+            key={key}
+            onClick={() => setTab(key)}
             className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
-              invStatus === s ? 'bg-white text-zinc-900 shadow-sm' : 'text-zinc-500 hover:text-zinc-700'
+              tab === key ? 'bg-white text-zinc-900 shadow-sm' : 'text-zinc-500 hover:text-zinc-700'
             }`}
           >
-            {s === 'all' ? 'Todas' : INVOICE_STATUS_LABELS[s]} ({invCount(s)})
+            {label} ({invCount(key)})
           </button>
         ))}
       </div>
@@ -118,7 +133,7 @@ export function FacturasContent({
           <p className="text-zinc-400 text-sm">
             {invQuery || invDesde || invHasta
               ? 'Sin resultados para los filtros aplicados.'
-              : `No hay facturas${invStatus !== 'all' ? ` con estado "${INVOICE_STATUS_LABELS[invStatus]}"` : ''}.`}
+              : `No hay facturas${tab !== 'all' ? ` para el filtro seleccionado` : ''}.`}
           </p>
           {!invQuery && !invDesde && !invHasta && (
             <Link
@@ -151,6 +166,9 @@ export function FacturasContent({
                     </Link>
                     {inv.type === 'rectificativa' && (
                       <span className="ml-2 text-[9px] uppercase tracking-wide text-amber-600 font-semibold">Rect.</span>
+                    )}
+                    {inv.type === 'proforma' && (
+                      <span className="ml-2 text-[9px] uppercase tracking-wide text-violet-600 font-semibold">Proforma</span>
                     )}
                   </td>
                   <td className="px-5 py-3">

@@ -90,7 +90,10 @@ export async function generateInvoicePdf(invoice: Invoice): Promise<Buffer> {
   const hasLineItems = items.length > 0
   const hasAnyDiscount = totalDiscounts > 0.001 || discountItems.length > 0
 
-  const invoiceTypeLabel = invoice.type === 'rectificativa' ? 'Factura Rectificativa' : 'Factura'
+  const invoiceTypeLabel =
+    invoice.type === 'rectificativa' ? 'Factura Rectificativa' :
+    invoice.type === 'proforma' ? 'Proforma' :
+    'Factura'
 
   const html = `<!DOCTYPE html>
 <html lang="es">
@@ -284,10 +287,11 @@ export async function generateInvoicePdf(invoice: Invoice): Promise<Buffer> {
     <div class="meta-label">Fecha de emisión</div>
     <div class="meta-value">${fmtDate(invoice.issuedAt)}</div>
   </div>
+  ${invoice.dueDateEnabled !== false ? `
   <div class="meta-item">
     <div class="meta-label">Fecha de vencimiento</div>
     <div class="meta-value">${fmtDate(invoice.dueAt)}</div>
-  </div>
+  </div>` : ''}
   <div class="meta-item">
     <div class="meta-label">Número</div>
     <div class="meta-value" style="font-family:Courier New,monospace;">${esc(invoice.number)}</div>
@@ -306,6 +310,8 @@ ${invoice.type === 'rectificativa' && invoice.rectifiesId ? `
   <div class="party-detail">
     ${invoice.clientCif ? `NIF/CIF: ${esc(invoice.clientCif)}<br/>` : ''}
     ${invoice.clientAddress ? esc(invoice.clientAddress) : ''}
+    ${invoice.locationName ? `<br/><span style="color:#94a3b8;">📍 ${esc(invoice.locationName)}</span>` : ''}
+    ${invoice.locationCostCenter ? `<br/><span style="color:#94a3b8;">Centro de coste: ${esc(invoice.locationCostCenter)}</span>` : ''}
   </div>
 </div>
 

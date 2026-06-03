@@ -10,6 +10,8 @@ import { OwnerSelector } from '@/components/owner-selector'
 import { getWorkspaceMembers } from '@/lib/auth'
 import { getPresupuestosByDeal } from '@/lib/supabase/presupuestos'
 import { getInvoicesByDeal } from '@/lib/supabase/invoices'
+import { listLocationsByDeal } from '@/lib/supabase/company-locations'
+import { DealLocationsPanel } from '@/components/deals/deal-locations-panel'
 import type { DealStage, PresupuestoStatus, InvoiceStatus, DeliveryPlanId, AddonId } from '@/types'
 
 const PRESUPUESTO_STATUS_LABELS: Record<PresupuestoStatus, string> = {
@@ -33,6 +35,7 @@ const INVOICE_STATUS_LABELS: Record<InvoiceStatus, string> = {
   issued: 'Emitida',
   paid: 'Pagada',
   overdue: 'Vencida',
+  converted: 'Convertida',
 }
 
 const INVOICE_STATUS_COLORS: Record<InvoiceStatus, string> = {
@@ -40,6 +43,7 @@ const INVOICE_STATUS_COLORS: Record<InvoiceStatus, string> = {
   issued: 'bg-blue-50 text-blue-700',
   paid: 'bg-emerald-50 text-emerald-700',
   overdue: 'bg-red-50 text-red-700',
+  converted: 'bg-zinc-100 text-zinc-500',
 }
 
 const STAGE_LABELS: Record<DealStage, string> = {
@@ -69,11 +73,12 @@ export default async function DealPage({
 }) {
   const { id } = await params
   const user = await getCurrentUser()
-  const [deal, members, presupuestos, facturas] = await Promise.all([
+  const [deal, members, presupuestos, facturas, locations] = await Promise.all([
     getDeal(id, user ?? undefined),
     getWorkspaceMembers(),
     getPresupuestosByDeal(id).catch(() => []),
     getInvoicesByDeal(id).catch(() => []),
+    listLocationsByDeal(id).catch(() => []),
   ])
 
   if (!deal) notFound()
@@ -260,6 +265,9 @@ export default async function DealPage({
           </div>
         )}
       </div>
+
+      {/* Localizaciones */}
+      <DealLocationsPanel dealId={deal.id} initialLocations={locations} />
 
       {/* Facturas */}
       <div className="bg-white border border-zinc-200 rounded-xl p-5 mb-6">
