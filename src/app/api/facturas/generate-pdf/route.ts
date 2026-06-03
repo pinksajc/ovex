@@ -19,8 +19,9 @@ export async function GET(req: Request) {
     const { generateInvoicePdf } = await import('@/lib/pdf/invoice')
     const pdfBuffer = await generateInvoicePdf(invoice)
 
-    const slug = invoice.number.replace(/[^A-Za-z0-9-]/g, '-').toLowerCase()
-    const filename = `factura-${slug}.pdf`
+    // Use the invoice number directly as filename (e.g. PF-2026-0001.pdf, F-2026-0001.pdf)
+    const slug = invoice.number.replace(/[^A-Za-z0-9-]/g, '-')
+    const filename = `${slug}.pdf`
 
     return new Response(pdfBuffer.buffer as ArrayBuffer, {
       headers: {

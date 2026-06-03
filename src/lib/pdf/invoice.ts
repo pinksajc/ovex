@@ -90,10 +90,12 @@ export async function generateInvoicePdf(invoice: Invoice): Promise<Buffer> {
   const hasLineItems = items.length > 0
   const hasAnyDiscount = totalDiscounts > 0.001 || discountItems.length > 0
 
-  const invoiceTypeLabel =
-    invoice.type === 'rectificativa' ? 'Factura Rectificativa' :
-    invoice.type === 'proforma' ? 'Proforma' :
-    'Factura'
+  // Label shown in the header box (top-right). For proformas: "PROFORMA".
+  // For rectificativas: "FACTURA RECTIFICATIVA". Otherwise: "FACTURA".
+  const headerBoxLabel =
+    invoice.type === 'rectificativa' ? 'FACTURA RECTIFICATIVA' :
+    invoice.type === 'proforma' ? 'PROFORMA' :
+    'FACTURA'
 
   const html = `<!DOCTYPE html>
 <html lang="es">
@@ -276,7 +278,7 @@ export async function generateInvoicePdf(invoice: Invoice): Promise<Buffer> {
     </div>
   </div>
   <div style="text-align:right;">
-    <div class="invoice-type-badge">${invoiceTypeLabel}</div>
+    <div class="invoice-type-badge">${headerBoxLabel}</div>
     <div class="invoice-number">${esc(invoice.number)}</div>
   </div>
 </div>
@@ -292,10 +294,6 @@ export async function generateInvoicePdf(invoice: Invoice): Promise<Buffer> {
     <div class="meta-label">Fecha de vencimiento</div>
     <div class="meta-value">${fmtDate(invoice.dueAt)}</div>
   </div>` : ''}
-  <div class="meta-item">
-    <div class="meta-label">Número</div>
-    <div class="meta-value" style="font-family:Courier New,monospace;">${esc(invoice.number)}</div>
-  </div>
 </div>
 
 ${invoice.type === 'rectificativa' && invoice.rectifiesId ? `
@@ -309,9 +307,9 @@ ${invoice.type === 'rectificativa' && invoice.rectifiesId ? `
   <div class="party-name">${esc(invoice.clientName)}</div>
   <div class="party-detail">
     ${invoice.clientCif ? `NIF/CIF: ${esc(invoice.clientCif)}<br/>` : ''}
-    ${invoice.clientAddress ? esc(invoice.clientAddress) : ''}
-    ${invoice.locationName ? `<br/><span style="color:#94a3b8;">📍 ${esc(invoice.locationName)}</span>` : ''}
-    ${invoice.locationCostCenter ? `<br/><span style="color:#94a3b8;">Centro de coste: ${esc(invoice.locationCostCenter)}</span>` : ''}
+    ${invoice.clientAddress ? `${esc(invoice.clientAddress)}<br/>` : ''}
+    ${invoice.locationName ? `${esc(invoice.locationName)}<br/>` : ''}
+    ${invoice.locationCostCenter ? `${esc(invoice.locationCostCenter)}` : ''}
   </div>
 </div>
 
