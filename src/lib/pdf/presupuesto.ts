@@ -378,10 +378,7 @@ export async function generatePresupuestoPdf(
       hola@platomico.com
     </div>
   </div>
-  <div style="text-align:right;">
-    <div class="doc-type-badge">Oferta</div>
-    <div class="doc-number">${esc(presupuesto.number)}</div>
-  </div>
+  <div></div>
 </div>
 
 <!-- Meta -->
@@ -393,10 +390,6 @@ export async function generatePresupuestoPdf(
   <div class="meta-item">
     <div class="meta-label">Válido hasta</div>
     <div class="meta-value">${fmtDate(presupuesto.validUntil)}</div>
-  </div>
-  <div class="meta-item">
-    <div class="meta-label">Número</div>
-    <div class="meta-value" style="font-family:Courier New,monospace;">${esc(presupuesto.number)}</div>
   </div>
 </div>
 

@@ -29,8 +29,8 @@ export async function GET(req: Request) {
     const { generatePresupuestoPdf } = await import('@/lib/pdf/presupuesto')
     const pdfBuffer = await generatePresupuestoPdf(presupuesto, { contactName })
 
-    const slug = presupuesto.number.replace(/[^A-Za-z0-9-]/g, '-').toLowerCase()
-    const filename = `oferta-${slug}.pdf`
+    const slug = presupuesto.clientName.replace(/[^A-Za-z0-9-]/g, '-').toLowerCase().replace(/-+/g, '-').replace(/^-|-$/g, '')
+    const filename = `oferta-${slug || 'cliente'}.pdf`
 
     return new Response(pdfBuffer.buffer as ArrayBuffer, {
       headers: {
