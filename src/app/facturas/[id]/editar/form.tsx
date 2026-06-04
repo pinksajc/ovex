@@ -4,9 +4,11 @@ import { useState, useTransition, useCallback, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { updateInvoiceAction } from '@/app/actions/invoices'
 import { listLocationsAction, createLocationAction } from '@/app/actions/company-locations'
+import { getActiveConfigAction } from '@/app/actions/deal-config'
+import { generateLinesForLocation } from '@/lib/invoice-lines'
 import { SERVICES, SERVICE_MAP, SERVICE_GROUPS } from '@/lib/invoice-catalog'
 import { DELIVERY_PLANS } from '@/lib/pricing/catalog'
-import type { Invoice, InvoiceLineItem, DiscountMode, CompanyLocation } from '@/types'
+import type { Invoice, InvoiceLineItem, DiscountMode, CompanyLocation, DealConfiguration } from '@/types'
 
 const COST_CENTERS = ['Operaciones', 'Administración', 'Tecnología', 'Marketing', 'RRHH', 'Otro']
 
@@ -74,15 +76,44 @@ export function EditInvoiceForm({ invoice, deals }: Props) {
   const [dueDateEnabled, setDueDateEnabled] = useState(invoice.dueDateEnabled !== false)
   const [rectifiesId, setRectifiesId] = useState(invoice.rectifiesId ?? '')
 
-  // Location
-  const [locations, setLocations]       = useState<CompanyLocation[]>([])
-  const [locationId, setLocationId]     = useState(invoice.locationId ?? '')
-  const [showLocModal, setShowLocModal] = useState(false)
+  // Location (multi-select)
+  const [locations, setLocations]            = useState<CompanyLocation[]>([])
+  const [dealConfig, setDealConfig]          = useState<DealConfiguration | null>(null)
+  const [showLocModal, setShowLocModal]      = useState(false)
+
+  // Initialize selectedLocations from existing line items' locationGroupIds
+  const [selectedLocations, setSelectedLocs] = useState<CompanyLocation[]>(() => {
+    const seen = new Set<string>()
+    const result: CompanyLocation[] = []
+    for (const item of invoice.lineItems) {
+      if (item.locationGroupId && !seen.has(item.locationGroupId)) {
+        seen.add(item.locationGroupId)
+        result.push({
+          id: item.locationGroupId,
+          dealId: invoice.dealId ?? '',
+          name: item.locationGroupName ?? item.locationGroupId,
+          address: item.locationGroupAddress ?? null,
+          costCenter: null,
+          createdAt: '',
+        })
+      }
+    }
+    return result
+  })
 
   useEffect(() => {
-    if (!dealId) { setLocations([]); return }
+    if (!dealId) { setLocations([]); setDealConfig(null); return }
     listLocationsAction(dealId).then((res) => {
-      if (res.ok && res.data) setLocations(res.data)
+      if (res.ok && res.data) {
+        setLocations(res.data)
+        // Refresh selectedLocations with full data from DB (to get latest addresses etc.)
+        setSelectedLocs((prev) =>
+          prev.map((sel) => res.data!.find((l) => l.id === sel.id) ?? sel)
+        )
+      }
+    })
+    getActiveConfigAction(dealId).then((res) => {
+      if (res.ok) setDealConfig(res.data ?? null)
     })
   }, [dealId])
 
@@ -123,8 +154,35 @@ export function EditInvoiceForm({ invoice, deals }: Props) {
     setLines((p) => { const n = p.filter((l) => l.id !== id); return n.length === 0 ? [emptyLine()] : n })
   }
 
+  function toggleLocation(loc: CompanyLocation) {
+    const isSelected = selectedLocations.some((l) => l.id === loc.id)
+    if (isSelected) {
+      setSelectedLocs((prev) => prev.filter((l) => l.id !== loc.id))
+      setLines((prev) => {
+        const without = prev.filter((l) => l.locationGroupId !== loc.id)
+        return without.length === 0 ? [emptyLine()] : without
+      })
+    } else {
+      setSelectedLocs((prev) => [...prev, loc])
+      if (dealConfig) {
+        const generated = generateLinesForLocation(loc, dealConfig).map((item) => ({
+          ...item,
+          serviceId: item.serviceId ?? '',
+          unit: item.unit ?? '',
+        })) as FormLine[]
+        setLines((prev) => {
+          const hasOnlyPlaceholder =
+            prev.length === 1 && !prev[0].description && !prev[0].locationGroupId
+          return hasOnlyPlaceholder ? generated : [...prev, ...generated]
+        })
+      }
+    }
+  }
+
   function handleDealSelect(id: string) {
     setDealId(id)
+    setSelectedLocs([])
+    setDealConfig(null)
     if (!id) return
     const deal = deals.find((d) => d.id === id)
     if (!deal) return
@@ -156,7 +214,12 @@ export function EditInvoiceForm({ invoice, deals }: Props) {
       period: l.period || undefined,
       lineDiscountPercent: l.lineDiscountPercent || undefined,
       discountName: l.discountName || undefined,
+      locationGroupId: l.locationGroupId || undefined,
+      locationGroupName: l.locationGroupName || undefined,
+      locationGroupAddress: l.locationGroupAddress || undefined,
     }))
+
+    const singleLocationId = selectedLocations.length === 1 ? selectedLocations[0].id : null
 
     startTransition(async () => {
       const result = await updateInvoiceAction(invoice.id, {
@@ -172,7 +235,7 @@ export function EditInvoiceForm({ invoice, deals }: Props) {
         issuedAt: issuedAt || null,
         dueAt: dueDateEnabled ? (dueAt || null) : null,
         dueDateEnabled,
-        locationId: locationId || null,
+        locationId: singleLocationId,
         rectifiesId: rectifiesId || null,
       })
       if (result?.error) setError(result.error)
@@ -216,31 +279,61 @@ export function EditInvoiceForm({ invoice, deals }: Props) {
           </div>
         )}
 
-        {/* Localización */}
+        {/* Localizaciones — multi-select checkboxes */}
         {dealId && (
           <div>
-            <label className="block text-xs font-medium text-zinc-700 mb-1">Localización</label>
-            <div className="flex items-center gap-2">
-              <select
-                value={locationId}
-                onChange={(e) => setLocationId(e.target.value)}
-                className="flex-1 border border-zinc-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-zinc-300 bg-white"
-              >
-                <option value="">— Sin localización —</option>
-                {locations.map((loc) => (
-                  <option key={loc.id} value={loc.id}>
-                    {loc.name}{loc.costCenter ? ` · ${loc.costCenter}` : ''}
-                  </option>
-                ))}
-              </select>
+            <div className="flex items-center justify-between mb-2">
+              <label className="text-xs font-medium text-zinc-700">Localizaciones</label>
               <button
                 type="button"
                 onClick={() => setShowLocModal(true)}
-                className="shrink-0 text-xs border border-zinc-200 text-zinc-600 hover:border-zinc-400 px-3 py-2 rounded-lg transition-colors"
+                className="text-xs border border-zinc-200 text-zinc-600 hover:border-zinc-400 px-2.5 py-1 rounded-lg transition-colors"
               >
                 + Nueva
               </button>
             </div>
+            {locations.length === 0 ? (
+              <p className="text-xs text-zinc-400 italic">Sin localizaciones para este deal.</p>
+            ) : (
+              <div className="space-y-1.5">
+                {locations.map((loc) => {
+                  const checked = selectedLocations.some((l) => l.id === loc.id)
+                  return (
+                    <label
+                      key={loc.id}
+                      className={`flex items-start gap-2.5 px-3 py-2 rounded-lg border cursor-pointer transition-colors ${
+                        checked
+                          ? 'border-zinc-900 bg-zinc-50'
+                          : 'border-zinc-200 hover:border-zinc-400'
+                      }`}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={checked}
+                        onChange={() => toggleLocation(loc)}
+                        className="mt-0.5 w-3.5 h-3.5 rounded border-zinc-300 text-zinc-900 focus:ring-zinc-500"
+                      />
+                      <span className="text-xs text-zinc-800 leading-tight">
+                        <span className="font-medium">{loc.name}</span>
+                        {loc.costCenter && (
+                          <span className="text-zinc-400 ml-1.5">· {loc.costCenter}</span>
+                        )}
+                        {loc.address && (
+                          <span className="block text-zinc-400 text-[10px] mt-0.5">{loc.address}</span>
+                        )}
+                      </span>
+                    </label>
+                  )
+                })}
+              </div>
+            )}
+            {dealConfig && selectedLocations.length > 0 && (
+              <p className="text-[10px] text-violet-600 mt-2">
+                Config activa: <strong>{dealConfig.plan}</strong>
+                {dealConfig.activeAddons.filter(a => a !== 'analytics_premium' && a !== 'datafono').length > 0 &&
+                  ` + ${dealConfig.activeAddons.filter(a => a !== 'analytics_premium' && a !== 'datafono').join(', ')}`}
+              </p>
+            )}
           </div>
         )}
 
@@ -273,15 +366,12 @@ export function EditInvoiceForm({ invoice, deals }: Props) {
         <div className="px-5 py-3 border-b border-zinc-100">
           <h2 className="text-xs font-semibold text-zinc-500 uppercase tracking-widest">Líneas</h2>
         </div>
-        <div className="divide-y divide-zinc-50">
-          {lines.map((line) =>
-            line.type === 'line' ? (
-              <RegularLineRow key={line.id} line={line} onChange={updateLine} onRemove={removeLine} canRemove={lines.length > 1} />
-            ) : (
-              <DiscountLineRow key={line.id} line={line} subtotal={subtotal} onChange={updateLine} onRemove={removeLine} />
-            )
-          )}
-        </div>
+        <GroupedLinesView
+          lines={lines}
+          subtotal={subtotal}
+          onUpdate={updateLine}
+          onRemove={removeLine}
+        />
         <div className="px-5 py-3 border-t border-zinc-100 flex items-center gap-3">
           <button type="button" onClick={addLine}
             className="text-xs text-zinc-500 hover:text-zinc-900 border border-zinc-200 hover:border-zinc-400 px-3 py-1.5 rounded-lg transition-colors">
@@ -358,8 +448,8 @@ export function EditInvoiceForm({ invoice, deals }: Props) {
           dealId={dealId}
           onCreated={(loc) => {
             setLocations((prev) => [...prev, loc])
-            setLocationId(loc.id)
             setShowLocModal(false)
+            toggleLocation(loc)
           }}
           onClose={() => setShowLocModal(false)}
         />
@@ -603,6 +693,73 @@ function TotalsRow({ label, value, red }: { label: string; value: string; red?: 
     <div className="flex items-center justify-between">
       <span className={`text-xs ${red ? 'text-red-500' : 'text-zinc-500'}`}>{label}</span>
       <span className={`text-xs font-mono ${red ? 'text-red-600 font-semibold' : 'text-zinc-700'}`}>{value} €</span>
+    </div>
+  )
+}
+
+// =========================================
+// GroupedLinesView
+// =========================================
+
+function GroupedLinesView({
+  lines,
+  subtotal,
+  onUpdate,
+  onRemove,
+}: {
+  lines: FormLine[]
+  subtotal: number
+  onUpdate: (id: string, patch: Partial<FormLine>) => void
+  onRemove: (id: string) => void
+}) {
+  const hasGroups = lines.some((l) => l.locationGroupId)
+
+  if (!hasGroups) {
+    return (
+      <div className="divide-y divide-zinc-50">
+        {lines.map((line) =>
+          line.type === 'line' ? (
+            <RegularLineRow key={line.id} line={line} onChange={onUpdate} onRemove={onRemove} canRemove={lines.length > 1} />
+          ) : (
+            <DiscountLineRow key={line.id} line={line} subtotal={subtotal} onChange={onUpdate} onRemove={onRemove} />
+          )
+        )}
+      </div>
+    )
+  }
+
+  const seen = new Set<string>()
+  const groupIds: Array<string | undefined> = []
+  for (const l of lines) {
+    const gid = l.locationGroupId ?? '__ungrouped__'
+    if (!seen.has(gid)) { seen.add(gid); groupIds.push(l.locationGroupId) }
+  }
+
+  return (
+    <div>
+      {groupIds.map((gid) => {
+        const groupLines = lines.filter((l) => (l.locationGroupId ?? undefined) === gid)
+        const groupName = groupLines[0]?.locationGroupName ?? (gid ? gid : 'General')
+        const groupAddr = groupLines[0]?.locationGroupAddress
+
+        return (
+          <div key={gid ?? '__ungrouped__'}>
+            <div className="flex items-center gap-2 px-5 py-2 bg-zinc-50 border-t border-zinc-100">
+              <span className="text-[10px] font-semibold text-zinc-600 uppercase tracking-wide">{groupName}</span>
+              {groupAddr && <span className="text-[10px] text-zinc-400">{groupAddr}</span>}
+            </div>
+            <div className="divide-y divide-zinc-50">
+              {groupLines.map((line) =>
+                line.type === 'line' ? (
+                  <RegularLineRow key={line.id} line={line} onChange={onUpdate} onRemove={onRemove} canRemove={true} />
+                ) : (
+                  <DiscountLineRow key={line.id} line={line} subtotal={subtotal} onChange={onUpdate} onRemove={onRemove} />
+                )
+              )}
+            </div>
+          </div>
+        )
+      })}
     </div>
   )
 }

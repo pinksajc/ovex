@@ -36,23 +36,57 @@ function fmtDate(s: string | null): string {
   return new Date(s).toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' })
 }
 
-// ---- Line items rendering (6 columns) ----
+// ---- Line items rendering (6 columns, with optional location group headers) ----
 function renderLineRows(items: InvoiceLineItem[]): string {
   if (!items || items.length === 0) return ''
-  return items.map((item) => {
+
+  // Determine if any item carries locationGroupId — if so, render group headers
+  const hasGroups = items.some((i) => i.locationGroupId)
+
+  const rows: string[] = []
+  let lastGroupId: string | undefined = undefined
+
+  for (const item of items) {
+    // Inject location group header when the group changes
+    if (hasGroups) {
+      const groupId = item.locationGroupId ?? ''
+      if (groupId !== lastGroupId) {
+        lastGroupId = groupId
+        if (groupId) {
+          // Named location group header
+          const name = item.locationGroupName ?? groupId
+          const addr = item.locationGroupAddress
+          rows.push(`
+            <tr class="location-group-header">
+              <td colspan="6">
+                <span style="font-weight:700;font-size:9px;letter-spacing:0.5px;">${esc(name)}</span>
+                ${addr ? `<span style="font-size:8px;color:#94a3b8;margin-left:8px;">${esc(addr)}</span>` : ''}
+              </td>
+            </tr>`)
+        } else {
+          // Ungrouped items get a subtle separator
+          rows.push(`
+            <tr class="location-group-header">
+              <td colspan="6" style="font-size:8px;color:#94a3b8;font-style:italic;">General</td>
+            </tr>`)
+        }
+      }
+    }
+
     if (item.type === 'discount') {
-      // Global discount rows — span first 4 cols, show in last col
-      return `
+      rows.push(`
         <tr class="discount-row">
           <td colspan="4" style="color:#dc2626;">${esc(item.description || 'Descuento')}</td>
           <td class="right" style="color:#dc2626;">—</td>
           <td class="right" style="color:#dc2626;font-weight:700;">${fmt(item.amount)} €</td>
-        </tr>`
+        </tr>`)
+      continue
     }
+
     const dto = item.lineDiscountPercent ?? 0
     const gross = item.quantity * item.unitPrice
     const net = item.amount
-    return `
+    rows.push(`
       <tr>
         <td>
           ${esc(item.description || '—')}
@@ -64,8 +98,10 @@ function renderLineRows(items: InvoiceLineItem[]): string {
         <td class="right">${dto > 0 ? `${fmt(dto)}%` : '—'}</td>
         <td class="right">${fmt(gross)} €</td>
         <td class="right" style="font-weight:600;">${dto > 0 ? `${fmt(net)} €` : '—'}</td>
-      </tr>`
-  }).join('')
+      </tr>`)
+  }
+
+  return rows.join('')
 }
 
 // ---- Invoice HTML ----
@@ -201,6 +237,14 @@ export async function generateInvoicePdf(invoice: Invoice): Promise<Buffer> {
   table.concept-table tbody tr.discount-row {
     background: #fff5f5;
     border-bottom: 1px solid #fee2e2;
+  }
+  table.concept-table tbody tr.location-group-header td {
+    background: #f0f4f8;
+    color: #1e3a5f;
+    padding: 6px 10px;
+    font-size: 9px;
+    font-weight: 700;
+    border-bottom: 1px solid #dde4ec;
   }
   table.concept-table tbody td {
     font-size: 10px;

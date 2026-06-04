@@ -270,6 +270,10 @@ export interface InvoiceLineItem {
   lineDiscountPercent?: number
   /** Optional name/label for the per-line discount (e.g. "CORE PARTNER DISCOUNT") */
   discountName?: string
+  /** Location group — groups this line under a location header in PDF and form */
+  locationGroupId?: string
+  locationGroupName?: string
+  locationGroupAddress?: string
 }
 
 export interface Invoice {
