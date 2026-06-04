@@ -253,6 +253,12 @@ export async function updateInvoiceStatus(id: string, status: InvoiceStatus): Pr
   if (error) throw error
 }
 
+export async function deleteInvoice(id: string): Promise<void> {
+  const db = getSupabaseClient()
+  const { error } = await invoicesTable(db).delete().eq('id', id)
+  if (error) throw error
+}
+
 /**
  * Converts a proforma into a real ordinary invoice.
  * - Creates a new invoice (type='ordinary') with the same data, status='draft', new F-YYYY number

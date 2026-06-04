@@ -2,7 +2,7 @@
 
 import { redirect } from 'next/navigation'
 import { revalidatePath } from 'next/cache'
-import { createInvoice, updateInvoice, updateInvoiceStatus, getInvoice, convertProformaToInvoice } from '@/lib/supabase/invoices'
+import { createInvoice, updateInvoice, updateInvoiceStatus, getInvoice, convertProformaToInvoice, deleteInvoice } from '@/lib/supabase/invoices'
 import { insertCashflowTransactions } from '@/lib/supabase/cashflow'
 import type { CreateInvoiceInput, UpdateInvoiceInput, InvoiceStatus } from '@/types'
 
@@ -76,6 +76,20 @@ export async function updateInvoiceStatusAction(
     revalidatePath(`/facturas/${id}`)
     return { ok: true }
   } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : 'Error desconocido' }
+  }
+}
+
+
+export async function deleteInvoiceAction(
+  id: string,
+): Promise<{ ok: boolean; error?: string }> {
+  try {
+    await deleteInvoice(id)
+    revalidatePath('/facturas')
+    redirect('/facturas')
+  } catch (err) {
+    if (err instanceof Error && err.message === 'NEXT_REDIRECT') throw err
     return { ok: false, error: err instanceof Error ? err.message : 'Error desconocido' }
   }
 }

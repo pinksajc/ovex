@@ -1,7 +1,7 @@
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import { getInvoice } from '@/lib/supabase/invoices'
-import { InvoiceActions, ConvertProformaButton } from './actions'
+import { InvoiceActions, ConvertProformaButton, DeleteInvoiceButton } from './actions'
 import type { Invoice, InvoiceStatus } from '@/types'
 
 const STATUS_LABELS: Record<InvoiceStatus, string> = {
@@ -190,6 +190,7 @@ export default async function FacturaDetailPage({ params }: { params: Promise<{ 
             ) : (
               <InvoiceActions invoiceId={invoice.id} currentStatus={invoice.status} />
             )}
+            <DeleteInvoiceButton invoiceId={invoice.id} />
           </div>
 
           {/* Deal link */}

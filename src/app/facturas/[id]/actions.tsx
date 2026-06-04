@@ -2,7 +2,7 @@
 
 import { useState, useTransition, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { updateInvoiceStatusAction, convertProformaAction } from '@/app/actions/invoices'
+import { updateInvoiceStatusAction, convertProformaAction, deleteInvoiceAction } from '@/app/actions/invoices'
 import type { InvoiceStatus } from '@/types'
 
 const TRANSITIONS: Record<InvoiceStatus, { label: string; next: InvoiceStatus; color: string; confirm?: boolean }[]> = {
@@ -72,6 +72,57 @@ export function ConvertProformaButton({ invoiceId }: { invoiceId: string }) {
                 className="px-4 py-2 text-xs font-medium text-violet-700 bg-violet-50 border border-violet-200 rounded-lg hover:bg-violet-100 transition-colors disabled:opacity-50"
               >
                 {isPending ? 'Convirtiendo...' : 'Sí, convertir'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
+  )
+}
+
+export function DeleteInvoiceButton({ invoiceId }: { invoiceId: string }) {
+  const [isPending, startTransition] = useTransition()
+  const [confirming, setConfirming]  = useState(false)
+  const [error, setError]            = useState<string | null>(null)
+
+  function handleDelete() {
+    startTransition(async () => {
+      const result = await deleteInvoiceAction(invoiceId)
+      if (result && !result.ok) setError(result.error ?? 'Error al eliminar')
+    })
+  }
+
+  return (
+    <>
+      {error && <p className="text-xs text-red-600 mt-2">{error}</p>}
+      <button
+        onClick={() => setConfirming(true)}
+        disabled={isPending}
+        className="w-full text-left px-3 py-2 rounded-lg border border-red-200 text-red-600 hover:bg-red-50 text-xs font-medium transition-colors disabled:opacity-50 mt-2"
+      >
+        {isPending ? 'Eliminando...' : 'Eliminar'}
+      </button>
+
+      {confirming && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl shadow-xl p-6 max-w-sm w-full mx-4">
+            <h3 className="text-sm font-semibold text-zinc-900 mb-2">¿Eliminar esta factura?</h3>
+            <p className="text-xs text-zinc-500 mb-5">Esta acción no se puede deshacer.</p>
+            <div className="flex gap-3 justify-end">
+              <button
+                onClick={() => setConfirming(false)}
+                disabled={isPending}
+                className="px-4 py-2 text-xs font-medium text-zinc-600 border border-zinc-200 rounded-lg hover:bg-zinc-50 transition-colors disabled:opacity-50"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleDelete}
+                disabled={isPending}
+                className="px-4 py-2 text-xs font-medium text-white bg-red-600 rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50"
+              >
+                {isPending ? 'Eliminando...' : 'Eliminar'}
               </button>
             </div>
           </div>
