@@ -81,7 +81,8 @@ export function EditInvoiceForm({ invoice, deals }: Props) {
   const [dealConfig, setDealConfig]          = useState<DealConfiguration | null>(null)
   const [showLocModal, setShowLocModal]      = useState(false)
 
-  // Initialize selectedLocations from existing line items' locationGroupIds
+  // Initialize selectedLocations from existing line items' locationGroupIds,
+  // falling back to invoice.locationId for single-location invoices.
   const [selectedLocations, setSelectedLocs] = useState<CompanyLocation[]>(() => {
     const seen = new Set<string>()
     const result: CompanyLocation[] = []
@@ -98,8 +99,23 @@ export function EditInvoiceForm({ invoice, deals }: Props) {
         })
       }
     }
+    // If no locationGroupId on lines but invoice has a single locationId,
+    // pre-select it so lines get grouped under it.
+    if (result.length === 0 && invoice.locationId) {
+      result.push({
+        id: invoice.locationId,
+        dealId: invoice.dealId ?? '',
+        name: invoice.locationName ?? invoice.locationId,
+        address: invoice.locationAddress ?? null,
+        costCenter: null,
+        createdAt: '',
+      })
+    }
     return result
   })
+
+  // State for deselect-with-lines confirmation
+  const [pendingDeselect, setPendingDeselect] = useState<CompanyLocation | null>(null)
 
   useEffect(() => {
     if (!dealId) { setLocations([]); setDealConfig(null); return }
@@ -117,11 +133,24 @@ export function EditInvoiceForm({ invoice, deals }: Props) {
     })
   }, [dealId])
 
-  const [lines, setLines] = useState<FormLine[]>(() =>
-    invoice.lineItems.length > 0
-      ? invoice.lineItems.map(itemToFormLine)
-      : [emptyLine()]
-  )
+  const [lines, setLines] = useState<FormLine[]>(() => {
+    if (invoice.lineItems.length === 0) return [emptyLine()]
+    const mapped = invoice.lineItems.map(itemToFormLine)
+    // For single-location invoices whose lines lack locationGroupId,
+    // assign the invoice-level locationId to all lines so they appear grouped.
+    const noneHaveGroup = !mapped.some((l) => l.locationGroupId)
+    if (noneHaveGroup && invoice.locationId) {
+      const name = invoice.locationName ?? invoice.locationId
+      const address = invoice.locationAddress ?? undefined
+      return mapped.map((l) => ({
+        ...l,
+        locationGroupId: invoice.locationId!,
+        locationGroupName: name,
+        locationGroupAddress: address,
+      }))
+    }
+    return mapped
+  })
 
   // ---- totals ----
   const regularLines = lines.filter((l) => l.type === 'line')
@@ -200,25 +229,40 @@ export function EditInvoiceForm({ invoice, deals }: Props) {
   function toggleLocation(loc: CompanyLocation) {
     const isSelected = selectedLocations.some((l) => l.id === loc.id)
     if (isSelected) {
-      setSelectedLocs((prev) => prev.filter((l) => l.id !== loc.id))
+      // If lines belong to this group, ask before removing
+      const hasLines = lines.some((l) => l.locationGroupId === loc.id)
+      if (hasLines) {
+        setPendingDeselect(loc)
+      } else {
+        setSelectedLocs((prev) => prev.filter((l) => l.id !== loc.id))
+      }
+    } else {
+      // In the edit form we never auto-generate — just activate the group.
+      // The user can add lines via the per-group + button.
+      setSelectedLocs((prev) => [...prev, loc])
+    }
+  }
+
+  function handleDeselectConfirm(action: 'move' | 'delete' | 'cancel') {
+    const loc = pendingDeselect
+    setPendingDeselect(null)
+    if (!loc || action === 'cancel') return
+    setSelectedLocs((prev) => prev.filter((l) => l.id !== loc.id))
+    if (action === 'move') {
+      // Detach lines from this group → they go to GENERAL
+      setLines((prev) =>
+        prev.map((l) =>
+          l.locationGroupId === loc.id
+            ? { ...l, locationGroupId: undefined, locationGroupName: undefined, locationGroupAddress: undefined }
+            : l
+        )
+      )
+    } else {
+      // Delete all lines belonging to this group
       setLines((prev) => {
         const without = prev.filter((l) => l.locationGroupId !== loc.id)
         return without.length === 0 ? [emptyLine()] : without
       })
-    } else {
-      setSelectedLocs((prev) => [...prev, loc])
-      if (dealConfig) {
-        const generated = generateLinesForLocation(loc, dealConfig).map((item) => ({
-          ...item,
-          serviceId: item.serviceId ?? '',
-          unit: item.unit ?? '',
-        })) as FormLine[]
-        setLines((prev) => {
-          const hasOnlyPlaceholder =
-            prev.length === 1 && !prev[0].description && !prev[0].locationGroupId
-          return hasOnlyPlaceholder ? generated : [...prev, ...generated]
-        })
-      }
     }
   }
 
@@ -415,6 +459,7 @@ export function EditInvoiceForm({ invoice, deals }: Props) {
           onUpdate={updateLine}
           onRemove={removeLine}
           onAddToGroup={(group) => { setPendingGroup(group); setShowServicePicker(true) }}
+          selectedLocations={selectedLocations}
         />
         <div className="px-5 py-3 border-t border-zinc-100 flex items-center gap-2">
           <button type="button" onClick={() => { setPendingGroup(null); setShowServicePicker(true) }}
@@ -489,6 +534,15 @@ export function EditInvoiceForm({ invoice, deals }: Props) {
           {isPending ? 'Guardando...' : 'Guardar cambios'}
         </button>
       </div>
+
+      {/* Deselect-location confirmation modal */}
+      {pendingDeselect && (
+        <DeselectLocationModal
+          location={pendingDeselect}
+          lineCount={lines.filter((l) => l.locationGroupId === pendingDeselect.id).length}
+          onConfirm={handleDeselectConfirm}
+        />
+      )}
 
       {/* New location mini-modal */}
       {showLocModal && (
@@ -768,14 +822,16 @@ function GroupedLinesView({
   onUpdate,
   onRemove,
   onAddToGroup,
+  selectedLocations,
 }: {
   lines: FormLine[]
   subtotal: number
   onUpdate: (id: string, patch: Partial<FormLine>) => void
   onRemove: (id: string) => void
   onAddToGroup?: (group: { id: string; name: string; address?: string }) => void
+  selectedLocations?: CompanyLocation[]
 }) {
-  const hasGroups = lines.some((l) => l.locationGroupId)
+  const hasGroups = lines.some((l) => l.locationGroupId) || (selectedLocations && selectedLocations.length > 0)
 
   if (!hasGroups) {
     return (
@@ -791,29 +847,46 @@ function GroupedLinesView({
     )
   }
 
-  const seen = new Set<string>()
-  const groupIds: Array<string | undefined> = []
+  // Build ordered group list:
+  // 1. Named groups derived from lines (preserve line order)
+  // 2. Selected locations with no lines (appended)
+  // 3. Ungrouped lines last (GENERAL)
+  const seenIds = new Set<string>()
+  type GroupEntry = { id: string; name: string; address?: string }
+  const namedGroups: GroupEntry[] = []
+  let hasUngrouped = false
+
   for (const l of lines) {
-    const gid = l.locationGroupId ?? '__ungrouped__'
-    if (!seen.has(gid)) { seen.add(gid); groupIds.push(l.locationGroupId) }
+    if (l.locationGroupId) {
+      if (!seenIds.has(l.locationGroupId)) {
+        seenIds.add(l.locationGroupId)
+        namedGroups.push({
+          id: l.locationGroupId,
+          name: l.locationGroupName ?? l.locationGroupId,
+          address: l.locationGroupAddress,
+        })
+      }
+    } else {
+      hasUngrouped = true
+    }
   }
+
+  // Selected locations that have no lines yet → show as empty groups
+  const emptyGroups: GroupEntry[] = (selectedLocations ?? [])
+    .filter((loc) => !seenIds.has(loc.id))
+    .map((loc) => ({ id: loc.id, name: loc.name, address: loc.address ?? undefined }))
 
   return (
     <div>
-      {groupIds.map((gid) => {
-        const groupLines = lines.filter((l) => (l.locationGroupId ?? undefined) === gid)
-        const groupName = groupLines[0]?.locationGroupName ?? (gid ? gid : 'General')
-        const groupAddr = groupLines[0]?.locationGroupAddress
-
+      {/* Named groups (with lines) */}
+      {namedGroups.map(({ id: gid, name: groupName, address: groupAddr }) => {
+        const groupLines = lines.filter((l) => l.locationGroupId === gid)
         return (
-          <div key={gid ?? '__ungrouped__'}>
-            {/* Group header */}
+          <div key={gid}>
             <div className="flex items-center gap-2 px-5 py-2 bg-zinc-50 border-t border-zinc-100">
               <span className="text-[10px] font-semibold text-zinc-600 uppercase tracking-wide">{groupName}</span>
               {groupAddr && <span className="text-[10px] text-zinc-400">{groupAddr}</span>}
             </div>
-
-            {/* Group lines */}
             <div className="divide-y divide-zinc-50">
               {groupLines.map((line) =>
                 line.type === 'line' ? (
@@ -823,9 +896,7 @@ function GroupedLinesView({
                 )
               )}
             </div>
-
-            {/* Per-group add button — only for named groups */}
-            {gid && onAddToGroup && (
+            {onAddToGroup && (
               <div className="flex justify-end px-5 py-1.5 border-t border-zinc-50">
                 <button
                   type="button"
@@ -843,6 +914,99 @@ function GroupedLinesView({
           </div>
         )
       })}
+
+      {/* Empty groups (selected locations with no lines yet) */}
+      {emptyGroups.map(({ id: gid, name: groupName, address: groupAddr }) => (
+        <div key={gid}>
+          <div className="flex items-center gap-2 px-5 py-2 bg-zinc-50 border-t border-zinc-100">
+            <span className="text-[10px] font-semibold text-zinc-400 uppercase tracking-wide">{groupName}</span>
+            {groupAddr && <span className="text-[10px] text-zinc-300">{groupAddr}</span>}
+          </div>
+          {onAddToGroup ? (
+            <div className="px-5 py-3 flex items-center gap-2 border-t border-zinc-50">
+              <button
+                type="button"
+                onClick={() => onAddToGroup({ id: gid, name: groupName, address: groupAddr })}
+                className="text-xs text-zinc-400 hover:text-zinc-700 border border-dashed border-zinc-200 hover:border-zinc-400 px-3 py-1.5 rounded-lg transition-colors"
+              >
+                ＋ Añadir servicio a {groupName}
+              </button>
+            </div>
+          ) : (
+            <div className="px-5 py-3 text-xs text-zinc-300 italic">Sin líneas</div>
+          )}
+        </div>
+      ))}
+
+      {/* Ungrouped lines (GENERAL) */}
+      {hasUngrouped && (
+        <div>
+          <div className="flex items-center gap-2 px-5 py-2 bg-zinc-50 border-t border-zinc-100">
+            <span className="text-[10px] font-semibold text-zinc-400 uppercase tracking-wide italic">General</span>
+          </div>
+          <div className="divide-y divide-zinc-50">
+            {lines.filter((l) => !l.locationGroupId).map((line) =>
+              line.type === 'line' ? (
+                <RegularLineRow key={line.id} line={line} onChange={onUpdate} onRemove={onRemove} canRemove={true} />
+              ) : (
+                <DiscountLineRow key={line.id} line={line} subtotal={subtotal} onChange={onUpdate} onRemove={onRemove} />
+              )
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// =========================================
+// DeselectLocationModal
+// =========================================
+
+function DeselectLocationModal({
+  location,
+  lineCount,
+  onConfirm,
+}: {
+  location: CompanyLocation
+  lineCount: number
+  onConfirm: (action: 'move' | 'delete' | 'cancel') => void
+}) {
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm"
+      onClick={(e) => { if (e.target === e.currentTarget) onConfirm('cancel') }}
+    >
+      <div className="bg-white rounded-2xl shadow-xl p-6 max-w-sm w-full mx-4">
+        <h3 className="text-sm font-semibold text-zinc-900 mb-1">Quitar localización</h3>
+        <p className="text-xs text-zinc-500 mb-5">
+          <strong className="text-zinc-700">{location.name}</strong> tiene{' '}
+          <strong className="text-zinc-700">{lineCount} línea{lineCount !== 1 ? 's' : ''}</strong>.
+          ¿Qué deseas hacer con ellas?
+        </p>
+        <div className="flex flex-col gap-2">
+          <button
+            onClick={() => onConfirm('move')}
+            className="px-4 py-2.5 text-xs font-medium text-zinc-700 border border-zinc-200 rounded-lg hover:bg-zinc-50 transition-colors text-left"
+          >
+            <span className="font-semibold">Mover a General</span>
+            <span className="block text-zinc-400 mt-0.5">Las líneas se conservan sin localización asignada</span>
+          </button>
+          <button
+            onClick={() => onConfirm('delete')}
+            className="px-4 py-2.5 text-xs font-medium text-red-600 border border-red-200 rounded-lg hover:bg-red-50 transition-colors text-left"
+          >
+            <span className="font-semibold">Eliminar líneas</span>
+            <span className="block text-red-400 mt-0.5">Se borran las {lineCount} línea{lineCount !== 1 ? 's' : ''} de este local</span>
+          </button>
+          <button
+            onClick={() => onConfirm('cancel')}
+            className="px-4 py-2 text-xs font-medium text-zinc-400 hover:text-zinc-700 transition-colors"
+          >
+            Cancelar
+          </button>
+        </div>
+      </div>
     </div>
   )
 }
