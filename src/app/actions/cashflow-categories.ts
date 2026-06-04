@@ -10,8 +10,6 @@ import {
 } from '@/lib/supabase/cashflow-categories'
 import type { CategoryWithCount } from '@/lib/supabase/cashflow-categories'
 
-export type { CategoryWithCount }
-
 function assertAdmin(role: string) {
   if (role !== 'owner' && role !== 'admin') throw new Error('No autorizado')
 }

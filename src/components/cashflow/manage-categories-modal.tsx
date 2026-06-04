@@ -8,7 +8,7 @@ import {
   renameCategoryAction,
   deleteCategoryAction,
 } from '@/app/actions/cashflow-categories'
-import type { CategoryWithCount } from '@/app/actions/cashflow-categories'
+import type { CategoryWithCount } from '@/lib/supabase/cashflow-categories'
 
 // ── Colour palette for new categories ─────────────────────────────────────────
 
