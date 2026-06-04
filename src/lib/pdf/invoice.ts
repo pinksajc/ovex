@@ -36,9 +36,12 @@ function fmtDate(s: string | null): string {
   return new Date(s).toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' })
 }
 
-// ---- Line items rendering (6 columns, with optional location group headers) ----
-function renderLineRows(items: InvoiceLineItem[]): string {
+// ---- Line items rendering (4 or 6 columns depending on hasDiscount) ----
+function renderLineRows(items: InvoiceLineItem[], hasDiscount: boolean): string {
   if (!items || items.length === 0) return ''
+
+  // Total column count — used for colspans
+  const totalCols = hasDiscount ? 6 : 4
 
   // Determine if any item carries locationGroupId — if so, render group headers
   const hasGroups = items.some((i) => i.locationGroupId)
@@ -53,27 +56,26 @@ function renderLineRows(items: InvoiceLineItem[]): string {
       if (groupId !== lastGroupId) {
         lastGroupId = groupId
         if (groupId) {
-          // Named location group header
           const name = item.locationGroupName ?? groupId
           const addr = item.locationGroupAddress
           rows.push(`
             <tr class="location-group-header">
-              <td colspan="6">
+              <td colspan="${totalCols}">
                 <span style="font-weight:700;font-size:9px;letter-spacing:0.5px;">${esc(name)}</span>
                 ${addr ? `<span style="font-size:8px;color:#94a3b8;margin-left:8px;">${esc(addr)}</span>` : ''}
               </td>
             </tr>`)
         } else {
-          // Ungrouped items get a subtle separator
           rows.push(`
             <tr class="location-group-header">
-              <td colspan="6" style="font-size:8px;color:#94a3b8;font-style:italic;">General</td>
+              <td colspan="${totalCols}" style="font-size:8px;color:#94a3b8;font-style:italic;">General</td>
             </tr>`)
         }
       }
     }
 
     if (item.type === 'discount') {
+      // Discount rows only appear when hasDiscount is true (6-col layout)
       rows.push(`
         <tr class="discount-row">
           <td colspan="4" style="color:#dc2626;">${esc(item.description || 'Descuento')}</td>
@@ -86,19 +88,33 @@ function renderLineRows(items: InvoiceLineItem[]): string {
     const dto = item.lineDiscountPercent ?? 0
     const gross = item.quantity * item.unitPrice
     const net = item.amount
-    rows.push(`
-      <tr>
-        <td>
-          ${esc(item.description || '—')}
-          ${item.period ? `<div style="font-size:8px;color:#94a3b8;margin-top:2px;">${esc(item.period)}</div>` : ''}
-          ${dto > 0 && item.discountName ? `<div style="font-size:8px;color:#10b981;margin-top:2px;font-weight:600;">${esc(item.discountName)}</div>` : ''}
-        </td>
-        <td class="right">${fmt(item.quantity)}</td>
-        <td class="right">${fmt(item.unitPrice)} €</td>
-        <td class="right">${dto > 0 ? `${fmt(dto)}%` : '—'}</td>
-        <td class="right">${fmt(gross)} €</td>
-        <td class="right" style="font-weight:600;">${dto > 0 ? `${fmt(net)} €` : '—'}</td>
-      </tr>`)
+
+    if (hasDiscount) {
+      rows.push(`
+        <tr>
+          <td>
+            ${esc(item.description || '—')}
+            ${item.period ? `<div style="font-size:8px;color:#94a3b8;margin-top:2px;">${esc(item.period)}</div>` : ''}
+            ${dto > 0 && item.discountName ? `<div style="font-size:8px;color:#10b981;margin-top:2px;font-weight:600;">${esc(item.discountName)}</div>` : ''}
+          </td>
+          <td class="right">${fmt(item.quantity)}</td>
+          <td class="right">${fmt(item.unitPrice)} €</td>
+          <td class="right">${dto > 0 ? `${fmt(dto)}%` : '—'}</td>
+          <td class="right">${fmt(gross)} €</td>
+          <td class="right" style="font-weight:600;">${dto > 0 ? `${fmt(net)} €` : '—'}</td>
+        </tr>`)
+    } else {
+      rows.push(`
+        <tr>
+          <td>
+            ${esc(item.description || '—')}
+            ${item.period ? `<div style="font-size:8px;color:#94a3b8;margin-top:2px;">${esc(item.period)}</div>` : ''}
+          </td>
+          <td class="right">${fmt(item.quantity)}</td>
+          <td class="right">${fmt(item.unitPrice)} €</td>
+          <td class="right" style="font-weight:600;">${fmt(net)} €</td>
+        </tr>`)
+    }
   }
 
   return rows.join('')
@@ -369,23 +385,25 @@ ${invoice.locationName ? `
   <thead>
     <tr>
       <th>Descripción</th>
-      <th class="right" style="width:55px;">Cantidad</th>
-      <th class="right" style="width:90px;">Precio unit.</th>
+      <th class="right" style="width:65px;">Cantidad</th>
+      <th class="right" style="width:100px;">Precio unit.</th>
+      ${hasAnyDiscount ? `
       <th class="right" style="width:50px;">Dto. %</th>
       <th class="right" style="width:90px;">Importe</th>
-      <th class="right" style="width:90px;">Importe c/dto.</th>
+      <th class="right" style="width:100px;">Importe c/dto.</th>
+      ` : `
+      <th class="right" style="width:110px;">Importe</th>
+      `}
     </tr>
   </thead>
   <tbody>
     ${hasLineItems
-      ? renderLineRows(items)
+      ? renderLineRows(items, hasAnyDiscount)
       : `<tr>
           <td>${esc(invoice.concept || '—')}</td>
           <td class="right">1</td>
           <td class="right">${fmt(invoice.amountNet)} €</td>
-          <td class="right">—</td>
           <td class="right" style="font-weight:600;">${fmt(invoice.amountNet)} €</td>
-          <td class="right">—</td>
         </tr>`
     }
   </tbody>
