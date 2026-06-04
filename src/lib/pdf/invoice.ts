@@ -90,12 +90,18 @@ export async function generateInvoicePdf(invoice: Invoice): Promise<Buffer> {
   const hasLineItems = items.length > 0
   const hasAnyDiscount = totalDiscounts > 0.001 || discountItems.length > 0
 
-  // Label shown in the header box (top-right). For proformas: "PROFORMA".
-  // For rectificativas: "FACTURA RECTIFICATIVA". Otherwise: "FACTURA".
-  const headerBoxLabel =
-    invoice.type === 'rectificativa' ? 'FACTURA RECTIFICATIVA' :
-    invoice.type === 'proforma' ? 'PROFORMA' :
-    'FACTURA'
+  // For proformas: only show a small "PROFORMA" label in the header, no big number.
+  // For invoices/rectificativas: show label + large number as before.
+  const isProforma = invoice.type === 'proforma'
+  const headerRightHtml = isProforma
+    ? `<div style="font-size:9px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:#94a3b8;">PROFORMA</div>`
+    : `<div style="font-size:9px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:#94a3b8;margin-bottom:4px;">${
+        invoice.type === 'rectificativa' ? 'FACTURA RECTIFICATIVA' : 'FACTURA'
+      }</div>
+      <div style="font-size:22px;font-weight:700;color:#1e3a5f;font-family:Courier New,monospace;">${esc(invoice.number)}</div>`
+
+  // "Total" label in the totals box
+  const totalLabel = isProforma ? 'Total proforma' : 'Total factura'
 
   const html = `<!DOCTYPE html>
 <html lang="es">
@@ -115,29 +121,15 @@ export async function generateInvoicePdf(invoice: Invoice): Promise<Buffer> {
     display: flex;
     align-items: flex-start;
     justify-content: space-between;
-    margin-bottom: 36px;
-    padding-bottom: 24px;
+    margin-bottom: 28px;
+    padding-bottom: 20px;
     border-bottom: 2px solid #1e3a5f;
   }
   .logo { height: 22px; object-fit: contain; }
-  .invoice-type-badge {
-    font-size: 9px;
-    font-weight: 700;
-    letter-spacing: 1.5px;
-    text-transform: uppercase;
-    color: #94a3b8;
-    margin-bottom: 4px;
-  }
-  .invoice-number {
-    font-size: 22px;
-    font-weight: 700;
-    color: #1e3a5f;
-    font-family: Courier New, monospace;
-  }
   .meta-row {
     display: flex;
     gap: 32px;
-    margin-bottom: 28px;
+    margin-bottom: 24px;
     flex-wrap: wrap;
   }
   .meta-item { min-width: 120px; }
@@ -154,20 +146,19 @@ export async function generateInvoicePdf(invoice: Invoice): Promise<Buffer> {
     font-weight: 600;
     color: #1e293b;
   }
-  .client-block {
-    background: #f8fafc;
-    border: 1px solid #e2e8f0;
-    border-radius: 8px;
-    padding: 14px 16px;
-    margin-bottom: 32px;
+  .parties-row {
+    display: flex;
+    gap: 40px;
+    margin-bottom: 20px;
   }
-  .party-title {
+  .party-col { flex: 1; }
+  .party-eyebrow {
     font-size: 8px;
     font-weight: 700;
     text-transform: uppercase;
     letter-spacing: 1px;
     color: #94a3b8;
-    margin-bottom: 6px;
+    margin-bottom: 5px;
   }
   .party-name {
     font-size: 11px;
@@ -178,7 +169,13 @@ export async function generateInvoicePdf(invoice: Invoice): Promise<Buffer> {
   .party-detail {
     font-size: 9px;
     color: #64748b;
-    line-height: 1.5;
+    line-height: 1.6;
+  }
+  .location-block {
+    border-left: 3px solid #1e2d4a;
+    padding: 8px 12px;
+    background: #f8f9fa;
+    margin-bottom: 24px;
   }
   table.concept-table {
     width: 100%;
@@ -265,25 +262,17 @@ export async function generateInvoicePdf(invoice: Invoice): Promise<Buffer> {
 </head>
 <body>
 
-<!-- Header -->
+<!-- Header: logo + company info left / type label (+ number for invoices) right -->
 <div class="header">
   <div>
     ${logo ? `<img class="logo" src="${logo}" alt="Platomico"/>` : '<span style="font-size:16px;font-weight:700;color:#1e3a5f;">Platomico</span>'}
-    <div style="margin-top:10px;font-size:9px;color:#475569;line-height:1.6;">
-      <strong style="font-size:11px;color:#1e3a5f;display:block;margin-bottom:2px;">Platomico, S.L.</strong>
-      NIF: B22741094<br/>
-      C/ Antonio Machado 9, Rozas de Puerto Real<br/>
-      Madrid 28649<br/>
-      hola@platomico.com
-    </div>
   </div>
   <div style="text-align:right;">
-    <div class="invoice-type-badge">${headerBoxLabel}</div>
-    <div class="invoice-number">${esc(invoice.number)}</div>
+    ${headerRightHtml}
   </div>
 </div>
 
-<!-- Meta -->
+<!-- Meta dates -->
 <div class="meta-row">
   <div class="meta-item">
     <div class="meta-label">Fecha de emisión</div>
@@ -301,18 +290,35 @@ ${invoice.type === 'rectificativa' && invoice.rectifiesId ? `
   ⚠️ Esta es una factura rectificativa. Rectifica la factura con referencia: <strong>${esc(invoice.rectifiesId)}</strong>
 </div>` : ''}
 
-<!-- Cliente -->
-<div class="client-block">
-  <div class="party-title">Cliente</div>
-  <div class="party-name">${esc(invoice.clientName)}</div>
-  <div class="party-detail">
-    ${invoice.clientCif ? `NIF/CIF: ${esc(invoice.clientCif)}<br/>` : ''}
-    ${invoice.clientAddress ? `${esc(invoice.clientAddress)}<br/>` : ''}
-    ${invoice.locationName ? `${esc(invoice.locationName)}<br/>` : ''}
-    ${invoice.locationAddress ? `${esc(invoice.locationAddress)}<br/>` : ''}
-    ${invoice.locationCostCenter ? `${esc(invoice.locationCostCenter)}` : ''}
+<!-- Emisor + Cliente en dos columnas -->
+<div class="parties-row">
+  <div class="party-col">
+    <div class="party-eyebrow">Emisor</div>
+    <div class="party-name">Platomico, S.L.</div>
+    <div class="party-detail">
+      NIF: B22741094<br/>
+      C/ Antonio Machado 9, Rozas de Puerto Real<br/>
+      Madrid 28649<br/>
+      hola@platomico.com
+    </div>
+  </div>
+  <div class="party-col">
+    <div class="party-eyebrow">Cliente</div>
+    <div class="party-name">${esc(invoice.clientName)}</div>
+    <div class="party-detail">
+      ${invoice.clientCif ? `NIF/CIF: ${esc(invoice.clientCif)}<br/>` : ''}
+      ${invoice.clientAddress ? esc(invoice.clientAddress) : ''}
+    </div>
   </div>
 </div>
+
+<!-- Localización destacada (solo si existe) -->
+${invoice.locationName ? `
+<div class="location-block">
+  <div style="font-size:8px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:#94a3b8;margin-bottom:3px;">Localización</div>
+  <div style="font-size:11px;font-weight:700;color:#1e2d4a;">${esc(invoice.locationName)}</div>
+  ${invoice.locationAddress ? `<div style="font-size:10px;color:#444;margin-top:2px;">${esc(invoice.locationAddress)}</div>` : ''}
+</div>` : ''}
 
 <!-- Line items table -->
 <table class="concept-table">
@@ -362,7 +368,7 @@ ${invoice.type === 'rectificativa' && invoice.rectifiesId ? `
     <span class="amount">${fmt(vatAmount)} €</span>
   </div>
   <div class="totals-row total-final">
-    <span class="label">Total factura</span>
+    <span class="label">${totalLabel}</span>
     <span class="amount" style="font-size:14px;">${fmt(invoice.amountTotal)} €</span>
   </div>
 </div>
