@@ -303,6 +303,10 @@ function buildPage1(
   const loanOut     = transactions.filter(t => t.category === 'Préstamos dados'     && t.type === 'expense').reduce((s, t) => s + Math.abs(t.amount), 0)
   const loanPending = loanIn - loanOut
 
+  const totalExternalCapital = transactions
+    .filter(t => t.description.toLowerCase().includes('from platomico llc'))
+    .reduce((s, t) => s + Math.abs(t.amount), 0)
+
   const facturasPendientes = invoices
     .filter(i => i.status === 'issued' || i.status === 'overdue')
     .reduce((s, i) => s + i.amountTotal, 0)
@@ -333,13 +337,14 @@ function buildPage1(
   <div style="position:relative;flex:1;display:flex;flex-direction:column;">
     ${pageHeader(logoUri, dateFrom, dateTo, today)}
 
-    <!-- KPI strip: 5 cards, big number, no uppercase tracking -->
-    <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-bottom:22px;">
+    <!-- KPI strip: 6 cards, big number, no uppercase tracking -->
+    <div style="display:grid;grid-template-columns:repeat(6,1fr);gap:10px;margin-bottom:22px;">
       ${kpiCard('Saldo neto',           fmt(Math.abs(netBalance)), netColor, netPrefix)}
       ${kpiCard('Ingresos',             fmt(totalIncome),          '#22c55e', '+')}
       ${kpiCard('Gastos',               fmt(totalExpense),         '#ef4444')}
       ${kpiCard('Fact. por cobrar',     fmt(facturasPendientes),   NAVY)}
       ${kpiCard('Préstamos pendientes', fmt(Math.max(0, loanPending)), loanPending > 0 ? '#f97316' : NAVY)}
+      ${kpiCard('Capital externo',      fmt(totalExternalCapital), NAVY, totalExternalCapital > 0 ? '+' : '')}
     </div>
 
     <!-- Bar chart — flex:1 fills all remaining page height -->
@@ -390,6 +395,12 @@ function buildPage2(
   const loanIn      = transactions.filter(t => t.category === 'Préstamos recibidos' && t.type === 'income').reduce((s, t) => s + t.amount, 0)
   const loanOut     = transactions.filter(t => t.category === 'Préstamos dados'     && t.type === 'expense').reduce((s, t) => s + Math.abs(t.amount), 0)
   const loanPending = loanIn - loanOut
+
+  // External capital — transfers from Platomico LLC
+  const externalCapitalTxs = transactions
+    .filter(t => t.description.toLowerCase().includes('from platomico llc'))
+    .sort((a, b) => a.date.localeCompare(b.date))
+  const totalExtCapital = externalCapitalTxs.reduce((s, t) => s + Math.abs(t.amount), 0)
 
   const donutSvg = buildDonutSvg(slices, totalOperational)
 
@@ -459,6 +470,35 @@ function buildPage2(
       </table>
     </div>` : ''
 
+  const capitalBlock = externalCapitalTxs.length > 0 ? `
+    <div style="margin-top:20px;">
+      <div style="font-size:8px;font-weight:700;color:#94a3b8;border-bottom:1.5px solid #e8eef6;padding-bottom:6px;margin-bottom:6px;">CAPITAL EXTERNO</div>
+      <div style="font-size:8px;color:#64748b;margin-bottom:8px;">Origen: Platomico LLC (inversión extranjera)</div>
+      <table style="width:100%;border-collapse:collapse;table-layout:fixed;">
+        <colgroup>
+          <col style="width:55%;"/>
+          <col style="width:45%;"/>
+        </colgroup>
+        <thead>
+          <tr style="background:#f8fafc;">
+            <th style="padding:5px 6px;font-size:7.5px;font-weight:700;color:#64748b;text-align:left;">Fecha</th>
+            <th style="padding:5px 6px;font-size:7.5px;font-weight:700;color:#1e2d4a;text-align:right;">Importe</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${externalCapitalTxs.map(t => `
+          <tr>
+            <td style="padding:5px 6px;border-bottom:1px solid #f1f5f9;font-size:8.5px;color:#334155;">${fmtDateLong(t.date)}</td>
+            <td style="padding:5px 6px;border-bottom:1px solid #f1f5f9;text-align:right;font-family:'Courier New',monospace;font-size:8.5px;color:#1e2d4a;font-weight:700;white-space:nowrap;">+${fmt(Math.abs(t.amount))}</td>
+          </tr>`).join('')}
+          <tr style="background:#f0f4f8;">
+            <td style="padding:6px 6px;font-size:8.5px;font-weight:700;color:#334155;">Total capital recibido</td>
+            <td style="padding:6px 6px;text-align:right;font-family:'Courier New',monospace;font-size:8.5px;font-weight:700;color:#1e2d4a;white-space:nowrap;">+${fmt(totalExtCapital)}</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>` : ''
+
   const tableHeader = `
     <tr style="background:#1e2d4a;">
       <th style="padding:8px 10px;color:#fff;font-size:8px;font-weight:700;text-align:left;white-space:nowrap;">Categoría</th>
@@ -507,6 +547,9 @@ function buildPage2(
 
     <!-- PRÉSTAMOS — full page width, outside the two-column grid -->
     ${loanBlock}
+
+    <!-- CAPITAL EXTERNO — full page width, below PRÉSTAMOS -->
+    ${capitalBlock}
 
   </div>
   ${WATERMARK}
