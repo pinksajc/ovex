@@ -75,7 +75,7 @@ export default async function FacturaDetailPage({ params }: { params: Promise<{ 
             )}
             {invoice.type === 'proforma' && (
               <span className="text-[10px] font-semibold uppercase tracking-wide px-2.5 py-1 rounded-full bg-violet-50 text-violet-700">
-                Proforma
+                Factura Proforma
               </span>
             )}
           </div>
@@ -186,7 +186,7 @@ export default async function FacturaDetailPage({ params }: { params: Promise<{ 
               </div>
             )}
             {invoice.status === 'converted' ? (
-              <p className="text-xs text-zinc-400">Esta proforma ya fue convertida a factura.</p>
+              <p className="text-xs text-zinc-400">Esta factura proforma ya fue convertida a factura.</p>
             ) : (
               <InvoiceActions invoiceId={invoice.id} currentStatus={invoice.status} />
             )}

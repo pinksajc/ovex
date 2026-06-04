@@ -94,14 +94,14 @@ export async function generateInvoicePdf(invoice: Invoice): Promise<Buffer> {
   // For invoices/rectificativas: show label + large number as before.
   const isProforma = invoice.type === 'proforma'
   const headerRightHtml = isProforma
-    ? `<div style="font-size:9px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:#94a3b8;">PROFORMA</div>`
+    ? `<div style="font-size:9px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:#94a3b8;">FACTURA PROFORMA</div>`
     : `<div style="font-size:9px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:#94a3b8;margin-bottom:4px;">${
         invoice.type === 'rectificativa' ? 'FACTURA RECTIFICATIVA' : 'FACTURA'
       }</div>
       <div style="font-size:22px;font-weight:700;color:#1e3a5f;font-family:Courier New,monospace;">${esc(invoice.number)}</div>`
 
   // "Total" label in the totals box
-  const totalLabel = isProforma ? 'Total proforma' : 'Total factura'
+  const totalLabel = isProforma ? 'Total factura proforma' : 'Total factura'
 
   const html = `<!DOCTYPE html>
 <html lang="es">

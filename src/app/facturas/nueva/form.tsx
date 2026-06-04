@@ -238,7 +238,7 @@ export function NewInvoiceForm({
         <div className="flex gap-3 flex-wrap">
           {([
             ['ordinary', 'Ordinaria'],
-            ['proforma', 'Proforma'],
+            ['proforma', 'Factura Proforma'],
             ['rectificativa', 'Rectificativa'],
           ] as [InvoiceType, string][]).map(([t, label]) => (
             <button
@@ -257,7 +257,7 @@ export function NewInvoiceForm({
         </div>
         {type === 'proforma' && (
           <p className="text-xs text-violet-600 bg-violet-50 border border-violet-100 rounded-lg px-3 py-2">
-            Se creará con número <strong>PF-{new Date().getFullYear()}-XXXX</strong>. Podrás convertirla a factura desde el detalle.
+            Se creará con número <strong>PF-{new Date().getFullYear()}-XXXX</strong>. Podrás convertirla a factura ordinaria desde el detalle.
           </p>
         )}
         {type === 'rectificativa' && (
@@ -485,7 +485,7 @@ export function NewInvoiceForm({
           disabled={isPending}
           className="px-5 py-2 text-sm font-medium bg-zinc-900 text-white hover:bg-zinc-700 rounded-lg transition-colors disabled:opacity-50"
         >
-          {isPending ? 'Guardando...' : type === 'proforma' ? 'Guardar proforma' : 'Guardar factura'}
+          {isPending ? 'Guardando...' : type === 'proforma' ? 'Guardar factura proforma' : 'Guardar factura'}
         </button>
       </div>
 

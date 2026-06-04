@@ -54,9 +54,9 @@ export function ConvertProformaButton({ invoiceId }: { invoiceId: string }) {
       {confirming && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm">
           <div className="bg-white rounded-2xl shadow-xl p-6 max-w-sm w-full mx-4">
-            <h3 className="text-sm font-semibold text-zinc-900 mb-2">Convertir proforma a factura</h3>
+            <h3 className="text-sm font-semibold text-zinc-900 mb-2">Convertir factura proforma a factura</h3>
             <p className="text-xs text-zinc-500 mb-5">
-              Se creará una factura ordinaria nueva (F-YYYY) con los mismos datos. La proforma quedará como <span className="font-semibold">Convertida</span>.
+              Se creará una factura ordinaria nueva (F-YYYY) con los mismos datos. La factura proforma quedará como <span className="font-semibold">Convertida</span>.
             </p>
             <div className="flex gap-3 justify-end">
               <button

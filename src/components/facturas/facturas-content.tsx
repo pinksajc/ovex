@@ -104,7 +104,7 @@ export function FacturasContent({
       <div className="flex items-center gap-1 mb-6 bg-zinc-100 rounded-lg p-0.5 w-fit flex-wrap">
         {([
           ['all', 'Todas'],
-          ['proforma', 'Proforma'],
+          ['proforma', 'Factura Proforma'],
           ['draft', 'Borrador'],
           ['issued', 'Emitida'],
           ['paid', 'Pagada'],
@@ -168,7 +168,7 @@ export function FacturasContent({
                       <span className="ml-2 text-[9px] uppercase tracking-wide text-amber-600 font-semibold">Rect.</span>
                     )}
                     {inv.type === 'proforma' && (
-                      <span className="ml-2 text-[9px] uppercase tracking-wide text-violet-600 font-semibold">Proforma</span>
+                      <span className="ml-2 text-[9px] uppercase tracking-wide text-violet-600 font-semibold">Factura Proforma</span>
                     )}
                   </td>
                   <td className="px-5 py-3">
