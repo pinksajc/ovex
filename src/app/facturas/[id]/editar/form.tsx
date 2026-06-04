@@ -148,10 +148,37 @@ export function EditInvoiceForm({ invoice, deals }: Props) {
     )
   }, [])
 
+  const [showServicePicker, setShowServicePicker] = useState(false)
+
   function addLine() { setLines((p) => [...p, emptyLine()]) }
   function addDiscount() { setLines((p) => [...p, emptyDiscount()]) }
   function removeLine(id: string) {
     setLines((p) => { const n = p.filter((l) => l.id !== id); return n.length === 0 ? [emptyLine()] : n })
+  }
+
+  function addServiceLine(serviceId: string) {
+    const svc = SERVICE_MAP.get(serviceId)
+    if (!svc) return
+    let autoPeriod: string | undefined
+    if (svc.deliveryPlanKey) {
+      const dp = DELIVERY_PLANS[svc.deliveryPlanKey]
+      autoPeriod = `${dp.label} · ${dp.includedOrders} ped. incl. · ${dp.extraOrderFee.toFixed(2).replace('.', ',')}€/ped. adic.`
+    }
+    const newLine: FormLine = {
+      id: newLineId(),
+      type: 'line',
+      description: svc.custom ? '' : svc.label,
+      quantity: 1,
+      unitPrice: svc.defaultPrice,
+      amount: svc.defaultPrice,
+      serviceId,
+      unit: svc.unit,
+      period: autoPeriod,
+    }
+    setLines((prev) => {
+      const onlyPlaceholder = prev.length === 1 && !prev[0].description && !prev[0].locationGroupId
+      return onlyPlaceholder ? [newLine] : [...prev, newLine]
+    })
   }
 
   function toggleLocation(loc: CompanyLocation) {
@@ -372,10 +399,14 @@ export function EditInvoiceForm({ invoice, deals }: Props) {
           onUpdate={updateLine}
           onRemove={removeLine}
         />
-        <div className="px-5 py-3 border-t border-zinc-100 flex items-center gap-3">
+        <div className="px-5 py-3 border-t border-zinc-100 flex items-center gap-2">
+          <button type="button" onClick={() => setShowServicePicker(true)}
+            className="text-xs font-medium text-zinc-700 hover:text-zinc-900 border border-zinc-300 hover:border-zinc-500 bg-white px-3 py-1.5 rounded-lg transition-colors">
+            ＋ Añadir servicio
+          </button>
           <button type="button" onClick={addLine}
-            className="text-xs text-zinc-500 hover:text-zinc-900 border border-zinc-200 hover:border-zinc-400 px-3 py-1.5 rounded-lg transition-colors">
-            ＋ Añadir línea
+            className="text-xs text-zinc-400 hover:text-zinc-700 border border-zinc-200 hover:border-zinc-300 px-3 py-1.5 rounded-lg transition-colors">
+            ＋ Línea vacía
           </button>
         </div>
         <div className="border-t border-zinc-200 px-5 py-4 space-y-1.5">
@@ -452,6 +483,14 @@ export function EditInvoiceForm({ invoice, deals }: Props) {
             toggleLocation(loc)
           }}
           onClose={() => setShowLocModal(false)}
+        />
+      )}
+
+      {/* Service picker modal */}
+      {showServicePicker && (
+        <ServicePickerModal
+          onPick={(serviceId) => { addServiceLine(serviceId); setShowServicePicker(false) }}
+          onClose={() => setShowServicePicker(false)}
         />
       )}
     </form>
@@ -760,6 +799,93 @@ function GroupedLinesView({
           </div>
         )
       })}
+    </div>
+  )
+}
+
+// =========================================
+// ServicePickerModal
+// =========================================
+
+function ServicePickerModal({
+  onPick,
+  onClose,
+}: {
+  onPick: (serviceId: string) => void
+  onClose: () => void
+}) {
+  const [query, setQuery] = useState('')
+  const q = query.toLowerCase()
+
+  const filtered = SERVICES.filter(
+    (s) => !q || s.label.toLowerCase().includes(q) || s.group.toLowerCase().includes(q)
+  )
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-4"
+      style={{ background: 'rgba(0,0,0,0.45)', backdropFilter: 'blur(4px)' }}
+      onClick={(e) => { if (e.target === e.currentTarget) onClose() }}
+    >
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg flex flex-col" style={{ maxHeight: '80vh' }}>
+        {/* Header */}
+        <div className="px-5 py-4 border-b border-zinc-100 flex items-center justify-between shrink-0">
+          <h2 className="text-sm font-semibold text-zinc-900">Añadir servicio</h2>
+          <button onClick={onClose} className="text-zinc-400 hover:text-zinc-700 text-lg leading-none">✕</button>
+        </div>
+
+        {/* Search */}
+        <div className="px-4 py-3 border-b border-zinc-100 shrink-0">
+          <input
+            autoFocus
+            type="text"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Buscar servicio…"
+            className="w-full text-sm bg-zinc-100 border-0 rounded-lg px-3 py-2 text-zinc-700 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-zinc-300"
+          />
+        </div>
+
+        {/* List */}
+        <div className="overflow-y-auto flex-1 pb-2">
+          {SERVICE_GROUPS.map((group) => {
+            const items = filtered.filter((s) => s.group === group)
+            if (items.length === 0) return null
+            return (
+              <div key={group}>
+                <div className="px-4 pt-3 pb-1 text-[9px] font-bold uppercase tracking-widest text-zinc-400">
+                  {group}
+                </div>
+                {items.map((svc) => (
+                  <button
+                    key={svc.id}
+                    type="button"
+                    onClick={() => onPick(svc.id)}
+                    className="w-full text-left px-4 py-2.5 hover:bg-zinc-50 active:bg-zinc-100 transition-colors flex items-center justify-between gap-4"
+                  >
+                    <span className="text-sm text-zinc-800 leading-tight">
+                      {svc.label}
+                      {svc.note && (
+                        <span className="ml-1.5 text-[10px] text-zinc-400">({svc.note})</span>
+                      )}
+                    </span>
+                    <span className="text-xs font-mono text-zinc-400 shrink-0">
+                      {svc.priceEditable
+                        ? 'precio libre'
+                        : `${svc.defaultPrice.toLocaleString('es-ES', { minimumFractionDigits: 2 })} €`
+                      }
+                      {svc.unit ? ` / ${svc.unit}` : ''}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            )
+          })}
+          {filtered.length === 0 && (
+            <p className="text-center text-sm text-zinc-400 py-10">Sin resultados para "{query}"</p>
+          )}
+        </div>
+      </div>
     </div>
   )
 }
