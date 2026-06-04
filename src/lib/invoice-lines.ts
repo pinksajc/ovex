@@ -32,7 +32,7 @@ export function generateLinesForLocation(
     lines.push({
       id: newId(),
       type: 'line',
-      description: `ROS ${plan.label} — ${loc.name}`,
+      description: `ROS ${plan.label}`,
       quantity: 1,
       unitPrice: plan.priceMonthly,
       amount: plan.priceMonthly,
@@ -48,7 +48,7 @@ export function generateLinesForLocation(
     lines.push({
       id: newId(),
       type: 'line',
-      description: `Cuota variable ROS — ${loc.name}`,
+      description: `Cuota variable ROS`,
       quantity: deliveryOrders,
       unitPrice: plan.variableFee,
       amount: deliveryOrders * plan.variableFee,
@@ -72,7 +72,7 @@ export function generateLinesForLocation(
       lines.push({
         id: newId(),
         type: 'line',
-        description: `${dp.label} — ${loc.name}`,
+        description: dp.label,
         quantity: 1,
         unitPrice: dp.priceMonthly,
         amount: dp.priceMonthly,
@@ -90,7 +90,7 @@ export function generateLinesForLocation(
     lines.push({
       id: newId(),
       type: 'line',
-      description: `${addon.label} — ${loc.name}`,
+      description: addon.label,
       quantity: 1,
       unitPrice: addon.priceMonthly,
       amount: addon.priceMonthly,
