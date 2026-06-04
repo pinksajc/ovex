@@ -149,6 +149,7 @@ export function EditInvoiceForm({ invoice, deals }: Props) {
   }, [])
 
   const [showServicePicker, setShowServicePicker] = useState(false)
+  const [pendingGroup, setPendingGroup] = useState<{ id: string; name: string; address?: string } | null>(null)
 
   function addLine() { setLines((p) => [...p, emptyLine()]) }
   function addDiscount() { setLines((p) => [...p, emptyDiscount()]) }
@@ -156,7 +157,10 @@ export function EditInvoiceForm({ invoice, deals }: Props) {
     setLines((p) => { const n = p.filter((l) => l.id !== id); return n.length === 0 ? [emptyLine()] : n })
   }
 
-  function addServiceLine(serviceId: string) {
+  function addServiceLine(
+    serviceId: string,
+    group?: { id: string; name: string; address?: string },
+  ) {
     const svc = SERVICE_MAP.get(serviceId)
     if (!svc) return
     let autoPeriod: string | undefined
@@ -174,8 +178,20 @@ export function EditInvoiceForm({ invoice, deals }: Props) {
       serviceId,
       unit: svc.unit,
       period: autoPeriod,
+      locationGroupId: group?.id,
+      locationGroupName: group?.name,
+      locationGroupAddress: group?.address,
     }
     setLines((prev) => {
+      if (group) {
+        // Insert right after the last line belonging to this group
+        const lastIdx = prev.reduce((acc, l, i) => l.locationGroupId === group.id ? i : acc, -1)
+        if (lastIdx >= 0) {
+          const next = [...prev]
+          next.splice(lastIdx + 1, 0, newLine)
+          return next
+        }
+      }
       const onlyPlaceholder = prev.length === 1 && !prev[0].description && !prev[0].locationGroupId
       return onlyPlaceholder ? [newLine] : [...prev, newLine]
     })
@@ -398,9 +414,10 @@ export function EditInvoiceForm({ invoice, deals }: Props) {
           subtotal={subtotal}
           onUpdate={updateLine}
           onRemove={removeLine}
+          onAddToGroup={(group) => { setPendingGroup(group); setShowServicePicker(true) }}
         />
         <div className="px-5 py-3 border-t border-zinc-100 flex items-center gap-2">
-          <button type="button" onClick={() => setShowServicePicker(true)}
+          <button type="button" onClick={() => { setPendingGroup(null); setShowServicePicker(true) }}
             className="text-xs font-medium text-zinc-700 hover:text-zinc-900 border border-zinc-300 hover:border-zinc-500 bg-white px-3 py-1.5 rounded-lg transition-colors">
             ＋ Añadir servicio
           </button>
@@ -489,8 +506,13 @@ export function EditInvoiceForm({ invoice, deals }: Props) {
       {/* Service picker modal */}
       {showServicePicker && (
         <ServicePickerModal
-          onPick={(serviceId) => { addServiceLine(serviceId); setShowServicePicker(false) }}
-          onClose={() => setShowServicePicker(false)}
+          groupName={pendingGroup?.name}
+          onPick={(serviceId) => {
+            addServiceLine(serviceId, pendingGroup ?? undefined)
+            setShowServicePicker(false)
+            setPendingGroup(null)
+          }}
+          onClose={() => { setShowServicePicker(false); setPendingGroup(null) }}
         />
       )}
     </form>
@@ -745,11 +767,13 @@ function GroupedLinesView({
   subtotal,
   onUpdate,
   onRemove,
+  onAddToGroup,
 }: {
   lines: FormLine[]
   subtotal: number
   onUpdate: (id: string, patch: Partial<FormLine>) => void
   onRemove: (id: string) => void
+  onAddToGroup?: (group: { id: string; name: string; address?: string }) => void
 }) {
   const hasGroups = lines.some((l) => l.locationGroupId)
 
@@ -783,10 +807,13 @@ function GroupedLinesView({
 
         return (
           <div key={gid ?? '__ungrouped__'}>
+            {/* Group header */}
             <div className="flex items-center gap-2 px-5 py-2 bg-zinc-50 border-t border-zinc-100">
               <span className="text-[10px] font-semibold text-zinc-600 uppercase tracking-wide">{groupName}</span>
               {groupAddr && <span className="text-[10px] text-zinc-400">{groupAddr}</span>}
             </div>
+
+            {/* Group lines */}
             <div className="divide-y divide-zinc-50">
               {groupLines.map((line) =>
                 line.type === 'line' ? (
@@ -796,6 +823,23 @@ function GroupedLinesView({
                 )
               )}
             </div>
+
+            {/* Per-group add button — only for named groups */}
+            {gid && onAddToGroup && (
+              <div className="flex justify-end px-5 py-1.5 border-t border-zinc-50">
+                <button
+                  type="button"
+                  title="Añadir servicio a este local"
+                  onClick={() => onAddToGroup({ id: gid, name: groupName, address: groupAddr })}
+                  className="group flex items-center gap-1 text-zinc-300 hover:text-zinc-600 transition-colors"
+                >
+                  <span className="text-base leading-none font-light">+</span>
+                  <span className="text-[10px] opacity-0 group-hover:opacity-100 transition-opacity">
+                    Añadir servicio
+                  </span>
+                </button>
+              </div>
+            )}
           </div>
         )
       })}
@@ -810,9 +854,11 @@ function GroupedLinesView({
 function ServicePickerModal({
   onPick,
   onClose,
+  groupName,
 }: {
   onPick: (serviceId: string) => void
   onClose: () => void
+  groupName?: string
 }) {
   const [query, setQuery] = useState('')
   const q = query.toLowerCase()
@@ -830,7 +876,12 @@ function ServicePickerModal({
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg flex flex-col" style={{ maxHeight: '80vh' }}>
         {/* Header */}
         <div className="px-5 py-4 border-b border-zinc-100 flex items-center justify-between shrink-0">
-          <h2 className="text-sm font-semibold text-zinc-900">Añadir servicio</h2>
+          <div>
+            <h2 className="text-sm font-semibold text-zinc-900">Añadir servicio</h2>
+            {groupName && (
+              <p className="text-[10px] text-zinc-400 mt-0.5">📍 {groupName}</p>
+            )}
+          </div>
           <button onClick={onClose} className="text-zinc-400 hover:text-zinc-700 text-lg leading-none">✕</button>
         </div>
 
