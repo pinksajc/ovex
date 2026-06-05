@@ -3,7 +3,7 @@
 import { redirect } from 'next/navigation'
 import { revalidatePath } from 'next/cache'
 import { isRedirectError } from 'next/dist/client/components/redirect-error'
-import { createPresupuesto, updatePresupuesto, updatePresupuestoStatus, updatePresupuestoSignatureRequired, getPresupuesto } from '@/lib/supabase/presupuestos'
+import { createPresupuesto, updatePresupuesto, updatePresupuestoStatus, updatePresupuestoSignatureRequired, getPresupuesto, createPresupuestoVersion } from '@/lib/supabase/presupuestos'
 import type { CreatePresupuestoInput, UpdatePresupuestoInput, PresupuestoStatus } from '@/types'
 
 export async function createPresupuestoAction(input: CreatePresupuestoInput): Promise<{ error?: string }> {
@@ -63,6 +63,20 @@ export async function toggleRequiresSignatureAction(
     await updatePresupuestoSignatureRequired(id, value)
     revalidatePath(`/ofertas/${id}`)
     return { ok: true }
+  } catch (err) {
+    return { ok: false, error: (err as { message?: string })?.message ?? 'Error desconocido' }
+  }
+}
+
+export async function createVersionAction(
+  presupuestoId: string
+): Promise<{ ok: boolean; id?: string; error?: string }> {
+  try {
+    const newPq = await createPresupuestoVersion(presupuestoId)
+    revalidatePath('/ofertas')
+    revalidatePath(`/ofertas/${presupuestoId}`)
+    revalidatePath('/deals')
+    return { ok: true, id: newPq.id }
   } catch (err) {
     return { ok: false, error: (err as { message?: string })?.message ?? 'Error desconocido' }
   }

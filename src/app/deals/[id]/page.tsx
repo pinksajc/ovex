@@ -12,6 +12,8 @@ import { getPresupuestosByDeal } from '@/lib/supabase/presupuestos'
 import { getInvoicesByDeal } from '@/lib/supabase/invoices'
 import { listLocationsByDeal } from '@/lib/supabase/company-locations'
 import { DealLocationsPanel } from '@/components/deals/deal-locations-panel'
+import { DealTimeline } from '@/components/deals/deal-timeline'
+import { ClientHistoryCard } from '@/components/deals/client-history-card'
 import type { DealStage, PresupuestoStatus, InvoiceStatus, DeliveryPlanId, AddonId } from '@/types'
 
 const PRESUPUESTO_STATUS_LABELS: Record<PresupuestoStatus, string> = {
@@ -307,6 +309,16 @@ export default async function DealPage({
           </div>
         )}
       </div>
+
+      {/* Timeline */}
+      {(presupuestos.length > 0 || facturas.length > 0) && (
+        <DealTimeline presupuestos={presupuestos} facturas={facturas} />
+      )}
+
+      {/* Client history */}
+      {facturas.length > 0 && (
+        <ClientHistoryCard facturas={facturas} mrr={cfgMrr > 0 ? cfgMrr : undefined} />
+      )}
 
       {/* Configuración activa */}
       {cfg && (

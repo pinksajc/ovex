@@ -1,9 +1,13 @@
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
-import { getPresupuesto } from '@/lib/supabase/presupuestos'
+import { getPresupuesto, getPresupuestosByDeal } from '@/lib/supabase/presupuestos'
+import { getInvoicesByDeal } from '@/lib/supabase/invoices'
 import { OfertaActions } from './actions'
 import { RequiresSignatureToggle } from './requires-signature-toggle'
 import { ContractSection } from './contract-section'
+import { NuevaVersionButton } from './nueva-version-button'
+import { DealTimeline } from '@/components/deals/deal-timeline'
+import { ClientHistoryCard } from '@/components/deals/client-history-card'
 import type { PresupuestoStatus } from '@/types'
 
 const STATUS_LABELS: Record<PresupuestoStatus, string> = {
@@ -48,6 +52,14 @@ export default async function OfertaDetailPage({ params }: { params: Promise<{ i
   const vatAmount = presupuesto.amountNet * (presupuesto.vatRate / 100)
   const canEdit = presupuesto.status === 'draft' || presupuesto.status === 'sent'
 
+  // Fetch deal-level data only when linked to a deal
+  const [dealPresupuestos, dealFacturas] = presupuesto.dealId
+    ? await Promise.all([
+        getPresupuestosByDeal(presupuesto.dealId).catch(() => []),
+        getInvoicesByDeal(presupuesto.dealId).catch(() => []),
+      ])
+    : [[], []]
+
   return (
     <div className="p-8 max-w-3xl mx-auto">
       {/* Back */}
@@ -71,6 +83,7 @@ export default async function OfertaDetailPage({ params }: { params: Promise<{ i
         </div>
 
         <div className="flex items-center gap-2 flex-wrap">
+          <NuevaVersionButton presupuestoId={presupuesto.id} />
           {canEdit && (
             <Link
               href={`/ofertas/${presupuesto.id}/editar`}
@@ -108,6 +121,16 @@ export default async function OfertaDetailPage({ params }: { params: Promise<{ i
           </a>
         </div>
       </div>
+
+      {/* Timeline */}
+      {(dealPresupuestos.length > 0 || dealFacturas.length > 0) && (
+        <DealTimeline presupuestos={dealPresupuestos} facturas={dealFacturas} />
+      )}
+
+      {/* Client history */}
+      {dealFacturas.length > 0 && (
+        <ClientHistoryCard facturas={dealFacturas} />
+      )}
 
       <div className="grid grid-cols-2 gap-5">
         {/* Left */}

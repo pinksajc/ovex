@@ -52,6 +52,8 @@ interface PresupuestoRow {
   signed_contract_url?: string | null
   signed_contract_filename?: string | null
   signed_at?: string | null
+  parent_id?: string | null
+  version?: number | null
   created_at: string
   updated_at: string
 }
@@ -89,6 +91,8 @@ function rowToPresupuesto(row: PresupuestoRow): Presupuesto {
     signedContractUrl: row.signed_contract_url ?? null,
     signedContractFilename: row.signed_contract_filename ?? null,
     signedAt: row.signed_at ?? null,
+    parentId: row.parent_id ?? null,
+    version: row.version ?? 1,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   }
@@ -247,6 +251,60 @@ export async function updatePresupuestoContract(id: string, upload: ContractUplo
     .eq('id', id)
 
   if (error) throw error
+}
+
+/**
+ * Duplicates a presupuesto as a new draft version.
+ * - parent_id = root of the version chain (the offer with no parent_id)
+ * - version   = max(versions in chain) + 1
+ * - number    = base number + '-v{version}' (strips any existing '-vN' suffix)
+ */
+export async function createPresupuestoVersion(sourceId: string): Promise<Presupuesto> {
+  const source = await getPresupuesto(sourceId)
+  if (!source) throw new Error('Oferta no encontrada')
+
+  const db = getSupabaseClient()
+
+  // Find the root of the version chain
+  const rootId = source.parentId ?? source.id
+
+  // Get all versions in the chain to determine next version number
+  const { data: siblings } = await presupuestosTable(db)
+    .select('version')
+    .or(`id.eq.${rootId},parent_id.eq.${rootId}`)
+
+  const maxVersion = siblings && siblings.length > 0
+    ? Math.max(...(siblings as { version: number | null }[]).map((s) => s.version ?? 1))
+    : source.version
+  const newVersion = maxVersion + 1
+
+  // Strip any existing -vN suffix and append new version
+  const baseNumber = source.number.replace(/-v\d+$/, '')
+  const newNumber = `${baseNumber}-v${newVersion}`
+
+  const { data, error } = await presupuestosTable(db)
+    .insert({
+      number: newNumber,
+      deal_id: source.dealId,
+      client_name: source.clientName,
+      client_cif: source.clientCif,
+      client_address: source.clientAddress,
+      line_items: JSON.stringify(source.lineItems),
+      amount_net: source.amountNet,
+      vat_rate: source.vatRate,
+      amount_total: source.amountTotal,
+      status: 'draft',
+      valid_until: source.validUntil,
+      notes: source.notes,
+      requires_signature: source.requiresSignature,
+      parent_id: rootId,
+      version: newVersion,
+    })
+    .select()
+    .single()
+
+  if (error) throw error
+  return rowToPresupuesto(data as PresupuestoRow)
 }
 
 /** Returns accepted presupuestos that have a contract_start_date but whose deal

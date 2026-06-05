@@ -384,6 +384,9 @@ export interface Presupuesto {
   signedContractUrl: string | null    // Supabase Storage public/signed URL
   signedContractFilename: string | null
   signedAt: string | null             // ISO timestamp when uploaded
+  // Versioning
+  parentId: string | null             // points to root offer in version chain
+  version: number                     // starts at 1, incremented per new version
   createdAt: string
   updatedAt: string
 }
