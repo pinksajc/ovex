@@ -2,6 +2,7 @@ import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import { getPresupuesto, getPresupuestosByDeal } from '@/lib/supabase/presupuestos'
 import { getInvoicesByDeal } from '@/lib/supabase/invoices'
+import { getDealById } from '@/lib/supabase/deals'
 import { OfertaActions } from './actions'
 import { RequiresSignatureToggle } from './requires-signature-toggle'
 import { ContractSection } from './contract-section'
@@ -52,13 +53,14 @@ export default async function OfertaDetailPage({ params }: { params: Promise<{ i
   const vatAmount = presupuesto.amountNet * (presupuesto.vatRate / 100)
   const canEdit = presupuesto.status === 'draft' || presupuesto.status === 'sent'
 
-  // Fetch deal-level data only when linked to a deal
-  const [dealPresupuestos, dealFacturas] = presupuesto.dealId
+  // Fetch deal-level data when linked to a deal
+  const [dealPresupuestos, dealFacturas, deal] = presupuesto.dealId
     ? await Promise.all([
         getPresupuestosByDeal(presupuesto.dealId).catch(() => []),
         getInvoicesByDeal(presupuesto.dealId).catch(() => []),
+        getDealById(presupuesto.dealId).catch(() => null),
       ])
-    : [[], []]
+    : [[], [], null]
 
   return (
     <div className="p-8 max-w-3xl mx-auto">
@@ -122,14 +124,21 @@ export default async function OfertaDetailPage({ params }: { params: Promise<{ i
         </div>
       </div>
 
-      {/* Timeline */}
-      {(dealPresupuestos.length > 0 || dealFacturas.length > 0) && (
-        <DealTimeline presupuestos={dealPresupuestos} facturas={dealFacturas} />
+      {/* Timeline — show when deal has at least one presupuesto */}
+      {dealPresupuestos.length > 0 && (
+        <DealTimeline
+          presupuestos={dealPresupuestos}
+          facturas={dealFacturas}
+          activePresupuestoId={presupuesto.id}
+        />
       )}
 
-      {/* Client history */}
-      {dealFacturas.length > 0 && (
-        <ClientHistoryCard facturas={dealFacturas} />
+      {/* Client history — show whenever linked to a deal */}
+      {presupuesto.dealId && (
+        <ClientHistoryCard
+          facturas={dealFacturas}
+          title="Historial con este cliente"
+        />
       )}
 
       <div className="grid grid-cols-2 gap-5">
@@ -199,14 +208,15 @@ export default async function OfertaDetailPage({ params }: { params: Promise<{ i
             />
           )}
 
+          {/* Deal vinculado — show company name, not UUID */}
           {presupuesto.dealId && (
             <div className="bg-white border border-zinc-200 rounded-xl p-5">
               <h2 className="text-[10px] font-semibold text-zinc-400 uppercase tracking-widest mb-2">Deal vinculado</h2>
               <Link
                 href={`/deals/${presupuesto.dealId}`}
-                className="text-xs text-blue-700 hover:underline font-mono"
+                className="text-xs text-blue-700 hover:underline"
               >
-                Ver deal →
+                {deal?.company?.name ?? presupuesto.clientName} →
               </Link>
             </div>
           )}

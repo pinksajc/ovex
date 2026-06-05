@@ -271,6 +271,19 @@ export default async function DealPage({
       {/* Localizaciones */}
       <DealLocationsPanel dealId={deal.id} initialLocations={locations} />
 
+      {/* Timeline */}
+      {(presupuestos.length > 0 || facturas.length > 0) && (
+        <DealTimeline presupuestos={presupuestos} facturas={facturas} />
+      )}
+
+      {/* Historial de facturación — always show when there's a config or invoices */}
+      {(facturas.length > 0 || cfg) && (
+        <ClientHistoryCard
+          facturas={facturas}
+          mrr={cfgMrr > 0 ? cfgMrr : undefined}
+        />
+      )}
+
       {/* Facturas */}
       <div className="bg-white border border-zinc-200 rounded-xl p-5 mb-6">
         <div className="flex items-center justify-between mb-4">
@@ -309,16 +322,6 @@ export default async function DealPage({
           </div>
         )}
       </div>
-
-      {/* Timeline */}
-      {(presupuestos.length > 0 || facturas.length > 0) && (
-        <DealTimeline presupuestos={presupuestos} facturas={facturas} />
-      )}
-
-      {/* Client history */}
-      {facturas.length > 0 && (
-        <ClientHistoryCard facturas={facturas} mrr={cfgMrr > 0 ? cfgMrr : undefined} />
-      )}
 
       {/* Configuración activa */}
       {cfg && (

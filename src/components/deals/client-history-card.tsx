@@ -1,5 +1,5 @@
 // Client history card — server component
-// Shows billing summary: total facturado, cobrado, pendiente, and invoice list
+// KPIs: total facturado / cobrado / pendiente / MRR + invoice list (date desc)
 
 import Link from 'next/link'
 import type { Invoice, InvoiceStatus } from '@/types'
@@ -33,42 +33,46 @@ function formatDateShort(s: string | null) {
 
 interface Props {
   facturas: Invoice[]
+  /** Label for the card — defaults to "Historial de facturación" */
+  title?: string
   /** Optional MRR from active deal config */
   mrr?: number
 }
 
-export function ClientHistoryCard({ facturas, mrr }: Props) {
-  // Filter out draft invoices for totals
-  const issued = facturas.filter((f) => f.status !== 'draft' && f.status !== 'converted')
+export function ClientHistoryCard({ facturas, title = 'Historial de facturación', mrr }: Props) {
+  // Sort by date desc
+  const sorted = [...facturas].sort((a, b) => {
+    const da = a.issuedAt ?? a.createdAt
+    const db = b.issuedAt ?? b.createdAt
+    return db.localeCompare(da)
+  })
 
-  const totalFacturado = issued.reduce((s, f) => s + f.amountTotal, 0)
-  const totalCobrado = issued.filter((f) => f.status === 'paid').reduce((s, f) => s + f.amountTotal, 0)
-  const totalPendiente = issued
-    .filter((f) => f.status === 'issued' || f.status === 'overdue')
-    .reduce((s, f) => s + f.amountTotal, 0)
+  // Totals (exclude draft + converted)
+  const billed = sorted.filter((f) => f.status !== 'draft' && f.status !== 'converted')
+  const totalFacturado = billed.reduce((s, f) => s + f.amountTotal, 0)
+  const totalCobrado   = billed.filter((f) => f.status === 'paid').reduce((s, f) => s + f.amountTotal, 0)
+  const totalPendiente = billed.filter((f) => f.status === 'issued' || f.status === 'overdue').reduce((s, f) => s + f.amountTotal, 0)
 
-  if (facturas.length === 0 && mrr === undefined) return null
+  const showMrr = mrr !== undefined && mrr > 0
 
   return (
     <div className="bg-white border border-zinc-200 rounded-xl p-5 mb-6">
       <h3 className="text-xs font-medium text-zinc-500 uppercase tracking-wide mb-4">
-        Historial cliente
+        {title}
       </h3>
 
       {/* KPIs */}
-      <div className="grid grid-cols-2 gap-3 mb-5 sm:grid-cols-4">
-        <KpiCell label="Facturado" value={formatEur(totalFacturado)} />
+      <div className={`grid gap-3 mb-5 ${showMrr ? 'grid-cols-2 sm:grid-cols-4' : 'grid-cols-3'}`}>
+        <KpiCell label="Total facturado" value={formatEur(totalFacturado)} />
         <KpiCell label="Cobrado" value={formatEur(totalCobrado)} positive />
         <KpiCell label="Pendiente" value={formatEur(totalPendiente)} warn={totalPendiente > 0} />
-        {mrr !== undefined && mrr > 0 && (
-          <KpiCell label="MRR activo" value={formatEur(mrr)} highlight />
-        )}
+        {showMrr && <KpiCell label="MRR activo" value={formatEur(mrr!)} highlight />}
       </div>
 
       {/* Invoice list */}
-      {facturas.length > 0 ? (
+      {sorted.length > 0 ? (
         <div className="divide-y divide-zinc-50">
-          {facturas.map((f) => (
+          {sorted.map((f) => (
             <div key={f.id} className="flex items-center justify-between py-2">
               <div className="flex items-center gap-2 min-w-0">
                 <Link
@@ -77,9 +81,7 @@ export function ClientHistoryCard({ facturas, mrr }: Props) {
                 >
                   {f.number}
                 </Link>
-                <span
-                  className={`text-[9px] font-semibold uppercase px-1.5 py-0.5 rounded-full shrink-0 ${STATUS_COLOR[f.status]}`}
-                >
+                <span className={`text-[9px] font-semibold uppercase px-1.5 py-0.5 rounded-full shrink-0 ${STATUS_COLOR[f.status]}`}>
                   {STATUS_LABEL[f.status]}
                 </span>
                 {f.concept && (
@@ -89,9 +91,7 @@ export function ClientHistoryCard({ facturas, mrr }: Props) {
                 )}
               </div>
               <div className="text-right shrink-0 ml-3">
-                <div className="text-xs font-mono text-zinc-700 font-semibold">
-                  {formatEur(f.amountTotal)}
-                </div>
+                <div className="text-xs font-mono text-zinc-700 font-semibold">{formatEur(f.amountTotal)}</div>
                 <div className="text-[10px] text-zinc-400">{formatDateShort(f.issuedAt)}</div>
               </div>
             </div>
@@ -104,27 +104,13 @@ export function ClientHistoryCard({ facturas, mrr }: Props) {
   )
 }
 
-function KpiCell({
-  label,
-  value,
-  positive,
-  warn,
-  highlight,
-}: {
-  label: string
-  value: string
-  positive?: boolean
-  warn?: boolean
-  highlight?: boolean
+function KpiCell({ label, value, positive, warn, highlight }: {
+  label: string; value: string; positive?: boolean; warn?: boolean; highlight?: boolean
 }) {
-  const valueColor = highlight
-    ? 'text-zinc-900'
-    : positive
-    ? 'text-emerald-600'
-    : warn
-    ? 'text-amber-600'
+  const valueColor = highlight ? 'text-zinc-900'
+    : positive ? 'text-emerald-600'
+    : warn     ? 'text-amber-600'
     : 'text-zinc-700'
-
   return (
     <div className="bg-zinc-50 rounded-lg px-3 py-2.5">
       <p className="text-[10px] text-zinc-400 mb-0.5">{label}</p>
