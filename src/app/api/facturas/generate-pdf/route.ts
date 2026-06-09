@@ -28,10 +28,11 @@ export async function GET(req: Request) {
       : ''
     const filename = `${prefix}${numberSlug}${locationSlug}.pdf`
 
+    const inline = searchParams.get('inline') === '1'
     return new Response(pdfBuffer.buffer as ArrayBuffer, {
       headers: {
         'Content-Type': 'application/pdf',
-        'Content-Disposition': `attachment; filename="${filename}"`,
+        'Content-Disposition': `${inline ? 'inline' : 'attachment'}; filename="${filename}"`,
         'Content-Length': String(pdfBuffer.length),
       },
     })

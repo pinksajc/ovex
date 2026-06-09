@@ -9,6 +9,7 @@ import { ContractSection } from './contract-section'
 import { NuevaVersionButton } from './nueva-version-button'
 import { DealTimeline } from '@/components/deals/deal-timeline'
 import { ClientHistoryCard } from '@/components/deals/client-history-card'
+import { PdfPreviewPanel } from '@/components/ui/pdf-preview-panel'
 import type { PresupuestoStatus } from '@/types'
 
 const STATUS_LABELS: Record<PresupuestoStatus, string> = {
@@ -62,166 +63,174 @@ export default async function OfertaDetailPage({ params }: { params: Promise<{ i
       ])
     : [[], [], null]
 
+  const pdfPreviewUrl  = `/api/presupuestos/generate-pdf?id=${presupuesto.id}&inline=1`
+  const pdfDownloadUrl = `/api/presupuestos/generate-pdf?id=${presupuesto.id}`
+
   return (
-    <div className="p-8 max-w-3xl mx-auto">
-      {/* Back */}
-      <Link
-        href="/ofertas"
-        className="inline-flex items-center gap-1 text-xs text-zinc-400 hover:text-zinc-700 mb-6 transition-colors"
-      >
-        ← Ofertas
-      </Link>
+    <div className="flex min-h-full">
+      {/* ── Left: main content (scrolls with the page) ─────────────────────── */}
+      <div className="flex-1 min-w-0 p-8">
+        {/* Back */}
+        <Link
+          href="/ofertas"
+          className="inline-flex items-center gap-1 text-xs text-zinc-400 hover:text-zinc-700 mb-6 transition-colors"
+        >
+          ← Ofertas
+        </Link>
 
-      {/* Header */}
-      <div className="mb-6 flex items-start justify-between gap-4 flex-wrap">
-        <div>
-          <div className="flex items-center gap-3 mb-1">
-            <h1 className="text-2xl font-semibold text-zinc-900 font-mono tracking-tight">{presupuesto.number}</h1>
-            <span className={`text-[10px] font-semibold uppercase tracking-wide px-2.5 py-1 rounded-full ${STATUS_COLORS[presupuesto.status]}`}>
-              {STATUS_LABELS[presupuesto.status]}
-            </span>
+        {/* Header */}
+        <div className="mb-6 flex items-start justify-between gap-4 flex-wrap">
+          <div>
+            <div className="flex items-center gap-3 mb-1">
+              <h1 className="text-2xl font-semibold text-zinc-900 font-mono tracking-tight">{presupuesto.number}</h1>
+              <span className={`text-[10px] font-semibold uppercase tracking-wide px-2.5 py-1 rounded-full ${STATUS_COLORS[presupuesto.status]}`}>
+                {STATUS_LABELS[presupuesto.status]}
+              </span>
+            </div>
+            <p className="text-sm text-zinc-500">{presupuesto.clientName}</p>
           </div>
-          <p className="text-sm text-zinc-500">{presupuesto.clientName}</p>
-        </div>
 
-        <div className="flex items-center gap-2 flex-wrap">
-          <NuevaVersionButton presupuestoId={presupuesto.id} />
-          {canEdit && (
-            <Link
-              href={`/ofertas/${presupuesto.id}/editar`}
+          <div className="flex items-center gap-2 flex-wrap">
+            <NuevaVersionButton presupuestoId={presupuesto.id} />
+            {canEdit && (
+              <Link
+                href={`/ofertas/${presupuesto.id}/editar`}
+                className="inline-flex items-center gap-1.5 text-xs font-medium border border-zinc-200 text-zinc-700 hover:bg-zinc-50 hover:border-zinc-400 px-3 py-1.5 rounded-lg transition-colors"
+              >
+                <svg className="w-3.5 h-3.5" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5">
+                  <path d="M9.5 2.5l2 2L5 11H3v-2L9.5 2.5z" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+                Editar
+              </Link>
+            )}
+            <a
+              href={pdfDownloadUrl}
+              download
               className="inline-flex items-center gap-1.5 text-xs font-medium border border-zinc-200 text-zinc-700 hover:bg-zinc-50 hover:border-zinc-400 px-3 py-1.5 rounded-lg transition-colors"
             >
               <svg className="w-3.5 h-3.5" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5">
-                <path d="M9.5 2.5l2 2L5 11H3v-2L9.5 2.5z" strokeLinecap="round" strokeLinejoin="round" />
+                <path d="M7 1v8M4 6l3 3 3-3" strokeLinecap="round" strokeLinejoin="round" />
+                <path d="M2 11h10" strokeLinecap="round" />
               </svg>
-              Editar
-            </Link>
-          )}
-          <a
-            href={`/api/presupuestos/generate-pdf?id=${presupuesto.id}`}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex items-center gap-1.5 text-xs font-medium border border-zinc-200 text-zinc-700 hover:bg-zinc-50 hover:border-zinc-400 px-3 py-1.5 rounded-lg transition-colors"
-          >
-            <svg className="w-3.5 h-3.5" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5">
-              <path d="M7 1v8M4 6l3 3 3-3" strokeLinecap="round" strokeLinejoin="round" />
-              <path d="M2 11h10" strokeLinecap="round" />
-            </svg>
-            Descargar oferta
-          </a>
-          <a
-            href={`/api/ofertas/generate-pdf?id=${presupuesto.id}`}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex items-center gap-1.5 text-xs font-medium border border-zinc-200 text-zinc-700 hover:bg-zinc-50 hover:border-zinc-400 px-3 py-1.5 rounded-lg transition-colors"
-          >
-            <svg className="w-3.5 h-3.5" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5">
-              <path d="M7 1v8M4 6l3 3 3-3" strokeLinecap="round" strokeLinejoin="round" />
-              <path d="M2 11h10" strokeLinecap="round" />
-            </svg>
-            Descargar Sales Deck
-          </a>
+              Descargar oferta
+            </a>
+            <a
+              href={`/api/ofertas/generate-pdf?id=${presupuesto.id}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1.5 text-xs font-medium border border-zinc-200 text-zinc-700 hover:bg-zinc-50 hover:border-zinc-400 px-3 py-1.5 rounded-lg transition-colors"
+            >
+              <svg className="w-3.5 h-3.5" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5">
+                <path d="M7 1v8M4 6l3 3 3-3" strokeLinecap="round" strokeLinejoin="round" />
+                <path d="M2 11h10" strokeLinecap="round" />
+              </svg>
+              Descargar Sales Deck
+            </a>
+          </div>
         </div>
-      </div>
 
-      {/* Timeline — show when deal has at least one presupuesto */}
-      {dealPresupuestos.length > 0 && (
-        <DealTimeline
-          presupuestos={dealPresupuestos}
-          facturas={dealFacturas}
-          activePresupuestoId={presupuesto.id}
-        />
-      )}
+        {/* Timeline — show when deal has at least one presupuesto */}
+        {dealPresupuestos.length > 0 && (
+          <DealTimeline
+            presupuestos={dealPresupuestos}
+            facturas={dealFacturas}
+            activePresupuestoId={presupuesto.id}
+          />
+        )}
 
-      {/* Client history — show whenever linked to a deal */}
-      {presupuesto.dealId && (
-        <ClientHistoryCard
-          facturas={dealFacturas}
-          title="Historial con este cliente"
-        />
-      )}
+        {/* Client history — show whenever linked to a deal */}
+        {presupuesto.dealId && (
+          <ClientHistoryCard
+            facturas={dealFacturas}
+            title="Historial con este cliente"
+          />
+        )}
 
-      <div className="grid grid-cols-2 gap-5">
-        {/* Left */}
-        <div className="space-y-5">
-          <div className="bg-white border border-zinc-200 rounded-xl p-5">
-            <h2 className="text-[10px] font-semibold text-zinc-400 uppercase tracking-widest mb-3">Cliente</h2>
-            <p className="text-sm font-semibold text-zinc-900">{presupuesto.clientName}</p>
-            {presupuesto.clientCif && <p className="text-xs text-zinc-500 mt-0.5">NIF/CIF: {presupuesto.clientCif}</p>}
-            {presupuesto.clientAddress && <p className="text-xs text-zinc-500 mt-0.5">{presupuesto.clientAddress}</p>}
-          </div>
-
-          <div className="bg-white border border-zinc-200 rounded-xl p-5">
-            <h2 className="text-[10px] font-semibold text-zinc-400 uppercase tracking-widest mb-3">Concepto</h2>
-            <p className="text-sm text-zinc-800">{presupuesto.concept}</p>
-          </div>
-
-          <div className="bg-white border border-zinc-200 rounded-xl p-5">
-            <h2 className="text-[10px] font-semibold text-zinc-400 uppercase tracking-widest mb-3">Fechas</h2>
-            <Row label="Válido hasta" value={formatDate(presupuesto.validUntil)} />
-            <Row label="Creado" value={formatDate(presupuesto.createdAt)} />
-          </div>
-
-          {presupuesto.notes && (
+        <div className="grid grid-cols-2 gap-5">
+          {/* Left */}
+          <div className="space-y-5">
             <div className="bg-white border border-zinc-200 rounded-xl p-5">
-              <h2 className="text-[10px] font-semibold text-zinc-400 uppercase tracking-widest mb-3">Notas</h2>
-              <p className="text-xs text-zinc-700 whitespace-pre-wrap">{presupuesto.notes}</p>
+              <h2 className="text-[10px] font-semibold text-zinc-400 uppercase tracking-widest mb-3">Cliente</h2>
+              <p className="text-sm font-semibold text-zinc-900">{presupuesto.clientName}</p>
+              {presupuesto.clientCif && <p className="text-xs text-zinc-500 mt-0.5">NIF/CIF: {presupuesto.clientCif}</p>}
+              {presupuesto.clientAddress && <p className="text-xs text-zinc-500 mt-0.5">{presupuesto.clientAddress}</p>}
             </div>
-          )}
-        </div>
 
-        {/* Right */}
-        <div className="space-y-5">
-          <div className="bg-white border border-zinc-200 rounded-xl p-5">
-            <h2 className="text-[10px] font-semibold text-zinc-400 uppercase tracking-widest mb-3">Importes</h2>
-            <div className="space-y-1">
-              <Row label="Base imponible" value={<span className="font-mono">{formatEur(presupuesto.amountNet)}</span>} />
-              <Row label={`IVA (${presupuesto.vatRate}%)`} value={<span className="font-mono">{formatEur(vatAmount)}</span>} />
-              <div className="flex items-start justify-between pt-2.5 border-t border-zinc-200">
-                <span className="text-xs font-semibold text-zinc-700">Total oferta</span>
-                <span className="text-base font-mono font-semibold text-zinc-900">{formatEur(presupuesto.amountTotal)}</span>
+            <div className="bg-white border border-zinc-200 rounded-xl p-5">
+              <h2 className="text-[10px] font-semibold text-zinc-400 uppercase tracking-widest mb-3">Concepto</h2>
+              <p className="text-sm text-zinc-800">{presupuesto.concept}</p>
+            </div>
+
+            <div className="bg-white border border-zinc-200 rounded-xl p-5">
+              <h2 className="text-[10px] font-semibold text-zinc-400 uppercase tracking-widest mb-3">Fechas</h2>
+              <Row label="Válido hasta" value={formatDate(presupuesto.validUntil)} />
+              <Row label="Creado" value={formatDate(presupuesto.createdAt)} />
+            </div>
+
+            {presupuesto.notes && (
+              <div className="bg-white border border-zinc-200 rounded-xl p-5">
+                <h2 className="text-[10px] font-semibold text-zinc-400 uppercase tracking-widest mb-3">Notas</h2>
+                <p className="text-xs text-zinc-700 whitespace-pre-wrap">{presupuesto.notes}</p>
+              </div>
+            )}
+          </div>
+
+          {/* Right */}
+          <div className="space-y-5">
+            <div className="bg-white border border-zinc-200 rounded-xl p-5">
+              <h2 className="text-[10px] font-semibold text-zinc-400 uppercase tracking-widest mb-3">Importes</h2>
+              <div className="space-y-1">
+                <Row label="Base imponible" value={<span className="font-mono">{formatEur(presupuesto.amountNet)}</span>} />
+                <Row label={`IVA (${presupuesto.vatRate}%)`} value={<span className="font-mono">{formatEur(vatAmount)}</span>} />
+                <div className="flex items-start justify-between pt-2.5 border-t border-zinc-200">
+                  <span className="text-xs font-semibold text-zinc-700">Total oferta</span>
+                  <span className="text-base font-mono font-semibold text-zinc-900">{formatEur(presupuesto.amountTotal)}</span>
+                </div>
               </div>
             </div>
-          </div>
 
-          <div className="bg-white border border-zinc-200 rounded-xl p-5">
-            <h2 className="text-[10px] font-semibold text-zinc-400 uppercase tracking-widest mb-3">Cambiar estado</h2>
-            <OfertaActions presupuestoId={presupuesto.id} currentStatus={presupuesto.status} />
-          </div>
-
-          <div className="bg-white border border-zinc-200 rounded-xl p-5">
-            <h2 className="text-[10px] font-semibold text-zinc-400 uppercase tracking-widest mb-3">PDF</h2>
-            <RequiresSignatureToggle
-              presupuestoId={presupuesto.id}
-              initialValue={presupuesto.requiresSignature}
-            />
-          </div>
-
-          {/* Contract management — only for accepted offers */}
-          {presupuesto.status === 'accepted' && (
-            <ContractSection
-              presupuestoId={presupuesto.id}
-              initialContractStartDate={presupuesto.contractStartDate}
-              initialSignedContractUrl={presupuesto.signedContractUrl}
-              initialSignedContractFilename={presupuesto.signedContractFilename}
-              initialSignedAt={presupuesto.signedAt}
-            />
-          )}
-
-          {/* Deal vinculado — show company name, not UUID */}
-          {presupuesto.dealId && (
             <div className="bg-white border border-zinc-200 rounded-xl p-5">
-              <h2 className="text-[10px] font-semibold text-zinc-400 uppercase tracking-widest mb-2">Deal vinculado</h2>
-              <Link
-                href={`/deals/${presupuesto.dealId}`}
-                className="text-xs text-blue-700 hover:underline"
-              >
-                {deal?.company?.name ?? presupuesto.clientName} →
-              </Link>
+              <h2 className="text-[10px] font-semibold text-zinc-400 uppercase tracking-widest mb-3">Cambiar estado</h2>
+              <OfertaActions presupuestoId={presupuesto.id} currentStatus={presupuesto.status} />
             </div>
-          )}
+
+            <div className="bg-white border border-zinc-200 rounded-xl p-5">
+              <h2 className="text-[10px] font-semibold text-zinc-400 uppercase tracking-widest mb-3">PDF</h2>
+              <RequiresSignatureToggle
+                presupuestoId={presupuesto.id}
+                initialValue={presupuesto.requiresSignature}
+              />
+            </div>
+
+            {/* Contract management — only for accepted offers */}
+            {presupuesto.status === 'accepted' && (
+              <ContractSection
+                presupuestoId={presupuesto.id}
+                initialContractStartDate={presupuesto.contractStartDate}
+                initialSignedContractUrl={presupuesto.signedContractUrl}
+                initialSignedContractFilename={presupuesto.signedContractFilename}
+                initialSignedAt={presupuesto.signedAt}
+              />
+            )}
+
+            {/* Deal vinculado — show company name, not UUID */}
+            {presupuesto.dealId && (
+              <div className="bg-white border border-zinc-200 rounded-xl p-5">
+                <h2 className="text-[10px] font-semibold text-zinc-400 uppercase tracking-widest mb-2">Deal vinculado</h2>
+                <Link
+                  href={`/deals/${presupuesto.dealId}`}
+                  className="text-xs text-blue-700 hover:underline"
+                >
+                  {deal?.company?.name ?? presupuesto.clientName} →
+                </Link>
+              </div>
+            )}
+          </div>
         </div>
       </div>
+
+      {/* ── Right: sticky PDF preview (desktop only) ───────────────────────── */}
+      <PdfPreviewPanel previewUrl={pdfPreviewUrl} downloadUrl={pdfDownloadUrl} />
     </div>
   )
 }

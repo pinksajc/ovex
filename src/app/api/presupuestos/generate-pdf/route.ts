@@ -32,10 +32,11 @@ export async function GET(req: Request) {
     const slug = presupuesto.clientName.replace(/[^A-Za-z0-9-]/g, '-').toLowerCase().replace(/-+/g, '-').replace(/^-|-$/g, '')
     const filename = `oferta-${slug || 'cliente'}.pdf`
 
+    const inline = searchParams.get('inline') === '1'
     return new Response(pdfBuffer.buffer as ArrayBuffer, {
       headers: {
         'Content-Type': 'application/pdf',
-        'Content-Disposition': `attachment; filename="${filename}"`,
+        'Content-Disposition': `${inline ? 'inline' : 'attachment'}; filename="${filename}"`,
         'Content-Length': String(pdfBuffer.length),
       },
     })
