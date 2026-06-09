@@ -3,7 +3,7 @@
 import { redirect } from 'next/navigation'
 import { revalidatePath } from 'next/cache'
 import { isRedirectError } from 'next/dist/client/components/redirect-error'
-import { createPresupuesto, updatePresupuesto, updatePresupuestoStatus, updatePresupuestoSignatureRequired, getPresupuesto, createPresupuestoVersion } from '@/lib/supabase/presupuestos'
+import { createPresupuesto, updatePresupuesto, updatePresupuestoStatus, updatePresupuestoSignatureRequired, getPresupuesto, createPresupuestoVersion, deletePresupuesto } from '@/lib/supabase/presupuestos'
 import type { CreatePresupuestoInput, UpdatePresupuestoInput, PresupuestoStatus } from '@/types'
 
 export async function createPresupuestoAction(input: CreatePresupuestoInput): Promise<{ error?: string }> {
@@ -77,6 +77,19 @@ export async function createVersionAction(
     revalidatePath(`/ofertas/${presupuestoId}`)
     revalidatePath('/deals')
     return { ok: true, id: newPq.id }
+  } catch (err) {
+    return { ok: false, error: (err as { message?: string })?.message ?? 'Error desconocido' }
+  }
+}
+
+export async function deletePresupuestoAction(
+  id: string
+): Promise<{ ok: boolean; error?: string }> {
+  try {
+    await deletePresupuesto(id)
+    revalidatePath('/ofertas')
+    revalidatePath('/deals')
+    return { ok: true }
   } catch (err) {
     return { ok: false, error: (err as { message?: string })?.message ?? 'Error desconocido' }
   }

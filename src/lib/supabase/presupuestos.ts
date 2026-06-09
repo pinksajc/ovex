@@ -307,6 +307,41 @@ export async function createPresupuestoVersion(sourceId: string): Promise<Presup
   return rowToPresupuesto(data as PresupuestoRow)
 }
 
+/**
+ * Deletes a presupuesto (and all its child versions via parent_id) from Supabase.
+ * Only drafts may be deleted — throws if the presupuesto is not in 'draft' status.
+ * Child versions are deleted first to avoid FK constraint violations.
+ */
+export async function deletePresupuesto(id: string): Promise<void> {
+  const db = getSupabaseClient()
+
+  // Verify the target is a draft
+  const { data: row, error: fetchErr } = await presupuestosTable(db)
+    .select('status')
+    .eq('id', id)
+    .maybeSingle()
+
+  if (fetchErr) throw fetchErr
+  if (!row) throw new Error('Oferta no encontrada')
+  if ((row as { status: string }).status !== 'draft') {
+    throw new Error('Solo se pueden eliminar ofertas en estado borrador')
+  }
+
+  // Delete child versions first (FK: parent_id → id)
+  const { error: childErr } = await presupuestosTable(db)
+    .delete()
+    .eq('parent_id', id)
+
+  if (childErr) throw childErr
+
+  // Delete the presupuesto itself
+  const { error: delErr } = await presupuestosTable(db)
+    .delete()
+    .eq('id', id)
+
+  if (delErr) throw delErr
+}
+
 /** Returns accepted presupuestos that have a contract_start_date but whose deal
  *  has not been invoiced in the current calendar month. Used for billing reminders. */
 export async function getPendingBillingPresupuestos(): Promise<Presupuesto[]> {
