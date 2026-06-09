@@ -131,7 +131,7 @@ export async function generateContractPdf(
     min-height: 297mm;
     padding: 22mm 20mm 18mm;
     position: relative;
-    overflow: hidden;
+    /* No overflow:hidden — lets the diagonal watermark bleed to page edges */
     break-after: page;
     page-break-after: always;
   }
@@ -140,16 +140,17 @@ export async function generateContractPdf(
     page-break-after: avoid;
   }
 
-  /* ── Watermark ── */
+  /* ── Watermark — full-page diagonal, matches Orvex PDF style ── */
   .watermark {
     position: absolute;
     top: 50%;
     left: 50%;
+    /* Center then rotate so the text spans the full page diagonal */
     transform: translate(-50%, -50%) rotate(-45deg);
-    font-size: 72px;
-    font-weight: 800;
-    color: rgba(0,0,0,0.035);
-    letter-spacing: 10px;
+    font-size: 130px;
+    font-weight: 900;
+    color: rgba(0,0,0,0.04);
+    letter-spacing: 18px;
     text-transform: uppercase;
     pointer-events: none;
     user-select: none;
@@ -629,10 +630,15 @@ export async function generateContractPdf(
         <div class="sig-presigned">✓ Firmado</div>
       </div>
 
-      <!-- Cliente — pendiente de firma -->
+      <!-- Cliente — datos prefijados, pendiente de firma -->
       <div class="sig-col">
         <div class="sig-col-title">Por ${esc(presupuesto.clientName)}</div>
-        <div style="margin-top: 12px;">
+        <!-- Pre-filled company data -->
+        <div class="sig-name">${esc(presupuesto.clientName)}</div>
+        ${presupuesto.clientCif     ? `<div class="sig-role">NIF/CIF: ${esc(presupuesto.clientCif)}</div>` : ''}
+        ${presupuesto.clientAddress ? `<div class="sig-nif">${esc(presupuesto.clientAddress)}</div>`      : ''}
+        <!-- Blank fields for handwritten completion -->
+        <div style="margin-top: 18px;">
           <div class="sig-line-label">Firma</div>
           <div class="sig-line">&nbsp;</div>
           <div class="sig-line-label">Nombre del representante</div>
