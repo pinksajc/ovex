@@ -1,35 +1,55 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 
 interface PdfPreviewPanelProps {
   /** URL used inside the iframe — must return Content-Disposition: inline */
   previewUrl: string
   /** URL used for the download button — Content-Disposition: attachment */
   downloadUrl: string
+  /** Optional document code shown in the header (e.g. "O-2026-0001") */
+  title?: string
+  /** Optional close/dismiss callback — renders an × button when provided */
+  onClose?: () => void
 }
 
-export function PdfPreviewPanel({ previewUrl, downloadUrl }: PdfPreviewPanelProps) {
+export function PdfPreviewPanel({ previewUrl, downloadUrl, title, onClose }: PdfPreviewPanelProps) {
   const [loaded, setLoaded] = useState(false)
 
+  // Reset spinner whenever the URL changes (new document selected)
+  useEffect(() => { setLoaded(false) }, [previewUrl])
+
   return (
-    <div className="hidden lg:flex flex-col w-[40%] shrink-0 sticky top-0 h-screen border-l border-zinc-200 bg-zinc-50">
+    <div className="hidden lg:flex flex-col w-full h-full bg-zinc-50">
       {/* Header bar */}
       <div className="flex items-center justify-between px-4 py-3 border-b border-zinc-200 bg-white shrink-0">
-        <span className="text-[10px] font-semibold text-zinc-400 uppercase tracking-widest">
-          Vista previa
+        <span className="text-[10px] font-semibold text-zinc-400 uppercase tracking-widest truncate mr-2">
+          {title ?? 'Vista previa'}
         </span>
-        <a
-          href={downloadUrl}
-          download
-          className="inline-flex items-center gap-1.5 text-xs font-medium bg-zinc-900 text-white hover:bg-zinc-700 px-3 py-1.5 rounded-lg transition-colors"
-        >
-          <svg className="w-3 h-3" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.8">
-            <path d="M6 1v7M3.5 6l2.5 2.5L8.5 6" strokeLinecap="round" strokeLinejoin="round" />
-            <path d="M1.5 10.5h9" strokeLinecap="round" />
-          </svg>
-          Descargar
-        </a>
+        <div className="flex items-center gap-2 shrink-0">
+          <a
+            href={downloadUrl}
+            download
+            className="inline-flex items-center gap-1.5 text-xs font-medium bg-zinc-900 text-white hover:bg-zinc-700 px-3 py-1.5 rounded-lg transition-colors"
+          >
+            <svg className="w-3 h-3" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.8">
+              <path d="M6 1v7M3.5 6l2.5 2.5L8.5 6" strokeLinecap="round" strokeLinejoin="round" />
+              <path d="M1.5 10.5h9" strokeLinecap="round" />
+            </svg>
+            Descargar
+          </a>
+          {onClose && (
+            <button
+              onClick={onClose}
+              title="Cerrar preview"
+              className="inline-flex items-center justify-center w-7 h-7 rounded-lg text-zinc-400 hover:text-zinc-700 hover:bg-zinc-100 transition-colors"
+            >
+              <svg className="w-3.5 h-3.5" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M2 2l10 10M12 2L2 12" strokeLinecap="round" />
+              </svg>
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Preview area */}
@@ -49,6 +69,7 @@ export function PdfPreviewPanel({ previewUrl, downloadUrl }: PdfPreviewPanelProp
           </div>
         )}
         <iframe
+          key={previewUrl}
           src={previewUrl}
           className={`w-full h-full transition-opacity duration-300 ${loaded ? 'opacity-100' : 'opacity-0'}`}
           onLoad={() => setLoaded(true)}

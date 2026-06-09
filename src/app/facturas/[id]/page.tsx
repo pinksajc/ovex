@@ -2,7 +2,7 @@ import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import { getInvoice } from '@/lib/supabase/invoices'
 import { InvoiceActions, ConvertProformaButton, DeleteInvoiceButton } from './actions'
-import { PdfPreviewPanel } from '@/components/ui/pdf-preview-panel'
+import { FacturaPageShell } from './factura-page-shell'
 import type { Invoice, InvoiceStatus } from '@/types'
 
 const STATUS_LABELS: Record<InvoiceStatus, string> = {
@@ -54,168 +54,173 @@ export default async function FacturaDetailPage({ params }: { params: Promise<{ 
   const pdfPreviewUrl  = `/api/facturas/generate-pdf?id=${invoice.id}&inline=1`
   const pdfDownloadUrl = `/api/facturas/generate-pdf?id=${invoice.id}`
 
+  /* ── Slots for FacturaPageShell ──────────────────────────────────────── */
+
+  const beforeSlot = (
+    <Link
+      href="/facturas"
+      className="inline-flex items-center gap-1 text-xs text-zinc-400 hover:text-zinc-700 mb-6 transition-colors"
+    >
+      ← Facturas
+    </Link>
+  )
+
+  // Status badges, type tags, client name + action buttons
+  // Rendered next to the (interactive) number heading inside the shell
+  const afterSlot = (
+    <>
+      <span className={`text-[10px] font-semibold uppercase tracking-wide px-2.5 py-1 rounded-full ${STATUS_COLORS[invoice.status]}`}>
+        {STATUS_LABELS[invoice.status]}
+      </span>
+      {invoice.type === 'rectificativa' && (
+        <span className="text-[10px] font-semibold uppercase tracking-wide px-2.5 py-1 rounded-full bg-amber-50 text-amber-700">
+          Rectificativa
+        </span>
+      )}
+      {invoice.type === 'proforma' && (
+        <span className="text-[10px] font-semibold uppercase tracking-wide px-2.5 py-1 rounded-full bg-violet-50 text-violet-700">
+          Factura Proforma
+        </span>
+      )}
+    </>
+  )
+
   return (
-    <div className="flex min-h-full">
-      {/* ── Left: main content (scrolls with the page) ─────────────────────── */}
-      <div className="flex-1 min-w-0 p-8">
-        {/* Back */}
-        <Link
-          href="/facturas"
-          className="inline-flex items-center gap-1 text-xs text-zinc-400 hover:text-zinc-700 mb-6 transition-colors"
-        >
-          ← Facturas
-        </Link>
+    <FacturaPageShell
+      number={invoice.number}
+      previewUrl={pdfPreviewUrl}
+      downloadUrl={pdfDownloadUrl}
+      before={beforeSlot}
+      after={afterSlot}
+    >
+      {/* Client name subtitle + action buttons row */}
+      <div className="flex items-start justify-between gap-4 flex-wrap mb-6 -mt-4">
+        <p className="text-sm text-zinc-500">{invoice.clientName}</p>
 
-        {/* Header */}
-        <div className="mb-6 flex items-start justify-between gap-4 flex-wrap">
-          <div>
-            <div className="flex items-center gap-3 mb-1">
-              <h1 className="text-2xl font-semibold text-zinc-900 font-mono tracking-tight">{invoice.number}</h1>
-              <span className={`text-[10px] font-semibold uppercase tracking-wide px-2.5 py-1 rounded-full ${STATUS_COLORS[invoice.status]}`}>
-                {STATUS_LABELS[invoice.status]}
-              </span>
-              {invoice.type === 'rectificativa' && (
-                <span className="text-[10px] font-semibold uppercase tracking-wide px-2.5 py-1 rounded-full bg-amber-50 text-amber-700">
-                  Rectificativa
-                </span>
-              )}
-              {invoice.type === 'proforma' && (
-                <span className="text-[10px] font-semibold uppercase tracking-wide px-2.5 py-1 rounded-full bg-violet-50 text-violet-700">
-                  Factura Proforma
-                </span>
-              )}
-            </div>
-            <p className="text-sm text-zinc-500">{invoice.clientName}</p>
-          </div>
-
-          <div className="flex items-center gap-2 flex-wrap">
-            {/* Edit — only for draft or issued */}
-            {(invoice.status === 'draft' || invoice.status === 'issued') && (
-              <Link
-                href={`/facturas/${invoice.id}/editar`}
-                className="inline-flex items-center gap-1.5 text-xs font-medium border border-zinc-200 text-zinc-700 hover:bg-zinc-50 hover:border-zinc-400 px-3 py-1.5 rounded-lg transition-colors"
-              >
-                <svg className="w-3.5 h-3.5" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5">
-                  <path d="M9.5 2.5l2 2L5 11H3v-2L9.5 2.5z" strokeLinecap="round" strokeLinejoin="round" />
-                </svg>
-                Editar
-              </Link>
-            )}
-
-            {/* PDF download */}
-            <a
-              href={pdfDownloadUrl}
-              download
+        <div className="flex items-center gap-2 flex-wrap">
+          {/* Edit — only for draft or issued */}
+          {(invoice.status === 'draft' || invoice.status === 'issued') && (
+            <Link
+              href={`/facturas/${invoice.id}/editar`}
               className="inline-flex items-center gap-1.5 text-xs font-medium border border-zinc-200 text-zinc-700 hover:bg-zinc-50 hover:border-zinc-400 px-3 py-1.5 rounded-lg transition-colors"
             >
               <svg className="w-3.5 h-3.5" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5">
-                <path d="M7 1v8M4 6l3 3 3-3" strokeLinecap="round" strokeLinejoin="round" />
-                <path d="M2 11h10" strokeLinecap="round" />
+                <path d="M9.5 2.5l2 2L5 11H3v-2L9.5 2.5z" strokeLinecap="round" strokeLinejoin="round" />
               </svg>
-              Descargar PDF
-            </a>
-          </div>
-        </div>
+              Editar
+            </Link>
+          )}
 
-        <div className="grid grid-cols-2 gap-5">
-          {/* Left: invoice data */}
-          <div className="space-y-5">
-            {/* Client */}
-            <div className="bg-white border border-zinc-200 rounded-xl p-5">
-              <h2 className="text-[10px] font-semibold text-zinc-400 uppercase tracking-widest mb-3">Cliente</h2>
-              <p className="text-sm font-semibold text-zinc-900">{invoice.clientName}</p>
-              {invoice.clientCif && <p className="text-xs text-zinc-500 mt-0.5">NIF/CIF: {invoice.clientCif}</p>}
-              {invoice.clientAddress && <p className="text-xs text-zinc-500 mt-0.5">{invoice.clientAddress}</p>}
-              {invoice.locationName && (
-                <p className="text-xs text-zinc-400 mt-1.5 pt-1.5 border-t border-zinc-100">
-                  📍 {invoice.locationName}
-                  {invoice.locationCostCenter && (
-                    <span className="ml-1.5 text-zinc-300">· Centro de coste: {invoice.locationCostCenter}</span>
-                  )}
-                </p>
-              )}
-            </div>
-
-            {/* Concept */}
-            <div className="bg-white border border-zinc-200 rounded-xl p-5">
-              <h2 className="text-[10px] font-semibold text-zinc-400 uppercase tracking-widest mb-3">Concepto</h2>
-              <p className="text-sm text-zinc-800">{invoice.concept}</p>
-            </div>
-
-            {/* Dates */}
-            <div className="bg-white border border-zinc-200 rounded-xl p-5">
-              <h2 className="text-[10px] font-semibold text-zinc-400 uppercase tracking-widest mb-3">Fechas</h2>
-              <Row label="Fecha emisión" value={formatDate(invoice.issuedAt)} />
-              {invoice.dueDateEnabled && (
-                <Row label="Fecha vencimiento" value={formatDate(invoice.dueAt)} />
-              )}
-              <Row label="Creada" value={formatDate(invoice.createdAt)} />
-            </div>
-
-            {/* Link to rectified invoice */}
-            {rectifiedInvoice && (
-              <div className="bg-amber-50 border border-amber-200 rounded-xl p-5">
-                <h2 className="text-[10px] font-semibold text-amber-600 uppercase tracking-widest mb-2">Rectifica la factura</h2>
-                <Link
-                  href={`/facturas/${rectifiedInvoice.id}`}
-                  className="text-sm font-mono font-semibold text-amber-700 hover:underline"
-                >
-                  {rectifiedInvoice.number}
-                </Link>
-                <p className="text-xs text-amber-600 mt-0.5">{rectifiedInvoice.clientName}</p>
-              </div>
-            )}
-          </div>
-
-          {/* Right: amounts + actions */}
-          <div className="space-y-5">
-            {/* Amounts */}
-            <div className="bg-white border border-zinc-200 rounded-xl p-5">
-              <h2 className="text-[10px] font-semibold text-zinc-400 uppercase tracking-widest mb-3">Importes</h2>
-              <div className="space-y-1">
-                <Row label="Base imponible" value={<span className="font-mono">{formatEur(invoice.amountNet)}</span>} />
-                <Row label={`IVA (${invoice.vatRate}%)`} value={<span className="font-mono">{formatEur(vatAmount)}</span>} />
-                <div className="flex items-start justify-between pt-2.5 border-t border-zinc-200">
-                  <span className="text-xs font-semibold text-zinc-700">Total factura</span>
-                  <span className="text-base font-mono font-semibold text-zinc-900">{formatEur(invoice.amountTotal)}</span>
-                </div>
-              </div>
-            </div>
-
-            {/* Actions */}
-            <div className="bg-white border border-zinc-200 rounded-xl p-5">
-              <h2 className="text-[10px] font-semibold text-zinc-400 uppercase tracking-widest mb-3">Acciones</h2>
-              {invoice.type === 'proforma' && invoice.status !== 'converted' && (
-                <div className="mb-3">
-                  <ConvertProformaButton invoiceId={invoice.id} />
-                </div>
-              )}
-              {invoice.status === 'converted' ? (
-                <p className="text-xs text-zinc-400">Esta factura proforma ya fue convertida a factura.</p>
-              ) : (
-                <InvoiceActions invoiceId={invoice.id} currentStatus={invoice.status} />
-              )}
-              <DeleteInvoiceButton invoiceId={invoice.id} />
-            </div>
-
-            {/* Deal link */}
-            {invoice.dealId && (
-              <div className="bg-white border border-zinc-200 rounded-xl p-5">
-                <h2 className="text-[10px] font-semibold text-zinc-400 uppercase tracking-widest mb-2">Deal vinculado</h2>
-                <Link
-                  href={`/deals/${invoice.dealId}`}
-                  className="text-xs text-blue-700 hover:underline font-mono"
-                >
-                  {invoice.dealId}
-                </Link>
-              </div>
-            )}
-          </div>
+          {/* PDF download */}
+          <a
+            href={pdfDownloadUrl}
+            download
+            className="inline-flex items-center gap-1.5 text-xs font-medium border border-zinc-200 text-zinc-700 hover:bg-zinc-50 hover:border-zinc-400 px-3 py-1.5 rounded-lg transition-colors"
+          >
+            <svg className="w-3.5 h-3.5" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5">
+              <path d="M7 1v8M4 6l3 3 3-3" strokeLinecap="round" strokeLinejoin="round" />
+              <path d="M2 11h10" strokeLinecap="round" />
+            </svg>
+            Descargar PDF
+          </a>
         </div>
       </div>
 
-      {/* ── Right: sticky PDF preview (desktop only) ───────────────────────── */}
-      <PdfPreviewPanel previewUrl={pdfPreviewUrl} downloadUrl={pdfDownloadUrl} />
-    </div>
+      <div className="grid grid-cols-2 gap-5">
+        {/* Left: invoice data */}
+        <div className="space-y-5">
+          {/* Client */}
+          <div className="bg-white border border-zinc-200 rounded-xl p-5">
+            <h2 className="text-[10px] font-semibold text-zinc-400 uppercase tracking-widest mb-3">Cliente</h2>
+            <p className="text-sm font-semibold text-zinc-900">{invoice.clientName}</p>
+            {invoice.clientCif && <p className="text-xs text-zinc-500 mt-0.5">NIF/CIF: {invoice.clientCif}</p>}
+            {invoice.clientAddress && <p className="text-xs text-zinc-500 mt-0.5">{invoice.clientAddress}</p>}
+            {invoice.locationName && (
+              <p className="text-xs text-zinc-400 mt-1.5 pt-1.5 border-t border-zinc-100">
+                📍 {invoice.locationName}
+                {invoice.locationCostCenter && (
+                  <span className="ml-1.5 text-zinc-300">· Centro de coste: {invoice.locationCostCenter}</span>
+                )}
+              </p>
+            )}
+          </div>
+
+          {/* Concept */}
+          <div className="bg-white border border-zinc-200 rounded-xl p-5">
+            <h2 className="text-[10px] font-semibold text-zinc-400 uppercase tracking-widest mb-3">Concepto</h2>
+            <p className="text-sm text-zinc-800">{invoice.concept}</p>
+          </div>
+
+          {/* Dates */}
+          <div className="bg-white border border-zinc-200 rounded-xl p-5">
+            <h2 className="text-[10px] font-semibold text-zinc-400 uppercase tracking-widest mb-3">Fechas</h2>
+            <Row label="Fecha emisión" value={formatDate(invoice.issuedAt)} />
+            {invoice.dueDateEnabled && (
+              <Row label="Fecha vencimiento" value={formatDate(invoice.dueAt)} />
+            )}
+            <Row label="Creada" value={formatDate(invoice.createdAt)} />
+          </div>
+
+          {/* Link to rectified invoice */}
+          {rectifiedInvoice && (
+            <div className="bg-amber-50 border border-amber-200 rounded-xl p-5">
+              <h2 className="text-[10px] font-semibold text-amber-600 uppercase tracking-widest mb-2">Rectifica la factura</h2>
+              <Link
+                href={`/facturas/${rectifiedInvoice.id}`}
+                className="text-sm font-mono font-semibold text-amber-700 hover:underline"
+              >
+                {rectifiedInvoice.number}
+              </Link>
+              <p className="text-xs text-amber-600 mt-0.5">{rectifiedInvoice.clientName}</p>
+            </div>
+          )}
+        </div>
+
+        {/* Right: amounts + actions */}
+        <div className="space-y-5">
+          {/* Amounts */}
+          <div className="bg-white border border-zinc-200 rounded-xl p-5">
+            <h2 className="text-[10px] font-semibold text-zinc-400 uppercase tracking-widest mb-3">Importes</h2>
+            <div className="space-y-1">
+              <Row label="Base imponible" value={<span className="font-mono">{formatEur(invoice.amountNet)}</span>} />
+              <Row label={`IVA (${invoice.vatRate}%)`} value={<span className="font-mono">{formatEur(vatAmount)}</span>} />
+              <div className="flex items-start justify-between pt-2.5 border-t border-zinc-200">
+                <span className="text-xs font-semibold text-zinc-700">Total factura</span>
+                <span className="text-base font-mono font-semibold text-zinc-900">{formatEur(invoice.amountTotal)}</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Actions */}
+          <div className="bg-white border border-zinc-200 rounded-xl p-5">
+            <h2 className="text-[10px] font-semibold text-zinc-400 uppercase tracking-widest mb-3">Acciones</h2>
+            {invoice.type === 'proforma' && invoice.status !== 'converted' && (
+              <div className="mb-3">
+                <ConvertProformaButton invoiceId={invoice.id} />
+              </div>
+            )}
+            {invoice.status === 'converted' ? (
+              <p className="text-xs text-zinc-400">Esta factura proforma ya fue convertida a factura.</p>
+            ) : (
+              <InvoiceActions invoiceId={invoice.id} currentStatus={invoice.status} />
+            )}
+            <DeleteInvoiceButton invoiceId={invoice.id} />
+          </div>
+
+          {/* Deal link */}
+          {invoice.dealId && (
+            <div className="bg-white border border-zinc-200 rounded-xl p-5">
+              <h2 className="text-[10px] font-semibold text-zinc-400 uppercase tracking-widest mb-2">Deal vinculado</h2>
+              <Link
+                href={`/deals/${invoice.dealId}`}
+                className="text-xs text-blue-700 hover:underline font-mono"
+              >
+                {invoice.dealId}
+              </Link>
+            </div>
+          )}
+        </div>
+      </div>
+    </FacturaPageShell>
   )
 }
