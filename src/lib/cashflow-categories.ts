@@ -37,7 +37,7 @@ export const CATEGORIZABLE = CASHFLOW_CATEGORIES.filter(
 export const OPERATIONAL_EXCLUDED = new Set([
   'Traspaso interno',
   'Préstamos recibidos',
-  'Préstamos dados',
+  'Devolución de préstamos',
   'Préstamos',
 ])
 

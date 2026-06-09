@@ -9,7 +9,7 @@
 // Filtering logic mirrors cashflow-charts.tsx exactly:
 //   income  → t.type === 'income'
 //   expense → t.type === 'expense'
-//   operational = exclude 'Traspaso interno', 'Préstamos recibidos', 'Préstamos dados'
+//   operational = exclude 'Traspaso interno', 'Préstamos recibidos', 'Devolución de préstamos'
 // =========================================
 
 import fs from 'fs'
@@ -286,8 +286,8 @@ function buildPage1(
   logoUri: string,
 ): string {
   // ── Mirror IncomeExpenseChart filtering exactly ───────────────────────────────
-  // Skip 'Traspaso interno', 'Préstamos recibidos', 'Préstamos dados'; use t.type
-  const isLoanCat = (c: string) => c === 'Préstamos recibidos' || c === 'Préstamos dados'
+  // Skip 'Traspaso interno', 'Préstamos recibidos', 'Devolución de préstamos'; use t.type
+  const isLoanCat = (c: string) => c === 'Préstamos recibidos' || c === 'Devolución de préstamos'
   const operational = transactions.filter(
     t => t.category !== 'Traspaso interno' && !isLoanCat(t.category),
   )
@@ -300,7 +300,7 @@ function buildPage1(
   const netBalance = totalIncome - totalExpense
 
   const loanIn      = transactions.filter(t => t.category === 'Préstamos recibidos' && t.type === 'income').reduce((s, t) => s + t.amount, 0)
-  const loanOut     = transactions.filter(t => t.category === 'Préstamos dados'     && t.type === 'expense').reduce((s, t) => s + Math.abs(t.amount), 0)
+  const loanOut     = transactions.filter(t => t.category === 'Devolución de préstamos'     && t.type === 'expense').reduce((s, t) => s + Math.abs(t.amount), 0)
   const loanPending = loanIn - loanOut
 
   const totalExternalCapital = transactions
@@ -369,8 +369,8 @@ function buildPage2(
   logoUri: string,
 ): string {
   // ── Mirror ExpenseCategoryDonut filtering exactly ─────────────────────────────
-  // t.type === 'expense', exclude 'Traspaso interno', 'Préstamos recibidos', 'Préstamos dados'
-  const isLoanCat = (c: string) => c === 'Préstamos recibidos' || c === 'Préstamos dados'
+  // t.type === 'expense', exclude 'Traspaso interno', 'Préstamos recibidos', 'Devolución de préstamos'
+  const isLoanCat = (c: string) => c === 'Préstamos recibidos' || c === 'Devolución de préstamos'
   const expenseTxs = transactions.filter(
     t => t.type === 'expense' &&
          t.category !== 'Traspaso interno' &&
@@ -391,9 +391,9 @@ function buildPage2(
       color: catColor(name),
     }))
 
-  // Loans — split into 'Préstamos recibidos' and 'Préstamos dados'
+  // Loans — split into 'Préstamos recibidos' and 'Devolución de préstamos'
   const loanIn      = transactions.filter(t => t.category === 'Préstamos recibidos' && t.type === 'income').reduce((s, t) => s + t.amount, 0)
-  const loanOut     = transactions.filter(t => t.category === 'Préstamos dados'     && t.type === 'expense').reduce((s, t) => s + Math.abs(t.amount), 0)
+  const loanOut     = transactions.filter(t => t.category === 'Devolución de préstamos'     && t.type === 'expense').reduce((s, t) => s + Math.abs(t.amount), 0)
   const loanPending = loanIn - loanOut
 
   // External capital — transfers from Platomico LLC

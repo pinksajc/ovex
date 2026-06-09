@@ -69,7 +69,7 @@ export default async function CashflowPage({
   const transactions = allTransactions.filter((t) => t.date >= dateFrom && t.date <= dateTo)
 
   // ── Operational P&L (excludes Traspaso interno + all Préstamos variants) ─────
-  // OPERATIONAL_EXCLUDED = { Traspaso interno, Préstamos recibidos, Préstamos dados, Préstamos }
+  // OPERATIONAL_EXCLUDED = { Traspaso interno, Préstamos recibidos, Devolución de préstamos, Préstamos }
   const operational  = transactions.filter((t) => !OPERATIONAL_EXCLUDED.has(t.category))
   const totalIncome  = operational.filter((t) => t.amount > 0).reduce((s, t) => s + t.amount, 0)
   const totalExpense = operational.filter((t) => t.amount < 0).reduce((s, t) => s + Math.abs(t.amount), 0)
@@ -106,10 +106,10 @@ export default async function CashflowPage({
 
   // ── Smashburger Préstamos debug ───────────────────────────────────────────────
   const smashTxs = transactions.filter(
-    (t) => t.category === 'Préstamos dados' && t.description.toLowerCase().includes('smashburger'),
+    (t) => t.category === 'Devolución de préstamos' && t.description.toLowerCase().includes('smashburger'),
   )
   const smashTotal = smashTxs.reduce((s, t) => s + t.amount, 0)
-  console.log('[cashflow] Smashburger "Préstamos dados" transactions:', {
+  console.log('[cashflow] Smashburger "Devolución de préstamos" transactions:', {
     count: smashTxs.length,
     total: Math.round(smashTotal),
     rows: smashTxs.map((t) => ({ date: t.date, description: t.description, amount: t.amount })),
@@ -117,7 +117,7 @@ export default async function CashflowPage({
 
   // ── Préstamos KPI ─────────────────────────────────────────────────────────────
   const prestamosRecibido  = transactions.filter((t) => t.category === 'Préstamos recibidos' && t.amount > 0).reduce((s, t) => s + t.amount, 0)
-  const prestamosDevuelto  = transactions.filter((t) => t.category === 'Préstamos dados'     && t.amount < 0).reduce((s, t) => s + Math.abs(t.amount), 0)
+  const prestamosDevuelto  = transactions.filter((t) => t.category === 'Devolución de préstamos'     && t.amount < 0).reduce((s, t) => s + Math.abs(t.amount), 0)
   const prestamosPendiente = prestamosRecibido - prestamosDevuelto
   console.log('[cashflow] préstamos KPI:', { prestamosRecibido: Math.round(prestamosRecibido), prestamosDevuelto: Math.round(prestamosDevuelto), prestamosPendiente: Math.round(prestamosPendiente) })
 

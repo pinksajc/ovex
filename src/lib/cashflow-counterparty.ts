@@ -52,7 +52,7 @@ export function buildCounterpartyMap(
   const map = new Map<string, { recibido: number; dado: number }>()
 
   for (const t of transactions) {
-    if (t.category !== 'Préstamos recibidos' && t.category !== 'Préstamos dados') continue
+    if (t.category !== 'Préstamos recibidos' && t.category !== 'Devolución de préstamos') continue
     const raw  = extractCounterparty(t.description ?? '')
     const name = normalizeCounterparty(raw)
     const e    = map.get(name) ?? { recibido: 0, dado: 0 }
