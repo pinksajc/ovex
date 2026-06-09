@@ -140,12 +140,11 @@ export async function generateContractPdf(
     page-break-after: avoid;
   }
 
-  /* ── Watermark — full-page diagonal, matches Orvex PDF style ── */
+  /* ── Watermark — fixed so it renders above all content on every page ── */
   .watermark {
-    position: absolute;
+    position: fixed;
     top: 50%;
     left: 50%;
-    /* Center then rotate so the text spans the full page diagonal */
     transform: translate(-50%, -50%) rotate(-45deg);
     font-size: 130px;
     font-weight: 900;
@@ -155,11 +154,11 @@ export async function generateContractPdf(
     pointer-events: none;
     user-select: none;
     white-space: nowrap;
-    z-index: 0;
+    z-index: 9999;
   }
 
-  /* ── Content layer above watermark ── */
-  .ct { position: relative; z-index: 1; }
+  /* ── Content layer ── */
+  .ct { position: relative; }
 
   /* ── Logo header ── */
   .logo { height: 20px; object-fit: contain; }
