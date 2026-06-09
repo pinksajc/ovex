@@ -9,7 +9,7 @@
 // Filtering logic mirrors cashflow-charts.tsx exactly:
 //   income  → t.type === 'income'
 //   expense → t.type === 'expense'
-//   operational = exclude 'Traspaso interno', 'Préstamos recibidos', 'Devolución de préstamos'
+//   operational = exclude 'Traspaso interno', 'Préstamos'
 // =========================================
 
 import fs from 'fs'
@@ -285,22 +285,19 @@ function buildPage1(
   today: string,
   logoUri: string,
 ): string {
-  // ── Mirror IncomeExpenseChart filtering exactly ───────────────────────────────
-  // Skip 'Traspaso interno', 'Préstamos recibidos', 'Devolución de préstamos'; use t.type
-  const isLoanCat = (c: string) => c === 'Préstamos recibidos' || c === 'Devolución de préstamos'
+  // ── Mirror dashboard filtering exactly ───────────────────────────────────────
+  // OPERATIONAL_EXCLUDED = { Traspaso interno, Préstamos }; use amount sign (not t.type)
   const operational = transactions.filter(
-    t => t.category !== 'Traspaso interno' && !isLoanCat(t.category),
+    t => t.category !== 'Traspaso interno' && t.category !== 'Préstamos',
   )
-  const totalIncome  = operational
-    .filter(t => t.type === 'income')
-    .reduce((s, t) => s + t.amount, 0)
-  const totalExpense = operational
-    .filter(t => t.type === 'expense')
-    .reduce((s, t) => s + Math.abs(t.amount), 0)
+  const totalIncome  = operational.filter(t => t.amount > 0).reduce((s, t) => s + t.amount, 0)
+  const totalExpense = operational.filter(t => t.amount < 0).reduce((s, t) => s + Math.abs(t.amount), 0)
   const netBalance = totalIncome - totalExpense
 
-  const loanIn      = transactions.filter(t => t.category === 'Préstamos recibidos' && t.type === 'income').reduce((s, t) => s + t.amount, 0)
-  const loanOut     = transactions.filter(t => t.category === 'Devolución de préstamos'     && t.type === 'expense').reduce((s, t) => s + Math.abs(t.amount), 0)
+  // Préstamos: single category, sign determines direction
+  const loanTxs1    = transactions.filter(t => t.category === 'Préstamos')
+  const loanIn      = loanTxs1.filter(t => t.amount > 0).reduce((s, t) => s + t.amount, 0)
+  const loanOut     = loanTxs1.filter(t => t.amount < 0).reduce((s, t) => s + Math.abs(t.amount), 0)
   const loanPending = loanIn - loanOut
 
   const totalExternalCapital = transactions
@@ -316,8 +313,8 @@ function buildPage1(
   for (const t of operational) {
     const mk = t.date.substring(0, 7)
     const e = monthMap.get(mk) ?? { income: 0, expense: 0 }
-    if (t.type === 'income') e.income  += t.amount
-    else                     e.expense += Math.abs(t.amount)
+    if (t.amount > 0) e.income  += t.amount
+    else              e.expense += Math.abs(t.amount)
     monthMap.set(mk, e)
   }
   const sortedMonths = Array.from(monthMap.keys()).sort()
@@ -369,12 +366,11 @@ function buildPage2(
   logoUri: string,
 ): string {
   // ── Mirror ExpenseCategoryDonut filtering exactly ─────────────────────────────
-  // t.type === 'expense', exclude 'Traspaso interno', 'Préstamos recibidos', 'Devolución de préstamos'
-  const isLoanCat = (c: string) => c === 'Préstamos recibidos' || c === 'Devolución de préstamos'
+  // OPERATIONAL_EXCLUDED = { Traspaso interno, Préstamos }; use amount sign (not t.type)
   const expenseTxs = transactions.filter(
-    t => t.type === 'expense' &&
+    t => t.amount < 0 &&
          t.category !== 'Traspaso interno' &&
-         !isLoanCat(t.category),
+         t.category !== 'Préstamos',
   )
 
   const catMap = new Map<string, number>()
@@ -391,9 +387,10 @@ function buildPage2(
       color: catColor(name),
     }))
 
-  // Loans — split into 'Préstamos recibidos' and 'Devolución de préstamos'
-  const loanIn      = transactions.filter(t => t.category === 'Préstamos recibidos' && t.type === 'income').reduce((s, t) => s + t.amount, 0)
-  const loanOut     = transactions.filter(t => t.category === 'Devolución de préstamos'     && t.type === 'expense').reduce((s, t) => s + Math.abs(t.amount), 0)
+  // Préstamos: single category, sign determines direction
+  const loanTxs2    = transactions.filter(t => t.category === 'Préstamos')
+  const loanIn      = loanTxs2.filter(t => t.amount > 0).reduce((s, t) => s + t.amount, 0)
+  const loanOut     = loanTxs2.filter(t => t.amount < 0).reduce((s, t) => s + Math.abs(t.amount), 0)
   const loanPending = loanIn - loanOut
 
   // External capital — transfers from Platomico LLC

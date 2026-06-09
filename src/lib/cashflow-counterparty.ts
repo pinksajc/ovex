@@ -44,6 +44,9 @@ export interface CounterpartyEntry {
 
 /**
  * Groups loan transactions by normalised counterparty name.
+ * All transactions with category === 'Préstamos'; sign of amount determines direction:
+ *   amount > 0  → recibido (money received / lent to us)
+ *   amount < 0  → devuelto (money paid back by us)
  * Returns entries sorted by |neto| descending (largest exposure first).
  */
 export function buildCounterpartyMap(
@@ -52,12 +55,12 @@ export function buildCounterpartyMap(
   const map = new Map<string, { recibido: number; dado: number }>()
 
   for (const t of transactions) {
-    if (t.category !== 'Préstamos recibidos' && t.category !== 'Devolución de préstamos') continue
+    if (t.category !== 'Préstamos') continue
     const raw  = extractCounterparty(t.description ?? '')
     const name = normalizeCounterparty(raw)
     const e    = map.get(name) ?? { recibido: 0, dado: 0 }
-    if (t.category === 'Préstamos recibidos') e.recibido += t.amount
-    else                                       e.dado    += Math.abs(t.amount)
+    if (t.amount > 0) e.recibido += t.amount
+    else              e.dado     += Math.abs(t.amount)
     map.set(name, e)
   }
 
