@@ -602,6 +602,7 @@ function emptyState(msg: string): string {
 function planTierFromLineItems(p: Presupuesto): string | null {
   for (const item of p.lineItems) {
     const sid = item.serviceId ?? ''
+    if (sid.startsWith('ros_elite'))   return 'elite'
     if (sid.startsWith('ros_pro'))     return 'pro'
     if (sid.startsWith('ros_growth'))  return 'growth'
     if (sid.startsWith('ros_starter')) return 'starter'
@@ -609,7 +610,7 @@ function planTierFromLineItems(p: Presupuesto): string | null {
   return null
 }
 
-const FEE_RATE: Record<string, number> = { pro: 0.03, growth: 0.05, starter: 0.08 }
+const FEE_RATE: Record<string, number> = { elite: 0, pro: 0.03, growth: 0.05, starter: 0.08 }
 
 /**
  * Returns { fixed, feeRate } for an offer.

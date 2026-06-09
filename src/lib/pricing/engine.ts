@@ -10,9 +10,10 @@ import type { PlanTier, AddonId, HardwareLineItem, DealEconomics } from '@/types
 
 export function suggestPlan(monthlyOrdersPerLocation: number): PlanTier | null {
   if (monthlyOrdersPerLocation === 0) return null
-  if (monthlyOrdersPerLocation <= 500) return 'starter'
+  if (monthlyOrdersPerLocation <= 500)  return 'starter'
   if (monthlyOrdersPerLocation <= 1000) return 'growth'
-  return 'pro'
+  if (monthlyOrdersPerLocation <= 5000) return 'pro'
+  return 'elite'
 }
 
 // ---- CORE CALCULATION ----

@@ -382,8 +382,8 @@ function s4Purpose(logoUri: string): string {
 
 // ── Section 5: PLANES Y ADD-ONS ───────────────────────────────────────────────
 function s5Plans(deal: Deal, cfg: DealConfiguration, logoUri: string): string {
-  const tiers = ['starter', 'growth', 'pro'] as const
-  const hiCol = tiers.indexOf(cfg.plan) + 1
+  const tiers = ['starter', 'growth', 'pro', 'elite'] as const
+  const hiCol = tiers.indexOf(cfg.plan as typeof tiers[number]) + 1
   const eco = cfg.economics as DealEconomics & {
     renEnabled?: boolean; renFeePerOrder?: number; renVenues?: number
     kdsVenues?: number; kioskVenues?: number
@@ -411,14 +411,15 @@ function s5Plans(deal: Deal, cfg: DealConfiguration, logoUri: string): string {
   const hwItems = cfg.hardware.filter(h => h.quantity > 0)
 
   const planRows: string[][] = [
-    ['Volumen tickets/mes/local', 'Hasta 500',                   '501 – 1.000',                    'Más de 1.000'],
-    ['Precio base',               'Gratis',                      `${fmt(15)}/local/mes`,            `${fmt(35)}/local/mes`],
-    ['Fee variable',              '0,08 €/ticket',               '0,05 €/ticket',                  '0,03 €/ticket'],
-    ['Soporte',                   'Email',                       'Email + Chat',                   'Tel · Chat · Email'],
-    ['Tiempo respuesta',          '48 h',                        '24 h',                           '4 h'],
-    ['Onboarding',                'Self-service',                'Sesión remota',                  'Presencial/remoto'],
-    ['Account Manager',           '—',                           '—',                              'Dedicado'],
-    ['SLA uptime',                '99,0 %',                      '99,5 %',                         '99,9 %'],
+    ['Volumen tickets/mes/local', 'Hasta 500',       '501 – 1.000',          '1.001 – 5.000',    'Más de 5.000'],
+    ['Precio base',               'Gratis',          `${fmt(15)}/local/mes`, `${fmt(35)}/local/mes`, `${fmt(299)}/local/mes`],
+    ['Fee variable',              '0,08 €/ticket',   '0,05 €/ticket',        '0,03 €/ticket',    'Sin fee variable'],
+    ['Delivery incluido',         '—',               '—',                    '—',                `${fmt(349)}/local/mes`],
+    ['Soporte',                   'Email',           'Email + Chat',         'Tel · Chat · Email','Tel · Chat · Email 24/7'],
+    ['Tiempo respuesta',          '48 h',            '24 h',                 '4 h',              '1 h'],
+    ['Onboarding',                'Self-service',    'Sesión remota',        'Presencial/remoto','Presencial dedicado'],
+    ['Account Manager',           '—',               '—',                    'Dedicado',         'Dedicado senior'],
+    ['SLA uptime',                '99,0 %',          '99,5 %',               '99,9 %',           '99,99 %'],
   ]
 
   const planHeaders = ['Característica', ...tiers.map((t, i) => {
@@ -559,19 +560,19 @@ function s6Modules(logoUri: string): string {
 
 // ── Section 7: SOPORTE ────────────────────────────────────────────────────────
 function s7Support(cfg: DealConfiguration, logoUri: string): string {
-  const hiCol = cfg.plan === 'starter' ? 1 : cfg.plan === 'growth' ? 2 : 3
+  const hiCol = cfg.plan === 'starter' ? 1 : cfg.plan === 'growth' ? 2 : cfg.plan === 'pro' ? 3 : 4
   const rows: string[][] = [
-    ['Canal de soporte',    'Email',                    'Email + WhatsApp',               'Teléfono · WhatsApp · Email'],
-    ['Tiempo de respuesta', '48 h hábiles',             '24 h hábiles',                   '4 h hábiles'],
-    ['Onboarding',          'Documentación self-service','Sesión guiada remota',           'Onboarding presencial o remoto'],
-    ['Account Manager',     '—',                        '—',                              'Dedicado'],
-    ['SLA uptime',          '99,0 %',                   '99,5 %',                         '99,9 %'],
-    ['Formación equipo',    'Vídeos y guías',           'Sesión remota (2 h)',            'Sesión presencial (4 h)'],
-    ['Actualizaciones',     'Automáticas',              'Automáticas + notas de versión', 'Automáticas + briefing previo'],
+    ['Canal de soporte',    'Email',                    'Email + WhatsApp',               'Teléfono · WhatsApp · Email',    'Teléfono · WhatsApp · Email 24/7'],
+    ['Tiempo de respuesta', '48 h hábiles',             '24 h hábiles',                   '4 h hábiles',                    '1 h hábiles'],
+    ['Onboarding',          'Documentación self-service','Sesión guiada remota',           'Onboarding presencial o remoto', 'Onboarding presencial dedicado'],
+    ['Account Manager',     '—',                        '—',                              'Dedicado',                       'Dedicado senior'],
+    ['SLA uptime',          '99,0 %',                   '99,5 %',                         '99,9 %',                         '99,99 %'],
+    ['Formación equipo',    'Vídeos y guías',           'Sesión remota (2 h)',            'Sesión presencial (4 h)',        'Sesión presencial ilimitada'],
+    ['Actualizaciones',     'Automáticas',              'Automáticas + notas de versión', 'Automáticas + briefing previo',  'Automáticas + briefing previo'],
   ]
   const content = `
     ${sectionTitle('Soporte y acompañamiento', 'Equipo nativo en español, especializado en hostelería')}
-    ${buildTable(['', 'Starter', 'Growth', 'Pro'], rows, { hi: hiCol })}
+    ${buildTable(['', 'Starter', 'Growth', 'Pro', 'Elite'], rows, { hi: hiCol })}
     <div style="margin-top:13px;background:#f0f5fb;border-left:3px solid #1e3a5f;border-radius:0 6px 6px 0;padding:11px 14px;font-size:10px;color:#334155;line-height:1.6;">
       Nuestro equipo de soporte está formado por especialistas en hostelería con experiencia operativa en restaurantes.
       No subcontratamos el soporte técnico — todos los agentes conocen el sector y hablan tu idioma.
@@ -785,7 +786,9 @@ function s11Economics(deal: Deal, cfg: DealConfiguration, sections: ProposalSect
             ? 'Gratis'
             : `${fmt(plan.priceMonthly)}/local/mes × ${cfg.locations} local${cfg.locations > 1 ? 'es' : ''}`
         })())}
-        ${cfg.calculateVariable
+        ${plan.noVariableFee
+          ? simpleRow('Fee variable ROS', 'Sin fee variable')
+          : cfg.calculateVariable
           ? simpleRow('Fee variable ROS', `${plan.variableFee.toFixed(2).replace('.', ',')}€ × ${fmtN(varBillableOrders)} ped. = ${fmt(varRosTotal)}/mes`)
           : simpleRow('Fee variable ROS', `${plan.variableFee.toFixed(2).replace('.', ',')}€/pedido`)
         }
@@ -864,8 +867,8 @@ function s11Economics(deal: Deal, cfg: DealConfiguration, sections: ProposalSect
       </div>
     </div>
 
-    <!-- Pricing block: unified when calculateVariable, fixed-only otherwise -->
-    ${cfg.calculateVariable ? (() => {
+    <!-- Pricing block: unified when calculateVariable, fixed-only otherwise. Elite has no variable fee so always use fixed-only block -->
+    ${cfg.calculateVariable && !plan.noVariableFee ? (() => {
       // Fixed components
       const fixedAddonFee = totals.addonFee + totals.datafonoFee
       const fixedDeliveryFee = totals.deliveryFee
@@ -899,7 +902,10 @@ function s11Economics(deal: Deal, cfg: DealConfiguration, sections: ProposalSect
       <!-- Variable rows -->
       <div style="font-size:7.5px;font-weight:700;color:#1e3a5f;text-transform:uppercase;letter-spacing:1px;margin-bottom:6px;">Costes variables (estimado)</div>
       <div style="display:flex;flex-direction:column;gap:3px;margin-bottom:8px;padding-bottom:8px;border-bottom:1px solid #dde6f0;">
-        ${simpleRow(`Fee por pedido ROS: ${plan.variableFee.toFixed(2).replace('.', ',')}€ × ${fmtN(totalBillableOrders)} pedidos`, `${fmt(rosTotal)}/mes`)}
+        ${plan.noVariableFee
+            ? simpleRow('Fee variable ROS', 'Sin fee variable (plan Elite)')
+            : simpleRow(`Fee por pedido ROS: ${plan.variableFee.toFixed(2).replace('.', ',')}€ × ${fmtN(totalBillableOrders)} pedidos`, `${fmt(rosTotal)}/mes`)
+          }
         ${renTotal > 0 ? simpleRow(`REN — Logística propia: ${renFeePerOrder.toFixed(2).replace('.', ',')}€ × ${fmtN(deliveryPerVenue)} ped. × ${renVenues} local${renVenues > 1 ? 'es' : ''}`, `${fmt(renTotal)}/mes`) : ''}
         ${simpleRow('Subtotal variable', `${fmt(subtotalVariable)}/mes`)}
       </div>

@@ -2,7 +2,7 @@
 // PRICING TYPES
 // =========================================
 
-export type PlanTier = 'starter' | 'growth' | 'pro'
+export type PlanTier = 'starter' | 'growth' | 'pro' | 'elite'
 
 export type DeliveryPlanId = 'start' | 'go' | 'pro' | 'enterprise'
 
@@ -66,6 +66,7 @@ export interface DealConfiguration {
   discountName?: string            // optional label for the ROS discount (default '')
   discountScope?: 'fixed' | 'all' // 'fixed' = discount on plan fixed fee only; 'all' = entire MRR
   deliveryPlan?: DeliveryPlanId    // selected Integración delivery sub-plan (default 'start')
+  eliteIncludesDelivery?: boolean  // Elite plan: delivery included at flat 349€/local/mes
 
   // Add-ons
   activeAddons: AddonId[]

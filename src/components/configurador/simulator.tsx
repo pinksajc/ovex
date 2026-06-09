@@ -251,6 +251,7 @@ export function Simulator({ deal, initialConfig, loadedConfigId }: SimulatorProp
   const [discountScope, setDiscountScope] = useState<'fixed' | 'all'>(init?.discountScope ?? 'fixed')
   const [calculateVariable, setCalculateVariable] = useState(init?.calculateVariable ?? false)
   const [deliveryPlan, setDeliveryPlan] = useState<DeliveryPlanId>(init?.deliveryPlan ?? 'start')
+  const [eliteIncludesDelivery, setEliteIncludesDelivery] = useState(init?.eliteIncludesDelivery ?? false)
   const [starterIncluded, setStarterIncluded] = useState<StarterIncluded>(() =>
     initStarterIncluded(init?.hardware)
   )
@@ -383,8 +384,21 @@ export function Simulator({ deal, initialConfig, loadedConfigId }: SimulatorProp
         ...prev,
         counter_stand: { ...prev.counter_stand, quantity: 0, mode: 'sold' as HardwareMode },
       }))
+      // Clear Elite delivery when switching away from Elite
+      if (activePlan !== 'elite') {
+        setEliteIncludesDelivery(false)
+        setItemPriceOverrides(prev => ({ ...prev, plan: null }))
+      }
     }
   }, [activePlan])
+
+  // ---- Sync Elite delivery price override when locations change ----
+  useEffect(() => {
+    if (activePlan === 'elite' && eliteIncludesDelivery) {
+      const deliveryPrice = PLANS.elite.deliveryIncludedPrice ?? 349
+      setItemPriceOverrides(prev => ({ ...prev, plan: deliveryPrice * locations }))
+    }
+  }, [activePlan, eliteIncludesDelivery, locations])
 
   const hardwareLineItems = useMemo(
     () => hardwareStateToLineItems(hardware, locations, activePlan, starterIncluded),
@@ -451,6 +465,7 @@ export function Simulator({ deal, initialConfig, loadedConfigId }: SimulatorProp
         deliveryPlan,
         itemDiscounts,
         itemPriceOverrides,
+        eliteIncludesDelivery,
       })
       if (result.ok) {
         setSaveState('saved')
@@ -488,6 +503,7 @@ export function Simulator({ deal, initialConfig, loadedConfigId }: SimulatorProp
         deliveryPlan,
         itemDiscounts,
         itemPriceOverrides,
+        eliteIncludesDelivery,
       })
       if (result.ok) {
         setSaveNewState('saved')
@@ -608,11 +624,12 @@ export function Simulator({ deal, initialConfig, loadedConfigId }: SimulatorProp
             </div>
           )}
 
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
             {PLAN_ORDER.map((tier) => {
               const plan = PLANS[tier]
               const isActive = activePlan === tier
               const isSuggested = suggestedPlan !== null && suggestedPlan === tier
+              const isElite = tier === 'elite'
 
               return (
                 <button
@@ -627,8 +644,12 @@ export function Simulator({ deal, initialConfig, loadedConfigId }: SimulatorProp
                     }
                   }}
                   className={`relative text-left p-4 rounded-xl border-2 transition-all ${
-                    isActive
+                    isActive && isElite
+                      ? 'border-amber-500 bg-amber-500 text-white'
+                      : isActive
                       ? 'border-zinc-900 bg-zinc-900 text-white'
+                      : isElite
+                      ? 'border-amber-200 bg-amber-50 hover:border-amber-400 text-zinc-700'
                       : 'border-zinc-200 bg-white hover:border-zinc-400 text-zinc-700'
                   }`}
                 >
@@ -644,8 +665,9 @@ export function Simulator({ deal, initialConfig, loadedConfigId }: SimulatorProp
                     {plan.description}
                   </p>
                   <p className={`text-xs mt-2 font-mono ${isActive ? 'text-zinc-200' : 'text-zinc-600'}`}>
-                    {plan.priceMonthly === 0 ? 'Gratis' : `${plan.priceMonthly}€/mes`}
+                    {plan.priceMonthly === 0 ? 'Gratis' : `${plan.priceMonthly}€/local/mes`}
                     {plan.variableFee > 0 && ` + ${plan.variableFee}€ × ${formatNumber(economics.totalMonthlyVolume)} tickets/mes`}
+                    {plan.noVariableFee && <span className={`block text-[10px] mt-0.5 ${isActive ? 'text-amber-200' : 'text-amber-600'}`}>Sin fee variable</span>}
                   </p>
                 </button>
               )
@@ -655,9 +677,14 @@ export function Simulator({ deal, initialConfig, loadedConfigId }: SimulatorProp
           {activePlan ? (
             <div className="mt-3 bg-zinc-50 rounded-lg px-4 py-3 space-y-2">
               <p className="text-xs font-mono text-zinc-500">
-                {PLANS[activePlan].priceMonthly > 0 && `${PLANS[activePlan].priceMonthly}€ × ${locations} local${locations > 1 ? 'es' : ''}`}
-                {PLANS[activePlan].priceMonthly > 0 && PLANS[activePlan].variableFee > 0 && ' + '}
-                {PLANS[activePlan].variableFee > 0 && `${PLANS[activePlan].variableFee}€ × ${formatNumber(economics.totalMonthlyVolume)} tickets/mes`}
+                {activePlan === 'elite'
+                  ? `${eliteIncludesDelivery ? (PLANS.elite.deliveryIncludedPrice ?? 349) : PLANS.elite.priceMonthly}€ × ${locations} local${locations > 1 ? 'es' : ''} (${eliteIncludesDelivery ? 'con delivery' : 'sin delivery'})`
+                  : PLANS[activePlan].priceMonthly > 0
+                    ? `${PLANS[activePlan].priceMonthly}€ × ${locations} local${locations > 1 ? 'es' : ''}`
+                    : ''
+                }
+                {activePlan !== 'elite' && PLANS[activePlan].priceMonthly > 0 && PLANS[activePlan].variableFee > 0 && ' + '}
+                {activePlan !== 'elite' && PLANS[activePlan].variableFee > 0 && `${PLANS[activePlan].variableFee}€ × ${formatNumber(economics.totalMonthlyVolume)} tickets/mes`}
                 {' = '}
                 {(itemDiscounts.plan > 0 || itemPriceOverrides.plan != null) ? (
                   <>
@@ -726,6 +753,46 @@ export function Simulator({ deal, initialConfig, loadedConfigId }: SimulatorProp
           ) : (
             <div className="mt-3 bg-zinc-50 rounded-lg px-4 py-3">
               <p className="text-xs text-zinc-400">Sin plan seleccionado · Ajusta el volumen o selecciona un plan manualmente</p>
+            </div>
+          )}
+
+          {/* —— Elite: delivery toggle —— */}
+          {activePlan === 'elite' && (
+            <div className="mt-3 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-xs font-semibold text-amber-900">Delivery incluido</p>
+                  <p className="text-[10px] text-amber-700 mt-0.5">
+                    {eliteIncludesDelivery
+                      ? `Order Hub Enterprise · ${PLANS.elite.deliveryIncludedPrice ?? 349}€/local/mes (sin fee variable ni pedidos adicionales)`
+                      : `Sin delivery · ${PLANS.elite.priceMonthly}€/local/mes`}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const next = !eliteIncludesDelivery
+                    setEliteIncludesDelivery(next)
+                    // Update plan price override to reflect 299 vs 349
+                    const deliveryPrice = PLANS.elite.deliveryIncludedPrice ?? 349
+                    setItemPriceOverrides(prev => ({
+                      ...prev,
+                      plan: next ? deliveryPrice * locations : null,
+                    }))
+                    // When delivery is included in Elite, remove delivery_integrations addon
+                    if (next) {
+                      setActiveAddons(prev => {
+                        const updated = new Set(prev)
+                        updated.delete('delivery_integrations')
+                        return updated
+                      })
+                    }
+                  }}
+                  className={`relative inline-flex h-5 w-9 flex-shrink-0 rounded-full border-2 border-transparent transition-colors duration-200 ${eliteIncludesDelivery ? 'bg-amber-500' : 'bg-zinc-200'}`}
+                >
+                  <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform duration-200 ${eliteIncludesDelivery ? 'translate-x-4' : 'translate-x-0'}`} />
+                </button>
+              </div>
             </div>
           )}
 
@@ -1835,8 +1902,8 @@ function EconomicsPanel({
         </div>
       </div>
 
-      {/* calculateVariable toggle — separate section below breakdown */}
-      <div className="px-5 py-4 border-b border-zinc-100">
+      {/* calculateVariable toggle — hidden for Elite (no variable fee) */}
+      {activePlan !== 'elite' && <div className="px-5 py-4 border-b border-zinc-100">
         <button
           type="button"
           onClick={() => onCalculateVariableChange(!calculateVariable)}
@@ -1868,7 +1935,7 @@ function EconomicsPanel({
             })()}
           </div>
         )}
-      </div>
+      </div>}
 
       {/* GMV */}
       {hasDatafono && (

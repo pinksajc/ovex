@@ -15,6 +15,8 @@ export interface PlanConfig {
   priceMonthly: number                       // € fijo por local
   variableFee: number                        // € por pedido
   highlight?: boolean
+  noVariableFee?: boolean                    // true → no variable fee (Elite)
+  deliveryIncludedPrice?: number             // € fijo por local/mes cuando delivery incluido (Elite)
 }
 
 export const PLANS: Record<PlanTier, PlanConfig> = {
@@ -39,13 +41,24 @@ export const PLANS: Record<PlanTier, PlanConfig> = {
     tier: 'pro',
     label: 'Pro',
     description: 'Más de 1.000 tickets/mes',
-    volumeRange: { min: 1001, max: Infinity },
+    volumeRange: { min: 1001, max: 5000 },
     priceMonthly: 35,
     variableFee: 0.03,
   },
+  elite: {
+    tier: 'elite',
+    label: 'Elite',
+    description: 'Cobertura total Orvex',
+    volumeRange: { min: 5001, max: Infinity },
+    priceMonthly: 299,
+    variableFee: 0,
+    noVariableFee: true,
+    deliveryIncludedPrice: 349,
+    highlight: true,
+  },
 }
 
-export const PLAN_ORDER: PlanTier[] = ['starter', 'growth', 'pro']
+export const PLAN_ORDER: PlanTier[] = ['starter', 'growth', 'pro', 'elite']
 
 // ---- ADD-ONS ----
 
@@ -260,5 +273,22 @@ export const PLAN_FEATURES: Record<PlanTier, string[]> = {
     'SLA garantizado',
     'Teléfono + WhatsApp 24/7',
     'CSM dedicado',
+  ],
+  elite: [
+    'Register',
+    'KDS',
+    'Analytics Basic',
+    'Web y pedidos online',
+    'Kiosk',
+    'Fidelización (Loyalty)',
+    'Analytics Premium',
+    'Customer Success Manager',
+    'SLA garantizado 99,99 %',
+    'Teléfono + WhatsApp 24/7',
+    'CSM dedicado',
+    'Stock',
+    'Sin tarifa variable',
+    'Onboarding presencial',
+    'Delivery incluido (opcional)',
   ],
 }
