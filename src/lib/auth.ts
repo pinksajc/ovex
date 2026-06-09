@@ -217,11 +217,26 @@ export interface WorkspaceMember {
 
 /**
  * Fetch all workspace members with email + login status (uses auth.admin API).
+ * Iterates over Auth users as the source of truth, so users without a profiles
+ * row are also returned (and their row is auto-created).
  * Admin-only.
  */
 export async function getWorkspaceMembersAdmin(): Promise<WorkspaceMember[]> {
   try {
     const db = getSupabaseClient()
+
+    // ── Env-var role overrides (same logic as getCurrentUser) ─────────────────
+    const ownerEmails = (process.env.OWNER_EMAIL ?? process.env.ADMIN_EMAIL ?? '')
+      .split(',').map((s) => s.trim().toLowerCase()).filter(Boolean)
+    const adminEmails = (process.env.ADMIN_EMAIL ?? '')
+      .split(',').map((s) => s.trim().toLowerCase()).filter(Boolean)
+
+    function envRole(email: string): UserRole | null {
+      const e = email.toLowerCase()
+      if (ownerEmails.includes(e)) return 'owner'
+      if (adminEmails.includes(e)) return 'admin'
+      return null
+    }
 
     const [{ data: authData }, profilesRes] = await Promise.all([
       db.auth.admin.listUsers({ perPage: 1000 }),
@@ -232,36 +247,73 @@ export async function getWorkspaceMembersAdmin(): Promise<WorkspaceMember[]> {
       }>,
     ])
 
-    const authMap = new Map(
-      (authData?.users ?? []).map((u) => ({
-        id: u.id,
-        email: u.email ?? '',
-        lastSignIn: u.last_sign_in_at ?? null,
-        createdAt: u.created_at ?? null,
-      })).map((u) => [u.id, u])
+    const authUsers = authData?.users ?? []
+    const profileMap = new Map(
+      (profilesRes.data ?? []).map((p) => [p.id, p])
     )
 
-    return (profilesRes.data ?? []).map((p) => {
-      const auth = authMap.get(p.id)
-      const hasLoggedIn = !!auth?.lastSignIn
-      // Derive status: pending if never logged in, else use DB status (active|inactive)
-      const dbStatus = (p.status ?? 'active') as string
+    // Auto-upsert profiles for any Auth user that has no row yet
+    const missing = authUsers.filter((u) => !profileMap.has(u.id))
+    if (missing.length > 0) {
+      const rows = missing.map((u) => {
+        const email = u.email ?? ''
+        const role: UserRole = envRole(email) ?? 'sales'
+        const name = (u.user_metadata?.full_name as string | undefined)
+          ?? (u.user_metadata?.name as string | undefined)
+          ?? email.split('@')[0]
+        return { id: u.id, email, full_name: name, role, status: 'active' }
+      })
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { data: inserted } = await (db.from('profiles') as any)
+        .upsert(rows, { onConflict: 'id', ignoreDuplicates: false })
+        .select('id, full_name, role, status, created_at') as {
+          data: Array<{ id: string; full_name: string | null; role: string; status?: string | null; created_at?: string | null }> | null
+        }
+      for (const p of inserted ?? []) {
+        profileMap.set(p.id, p)
+      }
+      // Fallback: if upsert didn't return data, insert synthetic rows from `rows`
+      for (const r of rows) {
+        if (!profileMap.has(r.id)) {
+          profileMap.set(r.id, { id: r.id, full_name: r.full_name, role: r.role, status: r.status, created_at: null })
+        }
+      }
+    }
+
+    // Build result list from Auth users (source of truth for membership)
+    return authUsers.map((u) => {
+      const email = u.email ?? ''
+      const profile = profileMap.get(u.id)
+      const hasLoggedIn = !!u.last_sign_in_at
+
+      // Env-var role always wins
+      const role: UserRole = envRole(email) ?? ((profile?.role as UserRole) ?? 'sales')
+
+      // status: 'pending' if never logged in; else DB value; fallback 'active'
+      const dbStatus = (profile?.status ?? 'active') as string
       const status: WorkspaceMember['status'] = !hasLoggedIn
         ? 'pending'
         : dbStatus === 'inactive'
         ? 'inactive'
         : 'active'
+
+      const name = profile?.full_name
+        ?? (u.user_metadata?.full_name as string | undefined)
+        ?? (u.user_metadata?.name as string | undefined)
+        ?? null
+
       return {
-        id: p.id,
-        email: auth?.email ?? '',
-        name: p.full_name,
-        role: p.role as UserRole,
+        id: u.id,
+        email,
+        name,
+        role,
         hasLoggedIn,
         status,
-        createdAt: p.created_at ?? auth?.createdAt ?? null,
+        createdAt: profile?.created_at ?? u.created_at ?? null,
       }
     })
-  } catch {
+  } catch (err) {
+    console.error('[getWorkspaceMembersAdmin]', err)
     return []
   }
 }
