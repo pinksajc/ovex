@@ -34,8 +34,8 @@ export function FacturaPageShell({
   const [isOpen, setIsOpen] = useState(false)
 
   return (
-    <div className="flex min-h-full">
-      {/* ── Left column ─────────────────────────────────────────────────────── */}
+    <div className="flex min-h-full overflow-x-hidden">
+      {/* ── Left column — min-w-0 prevents flex blowout ─────────────────── */}
       <div className="flex-1 min-w-0 p-8">
         {before}
 
@@ -69,12 +69,15 @@ export function FacturaPageShell({
         {children}
       </div>
 
-      {/* ── Right panel — animates in/out ────────────────────────────────── */}
+      {/* ── Right panel — animates width 0 → 40% ────────────────────────── */}
       <div
-        className="hidden lg:block shrink-0 sticky top-0 h-screen overflow-hidden border-l border-zinc-200 transition-[width] duration-300"
-        style={{ width: isOpen ? '40%' : '0', borderLeftWidth: isOpen ? 1 : 0 }}
+        className="hidden lg:flex shrink-0 sticky top-0 h-screen overflow-hidden transition-[width] duration-300"
+        style={{
+          width: isOpen ? '40%' : '0',
+          borderLeft: isOpen ? '1px solid #e4e4e7' : 'none',
+        }}
       >
-        <div style={{ width: '40vw', height: '100%', display: 'flex', flexDirection: 'column' }}>
+        <div style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column', flexShrink: 0 }}>
           {isOpen && (
             <PdfPreviewPanel
               previewUrl={previewUrl}

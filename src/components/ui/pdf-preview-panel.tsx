@@ -20,36 +20,39 @@ export function PdfPreviewPanel({ previewUrl, downloadUrl, title, onClose }: Pdf
   useEffect(() => { setLoaded(false) }, [previewUrl])
 
   return (
-    <div className="hidden lg:flex flex-col w-full h-full bg-zinc-50">
-      {/* Header bar */}
-      <div className="flex items-center justify-between px-4 py-3 border-b border-zinc-200 bg-white shrink-0">
-        <span className="text-[10px] font-semibold text-zinc-400 uppercase tracking-widest truncate mr-2">
+    // The parent shell already handles display:none on small screens.
+    // w-full h-full fills exactly whatever the animated outer container gives us.
+    <div className="flex flex-col w-full h-full bg-zinc-50">
+      {/* Header bar: [×] [title] ··· [download] */}
+      <div className="flex items-center gap-2 px-3 py-3 border-b border-zinc-200 bg-white shrink-0">
+        {/* ✕ close button — top-left of the panel, first thing you reach */}
+        {onClose && (
+          <button
+            onClick={onClose}
+            title="Cerrar preview"
+            className="inline-flex items-center justify-center w-7 h-7 rounded-lg text-zinc-500 hover:text-zinc-900 hover:bg-zinc-100 transition-colors shrink-0"
+          >
+            <svg className="w-3.5 h-3.5" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="2.2">
+              <path d="M2 2l10 10M12 2L2 12" strokeLinecap="round" />
+            </svg>
+          </button>
+        )}
+
+        <span className="flex-1 text-[10px] font-semibold text-zinc-400 uppercase tracking-widest truncate">
           {title ?? 'Vista previa'}
         </span>
-        <div className="flex items-center gap-2 shrink-0">
-          <a
-            href={downloadUrl}
-            download
-            className="inline-flex items-center gap-1.5 text-xs font-medium bg-zinc-900 text-white hover:bg-zinc-700 px-3 py-1.5 rounded-lg transition-colors"
-          >
-            <svg className="w-3 h-3" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.8">
-              <path d="M6 1v7M3.5 6l2.5 2.5L8.5 6" strokeLinecap="round" strokeLinejoin="round" />
-              <path d="M1.5 10.5h9" strokeLinecap="round" />
-            </svg>
-            Descargar
-          </a>
-          {onClose && (
-            <button
-              onClick={onClose}
-              title="Cerrar preview"
-              className="inline-flex items-center justify-center w-7 h-7 rounded-lg text-zinc-400 hover:text-zinc-700 hover:bg-zinc-100 transition-colors"
-            >
-              <svg className="w-3.5 h-3.5" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="2">
-                <path d="M2 2l10 10M12 2L2 12" strokeLinecap="round" />
-              </svg>
-            </button>
-          )}
-        </div>
+
+        <a
+          href={downloadUrl}
+          download
+          className="inline-flex items-center gap-1.5 text-xs font-medium bg-zinc-900 text-white hover:bg-zinc-700 px-3 py-1.5 rounded-lg transition-colors shrink-0"
+        >
+          <svg className="w-3 h-3" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.8">
+            <path d="M6 1v7M3.5 6l2.5 2.5L8.5 6" strokeLinecap="round" strokeLinejoin="round" />
+            <path d="M1.5 10.5h9" strokeLinecap="round" />
+          </svg>
+          Descargar
+        </a>
       </div>
 
       {/* Preview area */}
