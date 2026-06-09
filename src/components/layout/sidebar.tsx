@@ -4,17 +4,30 @@ import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { createAuthBrowserClient } from '@/lib/supabase/auth'
 import type { AuthUser } from '@/lib/auth'
+import { canAccess, type Module } from '@/lib/permissions'
 
-const NAV = [
-  { href: '/dashboard', label: 'Dashboard', icon: IconDashboard },
-  { href: '/deals', label: 'Deals', icon: IconDeals },
-  { href: '/pipeline', label: 'Pipeline', icon: IconPipeline },
-  { href: '/facturas', label: 'Facturas', icon: IconInvoice },
-  { href: '/ofertas', label: 'Ofertas', icon: IconQuote },
+interface NavItem {
+  href: string
+  label: string
+  icon: ({ className }: { className?: string }) => React.JSX.Element
+  module: Module
+}
+
+// All modules — filtered at render time based on user.role
+const MAIN_NAV: NavItem[] = [
+  { href: '/dashboard', label: 'Dashboard', icon: IconDashboard, module: 'dashboard' },
+  { href: '/deals',     label: 'Deals',     icon: IconDeals,     module: 'deals'     },
+  { href: '/pipeline',  label: 'Pipeline',  icon: IconPipeline,  module: 'pipeline'  },
+  { href: '/ofertas',   label: 'Ofertas',   icon: IconQuote,     module: 'ofertas'   },
+  { href: '/facturas',  label: 'Facturas',  icon: IconInvoice,   module: 'facturas'  },
 ]
 
-const ADMIN_NAV = [
-  { href: '/admin/users', label: 'Usuarios', icon: IconUsers },
+const FINANCE_NAV: NavItem[] = [
+  { href: '/cashflow', label: 'Flujo de Caja', icon: IconCashflow, module: 'cashflow' },
+]
+
+const ADMIN_NAV: NavItem[] = [
+  { href: '/usuarios', label: 'Usuarios', icon: IconUsers, module: 'usuarios' },
 ]
 
 export function Sidebar({ user, pendingBillingCount = 0 }: { user: AuthUser; pendingBillingCount?: number }) {
@@ -28,6 +41,39 @@ export function Sidebar({ user, pendingBillingCount = 0 }: { user: AuthUser; pen
     router.refresh()
   }
 
+  const visibleMain    = MAIN_NAV.filter(({ module }) => canAccess(user.role, module))
+  const visibleFinance = FINANCE_NAV.filter(({ module }) => canAccess(user.role, module))
+  const visibleAdmin   = ADMIN_NAV.filter(({ module }) => canAccess(user.role, module))
+
+  function navLink({ href, label, icon: Icon }: NavItem) {
+    const active =
+      href === '/dashboard'
+        ? pathname === '/dashboard'
+        : pathname.startsWith(href)
+
+    const showBadge = href === '/facturas' && pendingBillingCount > 0
+
+    return (
+      <Link
+        key={href}
+        href={href}
+        className={`flex items-center gap-2.5 px-3 py-2 rounded-md text-sm transition-colors ${
+          active
+            ? 'bg-zinc-800 text-white'
+            : 'text-zinc-400 hover:bg-zinc-800/60 hover:text-zinc-100'
+        }`}
+      >
+        <Icon className="w-4 h-4 shrink-0" />
+        <span className="flex-1">{label}</span>
+        {showBadge && (
+          <span className="ml-auto min-w-[18px] h-[18px] flex items-center justify-center rounded-full bg-red-500 text-white text-[9px] font-bold px-1">
+            {pendingBillingCount}
+          </span>
+        )}
+      </Link>
+    )
+  }
+
   return (
     <aside className="w-56 shrink-0 bg-zinc-900 flex flex-col h-full">
       {/* Brand */}
@@ -39,84 +85,27 @@ export function Sidebar({ user, pendingBillingCount = 0 }: { user: AuthUser; pen
 
       {/* Nav */}
       <nav className="flex-1 px-3 py-4 space-y-0.5">
-        {NAV.map(({ href, label, icon: Icon }) => {
-          const active =
-            href === '/dashboard'
-              ? pathname === '/dashboard'
-              : href === '/deals'
-              ? pathname.startsWith('/deals')
-              : pathname.startsWith(href)
+        {visibleMain.map((item) => navLink(item))}
 
-          const showBadge = href === '/facturas' && pendingBillingCount > 0
-
-          return (
-            <Link
-              key={href}
-              href={href}
-              className={`flex items-center gap-2.5 px-3 py-2 rounded-md text-sm transition-colors ${
-                active
-                  ? 'bg-zinc-800 text-white'
-                  : 'text-zinc-400 hover:bg-zinc-800/60 hover:text-zinc-100'
-              }`}
-            >
-              <Icon className="w-4 h-4 shrink-0" />
-              <span className="flex-1">{label}</span>
-              {showBadge && (
-                <span className="ml-auto min-w-[18px] h-[18px] flex items-center justify-center rounded-full bg-red-500 text-white text-[9px] font-bold px-1">
-                  {pendingBillingCount}
-                </span>
-              )}
-            </Link>
-          )
-        })}
-
-        {/* Owner-only: Flujo de Caja */}
-        {(user.role === 'owner' || user.role === 'admin') && (
+        {visibleFinance.length > 0 && (
           <>
             <div className="pt-3 pb-1 px-3">
               <span className="text-[9px] font-semibold uppercase tracking-widest text-zinc-600">
                 Finanzas
               </span>
             </div>
-            <Link
-              href="/cashflow"
-              className={`flex items-center gap-2.5 px-3 py-2 rounded-md text-sm transition-colors ${
-                pathname.startsWith('/cashflow')
-                  ? 'bg-zinc-800 text-white'
-                  : 'text-zinc-400 hover:bg-zinc-800/60 hover:text-zinc-100'
-              }`}
-            >
-              <IconCashflow className="w-4 h-4 shrink-0" />
-              Flujo de Caja
-            </Link>
+            {visibleFinance.map((item) => navLink(item))}
           </>
         )}
 
-        {/* Admin-only section */}
-        {(user.role === 'admin' || user.role === 'owner') && (
+        {visibleAdmin.length > 0 && (
           <>
             <div className="pt-3 pb-1 px-3">
               <span className="text-[9px] font-semibold uppercase tracking-widest text-zinc-600">
                 Admin
               </span>
             </div>
-            {ADMIN_NAV.map(({ href, label, icon: Icon }) => {
-              const active = pathname.startsWith(href)
-              return (
-                <Link
-                  key={href}
-                  href={href}
-                  className={`flex items-center gap-2.5 px-3 py-2 rounded-md text-sm transition-colors ${
-                    active
-                      ? 'bg-zinc-800 text-white'
-                      : 'text-zinc-400 hover:bg-zinc-800/60 hover:text-zinc-100'
-                  }`}
-                >
-                  <Icon className="w-4 h-4 shrink-0" />
-                  {label}
-                </Link>
-              )
-            })}
+            {visibleAdmin.map((item) => navLink(item))}
           </>
         )}
       </nav>

@@ -8,7 +8,7 @@ import { cookies } from 'next/headers'
 import { createAuthServerClient } from '@/lib/supabase/auth'
 import { getSupabaseClient } from '@/lib/supabase/client'
 
-export type UserRole = 'admin' | 'sales' | 'owner'
+export type UserRole = 'owner' | 'admin' | 'sales' | 'finance'
 
 export interface AuthUser {
   id: string
@@ -210,6 +210,9 @@ export interface WorkspaceMember {
   role: UserRole
   /** true if the user has completed their first sign-in */
   hasLoggedIn: boolean
+  /** active | pending (invited, not yet signed in) | inactive (manually disabled) */
+  status: 'active' | 'pending' | 'inactive'
+  createdAt: string | null
 }
 
 /**
@@ -223,8 +226,8 @@ export async function getWorkspaceMembersAdmin(): Promise<WorkspaceMember[]> {
     const [{ data: authData }, profilesRes] = await Promise.all([
       db.auth.admin.listUsers({ perPage: 1000 }),
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      (db.from('profiles').select('id, full_name, role') as any) as Promise<{
-        data: Array<{ id: string; full_name: string | null; role: string }> | null
+      (db.from('profiles').select('id, full_name, role, status, created_at') as any) as Promise<{
+        data: Array<{ id: string; full_name: string | null; role: string; status?: string | null; created_at?: string | null }> | null
         error: unknown
       }>,
     ])
@@ -234,17 +237,28 @@ export async function getWorkspaceMembersAdmin(): Promise<WorkspaceMember[]> {
         id: u.id,
         email: u.email ?? '',
         lastSignIn: u.last_sign_in_at ?? null,
+        createdAt: u.created_at ?? null,
       })).map((u) => [u.id, u])
     )
 
     return (profilesRes.data ?? []).map((p) => {
       const auth = authMap.get(p.id)
+      const hasLoggedIn = !!auth?.lastSignIn
+      // Derive status: pending if never logged in, else use DB status (active|inactive)
+      const dbStatus = (p.status ?? 'active') as string
+      const status: WorkspaceMember['status'] = !hasLoggedIn
+        ? 'pending'
+        : dbStatus === 'inactive'
+        ? 'inactive'
+        : 'active'
       return {
         id: p.id,
         email: auth?.email ?? '',
         name: p.full_name,
         role: p.role as UserRole,
-        hasLoggedIn: !!auth?.lastSignIn,
+        hasLoggedIn,
+        status,
+        createdAt: p.created_at ?? auth?.createdAt ?? null,
       }
     })
   } catch {
