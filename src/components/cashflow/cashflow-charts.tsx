@@ -280,10 +280,10 @@ export function ExpenseCategoryDonut({ transactions }: { transactions: CashflowT
             </div>
           )}
 
-          <div className="flex items-start gap-6">
-            {/* Donut — rendered at 110px (viewBox stays 144×144) to give legend more room */}
+          <div className="flex items-start gap-5">
+            {/* Donut — fixed 120 px, never shrinks */}
             <svg
-              width="110" height="110" viewBox="0 0 144 144"
+              width="120" height="120" viewBox="0 0 144 144"
               className="shrink-0"
               onMouseLeave={() => setHovered(null)}
             >
@@ -310,24 +310,24 @@ export function ExpenseCategoryDonut({ transactions }: { transactions: CashflowT
               </text>
             </svg>
 
-            {/* Legend — compact font so long category names don't overflow */}
-            <div className="flex-1 min-w-0 max-h-36 overflow-y-auto space-y-1 pr-1">
-              {segments.map((seg) => (
-                <div
-                  key={seg.label}
-                  className="flex items-start justify-between gap-1.5"
-                  style={{
-                    opacity: hovered && hovered.label !== seg.label ? 0.4 : 1,
-                    transition: 'opacity 0.12s',
-                  }}
-                >
-                  <div className="flex items-start gap-1.5 min-w-0">
-                    <span className="w-2 h-2 rounded-full shrink-0 mt-0.5" style={{ background: seg.color }} />
-                    <span className="text-[10px] text-zinc-600 leading-tight break-words">{seg.label}</span>
+            {/* Legend — each row never wraps; amount pinned right; scroll if many items */}
+            <div className="flex-1 overflow-x-auto">
+              <div className="max-h-40 overflow-y-auto space-y-1.5">
+                {segments.map((seg) => (
+                  <div
+                    key={seg.label}
+                    className="flex items-center gap-2 whitespace-nowrap"
+                    style={{
+                      opacity: hovered && hovered.label !== seg.label ? 0.4 : 1,
+                      transition: 'opacity 0.12s',
+                    }}
+                  >
+                    <span className="w-2 h-2 rounded-full shrink-0" style={{ background: seg.color }} />
+                    <span className="text-[10.5px] text-zinc-600 flex-1">{seg.label}</span>
+                    <span className="text-[10.5px] font-mono text-zinc-400 pl-3">{eur(seg.amount)}</span>
                   </div>
-                  <span className="text-[10px] font-mono text-zinc-400 shrink-0 pl-0.5">{eur(seg.amount)}</span>
-                </div>
-              ))}
+                ))}
+              </div>
             </div>
           </div>
         </>
