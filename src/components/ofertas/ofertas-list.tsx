@@ -280,7 +280,7 @@ export function OfertasList({
                       <button
                         onClick={() => setPendingDelete(o)}
                         title="Eliminar oferta"
-                        className="opacity-0 group-hover:opacity-100 transition-opacity p-1.5 rounded-lg text-zinc-300 hover:text-red-500 hover:bg-red-50"
+                        className="p-1.5 rounded-lg text-red-400 hover:text-red-600 hover:bg-red-50 transition-colors"
                       >
                         <svg className="w-3.5 h-3.5" viewBox="0 0 16 16" fill="currentColor">
                           <path d="M5.5 5.5A.5.5 0 0 1 6 6v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm3 .5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0V6z"/>
