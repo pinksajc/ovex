@@ -4,6 +4,7 @@ import { getCashflowTransactions, backfillManualBalances } from '@/lib/supabase/
 import { getCashflowPresupuesto } from '@/lib/supabase/cashflow-presupuesto'
 import { formatCurrency } from '@/lib/format'
 import { buildCounterpartyMap } from '@/lib/cashflow-counterparty'
+import { OPERATIONAL_EXCLUDED, NET_BALANCE_EXCLUDED } from '@/lib/cashflow-categories'
 import { RecategorizeButton } from '@/components/cashflow/recategorize-button'
 import { MoreActionsDropdown } from '@/components/cashflow/more-actions-dropdown'
 import { DateRangeFilter } from '@/components/cashflow/date-range-filter'
@@ -67,17 +68,58 @@ export default async function CashflowPage({
 
   const transactions = allTransactions.filter((t) => t.date >= dateFrom && t.date <= dateTo)
 
-  // Operational = exclude internal transfers AND both loan categories (tracked separately)
-  const operational  = transactions.filter(
-    (t) => t.category !== 'Traspaso interno' && t.category !== 'Préstamos recibidos' && t.category !== 'Préstamos dados',
-  )
+  // ── Operational P&L (excludes Traspaso interno + all Préstamos variants) ─────
+  // OPERATIONAL_EXCLUDED = { Traspaso interno, Préstamos recibidos, Préstamos dados, Préstamos }
+  const operational  = transactions.filter((t) => !OPERATIONAL_EXCLUDED.has(t.category))
   const totalIncome  = operational.filter((t) => t.amount > 0).reduce((s, t) => s + t.amount, 0)
   const totalExpense = operational.filter((t) => t.amount < 0).reduce((s, t) => s + Math.abs(t.amount), 0)
-  const netBalance   = totalIncome - totalExpense
 
+  // ── Saldo neto = SUM(amount) of all transactions except Traspaso interno ──────
+  // Includes loan movements because they genuinely affect the bank balance.
+  const netBalance = transactions
+    .filter((t) => !NET_BALANCE_EXCLUDED.has(t.category))
+    .reduce((s, t) => s + t.amount, 0)
+
+  // ── Debug logs ────────────────────────────────────────────────────────────────
+  console.log('[cashflow] KPI audit:', {
+    dateFrom, dateTo,
+    totalTransactions: transactions.length,
+    operationalCount: operational.length,
+    excludedCount: transactions.length - operational.length,
+    totalIncome: Math.round(totalIncome),
+    totalExpense: Math.round(totalExpense),
+    netBalance: Math.round(netBalance),
+    excludedCats: Array.from(OPERATIONAL_EXCLUDED),
+  })
+  // Expense breakdown by category (mirrors what the donut will show)
+  const expenseCatBreakdown: Record<string, number> = {}
+  for (const t of operational.filter((t) => t.amount < 0)) {
+    expenseCatBreakdown[t.category] = (expenseCatBreakdown[t.category] ?? 0) + Math.abs(t.amount)
+  }
+  console.log('[cashflow] expense breakdown (operational, amount<0):', expenseCatBreakdown)
+  // Categories that ARE excluded — verify Préstamos is out
+  const excludedByCategory: Record<string, number> = {}
+  for (const t of transactions.filter((t) => OPERATIONAL_EXCLUDED.has(t.category))) {
+    excludedByCategory[t.category] = (excludedByCategory[t.category] ?? 0) + t.amount
+  }
+  console.log('[cashflow] excluded-category totals:', excludedByCategory)
+
+  // ── Smashburger Préstamos debug ───────────────────────────────────────────────
+  const smashTxs = transactions.filter(
+    (t) => t.category === 'Préstamos dados' && t.description.toLowerCase().includes('smashburger'),
+  )
+  const smashTotal = smashTxs.reduce((s, t) => s + t.amount, 0)
+  console.log('[cashflow] Smashburger "Préstamos dados" transactions:', {
+    count: smashTxs.length,
+    total: Math.round(smashTotal),
+    rows: smashTxs.map((t) => ({ date: t.date, description: t.description, amount: t.amount })),
+  })
+
+  // ── Préstamos KPI ─────────────────────────────────────────────────────────────
   const prestamosRecibido  = transactions.filter((t) => t.category === 'Préstamos recibidos' && t.amount > 0).reduce((s, t) => s + t.amount, 0)
   const prestamosDevuelto  = transactions.filter((t) => t.category === 'Préstamos dados'     && t.amount < 0).reduce((s, t) => s + Math.abs(t.amount), 0)
   const prestamosPendiente = prestamosRecibido - prestamosDevuelto
+  console.log('[cashflow] préstamos KPI:', { prestamosRecibido: Math.round(prestamosRecibido), prestamosDevuelto: Math.round(prestamosDevuelto), prestamosPendiente: Math.round(prestamosPendiente) })
 
   // Counterparty breakdown (uses allTransactions so it's always complete, not date-filtered)
   const loanCounterparties = buildCounterpartyMap(allTransactions)
@@ -88,8 +130,7 @@ export default async function CashflowPage({
     .filter((t) =>
       t.date.startsWith(thisMonthKey) &&
       t.amount > 0 &&
-      t.category !== 'Traspaso interno' &&
-      t.category !== 'Préstamos recibidos',
+      !OPERATIONAL_EXCLUDED.has(t.category),
     )
     .reduce((s, t) => s + t.amount, 0)
 

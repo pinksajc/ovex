@@ -28,3 +28,21 @@ export type CashflowCategory = (typeof CASHFLOW_CATEGORIES)[number]
 export const CATEGORIZABLE = CASHFLOW_CATEGORIES.filter(
   (c) => c !== 'Sin categoría',
 ) as readonly string[]
+
+/**
+ * Categories excluded from operational P&L calculations:
+ * donut, income/expense chart, KPI gastos, KPI ingresos.
+ * Includes the legacy "Préstamos" category (pre-split) so it never leaks into the donut.
+ */
+export const OPERATIONAL_EXCLUDED = new Set([
+  'Traspaso interno',
+  'Préstamos recibidos',
+  'Préstamos dados',
+  'Préstamos',
+])
+
+/**
+ * Categories excluded from the net-balance ("Saldo neto") calculation.
+ * Only internal transfers are excluded — loan movements DO affect the real bank balance.
+ */
+export const NET_BALANCE_EXCLUDED = new Set(['Traspaso interno'])

@@ -1,6 +1,7 @@
 'use client'
 
 import { useMemo, useState } from 'react'
+import { OPERATIONAL_EXCLUDED } from '@/lib/cashflow-categories'
 import {
   ResponsiveContainer,
   XAxis,
@@ -142,11 +143,12 @@ export function IncomeExpenseChart({
   const data = useMemo<IncomeExpensePoint[]>(() => {
     const map = new Map<string, { income: number; expense: number }>()
     for (const t of transactions) {
-      if (t.category === 'Traspaso interno' || t.category === 'Préstamos recibidos' || t.category === 'Préstamos dados') continue
+      if (OPERATIONAL_EXCLUDED.has(t.category)) continue
       const k = weekStartKey(t.date)
       const rec = map.get(k) ?? { income: 0, expense: 0 }
-      if (t.type === 'income') rec.income += t.amount
-      else rec.expense += Math.abs(t.amount)
+      // Use amount sign (not type field) to match page.tsx KPI calculations
+      if (t.amount > 0) rec.income  += t.amount
+      else              rec.expense += Math.abs(t.amount)
       map.set(k, rec)
     }
     return Array.from(map.entries())
@@ -233,8 +235,10 @@ interface DonutHover { label: string; amount: number; pct: number; color: string
 export function ExpenseCategoryDonut({ transactions }: { transactions: CashflowTransaction[] }) {
   const [hovered, setHovered] = useState<DonutHover | null>(null)
 
+  // Use amount < 0 (same as page.tsx KPI) + shared OPERATIONAL_EXCLUDED set
+  // This ensures the donut total matches the totalExpense KPI exactly.
   const expenses = transactions.filter(
-    (t) => t.type === 'expense' && t.category !== 'Traspaso interno' && t.category !== 'Préstamos recibidos' && t.category !== 'Préstamos dados',
+    (t) => t.amount < 0 && !OPERATIONAL_EXCLUDED.has(t.category),
   )
   const catMap = new Map<string, number>()
   for (const t of expenses) {
