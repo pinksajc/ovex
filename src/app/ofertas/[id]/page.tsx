@@ -9,6 +9,7 @@ import { ContractSection } from './contract-section'
 import { NuevaVersionButton } from './nueva-version-button'
 import { ClientHistoryCard } from '@/components/deals/client-history-card'
 import { OfertaPageShell } from './oferta-page-shell'
+import { GenerarContratoButton } from './generar-contrato-button'
 import type { PresupuestoStatus } from '@/types'
 
 const STATUS_LABELS: Record<PresupuestoStatus, string> = {
@@ -90,6 +91,15 @@ export default async function OfertaDetailPage({ params }: { params: Promise<{ i
 
         <div className="flex items-center gap-2 flex-wrap">
           <NuevaVersionButton presupuestoId={presupuesto.id} />
+          {presupuesto.status === 'accepted' && (
+            <GenerarContratoButton
+              presupuestoId={presupuesto.id}
+              dealId={presupuesto.dealId ?? null}
+              clientName={presupuesto.clientName}
+              clientCif={presupuesto.clientCif}
+              clientAddress={presupuesto.clientAddress}
+            />
+          )}
           {canEdit && (
             <Link
               href={`/ofertas/${presupuesto.id}/editar`}
