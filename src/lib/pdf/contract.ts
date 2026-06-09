@@ -146,7 +146,7 @@ export async function generateContractPdf(
     top: 50%;
     left: 50%;
     transform: translate(-50%, -50%) rotate(-45deg);
-    font-size: 130px;
+    font-size: 50px;
     font-weight: 900;
     color: rgba(0,0,0,0.04);
     letter-spacing: 18px;
