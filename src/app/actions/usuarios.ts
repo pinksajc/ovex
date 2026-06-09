@@ -175,6 +175,8 @@ export async function deleteUsuarioAction(
 }
 
 // ── Reinvite ──────────────────────────────────────────────────────────────────
+// Re-sends the invite email by calling inviteUserByEmail again.
+// generateLink() only generates a URL and does NOT send an email.
 
 export async function reinviteAction(
   email: string,
@@ -187,13 +189,17 @@ export async function reinviteAction(
       process.env.APP_URL ??
       (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'http://localhost:3000')
 
-    const { error } = await db.auth.admin.generateLink({
-      type: 'invite',
-      email,
-      options: { redirectTo: appUrl },
+    const { error } = await db.auth.admin.inviteUserByEmail(email.trim(), {
+      redirectTo: appUrl,
     })
 
-    if (error) return { ok: false, error: error.message }
+    if (error) {
+      // "already registered" means the user confirmed their account — not really an error for reinvite
+      if (error.message.toLowerCase().includes('already registered')) {
+        return { ok: false, error: 'Este usuario ya confirmó su cuenta. No necesita invitación.' }
+      }
+      return { ok: false, error: error.message }
+    }
     return { ok: true }
   } catch (err) {
     return { ok: false, error: err instanceof Error ? err.message : 'Error reenviando invitación' }

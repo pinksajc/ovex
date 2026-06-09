@@ -2,7 +2,6 @@
 
 import { useState, useTransition } from 'react'
 import {
-  inviteUserAction,
   updateUserRoleAction,
   updateUserStatusAction,
   deleteUsuarioAction,
@@ -229,12 +228,21 @@ function InviteModal({
     e.preventDefault()
     if (!email.trim()) return
     startTransition(async () => {
-      const res = await inviteUserAction(name, email, role)
-      if (res.ok) {
-        onSuccess(`Invitación enviada a ${email}`)
-        onClose()
-      } else {
-        onError(res.error)
+      try {
+        const res = await fetch('/api/usuarios/invitar', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email: email.trim(), name: name.trim(), role }),
+        })
+        const json = await res.json() as { ok: boolean; error?: string }
+        if (json.ok) {
+          onSuccess(`Invitación enviada a ${email.trim()}`)
+          onClose()
+        } else {
+          onError(json.error ?? 'Error enviando invitación')
+        }
+      } catch {
+        onError('Error de red al enviar la invitación. Inténtalo de nuevo.')
       }
     })
   }
