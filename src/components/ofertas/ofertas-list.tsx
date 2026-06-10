@@ -14,11 +14,11 @@ const STATUS_LABELS: Record<PresupuestoStatus, string> = {
 }
 
 const STATUS_COLORS: Record<PresupuestoStatus, string> = {
-  draft: 'bg-zinc-100 text-zinc-600',
-  sent: 'bg-blue-50 text-blue-700',
-  accepted: 'bg-emerald-50 text-emerald-700',
-  rejected: 'bg-red-50 text-red-700',
-  expired: 'bg-amber-50 text-amber-700',
+  draft: 'bg-border-subtle text-text-tertiary',
+  sent: 'bg-info/12 text-info',
+  accepted: 'bg-success/12 text-success',
+  rejected: 'bg-danger/12 text-danger',
+  expired: 'bg-warning/12 text-warning',
 }
 
 function formatEur(n: number) {
@@ -83,13 +83,13 @@ export function OfertasList({
       />
 
       {/* Status filter tabs */}
-      <div className="flex items-center gap-1 mb-6 bg-zinc-100 rounded-lg p-0.5 w-fit flex-wrap">
+      <div className="flex items-center gap-1 mb-5 bg-elevated border border-border-subtle rounded-[6px] p-0.5 w-fit flex-wrap">
         {(['all', 'draft', 'sent', 'accepted', 'rejected', 'expired'] as (PresupuestoStatus | 'all')[]).map((s) => (
           <button
             key={s}
             onClick={() => setStatus(s)}
-            className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
-              status === s ? 'bg-white text-zinc-900 shadow-sm' : 'text-zinc-500 hover:text-zinc-700'
+            className={`px-3 h-8 rounded-[4px] text-[13px] font-medium transition-colors duration-150 ${
+              status === s ? 'bg-hover text-text-primary' : 'text-text-tertiary hover:text-text-secondary'
             }`}
           >
             {s === 'all' ? 'Todas' : STATUS_LABELS[s]} ({count(s)})
@@ -98,14 +98,14 @@ export function OfertasList({
       </div>
 
       {fetchError && (
-        <div className="mb-6 bg-red-50 border border-red-200 rounded-xl px-5 py-4 text-sm text-red-700">
+        <div className="mb-5 bg-danger/8 border border-danger/20 rounded-lg px-5 py-4 text-[13px] text-danger">
           Error al cargar las ofertas. Asegúrate de que la tabla <code>presupuestos</code> existe en Supabase.
         </div>
       )}
 
       {filtered.length === 0 ? (
-        <div className="bg-white border border-zinc-200 rounded-xl p-12 text-center">
-          <p className="text-zinc-400 text-sm">
+        <div className="bg-surface border border-border-subtle rounded-lg p-12 text-center">
+          <p className="text-text-tertiary text-[13px]">
             {hasFilters
               ? 'Sin resultados para los filtros aplicados.'
               : `No hay ofertas${status !== 'all' ? ` con estado "${STATUS_LABELS[status]}"` : ''}.`}
@@ -113,51 +113,51 @@ export function OfertasList({
           {!hasFilters && (
             <Link
               href="/ofertas/nuevo"
-              className="mt-4 inline-flex items-center gap-1.5 text-xs font-medium bg-zinc-900 text-white hover:bg-zinc-700 px-3 py-1.5 rounded-lg transition-colors"
+              className="mt-4 inline-flex items-center gap-1.5 text-[13px] font-medium bg-accent text-base hover:bg-accent-hover px-3 h-9 rounded-[6px] transition-colors duration-150"
             >
               + Nueva oferta
             </Link>
           )}
         </div>
       ) : (
-        <div className="bg-white border border-zinc-200 rounded-xl overflow-hidden">
-          <table className="w-full text-sm">
+        <div className="bg-surface border border-border-subtle rounded-lg overflow-hidden">
+          <table className="w-full text-[13px]">
             <thead>
-              <tr className="border-b border-zinc-100">
-                <th className="text-left px-5 py-3 text-[10px] font-semibold text-zinc-400 uppercase tracking-widest">Número</th>
-                <th className="text-left px-5 py-3 text-[10px] font-semibold text-zinc-400 uppercase tracking-widest">Cliente</th>
-                <th className="text-left px-4 py-3 text-[10px] font-semibold text-zinc-400 uppercase tracking-widest">Concepto</th>
-                <th className="text-right px-4 py-3 text-[10px] font-semibold text-zinc-400 uppercase tracking-widest">Total</th>
-                <th className="text-left px-4 py-3 text-[10px] font-semibold text-zinc-400 uppercase tracking-widest">Estado</th>
-                <th className="text-left px-4 py-3 text-[10px] font-semibold text-zinc-400 uppercase tracking-widest">Válido hasta</th>
-                <th className="text-left px-4 py-3 text-[10px] font-semibold text-zinc-400 uppercase tracking-widest">Creada</th>
+              <tr className="border-b border-border-subtle bg-hover">
+                <th className="text-left px-5 py-3 text-[12px] font-medium text-text-tertiary uppercase tracking-wider">Número</th>
+                <th className="text-left px-5 py-3 text-[12px] font-medium text-text-tertiary uppercase tracking-wider">Cliente</th>
+                <th className="text-left px-4 py-3 text-[12px] font-medium text-text-tertiary uppercase tracking-wider">Concepto</th>
+                <th className="text-right px-4 py-3 text-[12px] font-medium text-text-tertiary uppercase tracking-wider">Total</th>
+                <th className="text-left px-4 py-3 text-[12px] font-medium text-text-tertiary uppercase tracking-wider">Estado</th>
+                <th className="text-left px-4 py-3 text-[12px] font-medium text-text-tertiary uppercase tracking-wider">Válido hasta</th>
+                <th className="text-left px-4 py-3 text-[12px] font-medium text-text-tertiary uppercase tracking-wider">Creada</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-zinc-50">
+            <tbody className="divide-y divide-border-subtle">
               {filtered.map((o) => (
-                <tr key={o.id} className="hover:bg-zinc-50 transition-colors">
-                  <td className="px-5 py-3">
-                    <Link href={`/ofertas/${o.id}`} className="font-mono font-semibold text-zinc-900 hover:text-blue-700 text-xs">
+                <tr key={o.id} className="hover:bg-hover transition-colors duration-150 h-11">
+                  <td className="px-5 py-2">
+                    <Link href={`/ofertas/${o.id}`} className="font-mono font-semibold text-accent-text hover:text-accent text-[13px]">
                       {o.number}
                     </Link>
                   </td>
-                  <td className="px-5 py-3">
-                    <p className="text-xs font-medium text-zinc-800">{o.clientName}</p>
-                    {o.clientCif && <p className="text-[10px] text-zinc-400">{o.clientCif}</p>}
+                  <td className="px-5 py-2">
+                    <p className="text-[13px] font-medium text-text-primary">{o.clientName}</p>
+                    {o.clientCif && <p className="text-[11px] text-text-tertiary">{o.clientCif}</p>}
                   </td>
-                  <td className="px-4 py-3 max-w-xs">
-                    <p className="text-xs text-zinc-600 truncate">{o.concept}</p>
+                  <td className="px-4 py-2 max-w-xs">
+                    <p className="text-[13px] text-text-secondary truncate">{o.concept}</p>
                   </td>
-                  <td className="px-4 py-3 text-right">
-                    <span className="font-mono text-xs font-semibold text-zinc-900">{formatEur(o.amountTotal)}</span>
+                  <td className="px-4 py-2 text-right">
+                    <span className="font-mono text-[13px] font-semibold text-text-primary">{formatEur(o.amountTotal)}</span>
                   </td>
-                  <td className="px-4 py-3">
-                    <span className={`inline-block text-[10px] font-semibold uppercase tracking-wide px-2 py-0.5 rounded-full ${STATUS_COLORS[o.status]}`}>
+                  <td className="px-4 py-2">
+                    <span className={`inline-block text-[11px] font-medium uppercase tracking-wide px-2 py-0.5 rounded-[4px] ${STATUS_COLORS[o.status]}`}>
                       {STATUS_LABELS[o.status]}
                     </span>
                   </td>
-                  <td className="px-4 py-3 text-xs text-zinc-400">{formatDate(o.validUntil)}</td>
-                  <td className="px-4 py-3 text-xs text-zinc-400">{formatDate(o.createdAt)}</td>
+                  <td className="px-4 py-2 text-[13px] text-text-tertiary font-mono">{formatDate(o.validUntil)}</td>
+                  <td className="px-4 py-2 text-[13px] text-text-tertiary font-mono">{formatDate(o.createdAt)}</td>
                 </tr>
               ))}
             </tbody>

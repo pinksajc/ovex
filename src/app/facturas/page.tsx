@@ -28,7 +28,7 @@ export default async function FacturasPage({
   }
 
   return (
-    <div className="p-8 max-w-7xl mx-auto">
+    <div className="p-6 max-w-7xl mx-auto">
       <FacturasContent
         invoices={invoices}
         ofertas={ofertas}

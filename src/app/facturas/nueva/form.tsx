@@ -207,24 +207,24 @@ export function NewInvoiceForm({
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
       {error && (
-        <div className="bg-red-50 border border-red-200 rounded-xl px-5 py-4 text-sm text-red-700">
+        <div className="bg-danger/8 border border-danger/20 rounded-lg px-5 py-4 text-[13px] text-danger">
           {error}
         </div>
       )}
 
       {/* Tipo */}
-      <div className="bg-white border border-zinc-200 rounded-xl p-5 space-y-4">
-        <h2 className="text-xs font-semibold text-zinc-500 uppercase tracking-widest">Tipo de factura</h2>
+      <div className="bg-surface border border-border-subtle rounded-lg p-5 space-y-4">
+        <h2 className="text-[11px] font-medium text-text-tertiary uppercase tracking-wider">Tipo de factura</h2>
         <div className="flex gap-3">
           {(['ordinary', 'rectificativa'] as InvoiceType[]).map((t) => (
             <button
               key={t}
               type="button"
               onClick={() => setType(t)}
-              className={`px-4 py-2 rounded-lg border text-sm font-medium transition-colors ${
+              className={`px-4 h-9 rounded-[6px] border text-[13px] font-medium transition-colors duration-150 ${
                 type === t
-                  ? 'border-zinc-900 bg-zinc-900 text-white'
-                  : 'border-zinc-200 text-zinc-600 hover:border-zinc-400'
+                  ? 'border-accent bg-accent-muted text-accent-text'
+                  : 'border-border-subtle text-text-secondary hover:border-border-strong'
               }`}
             >
               {t === 'ordinary' ? 'Ordinaria' : 'Rectificativa'}
@@ -233,7 +233,7 @@ export function NewInvoiceForm({
         </div>
         {type === 'rectificativa' && (
           <div>
-            <label className="block text-xs font-medium text-zinc-700 mb-1">
+            <label className="block text-[13px] font-medium text-text-secondary mb-1">
               Factura que rectifica (ID)
             </label>
             <input
@@ -241,22 +241,22 @@ export function NewInvoiceForm({
               value={rectifiesId}
               onChange={(e) => setRectifiesId(e.target.value)}
               placeholder="UUID de la factura original"
-              className="w-full border border-zinc-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-zinc-300"
+              className="w-full border border-border-subtle rounded-[6px] px-3 h-9 text-[13px] focus:outline-none focus:ring-2 focus:ring-accent/40 bg-base text-text-primary placeholder:text-text-tertiary"
             />
           </div>
         )}
       </div>
 
       {/* Cliente */}
-      <div className="bg-white border border-zinc-200 rounded-xl p-5 space-y-4">
-        <h2 className="text-xs font-semibold text-zinc-500 uppercase tracking-widest">Datos del cliente</h2>
+      <div className="bg-surface border border-border-subtle rounded-lg p-5 space-y-4">
+        <h2 className="text-[11px] font-medium text-text-tertiary uppercase tracking-wider">Datos del cliente</h2>
         {deals.length > 0 && (
           <div>
-            <label className="block text-xs font-medium text-zinc-700 mb-1">Autocompletar desde deal</label>
+            <label className="block text-[13px] font-medium text-text-secondary mb-1">Autocompletar desde deal</label>
             <select
               value={dealId}
               onChange={(e) => handleDealSelect(e.target.value)}
-              className="w-full border border-zinc-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-zinc-300 bg-white"
+              className="w-full border border-border-subtle rounded-[6px] px-3 h-9 text-[13px] focus:outline-none focus:ring-2 focus:ring-accent/40 bg-base text-text-primary"
             >
               <option value="">— Selecciona un deal (opcional) —</option>
               {deals.map((d) => (
@@ -266,8 +266,8 @@ export function NewInvoiceForm({
           </div>
         )}
         <div>
-          <label className="block text-xs font-medium text-zinc-700 mb-1">
-            Nombre / Razón social <span className="text-red-500">*</span>
+          <label className="block text-[13px] font-medium text-text-secondary mb-1">
+            Nombre / Razón social <span className="text-danger">*</span>
           </label>
           <input
             type="text"
@@ -275,41 +275,41 @@ export function NewInvoiceForm({
             value={clientName}
             onChange={(e) => setClientName(e.target.value)}
             placeholder="Empresa S.L."
-            className="w-full border border-zinc-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-zinc-300"
+            className="w-full border border-border-subtle rounded-[6px] px-3 h-9 text-[13px] focus:outline-none focus:ring-2 focus:ring-accent/40 bg-base text-text-primary placeholder:text-text-tertiary"
           />
         </div>
         <div className="grid grid-cols-2 gap-3">
           <div>
-            <label className="block text-xs font-medium text-zinc-700 mb-1">CIF / NIF</label>
+            <label className="block text-[13px] font-medium text-text-secondary mb-1">CIF / NIF</label>
             <input
               type="text"
               value={clientCif}
               onChange={(e) => setClientCif(e.target.value)}
               placeholder="B12345678"
-              className="w-full border border-zinc-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-zinc-300"
+              className="w-full border border-border-subtle rounded-[6px] px-3 h-9 text-[13px] focus:outline-none focus:ring-2 focus:ring-accent/40 bg-base text-text-primary placeholder:text-text-tertiary"
             />
           </div>
           <div>
-            <label className="block text-xs font-medium text-zinc-700 mb-1">Dirección fiscal</label>
+            <label className="block text-[13px] font-medium text-text-secondary mb-1">Dirección fiscal</label>
             <input
               type="text"
               value={clientAddress}
               onChange={(e) => setClientAddress(e.target.value)}
               placeholder="C/ Ejemplo 1, Madrid"
-              className="w-full border border-zinc-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-zinc-300"
+              className="w-full border border-border-subtle rounded-[6px] px-3 h-9 text-[13px] focus:outline-none focus:ring-2 focus:ring-accent/40 bg-base text-text-primary placeholder:text-text-tertiary"
             />
           </div>
         </div>
       </div>
 
       {/* Line items */}
-      <div className="bg-white border border-zinc-200 rounded-xl overflow-hidden">
-        <div className="px-5 py-3 border-b border-zinc-100">
-          <h2 className="text-xs font-semibold text-zinc-500 uppercase tracking-widest">Líneas</h2>
+      <div className="bg-surface border border-border-subtle rounded-lg overflow-hidden">
+        <div className="px-5 py-3 border-b border-border-subtle">
+          <h2 className="text-[11px] font-medium text-text-tertiary uppercase tracking-wider">Líneas</h2>
         </div>
 
         {/* Lines */}
-        <div className="divide-y divide-zinc-50">
+        <div className="divide-y divide-border-subtle">
           {lines.map((line) =>
             line.type === 'line' ? (
               <RegularLineRow
@@ -332,25 +332,25 @@ export function NewInvoiceForm({
         </div>
 
         {/* Add buttons */}
-        <div className="px-5 py-3 border-t border-zinc-100 flex items-center gap-3">
+        <div className="px-5 py-3 border-t border-border-subtle flex items-center gap-3">
           <button
             type="button"
             onClick={addLine}
-            className="text-xs text-zinc-500 hover:text-zinc-900 border border-zinc-200 hover:border-zinc-400 px-3 py-1.5 rounded-lg transition-colors"
+            className="text-[13px] text-text-tertiary hover:text-text-primary border border-border-subtle hover:border-border-strong px-3 h-8 rounded-[6px] transition-colors duration-150"
           >
             ＋ Añadir línea
           </button>
         </div>
 
         {/* Totals */}
-        <div className="border-t border-zinc-200 px-5 py-4 space-y-1.5">
+        <div className="border-t border-border-subtle px-5 py-4 space-y-1.5">
           <TotalsRow label="Subtotal" value={fmtNum(subtotal)} />
           {discountTotal < 0 && (
             <TotalsRow label="Descuentos" value={fmtNum(discountTotal)} red />
           )}
           <TotalsRow label="Base imponible" value={fmtNum(base)} />
           <div className="flex items-center gap-2 justify-end">
-            <span className="text-xs text-zinc-500">IVA</span>
+            <span className="text-[13px] text-text-tertiary">IVA</span>
             <input
               type="number"
               min="0"
@@ -358,38 +358,38 @@ export function NewInvoiceForm({
               step="0.1"
               value={vatRate}
               onChange={(e) => setVatRate(e.target.value)}
-              className="w-16 border border-zinc-200 rounded px-2 py-1 text-xs font-mono text-right focus:outline-none focus:ring-1 focus:ring-zinc-300"
+              className="w-16 border border-border-subtle rounded-[4px] px-2 py-1 text-[13px] font-mono text-right focus:outline-none focus:ring-1 focus:ring-accent/40 bg-base text-text-primary"
             />
-            <span className="text-xs text-zinc-400">%</span>
-            <span className="text-xs font-mono w-28 text-right text-zinc-700">{fmtNum(vatAmount)} €</span>
+            <span className="text-[13px] text-text-tertiary">%</span>
+            <span className="text-[13px] font-mono w-28 text-right text-text-secondary">{fmtNum(vatAmount)} €</span>
           </div>
-          <div className="flex items-center justify-between pt-2 border-t border-zinc-200">
-            <span className="text-sm font-semibold text-zinc-900">Total factura</span>
-            <span className="text-lg font-mono font-semibold text-zinc-900">{fmtNum(total)} €</span>
+          <div className="flex items-center justify-between pt-2 border-t border-border-subtle">
+            <span className="text-[14px] font-semibold text-text-secondary">Total factura</span>
+            <span className="text-[18px] font-mono font-semibold text-text-primary">{fmtNum(total)} €</span>
           </div>
         </div>
       </div>
 
       {/* Fechas */}
-      <div className="bg-white border border-zinc-200 rounded-xl p-5 space-y-4">
-        <h2 className="text-xs font-semibold text-zinc-500 uppercase tracking-widest">Fechas</h2>
+      <div className="bg-surface border border-border-subtle rounded-lg p-5 space-y-4">
+        <h2 className="text-[11px] font-medium text-text-tertiary uppercase tracking-wider">Fechas</h2>
         <div className="grid grid-cols-2 gap-3">
           <div>
-            <label className="block text-xs font-medium text-zinc-700 mb-1">Fecha de emisión</label>
+            <label className="block text-[13px] font-medium text-text-secondary mb-1">Fecha de emisión</label>
             <input
               type="date"
               value={issuedAt}
               onChange={(e) => setIssuedAt(e.target.value)}
-              className="w-full border border-zinc-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-zinc-300"
+              className="w-full border border-border-subtle rounded-[6px] px-3 h-9 text-[13px] focus:outline-none focus:ring-2 focus:ring-accent/40 bg-base text-text-secondary"
             />
           </div>
           <div>
-            <label className="block text-xs font-medium text-zinc-700 mb-1">Fecha de vencimiento</label>
+            <label className="block text-[13px] font-medium text-text-secondary mb-1">Fecha de vencimiento</label>
             <input
               type="date"
               value={dueAt}
               onChange={(e) => setDueAt(e.target.value)}
-              className="w-full border border-zinc-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-zinc-300"
+              className="w-full border border-border-subtle rounded-[6px] px-3 h-9 text-[13px] focus:outline-none focus:ring-2 focus:ring-accent/40 bg-base text-text-secondary"
             />
           </div>
         </div>
@@ -400,14 +400,14 @@ export function NewInvoiceForm({
         <button
           type="button"
           onClick={() => router.back()}
-          className="px-4 py-2 text-sm text-zinc-600 hover:text-zinc-900 border border-zinc-200 hover:border-zinc-400 rounded-lg transition-colors"
+          className="px-4 h-9 text-[13px] text-text-secondary hover:text-text-primary border border-border-subtle hover:border-border-strong rounded-[6px] transition-colors duration-150"
         >
           Cancelar
         </button>
         <button
           type="submit"
           disabled={isPending}
-          className="px-5 py-2 text-sm font-medium bg-zinc-900 text-white hover:bg-zinc-700 rounded-lg transition-colors disabled:opacity-50"
+          className="px-5 h-9 text-[13px] font-medium bg-accent text-base hover:bg-accent-hover rounded-[6px] transition-colors duration-150 disabled:opacity-50"
         >
           {isPending ? 'Guardando...' : 'Guardar factura'}
         </button>
@@ -484,7 +484,7 @@ function RegularLineRow({
         <select
           value={line.serviceId}
           onChange={(e) => handleServiceSelect(e.target.value)}
-          className="border border-zinc-200 rounded px-2 py-1.5 text-xs bg-white focus:outline-none focus:ring-1 focus:ring-zinc-300 w-full text-zinc-700"
+          className="border border-border-subtle rounded-[4px] px-2 py-1.5 text-[13px] bg-base focus:outline-none focus:ring-1 focus:ring-accent/40 w-full text-text-primary"
         >
           <option value="">— Selecciona servicio —</option>
           {SERVICE_GROUPS.map((group) => {
@@ -509,7 +509,7 @@ function RegularLineRow({
           value={line.quantity || ''}
           placeholder={qtyLabel}
           onChange={(e) => handleQtyChange(parseFloat(e.target.value) || 0)}
-          className="border border-zinc-200 rounded px-2 py-1.5 text-xs font-mono text-right focus:outline-none focus:ring-1 focus:ring-zinc-300 w-full"
+          className="border border-border-subtle rounded-[4px] px-2 py-1.5 text-[13px] font-mono text-right focus:outline-none focus:ring-1 focus:ring-accent/40 w-full bg-base text-text-primary"
         />
 
         {/* Precio unitario */}
@@ -520,10 +520,10 @@ function RegularLineRow({
             step="0.01"
             value={line.unitPrice}
             onChange={(e) => handlePriceChange(parseFloat(e.target.value) || 0)}
-            className={`border rounded px-2 py-1.5 text-xs font-mono text-right focus:outline-none focus:ring-1 w-full ${
+            className={`border rounded-[4px] px-2 py-1.5 text-[13px] font-mono text-right focus:outline-none focus:ring-1 w-full bg-base text-text-primary ${
               priceEditable && line.unitPrice === 0 && line.serviceId
-                ? 'border-amber-300 bg-amber-50 focus:ring-amber-300'
-                : 'border-zinc-200 focus:ring-zinc-300'
+                ? 'border-warning/40 focus:ring-warning/40'
+                : 'border-border-subtle focus:ring-accent/40'
             }`}
           />
         </div>
@@ -541,24 +541,24 @@ function RegularLineRow({
               const val = Math.min(100, Math.max(0, parseFloat(e.target.value) || 0))
               onChange(line.id, { lineDiscountPercent: val || undefined })
             }}
-            className="border border-zinc-200 rounded px-2 py-1.5 text-xs font-mono text-right focus:outline-none focus:ring-1 focus:ring-zinc-300 w-full pr-5"
+            className="border border-border-subtle rounded-[4px] px-2 py-1.5 text-[13px] font-mono text-right focus:outline-none focus:ring-1 focus:ring-accent/40 w-full pr-5 bg-base text-text-primary"
           />
-          <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[9px] text-zinc-400 pointer-events-none">%</span>
+          <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] text-text-tertiary pointer-events-none">%</span>
         </div>
 
         {/* Importe */}
         <div className="text-right pr-1">
           {dto > 0 ? (
             <>
-              <div className="text-[10px] font-mono text-zinc-400 line-through leading-tight">
+              <div className="text-[11px] font-mono text-text-disabled line-through leading-tight">
                 {originalAmount.toLocaleString('es-ES', { minimumFractionDigits: 2 })} €
               </div>
-              <div className="text-xs font-mono font-semibold text-emerald-600 leading-tight">
+              <div className="text-[13px] font-mono font-semibold text-success leading-tight">
                 {line.amount.toLocaleString('es-ES', { minimumFractionDigits: 2 })} €
               </div>
             </>
           ) : (
-            <span className="text-xs font-mono text-zinc-700">
+            <span className="text-[13px] font-mono text-text-primary">
               {line.amount.toLocaleString('es-ES', { minimumFractionDigits: 2 })} €
             </span>
           )}
@@ -569,7 +569,7 @@ function RegularLineRow({
           <button
             type="button"
             onClick={() => onRemove(line.id)}
-            className="text-zinc-300 hover:text-red-500 transition-colors text-base leading-none"
+            className="text-text-disabled hover:text-danger transition-colors text-base leading-none"
             title="Eliminar línea"
           >
             ×
@@ -587,17 +587,17 @@ function RegularLineRow({
             value={line.description}
             onChange={(e) => onChange(line.id, { description: e.target.value })}
             placeholder="Descripción personalizada"
-            className="border border-zinc-200 rounded px-2 py-1 text-xs text-zinc-700 focus:outline-none focus:ring-1 focus:ring-zinc-300 w-full bg-white"
+            className="border border-border-subtle rounded-[4px] px-2 py-1 text-[13px] text-text-primary focus:outline-none focus:ring-1 focus:ring-accent/40 w-full bg-base"
           />
           <input
             type="text"
             value={line.unit}
             onChange={(e) => onChange(line.id, { unit: e.target.value })}
             placeholder="unidad"
-            className="border border-zinc-200 rounded px-2 py-1 text-[10px] text-center text-zinc-400 focus:outline-none focus:ring-1 focus:ring-zinc-300 w-full"
+            className="border border-border-subtle rounded-[4px] px-2 py-1 text-[11px] text-center text-text-tertiary focus:outline-none focus:ring-1 focus:ring-accent/40 w-full bg-base"
           />
           {svc?.note && (
-            <div className="text-[10px] text-amber-600 text-right truncate">{svc.note}</div>
+            <div className="text-[11px] text-warning text-right truncate">{svc.note}</div>
           )}
         </div>
       )}
@@ -609,7 +609,7 @@ function RegularLineRow({
           value={line.period ?? ''}
           onChange={(e) => onChange(line.id, { period: e.target.value || undefined })}
           placeholder="Período (ej: Enero - Marzo 2026)"
-          className="border border-zinc-100 rounded px-2 py-1 text-[10px] text-zinc-400 placeholder-zinc-300 focus:outline-none focus:ring-1 focus:ring-zinc-200 w-full bg-zinc-50 focus:bg-white"
+          className="border border-border-subtle rounded-[4px] px-2 py-1 text-[11px] text-text-tertiary placeholder:text-text-disabled focus:outline-none focus:ring-1 focus:ring-accent/40 w-full bg-hover"
         />
       </div>
 
@@ -621,7 +621,7 @@ function RegularLineRow({
             value={line.discountName ?? ''}
             onChange={(e) => onChange(line.id, { discountName: e.target.value || undefined })}
             placeholder="Nombre del descuento (ej: CORE PARTNER DISCOUNT)"
-            className="border border-zinc-100 rounded px-2 py-1 text-[10px] text-emerald-600 placeholder-zinc-300 focus:outline-none focus:ring-1 focus:ring-zinc-200 w-full bg-zinc-50 focus:bg-white col-span-4"
+            className="border border-border-subtle rounded-[4px] px-2 py-1 text-[11px] text-success placeholder:text-text-disabled focus:outline-none focus:ring-1 focus:ring-accent/40 w-full bg-hover col-span-4"
           />
         </div>
       )}
@@ -657,7 +657,7 @@ function DiscountLineRow({
   }
 
   return (
-    <div className="grid items-center gap-2 px-5 py-2.5 bg-red-50/30" style={{ gridTemplateColumns: '1fr 90px 110px 100px 28px' }}>
+    <div className="grid items-center gap-2 px-5 py-2.5 bg-danger/5" style={{ gridTemplateColumns: '1fr 90px 110px 100px 28px' }}>
       {/* Description + mode toggle */}
       <div className="flex items-center gap-2">
         <input
@@ -665,16 +665,16 @@ function DiscountLineRow({
           value={line.description}
           onChange={(e) => onChange(line.id, { description: e.target.value })}
           placeholder="Descuento"
-          className="border border-red-200 rounded px-2 py-1 text-xs text-red-700 focus:outline-none focus:ring-1 focus:ring-red-300 w-full"
+          className="border border-danger/20 rounded-[4px] px-2 py-1 text-[13px] text-danger focus:outline-none focus:ring-1 focus:ring-danger/30 w-full bg-base"
         />
-        <div className="flex rounded overflow-hidden border border-red-200 shrink-0">
+        <div className="flex rounded-[4px] overflow-hidden border border-danger/20 shrink-0">
           <button
             type="button"
             onClick={() => handleModeChange('percent')}
-            className={`px-2 py-1 text-[10px] font-medium transition-colors ${
+            className={`px-2 py-1 text-[11px] font-medium transition-colors ${
               line.discountMode === 'percent'
-                ? 'bg-red-100 text-red-700'
-                : 'bg-white text-zinc-400 hover:text-red-500'
+                ? 'bg-danger/12 text-danger'
+                : 'bg-base text-text-disabled hover:text-danger'
             }`}
           >
             %
@@ -682,10 +682,10 @@ function DiscountLineRow({
           <button
             type="button"
             onClick={() => handleModeChange('amount')}
-            className={`px-2 py-1 text-[10px] font-medium border-l border-red-200 transition-colors ${
+            className={`px-2 py-1 text-[11px] font-medium border-l border-danger/20 transition-colors ${
               line.discountMode === 'amount'
-                ? 'bg-red-100 text-red-700'
-                : 'bg-white text-zinc-400 hover:text-red-500'
+                ? 'bg-danger/12 text-danger'
+                : 'bg-base text-text-disabled hover:text-danger'
             }`}
           >
             €
@@ -703,18 +703,18 @@ function DiscountLineRow({
         step="0.01"
         value={line.discountValue ?? 0}
         onChange={(e) => handleValueChange(parseFloat(e.target.value) || 0)}
-        className="border border-red-200 rounded px-2 py-1 text-xs font-mono text-right text-red-600 focus:outline-none focus:ring-1 focus:ring-red-300 w-full"
+        className="border border-danger/20 rounded-[4px] px-2 py-1 text-[13px] font-mono text-right text-danger focus:outline-none focus:ring-1 focus:ring-danger/30 w-full bg-base"
       />
 
       {/* Computed amount */}
-      <div className="text-xs font-mono text-right text-red-600 font-semibold pr-1">
+      <div className="text-[13px] font-mono text-right text-danger font-semibold pr-1">
         {discountAmount.toLocaleString('es-ES', { minimumFractionDigits: 2 })} €
       </div>
 
       <button
         type="button"
         onClick={() => onRemove(line.id)}
-        className="text-red-300 hover:text-red-600 transition-colors text-base leading-none"
+        className="text-danger/40 hover:text-danger transition-colors text-base leading-none"
         title="Eliminar descuento"
       >
         ×
@@ -726,8 +726,8 @@ function DiscountLineRow({
 function TotalsRow({ label, value, red }: { label: string; value: string; red?: boolean }) {
   return (
     <div className="flex items-center justify-between">
-      <span className={`text-xs ${red ? 'text-red-500' : 'text-zinc-500'}`}>{label}</span>
-      <span className={`text-xs font-mono ${red ? 'text-red-600 font-semibold' : 'text-zinc-700'}`}>
+      <span className={`text-[13px] ${red ? 'text-danger' : 'text-text-tertiary'}`}>{label}</span>
+      <span className={`text-[13px] font-mono ${red ? 'text-danger font-semibold' : 'text-text-secondary'}`}>
         {value} €
       </span>
     </div>

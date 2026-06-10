@@ -22,10 +22,10 @@ export default async function NuevaOfertaPage({
   }
 
   return (
-    <div className="p-8 max-w-2xl mx-auto">
-      <div className="mb-8">
-        <h1 className="text-2xl font-semibold text-zinc-900 tracking-tight">Nueva oferta</h1>
-        <p className="text-zinc-500 text-sm mt-1">El número se genera automáticamente al guardar.</p>
+    <div className="p-6 max-w-2xl mx-auto">
+      <div className="mb-6">
+        <h1 className="text-xl font-semibold text-text-primary tracking-tight">Nueva oferta</h1>
+        <p className="text-text-tertiary text-[13px] mt-0.5">El número se genera automáticamente al guardar.</p>
       </div>
       <NuevaOfertaForm deals={deals} preselectedDealId={preselectedDealId} />
     </div>

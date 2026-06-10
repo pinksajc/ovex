@@ -14,17 +14,17 @@ export default async function OfertasPage() {
   }
 
   return (
-    <div className="p-8 max-w-7xl mx-auto">
-      <div className="mb-8 flex items-start justify-between flex-wrap gap-3">
+    <div className="p-6 max-w-7xl mx-auto">
+      <div className="mb-6 flex items-start justify-between flex-wrap gap-3">
         <div>
-          <h1 className="text-2xl font-semibold text-zinc-900 tracking-tight">Ofertas</h1>
-          <p className="text-zinc-500 text-sm mt-1">
+          <h1 className="text-xl font-semibold text-text-primary tracking-tight">Ofertas</h1>
+          <p className="text-text-tertiary text-[13px] mt-0.5">
             {ofertas.length} oferta{ofertas.length !== 1 ? 's' : ''}
           </p>
         </div>
         <Link
           href="/ofertas/nuevo"
-          className="inline-flex items-center gap-1.5 text-xs font-medium bg-zinc-900 text-white hover:bg-zinc-700 px-3 py-1.5 rounded-lg transition-colors"
+          className="inline-flex items-center gap-1.5 text-[13px] font-medium bg-accent text-base hover:bg-accent-hover px-3 h-9 rounded-[6px] transition-colors duration-150"
         >
           + Nueva oferta
         </Link>
