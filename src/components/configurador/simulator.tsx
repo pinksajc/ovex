@@ -2,14 +2,14 @@
 
 import { useState, useMemo, useTransition, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
-import { PLANS, ADDONS, ADDON_ORDER, PLAN_ORDER, HARDWARE, HARDWARE_ORDER, HARDWARE_MODE_LABELS, RENTAL_MONTHLY_PRICE, PLAN_FEATURES, DELIVERY_PLANS, DELIVERY_PLAN_ORDER } from '@/lib/pricing/catalog'
+import { PLANS, ADDONS, ADDON_ORDER, PLAN_ORDER, HARDWARE, HARDWARE_ORDER, HARDWARE_MODE_LABELS, RENTAL_MONTHLY_PRICE, PLAN_FEATURES, DELIVERY_PLANS, DELIVERY_PLAN_ORDER, WHISPR_PLANS, WHISPR_PLAN_ORDER, WHISPR_ANNUAL_DISCOUNT } from '@/lib/pricing/catalog'
 import { calculateEconomics, suggestPlan } from '@/lib/pricing/engine'
 import { calculateMonthlyTotals } from '@/lib/pricing/totals'
 import { formatCurrency, formatNumber } from '@/lib/format'
 import { saveConfigAction } from '@/app/actions/save-config'
 import { saveNewVersionAction } from '@/app/actions/save-version'
 import { VersionList } from './version-list'
-import type { Deal, DealConfiguration, DealEconomics, PlanTier, AddonId, HardwareId, HardwareMode, HardwareLineItem, DeliveryPlanId } from '@/types'
+import type { Deal, DealConfiguration, DealEconomics, PlanTier, AddonId, HardwareId, HardwareMode, HardwareLineItem, DeliveryPlanId, WhisprPlanId } from '@/types'
 
 // =========================================
 // Types & helpers
@@ -188,6 +188,9 @@ function serializeSimState(
   deliveryPlan: DeliveryPlanId,
   itemDiscounts: ItemDiscounts,
   itemPriceOverrides: ItemPriceOverrides,
+  whisprPlan: WhisprPlanId,
+  whisprBilling: 'monthly' | 'annual',
+  whisprEnterprisePrice: number,
   discountScope: 'fixed' | 'all',
 ): string {
   return JSON.stringify({
@@ -210,8 +213,18 @@ function serializeSimState(
     deliveryPlan,
     itemDiscounts,
     itemPriceOverrides,
+    whisprPlan,
+    whisprBilling,
+    whisprEnterprisePrice,
     discountScope,
   })
+}
+
+function getWhisprMonthly(plan: WhisprPlanId, billing: 'monthly' | 'annual', enterprisePrice: number): number {
+  if (plan === 'none') return 0
+  if (plan === 'enterprise') return enterprisePrice
+  const base = WHISPR_PLANS[plan].priceMonthly
+  return billing === 'annual' ? Math.round(base * (1 - WHISPR_ANNUAL_DISCOUNT) * 100) / 100 : base
 }
 
 // =========================================
@@ -254,6 +267,15 @@ export function Simulator({ deal, initialConfig, loadedConfigId }: SimulatorProp
   const [eliteIncludesDelivery, setEliteIncludesDelivery] = useState(init?.eliteIncludesDelivery ?? false)
   const [starterIncluded, setStarterIncluded] = useState<StarterIncluded>(() =>
     initStarterIncluded(init?.hardware)
+  )
+  const [whisprPlan, setWhisprPlan] = useState<WhisprPlanId>(
+    ((init?.economics as Record<string, unknown> | undefined)?.whisprPlan as WhisprPlanId) ?? 'none'
+  )
+  const [whisprBilling, setWhisprBilling] = useState<'monthly' | 'annual'>(
+    ((init?.economics as Record<string, unknown> | undefined)?.whisprBilling as 'monthly' | 'annual') ?? 'monthly'
+  )
+  const [whisprEnterprisePrice, setWhisprEnterprisePrice] = useState<number>(
+    ((init?.economics as Record<string, unknown> | undefined)?.whisprEnterprisePrice as number) ?? 0
   )
 
   // ---- Per-item discounts & price overrides ----
@@ -343,13 +365,16 @@ export function Simulator({ deal, initialConfig, loadedConfigId }: SimulatorProp
       init?.deliveryPlan ?? 'start',
       initItemDiscounts,
       initItemOverrides,
-      init?.discountScope ?? 'fixed',
+      ((saved?.whisprPlan as WhisprPlanId) ?? 'none'),
+      ((saved?.whisprBilling as 'monthly' | 'annual') ?? 'monthly'),
+      ((saved?.whisprEnterprisePrice as number) ?? 0),
+      (saved?.discountScope as 'fixed' | 'all') ?? 'fixed',
     )
   })
 
   const hasUnsavedChanges = useMemo(
-    () => serializeSimState(dailyOrders, deliveryOrders, locations, avgTicket, planOverride, activeAddons, hardware, renEnabled, renFeePerOrder, renVenues, kdsVenues, kioskVenues, discountPercent, starterIncluded, calculateVariable, discountName, deliveryPlan, itemDiscounts, itemPriceOverrides, discountScope) !== savedSnapshot,
-    [dailyOrders, deliveryOrders, locations, avgTicket, planOverride, activeAddons, hardware, renEnabled, renFeePerOrder, renVenues, kdsVenues, kioskVenues, discountPercent, starterIncluded, calculateVariable, discountName, deliveryPlan, itemDiscounts, itemPriceOverrides, discountScope, savedSnapshot]
+    () => serializeSimState(dailyOrders, deliveryOrders, locations, avgTicket, planOverride, activeAddons, hardware, renEnabled, renFeePerOrder, renVenues, kdsVenues, kioskVenues, discountPercent, starterIncluded, calculateVariable, discountName, deliveryPlan, itemDiscounts, itemPriceOverrides, whisprPlan, whisprBilling, whisprEnterprisePrice, discountScope) !== savedSnapshot,
+    [dailyOrders, deliveryOrders, locations, avgTicket, planOverride, activeAddons, hardware, renEnabled, renFeePerOrder, renVenues, kdsVenues, kioskVenues, discountPercent, starterIncluded, calculateVariable, discountName, deliveryPlan, itemDiscounts, itemPriceOverrides, whisprPlan, whisprBilling, whisprEnterprisePrice, discountScope, savedSnapshot]
   )
 
   useEffect(() => {
@@ -466,11 +491,14 @@ export function Simulator({ deal, initialConfig, loadedConfigId }: SimulatorProp
         itemDiscounts,
         itemPriceOverrides,
         eliteIncludesDelivery,
+        whisprPlan,
+        whisprBilling,
+        whisprEnterprisePrice,
       })
       if (result.ok) {
         setSaveState('saved')
         setLastSavePersisted(result.persisted)
-        setSavedSnapshot(serializeSimState(dailyOrders, deliveryOrders, locations, avgTicket, planOverride, activeAddons, hardware, renEnabled, renFeePerOrder, renVenues, kdsVenues, kioskVenues, discountPercent, starterIncluded, calculateVariable, discountName, deliveryPlan, itemDiscounts, itemPriceOverrides, discountScope))
+        setSavedSnapshot(serializeSimState(dailyOrders, deliveryOrders, locations, avgTicket, planOverride, activeAddons, hardware, renEnabled, renFeePerOrder, renVenues, kdsVenues, kioskVenues, discountPercent, starterIncluded, calculateVariable, discountName, deliveryPlan, itemDiscounts, itemPriceOverrides, whisprPlan, whisprBilling, whisprEnterprisePrice, discountScope))
         router.refresh()
       } else {
         setSaveState('error')
@@ -504,12 +532,15 @@ export function Simulator({ deal, initialConfig, loadedConfigId }: SimulatorProp
         itemDiscounts,
         itemPriceOverrides,
         eliteIncludesDelivery,
+        whisprPlan,
+        whisprBilling,
+        whisprEnterprisePrice,
       })
       if (result.ok) {
         setSaveNewState('saved')
         setLastNewVersion(result.version)
         setLastNewVersionPersisted(result.persisted)
-        setSavedSnapshot(serializeSimState(dailyOrders, deliveryOrders, locations, avgTicket, planOverride, activeAddons, hardware, renEnabled, renFeePerOrder, renVenues, kdsVenues, kioskVenues, discountPercent, starterIncluded, calculateVariable, discountName, deliveryPlan, itemDiscounts, itemPriceOverrides, discountScope))
+        setSavedSnapshot(serializeSimState(dailyOrders, deliveryOrders, locations, avgTicket, planOverride, activeAddons, hardware, renEnabled, renFeePerOrder, renVenues, kdsVenues, kioskVenues, discountPercent, starterIncluded, calculateVariable, discountName, deliveryPlan, itemDiscounts, itemPriceOverrides, whisprPlan, whisprBilling, whisprEnterprisePrice, discountScope))
         router.refresh()
       } else {
         setSaveNewState('error')
@@ -1591,6 +1622,71 @@ export function Simulator({ deal, initialConfig, loadedConfigId }: SimulatorProp
             )
           })()}
         </Section>
+
+        {/* ── Whispr ── */}
+        <div className="bg-white border border-zinc-200 rounded-xl overflow-hidden">
+          <div className="px-4 py-3 border-b border-zinc-100">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-semibold text-zinc-900">Whispr</p>
+                <p className="text-xs text-zinc-500 mt-0.5">Canal de denuncias y quejas</p>
+              </div>
+              {whisprPlan !== 'none' && (
+                <div className="flex items-center gap-1 bg-zinc-100 rounded-lg p-0.5">
+                  {(['monthly', 'annual'] as const).map((b) => (
+                    <button key={b} type="button" onClick={() => setWhisprBilling(b)}
+                      className={`px-2.5 py-1 text-[11px] font-semibold rounded-md transition-colors ${
+                        whisprBilling === b ? 'bg-white text-zinc-900 shadow-sm' : 'text-zinc-500 hover:text-zinc-700'
+                      }`}>
+                      {b === 'monthly' ? 'Mensual' : 'Anual −20%'}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+          <div className="px-4 py-3 grid grid-cols-2 gap-2">
+            {WHISPR_PLAN_ORDER.map((planId) => {
+              const plan = WHISPR_PLANS[planId]
+              const active = whisprPlan === planId
+              const monthly = getWhisprMonthly(planId, whisprBilling, whisprEnterprisePrice)
+              return (
+                <button key={planId} type="button"
+                  onClick={() => setWhisprPlan(planId)}
+                  className={`flex flex-col items-start p-3 rounded-xl border text-left transition-colors ${
+                    active ? 'border-violet-400 bg-violet-50' : 'border-zinc-200 bg-white hover:border-zinc-300'
+                  }`}>
+                  <span className={`text-xs font-semibold ${active ? 'text-violet-700' : 'text-zinc-700'}`}>
+                    {planId === 'none' ? 'Ninguno' : `Whispr ${plan.label}`}
+                  </span>
+                  {planId !== 'none' && (
+                    <span className="text-[10px] text-zinc-400 mt-0.5">{plan.description}</span>
+                  )}
+                  {planId !== 'none' && planId !== 'enterprise' && (
+                    <span className={`text-xs font-mono font-semibold mt-1 ${active ? 'text-violet-700' : 'text-zinc-600'}`}>
+                      {formatCurrency(monthly)}/mes
+                    </span>
+                  )}
+                  {planId === 'enterprise' && (
+                    <span className={`text-[10px] mt-1 ${active ? 'text-violet-600' : 'text-zinc-400'}`}>Precio personalizado</span>
+                  )}
+                </button>
+              )
+            })}
+          </div>
+          {whisprPlan === 'enterprise' && (
+            <div className="px-4 pb-3">
+              <label className="text-xs text-zinc-500 block mb-1">Precio mensual Enterprise</label>
+              <div className="flex items-center border border-zinc-200 rounded-lg overflow-hidden focus-within:ring-2 focus-within:ring-zinc-900 w-40">
+                <input type="number" min={0} step={1}
+                  value={whisprEnterprisePrice}
+                  onChange={(e) => setWhisprEnterprisePrice(Math.max(0, Number(e.target.value)))}
+                  className="flex-1 px-2 py-1.5 text-xs font-mono text-zinc-900 outline-none bg-white" />
+                <span className="px-2 text-xs text-zinc-400 bg-zinc-50 border-l border-zinc-200 py-1.5">€/mes</span>
+              </div>
+            </div>
+          )}
+        </div>
       </div>
 
       {/* ============================================================
@@ -1629,6 +1725,9 @@ export function Simulator({ deal, initialConfig, loadedConfigId }: SimulatorProp
           deliveryPlan={deliveryPlan}
           itemDiscounts={itemDiscounts}
           itemPriceOverrides={itemPriceOverrides}
+          whisprPlan={whisprPlan}
+          whisprBilling={whisprBilling}
+          whisprEnterprisePrice={whisprEnterprisePrice}
         />
       </div>
     </div>
@@ -1672,6 +1771,9 @@ function EconomicsPanel({
   deliveryPlan,
   itemDiscounts,
   itemPriceOverrides,
+  whisprPlan,
+  whisprBilling,
+  whisprEnterprisePrice,
 }: {
   economics: DealEconomics
   locations: number
@@ -1704,6 +1806,9 @@ function EconomicsPanel({
   deliveryPlan: DeliveryPlanId
   itemDiscounts: ItemDiscounts
   itemPriceOverrides: ItemPriceOverrides
+  whisprPlan: WhisprPlanId
+  whisprBilling: 'monthly' | 'annual'
+  whisprEnterprisePrice: number
 }) {
   const hasDatafono = activeAddons.has('datafono')
   const renMonthly = renEnabled ? renFeePerOrder * deliveryOrders * renVenues : 0
@@ -1751,7 +1856,8 @@ function EconomicsPanel({
     ? planFeeEffective + addonFeeEffective + datafonoFeeEffective + deliveryFeeEffective + renMonthly
     : planFixedOnly
   const discountAmount = discountBase * (discountPercent / 100)
-  const adjustedMRR = planFeeEffective + addonFeeEffective + datafonoFeeEffective + deliveryFeeEffective + renMonthly + hwMonthlyEffective - discountAmount
+  const whisprMonthly = getWhisprMonthly(whisprPlan, whisprBilling, whisprEnterprisePrice)
+  const adjustedMRR = planFeeEffective + addonFeeEffective + datafonoFeeEffective + deliveryFeeEffective + renMonthly + hwMonthlyEffective - discountAmount + whisprMonthly
   const rentedMonthly = HARDWARE_ORDER.reduce((sum, id) => {
     const s = hardware[id]
     return s.mode === 'rented' ? sum + (HARDWARE[id].rentalMonthlyPrice ?? RENTAL_MONTHLY_PRICE) * s.quantity : sum
@@ -1891,6 +1997,22 @@ function EconomicsPanel({
               />
             </div>
           </div>
+          {renMonthly > 0 && (
+            <BreakdownRow label="REN" value={`+${formatCurrency(renMonthly)}/mes`} />
+          )}
+          {whisprMonthly > 0 && (
+            <BreakdownRow
+              label={`Whispr ${WHISPR_PLANS[whisprPlan].label}`}
+              value={formatCurrency(whisprMonthly)}
+            />
+          )}
+          {hwMonthlyEffective > 0 && (
+            <BreakdownRow
+              label="Hardware (mensual)"
+              value={formatCurrency(hwMonthlyEffective)}
+              strikeValue={hwMonthlyEffective < totals.hardwareMonthly ? formatCurrency(totals.hardwareMonthly) : undefined}
+            />
+          )}
           <div className="pt-2 border-t border-zinc-100">
             <BreakdownRow label="Total mensual" value={formatCurrency(adjustedMRR)} bold />
             {locations > 1 && (

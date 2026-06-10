@@ -20,8 +20,8 @@
 
 import fs from 'fs'
 import path from 'path'
-import type { Deal, DealConfiguration, DealEconomics, ProposalSections, DeliveryPlanId } from '@/types'
-import { PLANS, ADDONS, HARDWARE, HARDWARE_MODE_LABELS, PLAN_FEATURES, RENTAL_MONTHLY_PRICE, DELIVERY_PLANS } from '@/lib/pricing/catalog'
+import type { Deal, DealConfiguration, DealEconomics, ProposalSections, DeliveryPlanId, WhisprPlanId } from '@/types'
+import { PLANS, ADDONS, HARDWARE, HARDWARE_MODE_LABELS, PLAN_FEATURES, RENTAL_MONTHLY_PRICE, DELIVERY_PLANS, WHISPR_PLANS } from '@/lib/pricing/catalog'
 import { calculateMonthlyTotals } from '@/lib/pricing/totals'
 
 // ── Logo ─────────────────────────────────────────────────────────────────────
@@ -528,6 +528,31 @@ function s5Plans(deal: Deal, cfg: DealConfiguration, logoUri: string): string {
       </div>
       <span style="font-size:10px;font-weight:700;color:#1e3a5f;font-family:'Courier New',monospace;">${renFeePerOrder.toFixed(2).replace('.', ',')}€/pedido</span>
     </div>` : ''}
+
+    ${(() => {
+      const ecoAny = eco as unknown as Record<string, unknown>
+      const whisprPlan = ecoAny.whisprPlan as WhisprPlanId ?? 'none'
+      const whisprBilling = ecoAny.whisprBilling as 'monthly' | 'annual' ?? 'monthly'
+      const whisprEnterprisePrice = Number(ecoAny.whisprEnterprisePrice ?? 0)
+      const whisprMonthly = whisprPlan === 'none' ? 0
+        : whisprPlan === 'enterprise' ? whisprEnterprisePrice
+        : whisprBilling === 'annual'
+          ? Math.round(WHISPR_PLANS[whisprPlan].priceMonthly * 0.8 * 100) / 100
+          : WHISPR_PLANS[whisprPlan].priceMonthly
+      if (whisprPlan === 'none') return ''
+      return `
+    <div style="font-size:9px;font-weight:700;color:#5b21b6;text-transform:uppercase;letter-spacing:1px;margin-top:18px;margin-bottom:6px;padding-top:12px;border-top:1px solid #e8eef6;">Whispr — Canal de denuncias</div>
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;padding:7px 11px;background:#f5f3ff;border:1px solid #ddd6fe;border-radius:6px;">
+      <div>
+        <span style="font-size:10px;font-weight:600;color:#0f172a;">Whispr ${WHISPR_PLANS[whisprPlan].label}</span>
+        <span style="font-size:9px;color:#94a3b8;margin-left:7px;">${WHISPR_PLANS[whisprPlan].description}</span>
+        <div style="font-size:8.5px;color:#7c3aed;margin-top:3px;">${whisprBilling === 'annual' ? 'Facturación anual · −20%' : 'Facturación mensual'}</div>
+      </div>
+      <div style="text-align:right;flex-shrink:0;margin-left:10px;">
+        <span style="font-size:10px;font-weight:700;color:#5b21b6;font-family:'Courier New',monospace;">${whisprPlan === 'enterprise' && whisprMonthly === 0 ? 'A medida' : fmt(whisprMonthly) + '/mes'}</span>
+      </div>
+    </div>`
+    })()}
 
     <div style="margin-top:12px;background:#f8fafc;border:1px solid #e8eef6;border-radius:7px;padding:10px 14px;font-size:9.5px;color:#64748b;line-height:1.6;">
       Sin permanencia mínima · facturación mes a mes · el plan puede cambiarse en cualquier momento.
