@@ -26,14 +26,14 @@ const STAGE_LABELS: Record<DealStage, string> = {
   rejected: 'Rechazado',
 }
 
-const STAGE_COLORS: Record<DealStage, { header: string; card: string }> = {
-  prospecting:   { header: 'bg-zinc-100 text-zinc-600',      card: 'border-zinc-200' },
-  qualified:     { header: 'bg-blue-50 text-blue-700',       card: 'border-blue-100' },
-  proposal_sent: { header: 'bg-violet-50 text-violet-700',   card: 'border-violet-100' },
-  negotiation:   { header: 'bg-amber-50 text-amber-700',     card: 'border-amber-100' },
-  closed_won:    { header: 'bg-emerald-50 text-emerald-700', card: 'border-emerald-100' },
-  closed_lost:   { header: 'bg-red-50 text-red-600',         card: 'border-red-100' },
-  rejected:      { header: 'bg-red-100 text-red-700',        card: 'border-red-200' },
+const STAGE_ACCENT: Record<DealStage, string> = {
+  prospecting:   '#62626B',
+  qualified:     '#60A5FA',
+  proposal_sent: '#7C72E8',
+  negotiation:   '#FBBF24',
+  closed_won:    '#4ADE80',
+  closed_lost:   '#F87171',
+  rejected:      '#F87171',
 }
 
 function matchesQuery(deal: Deal, q: string): boolean {
@@ -64,7 +64,7 @@ export function PipelineBoard({ deals }: { deals: Deal[] }) {
       <div className="mb-5">
         <div className="relative max-w-xs">
           <svg
-            className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-zinc-400 pointer-events-none"
+            className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-text-tertiary pointer-events-none"
             viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5"
           >
             <circle cx="6.5" cy="6.5" r="4.5" />
@@ -75,12 +75,12 @@ export function PipelineBoard({ deals }: { deals: Deal[] }) {
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Buscar por empresa, marca o contacto…"
-            className="w-full pl-7 pr-3 py-1.5 text-sm border border-zinc-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-zinc-300 focus:border-transparent bg-white placeholder:text-zinc-400"
+            className="w-full pl-7 pr-3 h-9 text-[13px] border border-border-subtle rounded-[6px] focus:outline-none focus:ring-2 focus:ring-accent/40 bg-base text-text-primary placeholder:text-text-tertiary"
           />
           {query && (
             <button
               onClick={() => setQuery('')}
-              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-zinc-600"
+              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-text-tertiary hover:text-text-secondary"
             >
               <svg className="w-3.5 h-3.5" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5">
                 <path d="M2 2l10 10M12 2L2 12" strokeLinecap="round" />
@@ -91,36 +91,45 @@ export function PipelineBoard({ deals }: { deals: Deal[] }) {
       </div>
 
       {/* Board */}
-      <div className="flex gap-4 overflow-x-auto pb-4 flex-1 items-start">
+      <div className="flex gap-3 overflow-x-auto pb-4 flex-1 items-start">
         {activeStages.map((stage) => {
           const stageDeals = byStage[stage]
           const stageMRR = stageDeals.reduce(
             (sum, d) => sum + (getActiveConfig(d)?.economics.totalMonthlyRevenue ?? 0),
             0
           )
-          const colors = STAGE_COLORS[stage]
+          const accent = STAGE_ACCENT[stage]
 
           return (
-            <div key={stage} className="flex-none w-64 flex flex-col gap-2">
-              <div className={`flex items-center justify-between px-3 py-2 rounded-lg ${colors.header}`}>
-                <span className="text-xs font-semibold">{STAGE_LABELS[stage]}</span>
-                <span className="text-xs font-mono">{stageDeals.length}</span>
+            <div key={stage} className="flex-none w-60 flex flex-col gap-2">
+              {/* Column header */}
+              <div
+                className="flex items-center justify-between px-3 py-2 rounded-[6px] bg-surface border border-border-subtle"
+                style={{ borderTopColor: accent, borderTopWidth: 2 }}
+              >
+                <span className="text-[12px] font-medium text-text-secondary">{STAGE_LABELS[stage]}</span>
+                <span
+                  className="text-[11px] font-mono font-semibold px-1.5 py-0.5 rounded-[4px]"
+                  style={{ color: accent, background: `${accent}18` }}
+                >
+                  {stageDeals.length}
+                </span>
               </div>
 
               {stageMRR > 0 && (
-                <p className="text-[11px] text-zinc-400 font-mono px-1">
+                <p className="text-[11px] text-text-tertiary font-mono px-1">
                   {formatCurrency(stageMRR)}/mes
                 </p>
               )}
 
               <div className="flex flex-col gap-2">
                 {stageDeals.length === 0 && (
-                  <p className="text-xs text-zinc-300 px-1 py-3 text-center">
+                  <p className="text-[12px] text-text-disabled px-1 py-3 text-center">
                     {query ? '—' : 'Sin deals'}
                   </p>
                 )}
                 {stageDeals.map((deal) => (
-                  <DealCard key={deal.id} deal={deal} />
+                  <DealCard key={deal.id} deal={deal} accent={accent} />
                 ))}
               </div>
             </div>
@@ -129,9 +138,17 @@ export function PipelineBoard({ deals }: { deals: Deal[] }) {
 
         {/* Closed lost — collapsed */}
         <div className="flex-none w-48 flex flex-col gap-2">
-          <div className={`flex items-center justify-between px-3 py-2 rounded-lg ${STAGE_COLORS.closed_lost.header}`}>
-            <span className="text-xs font-semibold">{STAGE_LABELS.closed_lost}</span>
-            <span className="text-xs font-mono">{byStage.closed_lost.length}</span>
+          <div
+            className="flex items-center justify-between px-3 py-2 rounded-[6px] bg-surface border border-border-subtle"
+            style={{ borderTopColor: STAGE_ACCENT.closed_lost, borderTopWidth: 2 }}
+          >
+            <span className="text-[12px] font-medium text-text-tertiary">{STAGE_LABELS.closed_lost}</span>
+            <span
+              className="text-[11px] font-mono font-semibold px-1.5 py-0.5 rounded-[4px]"
+              style={{ color: STAGE_ACCENT.closed_lost, background: `${STAGE_ACCENT.closed_lost}18` }}
+            >
+              {byStage.closed_lost.length}
+            </span>
           </div>
         </div>
       </div>
@@ -139,36 +156,36 @@ export function PipelineBoard({ deals }: { deals: Deal[] }) {
   )
 }
 
-function DealCard({ deal }: { deal: Deal }) {
+function DealCard({ deal, accent }: { deal: Deal; accent: string }) {
   const cfg = getActiveConfig(deal)
   const mrr = cfg?.economics.totalMonthlyRevenue ?? 0
 
   return (
     <Link
       href={`/deals/${deal.id}`}
-      className={`block bg-white border rounded-xl p-3 hover:shadow-sm transition-shadow ${STAGE_COLORS[deal.stage].card}`}
+      className="block bg-surface border border-border-subtle rounded-lg p-3 hover:bg-elevated hover:border-border-strong transition-colors duration-150"
     >
-      <p className="text-sm font-medium text-zinc-900 truncate">{deal.company.name}</p>
+      <p className="text-[13px] font-medium text-text-primary truncate">{deal.company.name}</p>
       {deal.company.brandName && (
-        <p className="text-xs text-zinc-400 truncate mt-0.5">{deal.company.brandName}</p>
+        <p className="text-[12px] text-text-tertiary truncate mt-0.5">{deal.company.brandName}</p>
       )}
       {deal.company.city && !deal.company.brandName && (
-        <p className="text-xs text-zinc-400 mt-0.5">{deal.company.city}</p>
+        <p className="text-[12px] text-text-tertiary mt-0.5">{deal.company.city}</p>
       )}
       {mrr > 0 && (
-        <p className="text-xs font-mono font-semibold text-zinc-700 mt-2">
+        <p className="text-[12px] font-mono font-semibold mt-2" style={{ color: accent }}>
           {formatCurrency(mrr)}/mes
         </p>
       )}
       <div className="flex items-center justify-between mt-2">
-        <span className="text-[10px] text-zinc-400">{deal.owner.split(' ')[0]}</span>
+        <span className="text-[11px] text-text-tertiary">{deal.owner.split(' ')[0]}</span>
         {deal.commercialStatus === 'proposal_created' && (
-          <span className="text-[10px] bg-zinc-900 text-white px-1.5 py-0.5 rounded-full">
+          <span className="text-[10px] bg-accent-muted text-accent-text px-1.5 py-0.5 rounded-[4px]">
             Propuesta
           </span>
         )}
         {deal.commercialStatus === 'no_config' && (
-          <span className="text-[10px] text-zinc-300">Sin config</span>
+          <span className="text-[10px] text-text-disabled">Sin config</span>
         )}
       </div>
     </Link>
