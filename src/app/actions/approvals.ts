@@ -63,7 +63,7 @@ export async function rejectItemAction(
     if (me.role !== 'admin' && me.role !== 'owner') {
       return { ok: false, error: 'No autorizado' }
     }
-    await rejectItem(itemType, itemId, notes.trim())
+    await rejectItem(itemType, itemId, notes.trim(), me.id)
 
     // Log rejection event to deal timeline
     const info = await getItemDealInfo(itemType, itemId)
@@ -96,7 +96,7 @@ export async function requestChangesAction(
     if (me.role !== 'admin' && me.role !== 'owner') {
       return { ok: false, error: 'No autorizado' }
     }
-    await requestChangesItem(itemType, itemId, notes.trim())
+    await requestChangesItem(itemType, itemId, notes.trim(), me.id)
 
     // Log changes-requested event to deal timeline
     const info = await getItemDealInfo(itemType, itemId)

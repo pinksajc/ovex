@@ -21,6 +21,21 @@ export interface ApprovalItem {
   createdAt: string
 }
 
+// ── Historial item ────────────────────────────────────────────────────────────
+
+export interface HistoryItem {
+  id: string
+  itemType: 'oferta' | 'factura'
+  number: string
+  clientName: string
+  amountTotal: number
+  approvalStatus: 'approved' | 'rejected' | 'changes_requested'
+  approvalNotes: string | null
+  approvedByName: string | null
+  approvedAt: string | null
+  createdAt: string
+}
+
 // ── Discount detection ────────────────────────────────────────────────────────
 
 /**
