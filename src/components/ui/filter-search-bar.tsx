@@ -22,7 +22,7 @@ export function FilterSearchBar({
       {/* Text search */}
       <div className="relative flex-1 min-w-[200px] max-w-xs">
         <svg
-          className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-text-tertiary pointer-events-none"
+          className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-zinc-400 pointer-events-none"
           viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5"
         >
           <circle cx="6.5" cy="6.5" r="4.5" />
@@ -33,12 +33,12 @@ export function FilterSearchBar({
           value={query}
           onChange={(e) => onQuery(e.target.value)}
           placeholder={placeholder}
-          className="w-full pl-7 pr-3 h-9 text-[13px] border border-border-subtle rounded-[6px] focus:outline-none focus:ring-2 focus:ring-accent/40 bg-base text-text-primary placeholder:text-text-tertiary"
+          className="w-full pl-7 pr-3 py-1.5 text-sm border border-zinc-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-zinc-300 focus:border-transparent bg-zinc-50 placeholder:text-zinc-400"
         />
         {query && (
           <button
             onClick={() => onQuery('')}
-            className="absolute right-2.5 top-1/2 -translate-y-1/2 text-text-tertiary hover:text-text-secondary"
+            className="absolute right-2.5 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-zinc-600"
           >
             <svg className="w-3.5 h-3.5" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5">
               <path d="M2 2l10 10M12 2L2 12" strokeLinecap="round" />
@@ -49,19 +49,19 @@ export function FilterSearchBar({
 
       {/* Date range */}
       <div className="flex items-center gap-2">
-        <span className="text-[13px] text-text-tertiary shrink-0">Desde</span>
+        <span className="text-xs text-zinc-400 shrink-0">Desde</span>
         <input
           type="date"
           value={desde}
           onChange={(e) => onDesde(e.target.value)}
-          className="text-[13px] border border-border-subtle rounded-[6px] px-2.5 h-9 focus:outline-none focus:ring-2 focus:ring-accent/40 bg-base text-text-secondary"
+          className="text-xs border border-zinc-200 rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-2 focus:ring-zinc-300 focus:border-transparent bg-zinc-50 text-zinc-700"
         />
-        <span className="text-[13px] text-text-tertiary shrink-0">Hasta</span>
+        <span className="text-xs text-zinc-400 shrink-0">Hasta</span>
         <input
           type="date"
           value={hasta}
           onChange={(e) => onHasta(e.target.value)}
-          className="text-[13px] border border-border-subtle rounded-[6px] px-2.5 h-9 focus:outline-none focus:ring-2 focus:ring-accent/40 bg-base text-text-secondary"
+          className="text-xs border border-zinc-200 rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-2 focus:ring-zinc-300 focus:border-transparent bg-zinc-50 text-zinc-700"
         />
       </div>
 
@@ -69,7 +69,7 @@ export function FilterSearchBar({
       {hasFilters && (
         <button
           onClick={() => { onQuery(''); onDesde(''); onHasta('') }}
-          className="text-[13px] text-text-tertiary hover:text-text-secondary transition-colors duration-150"
+          className="text-xs text-zinc-400 hover:text-zinc-700 transition-colors"
         >
           Limpiar
         </button>

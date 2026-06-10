@@ -13,25 +13,25 @@ export default async function ChangePasswordPage({
   const { error } = await searchParams
 
   return (
-    <div className="min-h-screen bg-base flex items-center justify-center p-4">
-      <div className="bg-surface border border-border-subtle rounded-lg p-8 w-full max-w-sm">
+    <div className="min-h-screen bg-zinc-50 flex items-center justify-center p-4">
+      <div className="bg-white border border-zinc-200 rounded-2xl p-8 w-full max-w-sm shadow-sm">
         <div className="mb-6">
-          <h1 className="text-xl font-semibold text-text-primary tracking-tight">Cambia tu contraseña</h1>
-          <p className="text-[13px] text-text-tertiary mt-1">
+          <h1 className="text-xl font-semibold text-zinc-900 tracking-tight">Cambia tu contraseña</h1>
+          <p className="text-sm text-zinc-400 mt-1">
             Por seguridad, debes establecer una contraseña personal antes de continuar.
           </p>
         </div>
 
         {error && (
-          <div className="mb-5 bg-danger/8 border border-danger/20 text-danger text-[13px] px-4 py-3 rounded-[6px]">
+          <div className="mb-5 bg-red-50 border border-red-200 text-red-700 text-sm px-4 py-3 rounded-lg">
             {error}
           </div>
         )}
 
         <form action={changePasswordAction} className="space-y-4">
           <div>
-            <label className="block text-[11px] font-medium uppercase tracking-wider text-text-tertiary mb-2">
-              Nueva contraseña <span className="text-danger">*</span>
+            <label className="block text-sm font-medium text-zinc-700 mb-1.5">
+              Nueva contraseña <span className="text-red-500">*</span>
             </label>
             <input
               type="password"
@@ -39,12 +39,12 @@ export default async function ChangePasswordPage({
               required
               minLength={6}
               placeholder="Mín. 6 caracteres"
-              className="w-full text-[13px] bg-base border border-border-subtle rounded-[6px] px-3 h-9 text-text-primary placeholder:text-text-tertiary focus:outline-none focus:ring-2 focus:ring-accent/40 transition"
+              className="w-full text-sm border border-zinc-300 rounded-lg px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-zinc-400 focus:border-transparent transition"
             />
           </div>
           <div>
-            <label className="block text-[11px] font-medium uppercase tracking-wider text-text-tertiary mb-2">
-              Confirmar contraseña <span className="text-danger">*</span>
+            <label className="block text-sm font-medium text-zinc-700 mb-1.5">
+              Confirmar contraseña <span className="text-red-500">*</span>
             </label>
             <input
               type="password"
@@ -52,12 +52,12 @@ export default async function ChangePasswordPage({
               required
               minLength={6}
               placeholder="Repite la contraseña"
-              className="w-full text-[13px] bg-base border border-border-subtle rounded-[6px] px-3 h-9 text-text-primary placeholder:text-text-tertiary focus:outline-none focus:ring-2 focus:ring-accent/40 transition"
+              className="w-full text-sm border border-zinc-300 rounded-lg px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-zinc-400 focus:border-transparent transition"
             />
           </div>
           <button
             type="submit"
-            className="w-full bg-accent text-base text-[13px] font-medium h-9 rounded-[6px] hover:bg-accent-hover transition-colors mt-2"
+            className="w-full bg-zinc-900 text-white text-sm font-medium px-5 py-2.5 rounded-lg hover:bg-zinc-700 transition-colors mt-2"
           >
             Guardar contraseña →
           </button>

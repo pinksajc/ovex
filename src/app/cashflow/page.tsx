@@ -1,11 +1,12 @@
 import { redirect } from 'next/navigation'
 import { getCurrentUser } from '@/lib/auth'
 import { getCashflowTransactions, backfillManualBalances } from '@/lib/supabase/cashflow'
-import { getCashflowPlanned } from '@/lib/supabase/cashflow-planned'
-import { getInvoices } from '@/lib/supabase/invoices'
+import { getCashflowPresupuesto } from '@/lib/supabase/cashflow-presupuesto'
 import { formatCurrency } from '@/lib/format'
-import { UploadZone } from '@/components/cashflow/upload-zone'
+import { buildCounterpartyMap } from '@/lib/cashflow-counterparty'
+import { OPERATIONAL_EXCLUDED, NET_BALANCE_EXCLUDED } from '@/lib/cashflow-categories'
 import { RecategorizeButton } from '@/components/cashflow/recategorize-button'
+import { MoreActionsDropdown } from '@/components/cashflow/more-actions-dropdown'
 import { DateRangeFilter } from '@/components/cashflow/date-range-filter'
 import { AddTransactionButton } from '@/components/cashflow/add-transaction-button'
 import { CashflowTabs } from '@/components/cashflow/cashflow-tabs'
@@ -16,43 +17,6 @@ import {
   ExpenseCategoryDonut,
   BalanceTrendChart,
 } from '@/components/cashflow/cashflow-charts'
-import type { CashflowTransaction } from '@/types'
-import type { SuggestedRecurring } from '@/lib/supabase/cashflow-planned'
-
-// ── Recurring-expense detector (server-side) ──────────────────────────────────
-
-function detectRecurring(transactions: CashflowTransaction[]): SuggestedRecurring[] {
-  const now = new Date()
-  const thisMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
-  const prev = new Date(now.getFullYear(), now.getMonth() - 1, 1)
-  const prevMonth = `${prev.getFullYear()}-${String(prev.getMonth() + 1).padStart(2, '0')}`
-
-  const thisMap = new Map<string, { amount: number; category: string }>()
-  const prevMap = new Map<string, { amount: number; category: string }>()
-
-  for (const t of transactions) {
-    if (t.type !== 'expense') continue
-    const m = t.date.slice(0, 7)
-    if (m === thisMonth) thisMap.set(t.description, { amount: Math.abs(t.amount), category: t.category })
-    else if (m === prevMonth) prevMap.set(t.description, { amount: Math.abs(t.amount), category: t.category })
-  }
-
-  const results: SuggestedRecurring[] = []
-  for (const [desc, thisData] of thisMap) {
-    const prevData = prevMap.get(desc)
-    if (!prevData) continue
-    const diff = Math.abs(thisData.amount - prevData.amount) / Math.max(thisData.amount, prevData.amount)
-    if (diff <= 0.2) {
-      results.push({
-        description: desc,
-        averageAmount: (thisData.amount + prevData.amount) / 2,
-        category: thisData.category,
-      })
-    }
-  }
-
-  return results.sort((a, b) => b.averageAmount - a.averageAmount).slice(0, 15)
-}
 
 // ── Page ──────────────────────────────────────────────────────────────────────
 
@@ -88,53 +52,96 @@ export default async function CashflowPage({
   }
 
   // ── Planning tab: additional fetches ─────────────────────────────────────────
-  const [plannedItems, allInvoices] =
-    activeTab === 'planning'
-      ? await Promise.all([getCashflowPlanned(), getInvoices()])
-      : [[], [] as Awaited<ReturnType<typeof getInvoices>>]
-
-  const pendingInvoices = allInvoices
-    .filter((inv) => inv.status === 'issued')
-    .map((inv) => ({
-      id: inv.id,
-      number: inv.number,
-      clientName: inv.clientName,
-      amountTotal: inv.amountTotal,
-      dueAt: inv.dueAt,
-    }))
-
-  const suggestedRecurring = activeTab === 'planning' ? detectRecurring(allTransactions) : []
+  const presupuestos = activeTab === 'planning' ? await getCashflowPresupuesto() : []
   const currentBalance = allTransactions.find((t) => t.balance != null)?.balance ?? 0
 
   // ── Transactions tab: date filtering + KPIs ───────────────────────────────────
-  const defaultFrom = `${now.getFullYear()}-01-01`
-  const defaultTo   = now.toISOString().split('T')[0]
+  // Default range = full span of available data (allTransactions sorted desc)
+  const defaultTo   = allTransactions.length > 0
+    ? allTransactions[0].date
+    : now.toISOString().split('T')[0]
+  const defaultFrom = allTransactions.length > 0
+    ? allTransactions[allTransactions.length - 1].date
+    : `${now.getFullYear()}-01-01`
   const dateFrom    = fromParam ?? defaultFrom
   const dateTo      = toParam   ?? defaultTo
 
   const transactions = allTransactions.filter((t) => t.date >= dateFrom && t.date <= dateTo)
 
-  const operational  = transactions.filter((t) => t.category !== 'Traspaso interno')
+  // ── Operational P&L (excludes Traspaso interno + Préstamos) ─────────────────
+  // OPERATIONAL_EXCLUDED = { Traspaso interno, Préstamos }
+  const operational  = transactions.filter((t) => !OPERATIONAL_EXCLUDED.has(t.category))
   const totalIncome  = operational.filter((t) => t.amount > 0).reduce((s, t) => s + t.amount, 0)
   const totalExpense = operational.filter((t) => t.amount < 0).reduce((s, t) => s + Math.abs(t.amount), 0)
-  const netBalance   = totalIncome - totalExpense
 
-  const prestamosNet = transactions
-    .filter((t) => t.category === 'Préstamos')
+  // ── Saldo neto = SUM(amount) of all transactions except Traspaso interno ──────
+  // Includes loan movements because they genuinely affect the bank balance.
+  const netBalance = transactions
+    .filter((t) => !NET_BALANCE_EXCLUDED.has(t.category))
     .reduce((s, t) => s + t.amount, 0)
 
+  // ── Debug logs ────────────────────────────────────────────────────────────────
+  console.log('[cashflow] KPI audit:', {
+    dateFrom, dateTo,
+    totalTransactions: transactions.length,
+    operationalCount: operational.length,
+    excludedCount: transactions.length - operational.length,
+    totalIncome: Math.round(totalIncome),
+    totalExpense: Math.round(totalExpense),
+    netBalance: Math.round(netBalance),
+    excludedCats: Array.from(OPERATIONAL_EXCLUDED),
+  })
+  // Expense breakdown by category (mirrors what the donut will show)
+  const expenseCatBreakdown: Record<string, number> = {}
+  for (const t of operational.filter((t) => t.amount < 0)) {
+    expenseCatBreakdown[t.category] = (expenseCatBreakdown[t.category] ?? 0) + Math.abs(t.amount)
+  }
+  console.log('[cashflow] expense breakdown (operational, amount<0):', expenseCatBreakdown)
+  // Categories that ARE excluded — verify Préstamos is out
+  const excludedByCategory: Record<string, number> = {}
+  for (const t of transactions.filter((t) => OPERATIONAL_EXCLUDED.has(t.category))) {
+    excludedByCategory[t.category] = (excludedByCategory[t.category] ?? 0) + t.amount
+  }
+  console.log('[cashflow] excluded-category totals:', excludedByCategory)
+
+  // ── Smashburger Préstamos debug ───────────────────────────────────────────────
+  const smashTxs = transactions.filter(
+    (t) => t.category === 'Préstamos' && t.description.toLowerCase().includes('smashburger'),
+  )
+  const smashTotal = smashTxs.reduce((s, t) => s + t.amount, 0)
+  console.log('[cashflow] Smashburger "Préstamos" transactions:', {
+    count: smashTxs.length,
+    total: Math.round(smashTotal),
+    rows: smashTxs.map((t) => ({ date: t.date, description: t.description, amount: t.amount })),
+  })
+
+  // ── Préstamos KPI — single category, sign determines direction ───────────────
+  const loanTxs = transactions.filter((t) => t.category === 'Préstamos')
+  const prestamosRecibido  = loanTxs.filter((t) => t.amount > 0).reduce((s, t) => s + t.amount, 0)
+  const prestamosDevuelto  = loanTxs.filter((t) => t.amount < 0).reduce((s, t) => s + Math.abs(t.amount), 0)
+  const prestamosPendiente = prestamosRecibido - prestamosDevuelto
+  console.log('[cashflow] préstamos KPI:', { prestamosRecibido: Math.round(prestamosRecibido), prestamosDevuelto: Math.round(prestamosDevuelto), prestamosPendiente: Math.round(prestamosPendiente) })
+
+  // Counterparty breakdown (uses allTransactions so it's always complete, not date-filtered)
+  const loanCounterparties = buildCounterpartyMap(allTransactions)
+
   const thisMonthKey    = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
-  const thisMonthIncome = transactions
-    .filter((t) => t.date.startsWith(thisMonthKey) && t.amount > 0 && t.category !== 'Traspaso interno')
+  // Use allTransactions so the KPI is always the current month regardless of the selected date range
+  const thisMonthIncome = allTransactions
+    .filter((t) =>
+      t.date.startsWith(thisMonthKey) &&
+      t.amount > 0 &&
+      !OPERATIONAL_EXCLUDED.has(t.category),
+    )
     .reduce((s, t) => s + t.amount, 0)
 
   return (
-    <div className="min-h-full bg-base p-6 space-y-6">
+    <div className="min-h-full bg-[#f5f5f7] p-8 space-y-5">
       {/* ── Header ─────────────────────────────────────────────────────────── */}
-      <div className="flex items-start justify-between gap-4">
+      <div className="mb-2 flex items-start justify-between gap-4">
         <div>
-          <h1 className="text-xl font-semibold text-text-primary tracking-tight">Flujo de Caja</h1>
-          <p className="text-[13px] text-text-tertiary mt-0.5">
+          <h1 className="text-2xl font-bold text-zinc-900 tracking-tight">Flujo de Caja</h1>
+          <p className="text-sm text-zinc-400 mt-0.5">
             {allTransactions.length} transacciones · datos de Revolut
           </p>
         </div>
@@ -144,6 +151,7 @@ export default async function CashflowPage({
               <DateRangeFilter from={dateFrom} to={dateTo} />
               <AddTransactionButton />
               <RecategorizeButton />
+              <MoreActionsDropdown dateFrom={dateFrom} dateTo={dateTo} />
             </>
           )}
           <CashflowTabs activeTab={activeTab} />
@@ -153,35 +161,31 @@ export default async function CashflowPage({
       {/* ── Tab content ────────────────────────────────────────────────────── */}
       {activeTab === 'planning' ? (
         <PlanningView
-          plannedItems={plannedItems}
-          pendingInvoices={pendingInvoices}
-          suggestedRecurring={suggestedRecurring}
           currentBalance={currentBalance}
+          presupuestos={presupuestos}
+          allTransactions={allTransactions}
         />
       ) : (
         <>
-          {/* KPI strip */}
-          <div className="grid grid-cols-3 gap-4">
+          {/* KPI strip — 4-col: Saldo neto | Préstamos (span-2) | Ingresos mes */}
+          <div className="grid grid-cols-4 gap-4">
             <CfKpi
               label="Saldo neto"
               value={formatCurrency(Math.abs(netBalance))}
-              success={netBalance >= 0}
-              danger={netBalance < 0}
+              color={netBalance >= 0 ? '#34c759' : '#ff3b30'}
               prefix={netBalance >= 0 ? '+' : '−'}
               sub="Total ingresos − gastos del período"
             />
-            <CfKpi
-              label="Total préstamos"
-              value={formatCurrency(Math.abs(prestamosNet))}
-              warning={prestamosNet >= 0}
-              danger={prestamosNet < 0}
-              prefix={prestamosNet >= 0 ? '+' : '−'}
-              sub="Préstamos netos del período"
+            <CfLoansTableKpi
+              counterparties={loanCounterparties}
+              totalRecibido={prestamosRecibido}
+              totalDado={prestamosDevuelto}
+              totalNeto={prestamosPendiente}
             />
             <CfKpi
               label={`Ingresos ${now.toLocaleDateString('es-ES', { month: 'long' })}`}
               value={formatCurrency(thisMonthIncome)}
-              accent
+              color="#0071e3"
               sub={`Ingresos ${now.toLocaleDateString('es-ES', { month: 'long' })} (sin traspasos)`}
             />
           </div>
@@ -189,16 +193,13 @@ export default async function CashflowPage({
           {/* Charts row 1 */}
           <div className="grid grid-cols-3 gap-5">
             <div className="col-span-2">
-              <IncomeExpenseChart transactions={transactions} />
+              <IncomeExpenseChart transactions={transactions} dateFrom={dateFrom} dateTo={dateTo} />
             </div>
             <ExpenseCategoryDonut transactions={transactions} />
           </div>
 
           {/* Charts row 2 */}
-          <BalanceTrendChart transactions={transactions} />
-
-          {/* Upload zone */}
-          <UploadZone />
+          <BalanceTrendChart transactions={transactions} dateFrom={dateFrom} dateTo={dateTo} />
 
           {/* Transactions table */}
           <TransactionsTable transactions={transactions} />
@@ -210,36 +211,100 @@ export default async function CashflowPage({
 
 // ── Sub-components ─────────────────────────────────────────────────────────────
 
+function CfLoansTableKpi({
+  counterparties,
+  totalRecibido,
+  totalDado,
+  totalNeto,
+}: {
+  counterparties: { name: string; recibido: number; dado: number; neto: number }[]
+  totalRecibido: number
+  totalDado: number
+  totalNeto: number
+}) {
+  return (
+    <div className="col-span-2 bg-white rounded-2xl shadow-sm p-5">
+      <p className="text-xs font-semibold uppercase tracking-widest text-zinc-400 mb-3 leading-tight">
+        Préstamos
+      </p>
+      <table className="w-full text-xs border-collapse">
+        <thead>
+          <tr className="border-b border-zinc-100">
+            <th className="text-left pb-1.5 text-[10px] font-semibold text-zinc-400 pr-3">Contraparte</th>
+            <th className="text-right pb-1.5 text-[10px] font-semibold text-emerald-600 pr-2">Recibido</th>
+            <th className="text-right pb-1.5 text-[10px] font-semibold text-red-500 pr-2">Pagado de vuelta</th>
+            <th className="text-right pb-1.5 text-[10px] font-semibold text-zinc-500">Deuda neta</th>
+          </tr>
+        </thead>
+        <tbody>
+          {counterparties.map((cp) => (
+            <tr key={cp.name} className="border-b border-zinc-50">
+              <td className="py-1 pr-3 text-zinc-700 font-medium whitespace-nowrap">{cp.name}</td>
+              <td className="py-1 pr-2 text-right font-mono text-emerald-600 whitespace-nowrap">
+                {cp.recibido > 0 ? `+${formatCurrency(cp.recibido)}` : '—'}
+              </td>
+              <td className="py-1 pr-2 text-right font-mono text-red-500 whitespace-nowrap">
+                {cp.dado > 0 ? `−${formatCurrency(cp.dado)}` : '—'}
+              </td>
+              <td className="py-1 text-right whitespace-nowrap">
+                {cp.neto <= 0 ? (
+                  <span className="inline-block px-1.5 py-0.5 rounded text-[9px] font-bold bg-emerald-50 text-emerald-600 border border-emerald-200">
+                    Saldado
+                  </span>
+                ) : (
+                  <span className="font-mono font-bold" style={{ color: '#ff9f0a' }}>
+                    {formatCurrency(cp.neto)}
+                  </span>
+                )}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+        <tfoot>
+          <tr className="bg-zinc-50 rounded">
+            <td className="pt-2 pr-3 text-[10px] font-bold text-zinc-500 uppercase tracking-wide">Total</td>
+            <td className="pt-2 pr-2 text-right font-mono font-bold text-emerald-600 whitespace-nowrap text-[11px]">
+              +{formatCurrency(totalRecibido)}
+            </td>
+            <td className="pt-2 pr-2 text-right font-mono font-bold text-red-500 whitespace-nowrap text-[11px]">
+              −{formatCurrency(totalDado)}
+            </td>
+            <td
+              className="pt-2 text-right font-mono font-bold whitespace-nowrap text-[11px]"
+              style={{ color: totalNeto > 0 ? '#ff9f0a' : totalNeto < 0 ? '#34c759' : '#71717a' }}
+            >
+              {formatCurrency(Math.abs(totalNeto))}
+            </td>
+          </tr>
+        </tfoot>
+      </table>
+    </div>
+  )
+}
+
 function CfKpi({
   label,
   value,
+  color = '#18181b',
   prefix,
   sub,
-  accent,
-  success,
-  warning,
-  danger,
 }: {
   label: string
   value: string
+  color?: string
   prefix?: string
   sub?: string
-  accent?: boolean
-  success?: boolean
-  warning?: boolean
-  danger?: boolean
 }) {
-  const valueColor = accent ? '#A9A2F2' : success ? '#4ADE80' : warning ? '#FBBF24' : danger ? '#F87171' : '#EDEDEF'
   return (
-    <div className="bg-surface border border-border-subtle rounded-lg p-5">
-      <p className="text-[12px] font-medium uppercase tracking-widest text-text-tertiary mb-3 leading-tight">
+    <div className="bg-white rounded-2xl shadow-sm p-5">
+      <p className="text-xs font-semibold uppercase tracking-widest text-zinc-400 mb-3 leading-tight">
         {label}
       </p>
-      <p className="text-[28px] font-semibold font-mono tracking-tight leading-none" style={{ color: valueColor }}>
+      <p className="text-2xl font-bold tracking-tight leading-none" style={{ color }}>
         {prefix && <span className="mr-0.5">{prefix}</span>}
         {value}
       </p>
-      {sub && <p className="text-[11px] text-text-tertiary mt-2 leading-tight">{sub}</p>}
+      {sub && <p className="text-[10px] text-zinc-400 mt-2 leading-tight">{sub}</p>}
     </div>
   )
 }

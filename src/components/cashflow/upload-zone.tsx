@@ -69,16 +69,18 @@ function parseRevolutCSV(text: string): ParsedRow[] {
     const state = idx.state >= 0 ? (cols[idx.state] || '').toUpperCase() : ''
     if (state && state !== 'COMPLETED') continue
 
-    // Date: use "Date completed (UTC)", fall back to "Date started (UTC)"
+    // Date: use "Date started (UTC)", fall back to "Date completed (UTC)"
     const rawDate =
-      (idx.completedDate >= 0 ? cols[idx.completedDate] : '') ||
       (idx.startedDate   >= 0 ? cols[idx.startedDate]   : '') ||
+      (idx.completedDate >= 0 ? cols[idx.completedDate] : '') ||
       ''
     const date = rawDate.split(' ')[0] // "YYYY-MM-DD"
     if (!date || !/^\d{4}-\d{2}-\d{2}$/.test(date)) continue
 
     const description = idx.description >= 0 ? cols[idx.description] || '' : ''
     if (!description) continue
+
+    const reference = idx.reference >= 0 ? (cols[idx.reference] || null) : null
 
     // Amount: already signed in Revolut CSVs (negative = expense, positive = income)
     // Strip unicode minus (−) and thousands separators; keep ASCII minus and decimal
@@ -90,8 +92,6 @@ function parseRevolutCSV(text: string): ParsedRow[] {
     if (isNaN(amount)) continue
 
     const currency = idx.currency >= 0 ? cols[idx.currency] || 'EUR' : 'EUR'
-
-    const reference = idx.reference >= 0 ? cols[idx.reference] || null : null
 
     const rawBalance = idx.balance >= 0 ? cols[idx.balance] : ''
     const cleanBalance = rawBalance
@@ -113,16 +113,18 @@ function parseRevolutCSV(text: string): ParsedRow[] {
   return rows
 }
 
-// ── Component ─────────────────────────────────────────────────────────────────
+// ── Shared upload state type ───────────────────────────────────────────────────
 
-type UploadState =
+export type UploadState =
   | { status: 'idle' }
   | { status: 'parsing' }
   | { status: 'uploading'; count: number }
   | { status: 'success'; inserted: number; skipped: number }
   | { status: 'error'; message: string }
 
-export function UploadZone() {
+// ── Bare upload UI (no card wrapper) — used inside modal ──────────────────────
+
+export function UploadZoneContent() {
   const [state, setState] = useState<UploadState>({ status: 'idle' })
   const [dragging, setDragging] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
@@ -177,95 +179,106 @@ export function UploadZone() {
     [handleFiles],
   )
 
-  return (
-    <div className="bg-surface border border-border-subtle rounded-lg p-6">
-      <div className="flex items-center justify-between mb-4">
-        <div>
-          <p className="text-[11px] font-medium uppercase tracking-widest text-text-tertiary">Importar CSV</p>
-          <p className="text-[13px] text-text-tertiary mt-0.5">Formato Revolut · detecta duplicados automáticamente</p>
-        </div>
-        {state.status === 'success' && (
-          <button
-            onClick={() => setState({ status: 'idle' })}
-            className="text-xs text-text-tertiary hover:text-text-secondary border border-border-subtle px-3 h-8 rounded-[6px] transition-colors"
-          >
-            Importar otro
-          </button>
-        )}
-      </div>
-
-      {state.status === 'success' ? (
-        <div className="flex items-center gap-3 bg-success/8 border border-success/20 rounded-[6px] px-5 py-4">
-          <span className="text-success text-xl">✓</span>
+  if (state.status === 'success') {
+    return (
+      <div className="space-y-4">
+        <div className="flex items-center gap-3 bg-emerald-50 border border-emerald-200 rounded-xl px-5 py-4">
+          <span className="text-emerald-500 text-xl">✓</span>
           <div>
-            <p className="text-[13px] font-semibold text-success">
+            <p className="text-sm font-semibold text-emerald-800">
               {state.inserted} transaccion{state.inserted !== 1 ? 'es' : ''} importada{state.inserted !== 1 ? 's' : ''}
             </p>
             {state.skipped > 0 && (
-              <p className="text-xs text-success/70 mt-0.5">
+              <p className="text-xs text-emerald-600/70 mt-0.5">
                 {state.skipped} omitida{state.skipped !== 1 ? 's' : ''} por duplicado
               </p>
             )}
           </div>
         </div>
-      ) : state.status === 'error' ? (
-        <div className="flex items-center gap-3 bg-danger/8 border border-danger/20 rounded-[6px] px-5 py-4">
-          <span className="text-danger text-xl">✗</span>
-          <div>
-            <p className="text-[13px] font-semibold text-danger">Error al importar</p>
-            <p className="text-xs text-danger/70 mt-0.5">{state.message}</p>
-          </div>
-          <button
-            onClick={() => setState({ status: 'idle' })}
-            className="ml-auto text-xs text-danger/70 hover:text-danger"
-          >
-            Reintentar
-          </button>
-        </div>
-      ) : (
-        <div
-          onDragOver={(e) => { e.preventDefault(); setDragging(true) }}
-          onDragLeave={() => setDragging(false)}
-          onDrop={onDrop}
-          onClick={() => inputRef.current?.click()}
-          className={`relative border-2 border-dashed rounded-[6px] px-6 py-10 flex flex-col items-center justify-center gap-3 cursor-pointer transition-colors select-none ${
-            dragging
-              ? 'border-accent bg-accent/5'
-              : 'border-border-strong hover:border-border-strong bg-elevated hover:bg-hover'
-          }`}
+        <button
+          onClick={() => setState({ status: 'idle' })}
+          className="text-xs text-zinc-400 hover:text-zinc-700 border border-zinc-200 px-3 py-1.5 rounded-lg transition-colors"
         >
-          <input
-            ref={inputRef}
-            type="file"
-            accept=".csv,text/csv"
-            className="hidden"
-            onChange={(e) => handleFiles(e.target.files)}
-          />
+          Importar otro
+        </button>
+      </div>
+    )
+  }
 
-          {state.status === 'parsing' || state.status === 'uploading' ? (
-            <>
-              <div className="w-8 h-8 border-2 border-border-strong border-t-accent rounded-full animate-spin" />
-              <p className="text-[13px] text-text-tertiary">
-                {state.status === 'parsing'
-                  ? 'Procesando CSV…'
-                  : `Importando ${state.count} transacciones…`}
-              </p>
-            </>
-          ) : (
-            <>
-              <IconUpload className="w-8 h-8 text-text-tertiary" />
-              <div className="text-center">
-                <p className="text-[13px] font-medium text-text-secondary">
-                  Arrastra un CSV de Revolut o haz clic para seleccionarlo
-                </p>
-                <p className="text-xs text-text-tertiary mt-1">
-                  Columnas: Type · Started Date · Completed Date · Description · Amount · Currency · State · Balance
-                </p>
-              </div>
-            </>
-          )}
+  if (state.status === 'error') {
+    return (
+      <div className="flex items-center gap-3 bg-red-50 border border-red-200 rounded-xl px-5 py-4">
+        <span className="text-red-400 text-xl">✗</span>
+        <div>
+          <p className="text-sm font-semibold text-red-700">Error al importar</p>
+          <p className="text-xs text-red-500 mt-0.5">{state.message}</p>
         </div>
+        <button
+          onClick={() => setState({ status: 'idle' })}
+          className="ml-auto text-xs text-red-400 hover:text-red-700"
+        >
+          Reintentar
+        </button>
+      </div>
+    )
+  }
+
+  return (
+    <div
+      onDragOver={(e) => { e.preventDefault(); setDragging(true) }}
+      onDragLeave={() => setDragging(false)}
+      onDrop={onDrop}
+      onClick={() => inputRef.current?.click()}
+      className={`relative border-2 border-dashed rounded-xl px-6 py-10 flex flex-col items-center justify-center gap-3 cursor-pointer transition-colors select-none ${
+        dragging
+          ? 'border-blue-400 bg-blue-50/50'
+          : 'border-zinc-200 hover:border-zinc-300 bg-zinc-50/50 hover:bg-zinc-100/50'
+      }`}
+    >
+      <input
+        ref={inputRef}
+        type="file"
+        accept=".csv,text/csv"
+        className="hidden"
+        onChange={(e) => handleFiles(e.target.files)}
+      />
+
+      {state.status === 'parsing' || state.status === 'uploading' ? (
+        <>
+          <div className="w-8 h-8 border-2 border-zinc-300 border-t-blue-500 rounded-full animate-spin" />
+          <p className="text-sm text-zinc-500">
+            {state.status === 'parsing'
+              ? 'Procesando CSV…'
+              : `Importando ${state.count} transacciones…`}
+          </p>
+        </>
+      ) : (
+        <>
+          <IconUpload className="w-8 h-8 text-zinc-300" />
+          <div className="text-center">
+            <p className="text-sm font-medium text-zinc-700">
+              Arrastra un CSV de Revolut o haz clic para seleccionarlo
+            </p>
+            <p className="text-xs text-zinc-400 mt-1">
+              Columnas: Type · Started Date · Completed Date · Description · Amount · Currency · State · Balance
+            </p>
+          </div>
+        </>
       )}
+    </div>
+  )
+}
+
+// ── Card wrapper (legacy standalone usage) ─────────────────────────────────────
+
+export function UploadZone() {
+  return (
+    <div className="bg-white rounded-2xl shadow-sm p-6">
+      <div className="mb-4">
+        <p className="text-xs font-semibold uppercase tracking-widest text-zinc-400">Importar CSV</p>
+        <p className="text-sm text-zinc-500 mt-0.5">Formato Revolut · detecta duplicados automáticamente</p>
+      </div>
+      <UploadZoneContent />
     </div>
   )
 }

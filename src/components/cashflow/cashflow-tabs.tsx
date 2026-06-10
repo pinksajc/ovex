@@ -19,10 +19,11 @@ export function CashflowTabs({ activeTab }: CashflowTabsProps) {
   }
 
   return (
-    <div className="flex items-center bg-elevated border border-border-subtle rounded-[6px] p-0.5">
+    <div className="flex items-center gap-0.5">
       <TabBtn active={activeTab === 'transactions'} onClick={() => switchTab('transactions')}>
         Transacciones
       </TabBtn>
+      <span className="text-zinc-200 text-xs select-none">|</span>
       <TabBtn active={activeTab === 'planning'} onClick={() => switchTab('planning')}>
         Planificación
       </TabBtn>
@@ -42,10 +43,10 @@ function TabBtn({
   return (
     <button
       onClick={onClick}
-      className={`px-3 h-8 text-[13px] font-medium rounded-[4px] transition-colors duration-150 ${
+      className={`px-2.5 py-1 text-xs font-medium rounded transition-colors ${
         active
-          ? 'bg-hover text-text-primary'
-          : 'text-text-tertiary hover:text-text-secondary'
+          ? 'text-zinc-900'
+          : 'text-zinc-400 hover:text-zinc-600'
       }`}
     >
       {children}

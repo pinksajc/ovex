@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
-import { UploadZone } from './upload-zone'
+import { UploadZoneContent } from './upload-zone'
 import { ManageCategoriesModal } from './manage-categories-modal'
 
 // ── More Actions Dropdown ──────────────────────────────────────────────────────
@@ -88,7 +88,7 @@ export function MoreActionsDropdown({ dateFrom, dateTo }: MoreActionsDropdownPro
           ref={buttonRef}
           onClick={() => setDropdownOpen((v) => !v)}
           title="Más opciones"
-          className="rounded-[6px] p-2 transition-colors text-text-tertiary hover:text-text-secondary hover:bg-hover"
+          className="rounded-full p-2 transition-colors text-zinc-400 hover:text-zinc-700 hover:bg-zinc-100"
         >
           <DotsIcon className="w-4 h-4" />
         </button>
@@ -97,12 +97,12 @@ export function MoreActionsDropdown({ dateFrom, dateTo }: MoreActionsDropdownPro
         {dropdownOpen && (
           <div
             ref={dropdownRef}
-            className="absolute right-0 top-full mt-1.5 w-44 bg-elevated border border-border-subtle rounded-[6px] shadow-lg py-1 z-30"
+            className="absolute right-0 top-full mt-1.5 w-44 bg-white rounded-xl shadow-lg border border-zinc-100 py-1 z-30"
           >
             {/* Importar CSV */}
             <button
               onClick={openImportModal}
-              className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs text-text-secondary hover:bg-hover transition-colors text-left"
+              className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs text-zinc-700 hover:bg-zinc-50 transition-colors text-left"
             >
               <IconUpload className="w-3.5 h-3.5 text-zinc-400 shrink-0" />
               Importar CSV
@@ -111,7 +111,7 @@ export function MoreActionsDropdown({ dateFrom, dateTo }: MoreActionsDropdownPro
             {/* Gestionar categorías */}
             <button
               onClick={openCatModal}
-              className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs text-text-secondary hover:bg-hover transition-colors text-left"
+              className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs text-zinc-700 hover:bg-zinc-50 transition-colors text-left"
             >
               <IconTag className="w-3.5 h-3.5 text-zinc-400 shrink-0" />
               Gestionar categorías
@@ -121,16 +121,16 @@ export function MoreActionsDropdown({ dateFrom, dateTo }: MoreActionsDropdownPro
             <button
               onClick={handleExportPdf}
               disabled={pdfLoading}
-              className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs text-text-secondary hover:bg-hover transition-colors text-left disabled:opacity-50 disabled:cursor-not-allowed"
+              className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs text-zinc-700 hover:bg-zinc-50 transition-colors text-left disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {pdfLoading ? (
                 <svg className="w-3.5 h-3.5 text-zinc-400 shrink-0 animate-spin" viewBox="0 0 16 16" fill="none">
                   <circle cx="8" cy="8" r="6" stroke="currentColor" strokeWidth="2" strokeDasharray="28" strokeDashoffset="10" />
                 </svg>
               ) : (
-                <IconDownload className={`w-3.5 h-3.5 shrink-0 ${pdfError ? 'text-danger' : 'text-text-tertiary'}`} />
+                <IconDownload className={`w-3.5 h-3.5 shrink-0 ${pdfError ? 'text-red-400' : 'text-zinc-400'}`} />
               )}
-              <span className={pdfError ? 'text-danger' : ''}>
+              <span className={pdfError ? 'text-red-600' : ''}>
                 {pdfLoading ? 'Generando…' : pdfError ? 'Error · Reintentar' : 'Exportar informe PDF'}
               </span>
             </button>
@@ -147,19 +147,30 @@ export function MoreActionsDropdown({ dateFrom, dateTo }: MoreActionsDropdownPro
       {modalOpen && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center p-4"
-          style={{ background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)' }}
+          style={{ background: 'rgba(0,0,0,0.4)', backdropFilter: 'blur(4px)' }}
           onClick={(e) => { if (e.target === e.currentTarget) setModalOpen(false) }}
         >
-          <div className="w-full max-w-lg">
-            <div className="flex items-center justify-end mb-2">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg">
+            {/* Header */}
+            <div className="px-6 py-4 border-b border-zinc-100 flex items-center justify-between">
+              <div>
+                <h2 className="text-sm font-semibold text-zinc-900">Importar CSV</h2>
+                <p className="text-xs text-zinc-400 mt-0.5">
+                  Formato Revolut · detecta duplicados automáticamente
+                </p>
+              </div>
               <button
                 onClick={() => setModalOpen(false)}
-                className="text-text-tertiary hover:text-text-secondary transition-colors"
+                className="text-zinc-400 hover:text-zinc-700 transition-colors"
               >
                 <XIcon className="w-4 h-4" />
               </button>
             </div>
-            <UploadZone />
+
+            {/* Body */}
+            <div className="px-6 py-5">
+              <UploadZoneContent />
+            </div>
           </div>
         </div>
       )}

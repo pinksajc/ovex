@@ -93,7 +93,7 @@ export function AddTransactionButton() {
       {/* Trigger button */}
       <button
         onClick={handleOpen}
-        className="inline-flex items-center gap-1 text-xs font-medium text-text-secondary hover:text-text-primary bg-surface border border-border-subtle hover:border-border-strong px-2.5 h-9 rounded-[6px] transition-colors"
+        className="inline-flex items-center gap-1 text-xs font-medium text-zinc-600 hover:text-zinc-900 bg-white border border-zinc-200 hover:border-zinc-400 px-2.5 py-1.5 rounded-lg transition-colors"
       >
         <PlusIcon className="w-3 h-3" />
         Añadir
@@ -103,17 +103,17 @@ export function AddTransactionButton() {
       {open && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center p-4"
-          style={{ background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)' }}
+          style={{ background: 'rgba(0,0,0,0.4)', backdropFilter: 'blur(4px)' }}
           onClick={(e) => { if (e.target === e.currentTarget) handleClose() }}
         >
-          <div className="bg-surface border border-border-subtle rounded-lg shadow-2xl w-full max-w-md">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md">
             {/* Header */}
-            <div className="px-6 py-4 border-b border-border-subtle flex items-center justify-between">
-              <h2 className="text-[13px] font-semibold text-text-primary">Nueva transacción</h2>
+            <div className="px-6 py-4 border-b border-zinc-100 flex items-center justify-between">
+              <h2 className="text-sm font-semibold text-zinc-900">Nueva transacción</h2>
               <button
                 onClick={handleClose}
                 disabled={isPending}
-                className="text-text-tertiary hover:text-text-secondary transition-colors"
+                className="text-zinc-400 hover:text-zinc-700 transition-colors"
               >
                 <XIcon className="w-4 h-4" />
               </button>
@@ -123,19 +123,19 @@ export function AddTransactionButton() {
             <form onSubmit={handleSubmit} className="px-6 py-5 space-y-4">
               {/* Tipo toggle */}
               <div>
-                <label className="block text-[11px] font-medium uppercase tracking-wider text-text-tertiary mb-2">
+                <label className="block text-[11px] font-semibold uppercase tracking-wider text-zinc-400 mb-2">
                   Tipo
                 </label>
-                <div className="flex items-center bg-elevated border border-border-subtle rounded-[6px] p-0.5 w-fit">
+                <div className="flex items-center bg-zinc-100 rounded-lg p-0.5 w-fit">
                   {(['income', 'expense'] as const).map((t) => (
                     <button
                       key={t}
                       type="button"
                       onClick={() => handleTypeChange(t)}
-                      className={`px-5 h-7 rounded-[4px] text-xs font-medium transition-colors duration-150 ${
+                      className={`px-5 py-1.5 rounded-md text-xs font-medium transition-colors ${
                         form.type === t
-                          ? 'bg-hover text-text-primary'
-                          : 'text-text-tertiary hover:text-text-secondary'
+                          ? 'bg-white text-zinc-900 shadow-sm'
+                          : 'text-zinc-500 hover:text-zinc-700'
                       }`}
                     >
                       {t === 'income' ? 'Ingreso' : 'Gasto'}
@@ -147,7 +147,7 @@ export function AddTransactionButton() {
               {/* Fecha + Importe row */}
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-[11px] font-medium uppercase tracking-wider text-text-tertiary mb-2">
+                  <label className="block text-[11px] font-semibold uppercase tracking-wider text-zinc-400 mb-2">
                     Fecha
                   </label>
                   <input
@@ -155,11 +155,11 @@ export function AddTransactionButton() {
                     value={form.date}
                     onChange={(e) => set('date', e.target.value)}
                     required
-                    className="w-full text-[13px] bg-base border border-border-subtle rounded-[6px] px-3 h-9 text-text-primary focus:outline-none focus:ring-2 focus:ring-accent/40"
+                    className="w-full text-sm bg-zinc-100 border-0 rounded-lg px-3 py-2 text-zinc-700 focus:outline-none focus:ring-2 focus:ring-zinc-300"
                   />
                 </div>
                 <div>
-                  <label className="block text-[11px] font-medium uppercase tracking-wider text-text-tertiary mb-2">
+                  <label className="block text-[11px] font-semibold uppercase tracking-wider text-zinc-400 mb-2">
                     Importe (€)
                   </label>
                   <input
@@ -170,14 +170,14 @@ export function AddTransactionButton() {
                     onChange={(e) => set('amount', e.target.value)}
                     required
                     placeholder="0.00"
-                    className="w-full text-[13px] bg-base border border-border-subtle rounded-[6px] px-3 h-9 text-text-primary placeholder:text-text-tertiary focus:outline-none focus:ring-2 focus:ring-accent/40"
+                    className="w-full text-sm bg-zinc-100 border-0 rounded-lg px-3 py-2 text-zinc-700 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-zinc-300"
                   />
                 </div>
               </div>
 
               {/* Descripción */}
               <div>
-                <label className="block text-[11px] font-medium uppercase tracking-wider text-text-tertiary mb-2">
+                <label className="block text-[11px] font-semibold uppercase tracking-wider text-zinc-400 mb-2">
                   Descripción
                 </label>
                 <input
@@ -186,19 +186,19 @@ export function AddTransactionButton() {
                   onChange={(e) => set('description', e.target.value)}
                   required
                   placeholder="Ej. Factura cliente XYZ"
-                  className="w-full text-[13px] bg-base border border-border-subtle rounded-[6px] px-3 h-9 text-text-primary placeholder:text-text-tertiary focus:outline-none focus:ring-2 focus:ring-accent/40"
+                  className="w-full text-sm bg-zinc-100 border-0 rounded-lg px-3 py-2 text-zinc-700 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-zinc-300"
                 />
               </div>
 
               {/* Categoría */}
               <div>
-                <label className="block text-[11px] font-medium uppercase tracking-wider text-text-tertiary mb-2">
+                <label className="block text-[11px] font-semibold uppercase tracking-wider text-zinc-400 mb-2">
                   Categoría
                 </label>
                 <select
                   value={form.category}
                   onChange={(e) => set('category', e.target.value)}
-                  className="w-full text-[13px] bg-base border border-border-subtle rounded-[6px] px-3 h-9 text-text-secondary focus:outline-none focus:ring-2 focus:ring-accent/40"
+                  className="w-full text-sm bg-zinc-100 border-0 rounded-lg px-3 py-2 text-zinc-700 focus:outline-none focus:ring-2 focus:ring-zinc-300"
                 >
                   {CASHFLOW_CATEGORIES.map((c) => (
                     <option key={c} value={c}>{c}</option>
@@ -208,20 +208,20 @@ export function AddTransactionButton() {
 
               {/* Notas */}
               <div>
-                <label className="block text-[11px] font-medium uppercase tracking-wider text-text-tertiary mb-2">
-                  Notas <span className="normal-case font-normal text-text-tertiary">(opcional)</span>
+                <label className="block text-[11px] font-semibold uppercase tracking-wider text-zinc-400 mb-2">
+                  Notas <span className="normal-case font-normal text-zinc-400">(opcional)</span>
                 </label>
                 <textarea
                   value={form.notes}
                   onChange={(e) => set('notes', e.target.value)}
                   rows={2}
                   placeholder="Información adicional…"
-                  className="w-full text-[13px] bg-base border border-border-subtle rounded-[6px] px-3 py-2 text-text-primary placeholder:text-text-tertiary resize-none focus:outline-none focus:ring-2 focus:ring-accent/40"
+                  className="w-full text-sm bg-zinc-100 border-0 rounded-lg px-3 py-2 text-zinc-700 placeholder:text-zinc-400 resize-none focus:outline-none focus:ring-2 focus:ring-zinc-300"
                 />
               </div>
 
               {error && (
-                <p className="text-xs text-danger bg-danger/8 border border-danger/20 px-3 py-2 rounded-[6px]">{error}</p>
+                <p className="text-xs text-red-500 bg-red-50 px-3 py-2 rounded-lg">{error}</p>
               )}
 
               {/* Actions */}
@@ -230,14 +230,14 @@ export function AddTransactionButton() {
                   type="button"
                   onClick={handleClose}
                   disabled={isPending}
-                  className="text-[13px] text-text-tertiary hover:text-text-secondary transition-colors px-2 py-1.5"
+                  className="text-sm text-zinc-500 hover:text-zinc-700 transition-colors px-2 py-1.5"
                 >
                   Cancelar
                 </button>
                 <button
                   type="submit"
                   disabled={isPending}
-                  className="text-[13px] font-medium text-base bg-accent hover:bg-accent-hover px-5 h-9 rounded-[6px] disabled:opacity-50 transition-colors"
+                  className="text-sm font-medium text-white bg-zinc-900 hover:bg-zinc-700 px-5 py-2 rounded-lg disabled:opacity-50 transition-colors"
                 >
                   {isPending ? 'Guardando…' : 'Guardar'}
                 </button>

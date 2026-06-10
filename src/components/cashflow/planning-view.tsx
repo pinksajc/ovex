@@ -1,581 +1,504 @@
 'use client'
 
-import { useState, useMemo, useTransition } from 'react'
+import { useState, useTransition, useRef, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
-import {
-  ResponsiveContainer,
-  LineChart,
-  Line,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  ReferenceLine,
-  ReferenceArea,
-} from 'recharts'
-import {
-  addPlannedItemAction,
-  deletePlannedItemAction,
-  confirmSuggestedRecurringAction,
-} from '@/app/actions/cashflow-planned'
-import { CASHFLOW_CATEGORIES } from '@/lib/cashflow-categories'
-import { chartColors, colors } from '@/lib/design-tokens'
-import type { PlannedItem, SuggestedRecurring } from '@/lib/supabase/cashflow-planned'
+import { upsertPresupuestoAction } from '@/app/actions/cashflow-presupuesto'
+import type { Presupuesto } from '@/lib/supabase/cashflow-presupuesto'
+import type { CashflowTransaction } from '@/types'
 
-// ── Slim invoice shape needed for planning ─────────────────────────────────────
+// ── Constants ─────────────────────────────────────────────────────────────────
 
-export interface PendingInvoice {
-  id: string
-  number: string
-  clientName: string
-  amountTotal: number
-  dueAt: string | null
-}
+const BUDGET_CATEGORIES = [
+  'Nómina', 'Hardware', 'Administrativo', 'Impuestos', 'Préstamos',
+  'Oficina', 'Viajes', 'Servidores/Hosting', 'Base de datos', 'Herramientas IA',
+  'Comunicaciones', 'Marketing', 'Otras herramientas', 'Traspaso interno', 'Refunds', 'Otros',
+] as const
 
-// ── Helpers ────────────────────────────────────────────────────────────────────
+type Period = 'semana' | 'mes'
+
+// ── Formatters ─────────────────────────────────────────────────────────────────
 
 const _EUR2 = new Intl.NumberFormat('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-function formatEurFull(n: number) { return `${_EUR2.format(n)} €` }
-function formatEur(n: number) {
-  return new Intl.NumberFormat('es-ES', { maximumFractionDigits: 0 }).format(n)
+function eur(n: number) { return `${_EUR2.format(n)} €` }
+
+// ── Date helpers ───────────────────────────────────────────────────────────────
+
+function toDateKey(d: Date): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 }
 
-function monthLabel(key: string) {
-  const [y, m] = key.split('-').map(Number)
-  return new Date(y, m - 1, 1).toLocaleDateString('es-ES', { month: 'short', year: '2-digit' })
-}
-
-function getNextMonths(n: number): string[] {
+function getCurrentWeekRange(): { from: string; to: string } {
   const now = new Date()
-  return Array.from({ length: n }, (_, i) => {
-    const d = new Date(now.getFullYear(), now.getMonth() + i, 1)
-    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
-  })
+  const dow = now.getDay() === 0 ? 6 : now.getDay() - 1  // Mon=0 … Sun=6
+  const mon = new Date(now)
+  mon.setDate(now.getDate() - dow)
+  const sun = new Date(mon)
+  sun.setDate(mon.getDate() + 6)
+  return { from: toDateKey(mon), to: toDateKey(sun) }
 }
 
-// ── Projection computation ─────────────────────────────────────────────────────
-
-interface ProjectionPoint {
-  monthKey: string
-  label: string
-  income: number
-  expense: number
-  balance: number
-  status: 'green' | 'yellow' | 'red'
+function getCurrentMonthRange(): { from: string; to: string } {
+  const now = new Date()
+  const y = now.getFullYear()
+  const m = String(now.getMonth() + 1).padStart(2, '0')
+  const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate()
+  return { from: `${y}-${m}-01`, to: `${y}-${m}-${String(lastDay).padStart(2, '0')}` }
 }
 
-function computeProjection(
-  currentBalance: number,
-  pendingInvoices: PendingInvoice[],
-  plannedItems: PlannedItem[],
-): ProjectionPoint[] {
-  const months = getNextMonths(6)
-  let running = currentBalance
+// ── Traffic-light helpers (for balance strip) ─────────────────────────────────
 
-  return months.map((monthKey) => {
-    // Invoice income due this month
-    const invoiceIncome = pendingInvoices
-      .filter((inv) => inv.dueAt?.startsWith(monthKey))
-      .reduce((s, inv) => s + inv.amountTotal, 0)
+type TrafficLight = 'green' | 'yellow' | 'red'
+function semaforo(b: number): TrafficLight {
+  return b > 5000 ? 'green' : b > 1000 ? 'yellow' : 'red'
+}
+const TRAFFIC_COLORS: Record<TrafficLight, string> = {
+  green: '#34c759', yellow: '#ff9f0a', red: '#ff3b30',
+}
+function TrafficDot({ status, size = 8 }: { status: TrafficLight; size?: number }) {
+  return (
+    <span
+      className="inline-block rounded-full shrink-0"
+      style={{ width: size, height: size, background: TRAFFIC_COLORS[status] }}
+    />
+  )
+}
 
-    // Planned incomes: date matches OR recurring (every month)
-    const plannedIncome = plannedItems
-      .filter((p) => p.type === 'income' && (p.isRecurring || p.date.startsWith(monthKey)))
-      .reduce((s, p) => s + p.amount, 0)
+// ── Budget row computation ─────────────────────────────────────────────────────
 
-    // Planned expenses: date matches OR recurring (every month)
-    const plannedExpense = plannedItems
-      .filter((p) => p.type === 'expense' && (p.isRecurring || p.date.startsWith(monthKey)))
-      .reduce((s, p) => s + p.amount, 0)
+interface BudgetRow {
+  categoria: string
+  presupuestado: number
+  real: number
+  diferencia: number
+  pct: number
+}
 
-    const totalIncome = invoiceIncome + plannedIncome
-    running = running + totalIncome - plannedExpense
+function computeBudgetRows(
+  period: Period,
+  presupuestos: Presupuesto[],
+  transactions: CashflowTransaction[],
+): BudgetRow[] {
+  const range = period === 'semana' ? getCurrentWeekRange() : getCurrentMonthRange()
+  const periodTx = transactions.filter((t) => t.date >= range.from && t.date <= range.to)
 
-    const status: ProjectionPoint['status'] =
-      running > 5000 ? 'green' : running > 1000 ? 'yellow' : 'red'
+  const presMap = new Map<string, number>(presupuestos.map((p) => [p.categoria, p.presupuestoMensual]))
 
-    return {
-      monthKey,
-      label: monthLabel(monthKey),
-      income: Math.round(totalIncome),
-      expense: Math.round(plannedExpense),
-      balance: Math.round(running),
-      status,
+  const realMap = new Map<string, number>()
+  for (const t of periodTx) {
+    if (t.amount < 0) {
+      realMap.set(t.category, (realMap.get(t.category) ?? 0) + Math.abs(t.amount))
     }
-  })
-}
-
-// ── Add item modal ─────────────────────────────────────────────────────────────
-
-interface AddModalProps {
-  type: 'income' | 'expense'
-  onSave: (payload: {
-    date: string; description: string; amount: number
-    type: 'income' | 'expense'; category: string; isRecurring: boolean
-  }) => void
-  onClose: () => void
-  saving: boolean
-  error: string | null
-}
-
-function AddItemModal({ type, onSave, onClose, saving, error }: AddModalProps) {
-  const today = new Date().toISOString().split('T')[0]
-  const [date, setDate]               = useState(today)
-  const [description, setDescription] = useState('')
-  const [amount, setAmount]           = useState('')
-  const [category, setCategory]       = useState(type === 'income' ? 'Ingreso cliente' : 'Sin categoría')
-  const [isRecurring, setRecurring]   = useState(false)
-
-  function handleSubmit(e: React.FormEvent) {
-    e.preventDefault()
-    const amt = parseFloat(amount)
-    if (isNaN(amt) || amt <= 0) return
-    onSave({ date, description: description.trim(), amount: amt, type, category, isRecurring })
   }
 
+  const rows: BudgetRow[] = []
+  for (const cat of BUDGET_CATEGORIES) {
+    const monthly = presMap.get(cat) ?? 0
+    const presupuestado = period === 'semana' ? monthly / 4 : monthly
+    const real = realMap.get(cat) ?? 0
+    if (presupuestado === 0 && real === 0) continue
+    const diferencia = presupuestado - real
+    const pct = presupuestado > 0 ? (real / presupuestado) * 100 : 0
+    rows.push({ categoria: cat, presupuestado, real, diferencia, pct })
+  }
+  return rows
+}
+
+// ── Balance strip ──────────────────────────────────────────────────────────────
+
+function BalanceStrip({ currentBalance }: { currentBalance: number }) {
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4"
-      style={{ background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)' }}
-      onClick={(e) => { if (e.target === e.currentTarget && !saving) onClose() }}
-    >
-      <div className="bg-surface border border-border-subtle rounded-lg shadow-2xl w-full max-w-md">
-        <div className="px-6 py-4 border-b border-border-subtle flex items-center justify-between">
-          <h2 className="text-[13px] font-semibold text-text-primary">
-            {type === 'income' ? '+ Ingreso esperado' : '+ Gasto planificado'}
-          </h2>
-          <button onClick={onClose} disabled={saving} className="text-text-tertiary hover:text-text-secondary transition-colors">
-            <XIcon className="w-4 h-4" />
-          </button>
-        </div>
+    <div className="bg-white rounded-2xl shadow-sm px-6 py-4 flex flex-wrap items-center gap-3 sm:gap-0">
+      <BalanceChip label="Saldo hoy" value={currentBalance} highlight />
+    </div>
+  )
+}
 
-        <form onSubmit={handleSubmit} className="px-6 py-5 space-y-4">
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="block text-[11px] font-medium uppercase tracking-wider text-text-tertiary mb-2">
-                Fecha esperada
-              </label>
-              <input
-                type="date" value={date} onChange={(e) => setDate(e.target.value)} required
-                className="w-full text-[13px] bg-base border border-border-subtle rounded-[6px] px-3 h-9 text-text-primary focus:outline-none focus:ring-2 focus:ring-accent/40"
-              />
-            </div>
-            <div>
-              <label className="block text-[11px] font-medium uppercase tracking-wider text-text-tertiary mb-2">
-                Importe (€)
-              </label>
-              <input
-                type="number" min="0.01" step="0.01" value={amount}
-                onChange={(e) => setAmount(e.target.value)} required placeholder="0"
-                className="w-full text-[13px] bg-base border border-border-subtle rounded-[6px] px-3 h-9 text-text-primary placeholder:text-text-tertiary focus:outline-none focus:ring-2 focus:ring-accent/40"
-              />
-            </div>
-          </div>
-
-          <div>
-            <label className="block text-[11px] font-medium uppercase tracking-wider text-text-tertiary mb-2">Descripción</label>
-            <input
-              type="text" value={description} onChange={(e) => setDescription(e.target.value)} required
-              placeholder={type === 'income' ? 'Ej. Pago cliente ABC' : 'Ej. Suscripción mensual'}
-              className="w-full text-[13px] bg-base border border-border-subtle rounded-[6px] px-3 h-9 text-text-primary placeholder:text-text-tertiary focus:outline-none focus:ring-2 focus:ring-accent/40"
-            />
-          </div>
-
-          <div>
-            <label className="block text-[11px] font-medium uppercase tracking-wider text-text-tertiary mb-2">Categoría</label>
-            <select
-              value={category} onChange={(e) => setCategory(e.target.value)}
-              className="w-full text-[13px] bg-base border border-border-subtle rounded-[6px] px-3 h-9 text-text-secondary focus:outline-none focus:ring-2 focus:ring-accent/40"
-            >
-              {CASHFLOW_CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
-            </select>
-          </div>
-
-          {type === 'expense' && (
-            <label className="flex items-center gap-2.5 cursor-pointer select-none">
-              <div
-                onClick={() => setRecurring(!isRecurring)}
-                className={`w-9 h-5 rounded-full transition-colors relative ${isRecurring ? 'bg-accent' : 'bg-border-strong'}`}
-              >
-                <span className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${isRecurring ? 'translate-x-4' : 'translate-x-0.5'}`} />
-              </div>
-              <span className="text-xs text-text-secondary">¿Es recurrente? (mensual)</span>
-            </label>
-          )}
-
-          {error && <p className="text-xs text-danger bg-danger/8 border border-danger/20 px-3 py-2 rounded-[6px]">{error}</p>}
-
-          <div className="flex items-center justify-end gap-3 pt-1">
-            <button type="button" onClick={onClose} disabled={saving} className="text-[13px] text-text-tertiary hover:text-text-secondary px-2 py-1.5 transition-colors">Cancelar</button>
-            <button type="submit" disabled={saving} className="text-[13px] font-medium text-base bg-accent hover:bg-accent-hover px-5 h-9 rounded-[6px] disabled:opacity-50 transition-colors">
-              {saving ? 'Guardando…' : 'Guardar'}
-            </button>
-          </div>
-        </form>
+function BalanceChip({
+  label, value, highlight,
+}: { label: string; value: number; highlight?: boolean }) {
+  const st = semaforo(value)
+  return (
+    <div className="flex items-center gap-2.5 px-0 sm:px-5 first:pl-0 last:pr-0">
+      <TrafficDot status={st} size={10} />
+      <div>
+        <p className="text-[10px] font-semibold uppercase tracking-widest text-zinc-400">{label}</p>
+        <p
+          className={`font-bold tracking-tight ${highlight ? 'text-xl text-zinc-900' : 'text-lg'}`}
+          style={{ color: highlight ? undefined : TRAFFIC_COLORS[st] }}
+        >
+          {eur(value)}
+        </p>
       </div>
     </div>
   )
 }
 
-// ── Tooltip for projection chart ──────────────────────────────────────────────
+// ── Inline presupuesto editor ─────────────────────────────────────────────────
 
-interface TooltipEntry { name: string; value: number }
+function InlineEdit({
+  categoria,
+  value,
+  onSaved,
+}: {
+  categoria: string
+  value: number
+  onSaved: (categoria: string, val: number) => void
+}) {
+  const [editing, setEditing] = useState(false)
+  const [draft, setDraft]     = useState('')
+  const [saving, setSaving]   = useState(false)
+  const inputRef = useRef<HTMLInputElement>(null)
 
-function ProjectionTooltip({ active, payload, label }: { active?: boolean; payload?: TooltipEntry[]; label?: string }) {
-  if (!active || !payload?.length) return null
-  const bal = payload[0]?.value ?? 0
+  function startEdit() {
+    setDraft(value === 0 ? '' : String(value))
+    setEditing(true)
+    setTimeout(() => inputRef.current?.select(), 0)
+  }
+
+  async function commit() {
+    const parsed = parseFloat(draft.replace(',', '.'))
+    const next   = isNaN(parsed) || parsed < 0 ? value : parsed
+    if (next !== value) {
+      setSaving(true)
+      const res = await upsertPresupuestoAction(categoria, next)
+      setSaving(false)
+      if (res.ok) onSaved(categoria, next)
+    }
+    setEditing(false)
+  }
+
+  function onKeyDown(e: React.KeyboardEvent) {
+    if (e.key === 'Enter') { e.preventDefault(); void commit() }
+    if (e.key === 'Escape') setEditing(false)
+  }
+
+  if (editing) {
+    return (
+      <input
+        ref={inputRef}
+        type="text"
+        value={draft}
+        onChange={(e) => setDraft(e.target.value)}
+        onBlur={() => void commit()}
+        onKeyDown={onKeyDown}
+        disabled={saving}
+        className="w-28 text-right text-xs font-mono bg-zinc-100 border border-zinc-300 rounded px-2 py-1 focus:outline-none focus:ring-2 focus:ring-zinc-400"
+        placeholder="0,00"
+      />
+    )
+  }
+
   return (
-    <div className="rounded-[6px] px-4 py-3 text-xs border" style={{ background: chartColors.tooltipBg, borderColor: chartColors.tooltipBorder }}>
-      <p className="font-semibold mb-1" style={{ color: chartColors.tooltipText }}>{label}</p>
-      <p className="font-mono" style={{ color: bal > 5000 ? colors.success : bal > 1000 ? colors.warning : colors.danger }}>
-        Saldo: {formatEurFull(bal)}
-      </p>
+    <button
+      type="button"
+      onClick={startEdit}
+      className="text-xs font-mono text-zinc-700 hover:text-zinc-900 hover:underline decoration-dotted underline-offset-2 transition-colors cursor-text"
+      title="Clic para editar"
+    >
+      {value === 0 ? <span className="text-zinc-300 italic">—</span> : eur(value)}
+    </button>
+  )
+}
+
+// ── Budget table ──────────────────────────────────────────────────────────────
+
+function BudgetTable({
+  rows,
+  onPresupuestoSaved,
+  presupuestos,
+  period,
+}: {
+  rows: BudgetRow[]
+  onPresupuestoSaved: (categoria: string, val: number) => void
+  presupuestos: Presupuesto[]
+  period: Period
+}) {
+  // For inline edit we need the raw monthly value per category
+  const monthlyMap = new Map<string, number>(presupuestos.map((p) => [p.categoria, p.presupuestoMensual]))
+
+  const totals = rows.reduce(
+    (acc, r) => ({
+      presupuestado: acc.presupuestado + r.presupuestado,
+      real: acc.real + r.real,
+      diferencia: acc.diferencia + r.diferencia,
+    }),
+    { presupuestado: 0, real: 0, diferencia: 0 },
+  )
+  const totalPct = totals.presupuestado > 0 ? (totals.real / totals.presupuestado) * 100 : 0
+
+  const difColor = (d: number) => d >= 0 ? '#34c759' : '#ff3b30'
+
+  return (
+    <div className="overflow-x-auto">
+      <table className="w-full text-sm">
+        <thead>
+          <tr className="border-b border-zinc-100 bg-zinc-50/60">
+            <th className="px-5 py-3 text-left text-[10px] font-semibold uppercase tracking-widest text-zinc-400">
+              Categoría
+            </th>
+            <th className="px-4 py-3 text-right text-[10px] font-semibold uppercase tracking-widest text-zinc-400 w-36">
+              Presupuestado {period === 'semana' ? '(semana)' : '(mes)'}
+            </th>
+            <th className="px-4 py-3 text-right text-[10px] font-semibold uppercase tracking-widest text-zinc-400 w-32">
+              Real
+            </th>
+            <th className="px-4 py-3 text-right text-[10px] font-semibold uppercase tracking-widest text-zinc-400 w-32">
+              Diferencia
+            </th>
+            <th className="px-5 py-3 text-left text-[10px] font-semibold uppercase tracking-widest text-zinc-400 w-44">
+              %
+            </th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.length === 0 && (
+            <tr>
+              <td colSpan={5} className="px-5 py-12 text-center text-sm text-zinc-300">
+                Sin presupuesto configurado. Haz clic en — para añadir.
+              </td>
+            </tr>
+          )}
+          {rows.map((row) => {
+            const over    = row.pct > 100
+            const barPct  = Math.min(row.pct, 100)
+            const monthly = monthlyMap.get(row.categoria) ?? 0
+
+            return (
+              <tr
+                key={row.categoria}
+                className="border-b border-zinc-50 hover:bg-zinc-50/60 transition-colors"
+              >
+                {/* Categoría */}
+                <td className="px-5 py-3">
+                  <span className="text-xs font-medium text-zinc-700">{row.categoria}</span>
+                </td>
+
+                {/* Presupuestado — inline editable (always edits monthly value) */}
+                <td className="px-4 py-3 text-right">
+                  <InlineEdit
+                    categoria={row.categoria}
+                    value={monthly}
+                    onSaved={onPresupuestoSaved}
+                  />
+                </td>
+
+                {/* Real */}
+                <td className="px-4 py-3 text-right">
+                  <span className="text-xs font-mono text-zinc-700">{eur(row.real)}</span>
+                </td>
+
+                {/* Diferencia */}
+                <td className="px-4 py-3 text-right">
+                  <span
+                    className="text-xs font-mono font-semibold"
+                    style={{ color: difColor(row.diferencia) }}
+                  >
+                    {row.diferencia >= 0 ? '+' : '−'}{eur(Math.abs(row.diferencia))}
+                  </span>
+                </td>
+
+                {/* % + progress bar */}
+                <td className="px-5 py-3">
+                  <div className="flex items-center gap-2">
+                    <div className="flex-1 h-1.5 bg-zinc-100 rounded-full overflow-hidden">
+                      <div
+                        className="h-full rounded-full transition-all"
+                        style={{
+                          width: `${barPct}%`,
+                          background: over ? '#ff3b30' : '#0071e3',
+                        }}
+                      />
+                    </div>
+                    <span
+                      className="text-xs font-mono shrink-0 w-12 text-right"
+                      style={{ color: over ? '#ff3b30' : '#64748b' }}
+                    >
+                      {row.presupuestado > 0 ? `${Math.round(row.pct)}%` : '—'}
+                    </span>
+                  </div>
+                </td>
+              </tr>
+            )
+          })}
+        </tbody>
+
+        {/* Totals row */}
+        {rows.length > 0 && (
+          <tfoot>
+            <tr className="border-t-2 border-zinc-200 bg-zinc-50/80">
+              <td className="px-5 py-3">
+                <span className="text-xs font-bold text-zinc-900 uppercase tracking-wide">Total</span>
+              </td>
+              <td className="px-4 py-3 text-right">
+                <span className="text-xs font-mono font-bold text-zinc-700">{eur(totals.presupuestado)}</span>
+              </td>
+              <td className="px-4 py-3 text-right">
+                <span className="text-xs font-mono font-bold text-zinc-700">{eur(totals.real)}</span>
+              </td>
+              <td className="px-4 py-3 text-right">
+                <span
+                  className="text-xs font-mono font-bold"
+                  style={{ color: difColor(totals.diferencia) }}
+                >
+                  {totals.diferencia >= 0 ? '+' : '−'}{eur(Math.abs(totals.diferencia))}
+                </span>
+              </td>
+              <td className="px-5 py-3">
+                <div className="flex items-center gap-2">
+                  <div className="flex-1 h-1.5 bg-zinc-100 rounded-full overflow-hidden">
+                    <div
+                      className="h-full rounded-full transition-all"
+                      style={{
+                        width: `${Math.min(totalPct, 100)}%`,
+                        background: totalPct > 100 ? '#ff3b30' : '#0071e3',
+                      }}
+                    />
+                  </div>
+                  <span
+                    className="text-xs font-mono shrink-0 w-12 text-right font-bold"
+                    style={{ color: totalPct > 100 ? '#ff3b30' : '#64748b' }}
+                  >
+                    {totals.presupuestado > 0 ? `${Math.round(totalPct)}%` : '—'}
+                  </span>
+                </div>
+              </td>
+            </tr>
+          </tfoot>
+        )}
+      </table>
     </div>
   )
 }
 
-// ── Semáforo dot ───────────────────────────────────────────────────────────────
+// ── Also render rows for categories with real spend but no budget ─────────────
+// (already handled in computeBudgetRows — real > 0 || presupuesto > 0)
 
-const SEMAFORO_COLORS = { green: colors.success, yellow: colors.warning, red: colors.danger }
+// ── Missing-budget rows (show all budget categories inline-editable) ──────────
+//
+// We also want to show ALL BUDGET_CATEGORIES as editable even if presupuesto=0
+// and real=0, so the user can set budgets. This is handled by the table: if
+// presupuestado=0 AND real=0 the row is hidden. User clicks an empty month/week
+// cell to set a budget for the first time — but those rows are hidden.
+//
+// To allow first-time budget entry: show a secondary "Sin presupuesto" section
+// listing categories not yet in the table, so user can click to add them.
 
-function Semaforo({ status }: { status: 'green' | 'yellow' | 'red' }) {
+function UnbudgetedCategories({
+  existing,
+  onSaved,
+}: {
+  existing: string[]
+  onSaved: (categoria: string, val: number) => void
+}) {
+  const missing = BUDGET_CATEGORIES.filter((c) => !existing.includes(c))
+  if (missing.length === 0) return null
+
   return (
-    <span
-      className="inline-block w-2.5 h-2.5 rounded-full"
-      style={{ background: SEMAFORO_COLORS[status] }}
-    />
+    <div className="px-5 py-3 border-t border-zinc-100">
+      <p className="text-[10px] font-semibold uppercase tracking-widest text-zinc-400 mb-2">
+        Sin presupuesto configurado
+      </p>
+      <div className="flex flex-wrap gap-2">
+        {missing.map((cat) => (
+          <div key={cat} className="flex items-center gap-1.5 bg-zinc-50 border border-zinc-200 rounded-lg px-3 py-1.5">
+            <span className="text-xs text-zinc-500">{cat}</span>
+            <InlineEdit categoria={cat} value={0} onSaved={onSaved} />
+          </div>
+        ))}
+      </div>
+    </div>
   )
 }
 
 // ── Main export ────────────────────────────────────────────────────────────────
 
-interface PlanningViewProps {
-  plannedItems: PlannedItem[]
-  pendingInvoices: PendingInvoice[]
-  suggestedRecurring: SuggestedRecurring[]
+export interface PlanningViewProps {
   currentBalance: number
+  presupuestos: Presupuesto[]
+  allTransactions: CashflowTransaction[]
 }
 
 export function PlanningView({
-  plannedItems,
-  pendingInvoices,
-  suggestedRecurring,
   currentBalance,
+  presupuestos: initialPresupuestos,
+  allTransactions,
 }: PlanningViewProps) {
-  const router  = useRouter()
+  const router = useRouter()
   const [, startTransition] = useTransition()
 
-  const [addModal, setAddModal]   = useState<'income' | 'expense' | null>(null)
-  const [saving, setSaving]       = useState(false)
-  const [saveError, setSaveError] = useState<string | null>(null)
-  const [ignored, setIgnored]     = useState<Set<string>>(new Set())
-  const [pendingConfirm, setPendingConfirm] = useState<Set<string>>(new Set())
+  const [period, setPeriod]                 = useState<Period>('mes')
+  const [presupuestos, setPresupuestos]     = useState(initialPresupuestos)
 
-  // Filter out suggestions that are already confirmed as recurring
-  const confirmedDescs = new Set(plannedItems.filter((p) => p.isRecurring).map((p) => p.description))
-  const visibleSuggestions = suggestedRecurring.filter(
-    (s) => !ignored.has(s.description) && !confirmedDescs.has(s.description),
-  )
-
-  const projection = useMemo(
-    () => computeProjection(currentBalance, pendingInvoices, plannedItems),
-    [currentBalance, pendingInvoices, plannedItems],
-  )
-
-  // ── Handlers ────────────────────────────────────────────────────────────────
-
-  function handleDelete(id: string) {
-    startTransition(async () => {
-      await deletePlannedItemAction(id)
-      router.refresh()
+  const handlePresupuestoSaved = useCallback((categoria: string, val: number) => {
+    setPresupuestos((prev) => {
+      const idx = prev.findIndex((p) => p.categoria === categoria)
+      if (idx >= 0) {
+        const next = [...prev]
+        next[idx] = { ...next[idx], presupuestoMensual: val }
+        return next
+      }
+      return [...prev, { id: '', categoria, presupuestoMensual: val, createdAt: '' }]
     })
-  }
+    // Background revalidate
+    startTransition(() => router.refresh())
+  }, [router, startTransition])
 
-  function handleConfirm(s: SuggestedRecurring) {
-    setPendingConfirm((p) => new Set(p).add(s.description))
-    startTransition(async () => {
-      await confirmSuggestedRecurringAction({ description: s.description, amount: s.averageAmount, category: s.category })
-      router.refresh()
-    })
-  }
-
-  async function handleSave(payload: Parameters<AddModalProps['onSave']>[0]) {
-    setSaving(true)
-    setSaveError(null)
-    const result = await addPlannedItemAction(payload)
-    setSaving(false)
-    if (result.ok) {
-      setAddModal(null)
-      router.refresh()
-    } else {
-      setSaveError(result.error ?? 'Error')
-    }
-  }
-
-  // ── Y-axis domain for chart ──────────────────────────────────────────────────
-  const balances = projection.map((p) => p.balance)
-  const yMin = Math.min(0, ...balances)
-  const yMax = Math.max(...balances)
-  const yPad = Math.max((yMax - yMin) * 0.1, 1000)
-
-  // ── Render ───────────────────────────────────────────────────────────────────
+  const rows = computeBudgetRows(period, presupuestos, allTransactions)
+  const budgetedCategories = rows.map((r) => r.categoria)
 
   return (
     <div className="space-y-5">
-      {/* ── Row 1: Ingresos + Gastos ─────────────────────────────────────────── */}
-      <div className="grid grid-cols-2 gap-5">
 
-        {/* Ingresos esperados */}
-        <div className="bg-surface border border-border-subtle rounded-lg p-6">
-          <div className="flex items-center justify-between mb-4">
-            <p className="text-[11px] font-medium uppercase tracking-widest text-text-tertiary">
-              Ingresos esperados
+      {/* Balance strip */}
+      <BalanceStrip currentBalance={currentBalance} />
+
+      {/* Budget section */}
+      <div className="bg-white rounded-2xl shadow-sm overflow-hidden">
+        {/* Header */}
+        <div className="px-6 py-4 border-b border-zinc-100 flex items-center justify-between">
+          <div>
+            <h2 className="text-xs font-semibold uppercase tracking-widest text-zinc-400">
+              Presupuesto vs Real
+            </h2>
+            <p className="text-[11px] text-zinc-400 mt-0.5">
+              {period === 'semana' ? 'Semana actual' : 'Mes actual'} · haz clic en Presupuestado para editar
             </p>
-            <button
-              onClick={() => { setSaveError(null); setAddModal('income') }}
-              className="inline-flex items-center gap-1 text-xs font-medium text-success bg-success/10 hover:bg-success/15 border border-success/20 px-2.5 h-7 rounded-[6px] transition-colors"
-            >
-              <PlusIcon className="w-3 h-3" /> Añadir
-            </button>
           </div>
 
-          <div className="space-y-2">
-            {/* Pending invoices (from orvex) */}
-            {pendingInvoices.length === 0 && plannedItems.filter((p) => p.type === 'income').length === 0 && (
-              <p className="text-xs text-text-tertiary py-4 text-center">Sin ingresos esperados</p>
-            )}
-
-            {pendingInvoices.map((inv) => (
-              <div key={inv.id} className="flex items-center justify-between gap-3 py-2 border-b border-border-subtle">
-                <div className="min-w-0">
-                  <p className="text-xs font-medium text-text-primary truncate">
-                    {inv.number} · {inv.clientName}
-                  </p>
-                  <p className="text-[11px] text-text-tertiary">
-                    Vence: {inv.dueAt ? new Date(inv.dueAt + 'T00:00:00').toLocaleDateString('es-ES', { day: '2-digit', month: 'short' }) : '—'}
-                    {' · '}
-                    <span className="text-warning font-medium">pendiente de cobro</span>
-                  </p>
-                </div>
-                <span className="text-xs font-semibold font-mono text-success shrink-0">
-                  +{formatEurFull(inv.amountTotal)}
-                </span>
-              </div>
-            ))}
-
-            {/* Manual planned incomes */}
-            {plannedItems.filter((p) => p.type === 'income').map((item) => (
-              <div key={item.id} className="flex items-center justify-between gap-3 py-2 border-b border-border-subtle">
-                <div className="min-w-0">
-                  <p className="text-xs font-medium text-text-primary truncate">{item.description}</p>
-                  <p className="text-[11px] text-text-tertiary">
-                    {new Date(item.date + 'T00:00:00').toLocaleDateString('es-ES', { day: '2-digit', month: 'short', year: '2-digit' })}
-                    {' · '}{item.category}
-                    {item.isRecurring && ' · 🔄 recurrente'}
-                  </p>
-                </div>
-                <div className="flex items-center gap-2 shrink-0">
-                  <span className="text-xs font-semibold font-mono text-success">
-                    +{formatEurFull(item.amount)}
-                  </span>
-                  <button onClick={() => handleDelete(item.id)} className="text-text-tertiary hover:text-danger transition-colors">
-                    <TrashIcon className="w-3.5 h-3.5" />
-                  </button>
-                </div>
-              </div>
+          {/* Period toggle */}
+          <div className="flex items-center gap-0.5 bg-zinc-100 rounded-lg p-0.5">
+            {(['semana', 'mes'] as const).map((p) => (
+              <button
+                key={p}
+                type="button"
+                onClick={() => setPeriod(p)}
+                className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
+                  period === p
+                    ? 'bg-white text-zinc-900 shadow-sm'
+                    : 'text-zinc-500 hover:text-zinc-700'
+                }`}
+              >
+                {p === 'semana' ? 'Semana' : 'Mes'}
+              </button>
             ))}
           </div>
         </div>
 
-        {/* Gastos planificados */}
-        <div className="bg-surface border border-border-subtle rounded-lg p-6">
-          <div className="flex items-center justify-between mb-4">
-            <p className="text-[11px] font-medium uppercase tracking-widest text-text-tertiary">
-              Gastos planificados
-            </p>
-            <button
-              onClick={() => { setSaveError(null); setAddModal('expense') }}
-              className="inline-flex items-center gap-1 text-xs font-medium text-danger bg-danger/10 hover:bg-danger/15 border border-danger/20 px-2.5 h-7 rounded-[6px] transition-colors"
-            >
-              <PlusIcon className="w-3 h-3" /> Añadir
-            </button>
-          </div>
-
-          <div className="space-y-2">
-            {/* Suggested recurring */}
-            {visibleSuggestions.map((s) => (
-              <div key={s.description} className="flex items-start justify-between gap-3 py-2 border-b border-border-subtle">
-                <div className="min-w-0">
-                  <div className="flex items-center gap-1.5 mb-0.5">
-                    <span className="text-[9px] font-semibold uppercase tracking-wider text-warning bg-warning/10 px-1.5 py-0.5 rounded-[3px]">sugerido</span>
-                  </div>
-                  <p className="text-xs font-medium text-text-primary truncate">{s.description}</p>
-                  <p className="text-[11px] text-text-tertiary">{s.category} · ~{formatEurFull(s.averageAmount)}/mes</p>
-                </div>
-                <div className="flex items-center gap-1.5 shrink-0">
-                  <button
-                    onClick={() => handleConfirm(s)}
-                    disabled={pendingConfirm.has(s.description)}
-                    className="text-[11px] font-medium text-success bg-success/10 hover:bg-success/15 border border-success/20 px-2 h-6 rounded-[4px] transition-colors disabled:opacity-50"
-                  >
-                    Confirmar
-                  </button>
-                  <button
-                    onClick={() => setIgnored((p) => new Set(p).add(s.description))}
-                    className="text-[11px] font-medium text-text-tertiary bg-hover hover:bg-elevated px-2 h-6 rounded-[4px] transition-colors"
-                  >
-                    Ignorar
-                  </button>
-                </div>
-              </div>
-            ))}
-
-            {/* Manual planned expenses */}
-            {plannedItems.filter((p) => p.type === 'expense').length === 0 && visibleSuggestions.length === 0 && (
-              <p className="text-xs text-text-tertiary py-4 text-center">Sin gastos planificados</p>
-            )}
-
-            {plannedItems.filter((p) => p.type === 'expense').map((item) => (
-              <div key={item.id} className="flex items-center justify-between gap-3 py-2 border-b border-border-subtle">
-                <div className="min-w-0">
-                  <p className="text-xs font-medium text-text-primary truncate">{item.description}</p>
-                  <p className="text-[11px] text-text-tertiary">
-                    {new Date(item.date + 'T00:00:00').toLocaleDateString('es-ES', { day: '2-digit', month: 'short', year: '2-digit' })}
-                    {' · '}{item.category}
-                    {item.isRecurring && ' · 🔄 recurrente'}
-                  </p>
-                </div>
-                <div className="flex items-center gap-2 shrink-0">
-                  <span className="text-xs font-semibold font-mono text-danger">
-                    −{formatEurFull(item.amount)}
-                  </span>
-                  <button onClick={() => handleDelete(item.id)} className="text-text-tertiary hover:text-danger transition-colors">
-                    <TrashIcon className="w-3.5 h-3.5" />
-                  </button>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
-
-      {/* ── Row 2: Projection table ──────────────────────────────────────────── */}
-      <div className="bg-surface border border-border-subtle rounded-lg p-6">
-        <p className="text-[11px] font-medium uppercase tracking-widest text-text-tertiary mb-4">
-          Proyección mes a mes · próximos 6 meses
-        </p>
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-border-subtle">
-                <th className="pb-3 text-left text-[11px] font-medium uppercase tracking-wider text-text-tertiary">Mes</th>
-                <th className="pb-3 text-right text-[11px] font-medium uppercase tracking-wider text-text-tertiary">Ingresos esp.</th>
-                <th className="pb-3 text-right text-[11px] font-medium uppercase tracking-wider text-text-tertiary">Gastos plan.</th>
-                <th className="pb-3 text-right text-[11px] font-medium uppercase tracking-wider text-text-tertiary">Saldo proy.</th>
-                <th className="pb-3 text-center text-[11px] font-medium uppercase tracking-wider text-text-tertiary w-16"></th>
-              </tr>
-            </thead>
-            <tbody>
-              {projection.map((p) => (
-                <tr key={p.monthKey} className="border-b border-border-subtle hover:bg-hover transition-colors duration-150">
-                  <td className="py-3 text-xs font-medium text-text-primary capitalize">{p.label}</td>
-                  <td className="py-3 text-xs font-mono text-right text-success">
-                    {p.income > 0 ? `+${formatEurFull(p.income)}` : '—'}
-                  </td>
-                  <td className="py-3 text-xs font-mono text-right text-danger">
-                    {p.expense > 0 ? `−${formatEurFull(p.expense)}` : '—'}
-                  </td>
-                  <td className="py-3 text-xs font-mono font-semibold text-right" style={{ color: SEMAFORO_COLORS[p.status] }}>
-                    {formatEurFull(p.balance)}
-                  </td>
-                  <td className="py-3 text-center">
-                    <Semaforo status={p.status} />
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-        <p className="text-[11px] text-text-tertiary mt-3">
-          🟢 &gt;5.000 € · 🟡 1.000–5.000 € · 🔴 &lt;1.000 €
-          {' · '}Saldo inicial: {formatEurFull(currentBalance)}
-        </p>
-      </div>
-
-      {/* ── Row 3: Projection chart ──────────────────────────────────────────── */}
-      <div className="bg-surface border border-border-subtle rounded-lg p-6">
-        <p className="text-[11px] font-medium uppercase tracking-widest text-text-tertiary mb-4">
-          Saldo proyectado
-        </p>
-        <ResponsiveContainer width="100%" height={200}>
-          <LineChart data={projection} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
-            {/* Background zones */}
-            <ReferenceArea y1={5000} fill={`${colors.success}08`} stroke="none" />
-            <ReferenceArea y1={1000} y2={5000} fill={`${colors.warning}08`} stroke="none" />
-            <ReferenceArea y2={1000} fill={`${colors.danger}08`} stroke="none" />
-            <CartesianGrid strokeDasharray="0" stroke={chartColors.grid} vertical={false} />
-            <XAxis dataKey="label" tick={{ fontSize: 10, fill: chartColors.axis }} axisLine={false} tickLine={false} dy={4} />
-            <YAxis
-              tickFormatter={(v: number) => formatEur(v)}
-              tick={{ fontSize: 10, fill: chartColors.axis }}
-              axisLine={false}
-              tickLine={false}
-              dx={-4}
-              width={48}
-              domain={[yMin - yPad, yMax + yPad]}
-            />
-            <Tooltip content={<ProjectionTooltip />} />
-            <ReferenceLine y={1000} stroke={colors.warning} strokeDasharray="4 2" strokeWidth={1} />
-            <ReferenceLine y={5000} stroke={colors.success} strokeDasharray="4 2" strokeWidth={1} />
-            <Line
-              type="monotone"
-              dataKey="balance"
-              stroke={colors.accent}
-              strokeWidth={2.5}
-              strokeDasharray="6 3"
-              dot={{ r: 4, fill: colors.accent, strokeWidth: 0 }}
-              activeDot={{ r: 6, fill: colors.accent, strokeWidth: 0 }}
-            />
-          </LineChart>
-        </ResponsiveContainer>
-      </div>
-
-      {/* ── Add modal ────────────────────────────────────────────────────────── */}
-      {addModal && (
-        <AddItemModal
-          type={addModal}
-          onSave={handleSave}
-          onClose={() => setAddModal(null)}
-          saving={saving}
-          error={saveError}
+        {/* Table */}
+        <BudgetTable
+          rows={rows}
+          onPresupuestoSaved={handlePresupuestoSaved}
+          presupuestos={presupuestos}
+          period={period}
         />
-      )}
+
+        {/* Categories not yet budgeted */}
+        <UnbudgetedCategories
+          existing={budgetedCategories}
+          onSaved={handlePresupuestoSaved}
+        />
+      </div>
+
     </div>
-  )
-}
-
-// ── Icons ──────────────────────────────────────────────────────────────────────
-
-function PlusIcon({ className }: { className?: string }) {
-  return (
-    <svg className={className} viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-      <path d="M6 1v10M1 6h10" />
-    </svg>
-  )
-}
-
-function TrashIcon({ className }: { className?: string }) {
-  return (
-    <svg className={className} viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M2 3h8M5 3V2h2v1M4 3v6.5a.5.5 0 0 0 .5.5h3a.5.5 0 0 0 .5-.5V3" />
-    </svg>
-  )
-}
-
-function XIcon({ className }: { className?: string }) {
-  return (
-    <svg className={className} viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-      <path d="M1 1l10 10M11 1L1 11" />
-    </svg>
   )
 }

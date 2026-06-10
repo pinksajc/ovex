@@ -27,12 +27,12 @@ const STAGE_LABELS: Record<string, string> = {
 }
 
 const STAGE_COLORS: Record<string, string> = {
-  prospecting:   '#62626B',
-  qualified:     '#60A5FA',
-  negotiation:   '#FBBF24',
-  proposal_sent: '#7C72E8',
-  closed_won:    '#4ADE80',
-  closed_lost:   '#F87171',
+  prospecting:   '#a1a1aa',
+  qualified:     '#60a5fa',
+  negotiation:   '#c084fc',
+  proposal_sent: '#818cf8',
+  closed_won:    '#34c759',
+  closed_lost:   '#ff3b30',
 }
 
 // ── Page ──────────────────────────────────────────────────────────────────────
@@ -79,10 +79,10 @@ export default async function DashboardPage() {
   const overdue = invoices.filter((i) => i.status === 'overdue')
 
   const donutSegments = [
-    { label: 'Pagadas',    count: paid.length,    amount: sum(paid),    color: '#4ADE80' },
-    { label: 'Emitidas',   count: issued.length,  amount: sum(issued),  color: '#60A5FA' },
-    { label: 'Borradores', count: draft.length,   amount: sum(draft),   color: '#62626B' },
-    { label: 'Vencidas',   count: overdue.length, amount: sum(overdue), color: '#F87171' },
+    { label: 'Pagadas',    count: paid.length,    amount: sum(paid),    color: '#34c759' },
+    { label: 'Emitidas',   count: issued.length,  amount: sum(issued),  color: '#0071e3' },
+    { label: 'Borradores', count: draft.length,   amount: sum(draft),   color: '#d4d4d8' },
+    { label: 'Vencidas',   count: overdue.length, amount: sum(overdue), color: '#ff3b30' },
   ]
 
   // ── Section 3: Pipeline ────────────────────────────────────────────────────
@@ -127,62 +127,62 @@ export default async function DashboardPage() {
 
   // ── Render ─────────────────────────────────────────────────────────────────
   return (
-    <div className="min-h-full bg-base p-6 space-y-6">
+    <div className="min-h-full bg-[#f5f5f7] p-8 space-y-5">
 
       {/* Header */}
-      <div>
-        <h1 className="text-xl font-semibold text-text-primary tracking-tight">Dashboard</h1>
-        <p className="text-[13px] text-text-tertiary mt-0.5">
+      <div className="mb-2">
+        <h1 className="text-2xl font-bold text-zinc-900 tracking-tight">Dashboard</h1>
+        <p className="text-sm text-zinc-400 mt-0.5">
           {now.toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
         </p>
       </div>
 
       {/* ── Section 1: KPI strip ── */}
       <div className="grid grid-cols-5 gap-4">
-        <KpiCard label="MRR" value={formatCurrency(mrr)} accent />
-        <KpiCard label="ARR" value={formatCurrency(arr)} accent />
-        <KpiCard label="Facturado este mes" value={formatCurrency(facturacionMes)} />
-        <KpiCard label="Cobrado este mes" value={formatCurrency(cobradoMes)} success />
-        <KpiCard label="Pendiente de cobro" value={formatCurrency(pendiente)} warning={pendiente > 0} />
+        <KpiCard label="MRR" value={formatCurrency(mrr)} color="#0071e3" />
+        <KpiCard label="ARR" value={formatCurrency(arr)} color="#0071e3" />
+        <KpiCard label="Facturado este mes" value={formatCurrency(facturacionMes)} color="#8e8e93" />
+        <KpiCard label="Cobrado este mes" value={formatCurrency(cobradoMes)} color="#34c759" />
+        <KpiCard label="Pendiente de cobro" value={formatCurrency(pendiente)} color={pendiente > 0 ? '#ff9f0a' : '#8e8e93'} />
       </div>
 
       {/* ── Section 2: Billing line chart ── */}
-      <div className="bg-surface border border-border-subtle rounded-lg p-6">
-        <div className="flex items-start justify-between mb-5 gap-4">
+      <div className="bg-white rounded-2xl shadow-sm p-7">
+        <div className="flex items-start justify-between mb-4 gap-4">
           <div className="shrink-0">
-            <p className="text-[12px] font-medium uppercase tracking-widest text-text-tertiary mb-1">Evolución Facturación</p>
-            <p className="text-[28px] font-semibold text-text-primary font-mono tracking-tight leading-none">{formatCurrency(mrr)}</p>
-            <p className="text-[12px] text-text-tertiary mt-1">MRR pipeline</p>
+            <p className="text-xs font-semibold uppercase tracking-widest text-zinc-400 mb-1">Evolución Facturación</p>
+            <p className="text-3xl font-bold text-zinc-900 tracking-tight">{formatCurrency(mrr)}</p>
+            <p className="text-xs text-zinc-400 mt-1">MRR pipeline</p>
           </div>
           <div className="flex items-center gap-5 pt-1">
-            <LegendDot color="#7C72E8" label="Facturado" />
-            <LegendDot color="#4ADE80" label="Cobrado" />
-            <LegendDot color="#7C72E8" label="Proyectado" dashed />
+            <LegendDot color="#0071e3" label="Facturado" />
+            <LegendDot color="#34c759" label="Cobrado" />
+            <LegendDot color="#0071e3" label="Proyectado" dashed />
           </div>
         </div>
         <BillingChart invoices={invoices} />
       </div>
 
       {/* ── Section 3: Facturas + Pipeline ── */}
-      <div className="grid grid-cols-2 gap-6">
+      <div className="grid grid-cols-2 gap-5">
 
         {/* Facturas donut */}
-        <div className="bg-surface border border-border-subtle rounded-lg p-6">
-          <p className="text-[12px] font-medium uppercase tracking-widest text-text-tertiary mb-5">Facturas</p>
-          <div className="flex items-center gap-6">
+        <div className="bg-white rounded-2xl shadow-sm p-7">
+          <p className="text-xs font-semibold uppercase tracking-widest text-zinc-400 mb-6">Facturas</p>
+          <div className="flex items-center gap-8">
             <DonutChart segments={donutSegments} />
-            <div className="flex-1 space-y-3">
+            <div className="flex-1 space-y-3.5">
               {donutSegments.map((seg) => (
                 <div key={seg.label} className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2.5">
                     <span
-                      className="w-2 h-2 rounded-full shrink-0"
+                      className="w-2.5 h-2.5 rounded-full shrink-0"
                       style={{ background: seg.color }}
                     />
-                    <span className="text-[13px] text-text-secondary">{seg.label}</span>
-                    <span className="text-[13px] font-semibold text-text-primary">{seg.count}</span>
+                    <span className="text-sm text-zinc-600">{seg.label}</span>
+                    <span className="text-sm font-semibold text-zinc-900">{seg.count}</span>
                   </div>
-                  <span className="text-[12px] font-mono text-text-tertiary">{formatCurrency(seg.amount)}</span>
+                  <span className="text-xs font-mono text-zinc-400">{formatCurrency(seg.amount)}</span>
                 </div>
               ))}
             </div>
@@ -190,26 +190,25 @@ export default async function DashboardPage() {
         </div>
 
         {/* Pipeline bars */}
-        <div className="bg-surface border border-border-subtle rounded-lg p-6">
-          <p className="text-[12px] font-medium uppercase tracking-widest text-text-tertiary mb-5">Pipeline de deals</p>
+        <div className="bg-white rounded-2xl shadow-sm p-7">
+          <p className="text-xs font-semibold uppercase tracking-widest text-zinc-400 mb-6">Pipeline de deals</p>
           <div className="space-y-3">
             {pipeline.map(({ stage, label, count, mrr: stageMrr, color }) => (
               <div key={stage} className="flex items-center gap-3">
-                <span className="text-[12px] text-text-tertiary w-36 shrink-0 text-right truncate">{label}</span>
-                <div className="flex-1 h-6 bg-hover rounded overflow-hidden">
+                <span className="text-xs text-zinc-500 w-36 shrink-0 text-right truncate">{label}</span>
+                <div className="flex-1 h-8 bg-zinc-50 rounded-full overflow-hidden">
                   <div
-                    className="h-full rounded transition-all"
+                    className="h-full rounded-full transition-all"
                     style={{
                       width: `${Math.max((stageMrr / maxPipelineMrr) * 100, count > 0 ? 5 : 0)}%`,
                       backgroundColor: color,
-                      opacity: 0.8,
                     }}
                   />
                 </div>
                 <div className="text-right shrink-0 w-20">
-                  <span className="text-[13px] font-semibold text-text-primary block font-mono">{count}</span>
+                  <span className="text-xs font-semibold text-zinc-900 block">{count} deal{count !== 1 ? 's' : ''}</span>
                   {stageMrr > 0 && (
-                    <span className="text-[11px] font-mono text-text-tertiary">{formatCurrency(stageMrr)}</span>
+                    <span className="text-[10px] font-mono text-zinc-400">{formatCurrency(stageMrr)}</span>
                   )}
                 </div>
               </div>
@@ -266,11 +265,11 @@ export default async function DashboardPage() {
       )}
 
       {/* ── Section 4: Propuestas + Leaderboard ── */}
-      <div className="grid grid-cols-2 gap-6">
+      <div className="grid grid-cols-2 gap-5">
 
         {/* Propuestas */}
-        <div className="bg-surface border border-border-subtle rounded-lg p-6">
-          <p className="text-[12px] font-medium uppercase tracking-widest text-text-tertiary mb-5">Propuestas</p>
+        <div className="bg-white rounded-2xl shadow-sm p-7">
+          <p className="text-xs font-semibold uppercase tracking-widest text-zinc-400 mb-5">Propuestas</p>
 
           {/* 3 stat cards */}
           <div className="grid grid-cols-3 gap-3 mb-5">
@@ -282,7 +281,7 @@ export default async function DashboardPage() {
             <StatCard
               label="Conversión"
               value={`${convRate.toFixed(0)}%`}
-              success
+              color="#34c759"
             />
             <StatCard
               label="MRR medio"
@@ -292,25 +291,25 @@ export default async function DashboardPage() {
           </div>
 
           {/* Mini stats row */}
-          <div className="pt-4 border-t border-border-subtle grid grid-cols-3 text-center gap-2">
+          <div className="pt-4 border-t border-zinc-50 grid grid-cols-3 text-center gap-2">
             <MiniStat
               label="Borradores"
               value={presupuestos.filter((p) => p.status === 'draft').length}
             />
-            <MiniStat label="Rechazadas" value={pqRejected.length} danger />
+            <MiniStat label="Rechazadas" value={pqRejected.length} color="#ff3b30" />
             <MiniStat
               label="Expiradas"
               value={presupuestos.filter((p) => p.status === 'expired').length}
-              warning
+              color="#ff9f0a"
             />
           </div>
         </div>
 
         {/* Owner leaderboard */}
-        <div className="bg-surface border border-border-subtle rounded-lg p-6">
-          <p className="text-[12px] font-medium uppercase tracking-widest text-text-tertiary mb-5">Por comercial</p>
+        <div className="bg-white rounded-2xl shadow-sm p-7">
+          <p className="text-xs font-semibold uppercase tracking-widest text-zinc-400 mb-5">Por comercial</p>
           {owners.length === 0 ? (
-            <p className="text-[13px] text-text-tertiary py-8 text-center">Sin datos</p>
+            <p className="text-sm text-zinc-400 py-8 text-center">Sin datos</p>
           ) : (
             <div className="space-y-3">
               {owners.map((owner, idx) => {
@@ -320,28 +319,32 @@ export default async function DashboardPage() {
                   .join('')
                   .slice(0, 2)
                   .toUpperCase()
-                const rankColors = ['#7C72E8', '#4ADE80', '#FBBF24']
-                const rankColor = rankColors[idx] ?? '#62626B'
+                const rankColors = ['#0071e3', '#34c759', '#ff9f0a']
+                const rankColor = rankColors[idx] ?? '#a1a1aa'
                 return (
-                  <div key={owner.name} className="flex items-center gap-3">
+                  <div key={owner.name} className="flex items-center gap-4">
+                    {/* Rank */}
                     <span
-                      className="text-[13px] font-semibold w-5 text-right shrink-0 font-mono"
+                      className="text-sm font-bold w-5 text-right shrink-0"
                       style={{ color: rankColor }}
                     >
                       {idx + 1}
                     </span>
+                    {/* Avatar */}
                     <div
-                      className="w-8 h-8 rounded-full flex items-center justify-center text-[11px] font-semibold shrink-0"
-                      style={{ background: `${rankColor}20`, color: rankColor }}
+                      className="w-9 h-9 rounded-full flex items-center justify-center text-xs font-bold text-white shrink-0"
+                      style={{ backgroundColor: rankColor }}
                     >
                       {initials || '?'}
                     </div>
+                    {/* Name + MRR */}
                     <div className="flex-1 min-w-0">
-                      <p className="text-[13px] font-medium text-text-primary truncate">{owner.name}</p>
-                      <p className="text-[12px] font-mono text-text-tertiary">{formatCurrency(owner.mrr)}/mes</p>
+                      <p className="text-sm font-semibold text-zinc-900 truncate">{owner.name}</p>
+                      <p className="text-xs font-mono text-zinc-400">{formatCurrency(owner.mrr)}/mes</p>
                     </div>
-                    <span className="text-[12px] font-mono text-text-tertiary bg-hover px-2.5 py-1 rounded-[4px] shrink-0">
-                      {owner.count}
+                    {/* Deal count badge */}
+                    <span className="text-xs font-semibold bg-zinc-100 text-zinc-600 px-2.5 py-1 rounded-full shrink-0">
+                      {owner.count} deal{owner.count !== 1 ? 's' : ''}
                     </span>
                   </div>
                 )
@@ -359,29 +362,18 @@ export default async function DashboardPage() {
 function KpiCard({
   label,
   value,
-  accent,
-  success,
-  warning,
+  color = '#18181b',
 }: {
   label: string
   value: string
-  accent?: boolean
-  success?: boolean
-  warning?: boolean
+  color?: string
 }) {
-  const valueColor = accent
-    ? '#A9A2F2'
-    : success
-    ? '#4ADE80'
-    : warning
-    ? '#FBBF24'
-    : '#EDEDEF'
   return (
-    <div className="bg-surface border border-border-subtle rounded-lg p-5">
-      <p className="text-[12px] font-medium uppercase tracking-widest text-text-tertiary mb-3 leading-tight">
+    <div className="bg-white rounded-2xl shadow-sm p-5">
+      <p className="text-xs font-semibold uppercase tracking-widest text-zinc-400 mb-3 leading-tight">
         {label}
       </p>
-      <p className="text-[28px] font-semibold font-mono tracking-tight leading-none" style={{ color: valueColor }}>
+      <p className="text-2xl font-bold tracking-tight" style={{ color }}>
         {value}
       </p>
     </div>
@@ -412,7 +404,7 @@ function LegendDot({
           <line x1="0" y1="2" x2="20" y2="2" stroke={color} strokeWidth="2.5" />
         )}
       </svg>
-      <span className="text-[12px] text-text-tertiary">{label}</span>
+      <span className="text-xs text-zinc-400">{label}</span>
     </div>
   )
 }
@@ -421,25 +413,25 @@ function StatCard({
   label,
   value,
   sub,
-  success,
+  color,
 }: {
   label: string
   value: string
   sub?: string
-  success?: boolean
+  color?: string
 }) {
   return (
-    <div className="bg-hover rounded-[6px] p-4">
-      <p className="text-[11px] font-medium uppercase tracking-widest text-text-tertiary mb-2 leading-tight">
+    <div className="bg-[#f5f5f7] rounded-xl p-4">
+      <p className="text-[10px] font-semibold uppercase tracking-widest text-zinc-400 mb-2 leading-tight">
         {label}
       </p>
       <p
-        className="text-[24px] font-semibold font-mono leading-none tracking-tight"
-        style={{ color: success ? '#4ADE80' : '#EDEDEF' }}
+        className="text-2xl font-bold leading-none tracking-tight"
+        style={{ color: color ?? '#18181b' }}
       >
         {value}
       </p>
-      {sub && <p className="text-[11px] text-text-tertiary mt-1.5 leading-tight">{sub}</p>}
+      {sub && <p className="text-[10px] text-zinc-400 mt-1.5 leading-tight">{sub}</p>}
     </div>
   )
 }
@@ -447,24 +439,21 @@ function StatCard({
 function MiniStat({
   label,
   value,
-  danger,
-  warning,
+  color,
 }: {
   label: string
   value: number
-  danger?: boolean
-  warning?: boolean
+  color?: string
 }) {
-  const color = danger ? '#F87171' : warning ? '#FBBF24' : '#EDEDEF'
   return (
     <div>
       <p
-        className="text-[20px] font-semibold font-mono tracking-tight"
-        style={{ color }}
+        className="text-xl font-bold tracking-tight"
+        style={{ color: color ?? '#18181b' }}
       >
         {value}
       </p>
-      <p className="text-[11px] text-text-tertiary mt-0.5">{label}</p>
+      <p className="text-[10px] text-zinc-400 mt-0.5">{label}</p>
     </div>
   )
 }
@@ -481,8 +470,8 @@ function DonutChart({
   if (total === 0) {
     return (
       <svg width="144" height="144" viewBox="0 0 144 144" className="shrink-0">
-        <circle cx={cx} cy={cy} r={r} fill="none" stroke="#26262C" strokeWidth={sw} />
-        <text x={cx} y={cy + 6} textAnchor="middle" fontSize={16} fontWeight="600" fill="#62626B">
+        <circle cx={cx} cy={cy} r={r} fill="none" stroke="#e4e4e7" strokeWidth={sw} />
+        <text x={cx} y={cy + 6} textAnchor="middle" fontSize={16} fontWeight="700" fill="#a1a1aa">
           0
         </text>
       </svg>
@@ -514,10 +503,10 @@ function DonutChart({
   return (
     <svg width="144" height="144" viewBox="0 0 144 144" className="shrink-0">
       {arcs}
-      <text x={cx} y={cy + 1} textAnchor="middle" fontSize={22} fontWeight="600" fill="#EDEDEF">
+      <text x={cx} y={cy + 1} textAnchor="middle" fontSize={22} fontWeight="700" fill="#18181b">
         {total}
       </text>
-      <text x={cx} y={cy + 17} textAnchor="middle" fontSize={10} fill="#62626B" fontWeight="500">
+      <text x={cx} y={cy + 17} textAnchor="middle" fontSize={10} fill="#a1a1aa" fontWeight="500">
         facturas
       </text>
     </svg>
