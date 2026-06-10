@@ -126,6 +126,24 @@ export type DealEventType =
   | 'proposal_sent_for_signature'
   | 'proposal_signed'
   | 'proposal_declined'
+  | 'approval_pending'
+  | 'approval_approved'
+  | 'approval_rejected'
+  | 'approval_changes_requested'
+
+export type ApprovalEventType = Extract<
+  DealEventType,
+  'approval_pending' | 'approval_approved' | 'approval_rejected' | 'approval_changes_requested'
+>
+
+export interface ApprovalEventDisplay {
+  id: string
+  eventType: ApprovalEventType
+  documentNumber: string
+  actor: string
+  notes: string | null
+  createdAt: string
+}
 
 /**
  * Logs a deal event to Supabase.
@@ -147,5 +165,78 @@ export async function logEvent(
       .insert({ deal_id: dealId, event_type: eventType })
   } catch {
     // never surface — tracking must not affect UX
+  }
+}
+
+/**
+ * Logs an approval-related event with metadata (actor, document number, notes).
+ * Never throws.
+ */
+export async function logApprovalEvent(
+  dealId: string,
+  eventType: ApprovalEventType,
+  metadata: { actor: string; documentNumber: string; notes?: string | null }
+): Promise<void> {
+  try {
+    const url = process.env.SUPABASE_URL
+    const key = process.env.SUPABASE_SERVICE_ROLE_KEY
+    if (!url || !key) return
+
+    const { getSupabaseClient } = await import('./client')
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    await (getSupabaseClient() as any)
+      .from('deal_events')
+      .insert({
+        deal_id:    dealId,
+        event_type: eventType,
+        metadata:   {
+          actor:          metadata.actor,
+          documentNumber: metadata.documentNumber,
+          notes:          metadata.notes ?? null,
+        },
+      })
+  } catch {
+    // never surface
+  }
+}
+
+/**
+ * Returns approval events for a deal, newest first.
+ */
+export async function getApprovalEventsByDeal(
+  dealId: string
+): Promise<ApprovalEventDisplay[]> {
+  try {
+    const url = process.env.SUPABASE_URL
+    const key = process.env.SUPABASE_SERVICE_ROLE_KEY
+    if (!url || !key) return []
+
+    const { getSupabaseClient } = await import('./client')
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data } = await (getSupabaseClient() as any)
+      .from('deal_events')
+      .select('id, event_type, metadata, created_at')
+      .eq('deal_id', dealId)
+      .in('event_type', [
+        'approval_pending',
+        'approval_approved',
+        'approval_rejected',
+        'approval_changes_requested',
+      ])
+      .order('created_at', { ascending: false })
+
+    if (!data) return []
+
+    return (data as Array<{ id: string; event_type: string; metadata: Record<string, unknown> | null; created_at: string }>)
+      .map((row) => ({
+        id:             row.id,
+        eventType:      row.event_type as ApprovalEventType,
+        documentNumber: String(row.metadata?.documentNumber ?? ''),
+        actor:          String(row.metadata?.actor ?? ''),
+        notes:          row.metadata?.notes ? String(row.metadata.notes) : null,
+        createdAt:      row.created_at,
+      }))
+  } catch {
+    return []
   }
 }

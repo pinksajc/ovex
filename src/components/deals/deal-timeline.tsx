@@ -3,6 +3,7 @@
 
 import Link from 'next/link'
 import type { Presupuesto, Invoice, PresupuestoStatus, InvoiceStatus } from '@/types'
+import type { ApprovalEventDisplay } from '@/lib/supabase/events'
 
 const PQ_STATUS_LABEL: Record<PresupuestoStatus, string> = {
   draft: 'Borrador', sent: 'Enviado', accepted: 'Aceptado', rejected: 'Rechazado', expired: 'Expirado',
@@ -44,17 +45,19 @@ export function DealTimeline({
   presupuestos,
   facturas,
   activePresupuestoId,
+  approvalEvents = [],
 }: {
   presupuestos: Presupuesto[]
   facturas: Invoice[]
   activePresupuestoId?: string
+  approvalEvents?: ApprovalEventDisplay[]
 }) {
   const items: TItem[] = [
     ...presupuestos.map((p): TItem => ({ kind: 'oferta',  data: p, sortDate: p.createdAt })),
     ...facturas.map((f):    TItem => ({ kind: 'factura', data: f, sortDate: f.issuedAt ?? f.createdAt })),
   ].sort((a, b) => a.sortDate.localeCompare(b.sortDate))
 
-  if (items.length === 0) return null
+  if (items.length === 0 && approvalEvents.length === 0) return null
 
   return (
     <div style={{ background: '#fff', border: '1px solid #e4e4e7', borderRadius: 12, padding: '20px 20px 20px 20px', marginBottom: 24 }}>
@@ -127,8 +130,102 @@ export function DealTimeline({
           })}
         </div>
       </div>
+
+      {/* ── Approval events feed ── */}
+      {approvalEvents.length > 0 && (
+        <div style={{ marginTop: 20, paddingTop: 16, borderTop: '1px solid #f4f4f5' }}>
+          <p style={{ fontSize: 10, fontWeight: 600, color: '#a1a1aa', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 10 }}>
+            Aprobaciones
+          </p>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            {approvalEvents.map((ev) => {
+              const cfg = APPROVAL_EVENT_CONFIG[ev.eventType]
+              const timeStr = new Date(ev.createdAt).toLocaleDateString('es-ES', { day: 'numeric', month: 'short', year: '2-digit' })
+              return (
+                <div key={ev.id} style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
+                  {/* Icon */}
+                  <div style={{
+                    width: 20, height: 20, borderRadius: '50%', flexShrink: 0, marginTop: 1,
+                    background: cfg.bg,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  }}>
+                    {cfg.icon}
+                  </div>
+                  {/* Text */}
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <p style={{ fontSize: 12, color: '#27272a', margin: 0, lineHeight: 1.4 }}>
+                      <span style={{ fontWeight: 600 }}>{ev.documentNumber}</span>
+                      {' '}
+                      <span style={{ color: cfg.color }}>{cfg.label}</span>
+                      {ev.actor && (
+                        <span style={{ color: '#71717a' }}> · {ev.actor}</span>
+                      )}
+                    </p>
+                    {ev.notes && (
+                      <p style={{ fontSize: 11, color: '#71717a', margin: '2px 0 0 0', fontStyle: 'italic', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        &ldquo;{ev.notes}&rdquo;
+                      </p>
+                    )}
+                  </div>
+                  {/* Date */}
+                  <span style={{ fontSize: 10, color: '#a1a1aa', flexShrink: 0, fontFamily: 'monospace', marginTop: 2 }}>{timeStr}</span>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      )}
     </div>
   )
+}
+
+/* ── Approval event config ── */
+
+const APPROVAL_EVENT_CONFIG: Record<
+  ApprovalEventDisplay['eventType'],
+  { label: string; color: string; bg: string; icon: React.ReactNode }
+> = {
+  approval_pending: {
+    label: 'pendiente de aprobación',
+    color: '#71717a',
+    bg: '#f4f4f5',
+    icon: (
+      <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
+        <circle cx="5" cy="5" r="3.5" stroke="#a1a1aa" strokeWidth="1.5" />
+        <path d="M5 3v2.5l1.5 1" stroke="#a1a1aa" strokeWidth="1.25" strokeLinecap="round" />
+      </svg>
+    ),
+  },
+  approval_approved: {
+    label: 'aprobada',
+    color: '#16a34a',
+    bg: '#dcfce7',
+    icon: (
+      <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
+        <path d="M2 5l2.5 2.5 4-4" stroke="#16a34a" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+      </svg>
+    ),
+  },
+  approval_rejected: {
+    label: 'rechazada',
+    color: '#dc2626',
+    bg: '#fee2e2',
+    icon: (
+      <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
+        <path d="M3 3l4 4M7 3l-4 4" stroke="#dc2626" strokeWidth="1.5" strokeLinecap="round" />
+      </svg>
+    ),
+  },
+  approval_changes_requested: {
+    label: 'cambios solicitados',
+    color: '#d97706',
+    bg: '#fef3c7',
+    icon: (
+      <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
+        <path d="M2 5h6M6 3l2 2-2 2" stroke="#d97706" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+      </svg>
+    ),
+  },
 }
 
 /* ── Sub-components ── */

@@ -4,11 +4,21 @@ import { redirect } from 'next/navigation'
 import { revalidatePath } from 'next/cache'
 import { isRedirectError } from 'next/dist/client/components/redirect-error'
 import { createPresupuesto, updatePresupuesto, updatePresupuestoStatus, updatePresupuestoSignatureRequired, getPresupuesto, createPresupuestoVersion, deletePresupuesto } from '@/lib/supabase/presupuestos'
+import { logApprovalEvent } from '@/lib/supabase/events'
 import type { CreatePresupuestoInput, UpdatePresupuestoInput, PresupuestoStatus } from '@/types'
 
 export async function createPresupuestoAction(input: CreatePresupuestoInput): Promise<{ error?: string }> {
   try {
     const presupuesto = await createPresupuesto(input)
+
+    // Log "pending approval" event if linked to a deal
+    if (presupuesto.dealId) {
+      await logApprovalEvent(presupuesto.dealId, 'approval_pending', {
+        actor:          '',
+        documentNumber: presupuesto.number,
+      })
+    }
+
     revalidatePath('/ofertas')
     revalidatePath('/deals')
     redirect(`/ofertas/${presupuesto.id}`)

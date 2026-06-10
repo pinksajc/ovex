@@ -86,6 +86,25 @@ export async function getPendingApprovalsCount(): Promise<number> {
   return (presRes.count ?? 0) + (invRes.count ?? 0)
 }
 
+// ── Deal info helper ──────────────────────────────────────────────────────────
+
+/**
+ * Returns the deal_id and document number for an oferta or factura.
+ * Returns null if the item has no linked deal.
+ */
+export async function getItemDealInfo(
+  itemType: 'oferta' | 'factura',
+  itemId: string,
+): Promise<{ dealId: string; number: string } | null> {
+  const table = itemType === 'oferta' ? presupuestosTable() : invoicesTable()
+  const { data, error } = await table
+    .select('deal_id, number')
+    .eq('id', itemId)
+    .maybeSingle()
+  if (error || !data || !data.deal_id) return null
+  return { dealId: data.deal_id as string, number: data.number as string }
+}
+
 // ── Mutations ─────────────────────────────────────────────────────────────────
 
 export async function approveItem(

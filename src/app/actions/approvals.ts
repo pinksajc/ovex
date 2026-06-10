@@ -7,7 +7,9 @@ import {
   approveItem,
   rejectItem,
   requestChangesItem,
+  getItemDealInfo,
 } from '@/lib/supabase/approvals'
+import { logApprovalEvent } from '@/lib/supabase/events'
 import type { ApprovalType } from '@/types'
 
 type Result = { ok: true } | { ok: false; error: string }
@@ -30,6 +32,17 @@ export async function approveItemAction(
       }
     }
     await approveItem(itemType, itemId, me.id)
+
+    // Log approval event to deal timeline
+    const info = await getItemDealInfo(itemType, itemId)
+    if (info?.dealId) {
+      await logApprovalEvent(info.dealId, 'approval_approved', {
+        actor:          me.name ?? me.email.split('@')[0],
+        documentNumber: info.number,
+      })
+      revalidatePath(`/deals/${info.dealId}`)
+    }
+
     revalidatePath('/gestiones')
     revalidatePath(`/${itemType === 'oferta' ? 'ofertas' : 'facturas'}/${itemId}`)
     return { ok: true }
@@ -51,6 +64,18 @@ export async function rejectItemAction(
       return { ok: false, error: 'No autorizado' }
     }
     await rejectItem(itemType, itemId, notes.trim())
+
+    // Log rejection event to deal timeline
+    const info = await getItemDealInfo(itemType, itemId)
+    if (info?.dealId) {
+      await logApprovalEvent(info.dealId, 'approval_rejected', {
+        actor:          me.name ?? me.email.split('@')[0],
+        documentNumber: info.number,
+        notes:          notes.trim(),
+      })
+      revalidatePath(`/deals/${info.dealId}`)
+    }
+
     revalidatePath('/gestiones')
     revalidatePath(`/${itemType === 'oferta' ? 'ofertas' : 'facturas'}/${itemId}`)
     return { ok: true }
@@ -72,6 +97,18 @@ export async function requestChangesAction(
       return { ok: false, error: 'No autorizado' }
     }
     await requestChangesItem(itemType, itemId, notes.trim())
+
+    // Log changes-requested event to deal timeline
+    const info = await getItemDealInfo(itemType, itemId)
+    if (info?.dealId) {
+      await logApprovalEvent(info.dealId, 'approval_changes_requested', {
+        actor:          me.name ?? me.email.split('@')[0],
+        documentNumber: info.number,
+        notes:          notes.trim(),
+      })
+      revalidatePath(`/deals/${info.dealId}`)
+    }
+
     revalidatePath('/gestiones')
     revalidatePath(`/${itemType === 'oferta' ? 'ofertas' : 'facturas'}/${itemId}`)
     return { ok: true }

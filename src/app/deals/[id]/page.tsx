@@ -14,6 +14,7 @@ import { listLocationsByDeal } from '@/lib/supabase/company-locations'
 import { DealLocationsPanel } from '@/components/deals/deal-locations-panel'
 import { DealTimeline } from '@/components/deals/deal-timeline'
 import { ClientHistoryCard } from '@/components/deals/client-history-card'
+import { getApprovalEventsByDeal } from '@/lib/supabase/events'
 import type { DealStage, PresupuestoStatus, InvoiceStatus, DeliveryPlanId, AddonId } from '@/types'
 
 const PRESUPUESTO_STATUS_LABELS: Record<PresupuestoStatus, string> = {
@@ -75,12 +76,13 @@ export default async function DealPage({
 }) {
   const { id } = await params
   const user = await getCurrentUser()
-  const [deal, members, presupuestos, facturas, locations] = await Promise.all([
+  const [deal, members, presupuestos, facturas, locations, approvalEvents] = await Promise.all([
     getDeal(id, user ?? undefined),
     getWorkspaceMembers(),
     getPresupuestosByDeal(id).catch(() => []),
     getInvoicesByDeal(id).catch(() => []),
     listLocationsByDeal(id).catch(() => []),
+    getApprovalEventsByDeal(id).catch(() => []),
   ])
 
   if (!deal) notFound()
@@ -272,8 +274,8 @@ export default async function DealPage({
       <DealLocationsPanel dealId={deal.id} initialLocations={locations} />
 
       {/* Timeline */}
-      {(presupuestos.length > 0 || facturas.length > 0) && (
-        <DealTimeline presupuestos={presupuestos} facturas={facturas} />
+      {(presupuestos.length > 0 || facturas.length > 0 || approvalEvents.length > 0) && (
+        <DealTimeline presupuestos={presupuestos} facturas={facturas} approvalEvents={approvalEvents} />
       )}
 
       {/* Historial de facturación — always show when there's a config or invoices */}

@@ -4,11 +4,21 @@ import { redirect } from 'next/navigation'
 import { revalidatePath } from 'next/cache'
 import { createInvoice, updateInvoice, updateInvoiceStatus, getInvoice, convertProformaToInvoice, deleteInvoice } from '@/lib/supabase/invoices'
 import { insertCashflowTransactions } from '@/lib/supabase/cashflow'
+import { logApprovalEvent } from '@/lib/supabase/events'
 import type { CreateInvoiceInput, UpdateInvoiceInput, InvoiceStatus } from '@/types'
 
 export async function createInvoiceAction(input: CreateInvoiceInput): Promise<{ error?: string }> {
   try {
     const invoice = await createInvoice(input)
+
+    // Log "pending approval" event if linked to a deal
+    if (invoice.dealId) {
+      await logApprovalEvent(invoice.dealId, 'approval_pending', {
+        actor:          '',
+        documentNumber: invoice.number,
+      })
+    }
+
     revalidatePath('/facturas')
     redirect(`/facturas/${invoice.id}`)
   } catch (err) {
