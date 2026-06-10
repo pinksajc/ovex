@@ -212,7 +212,7 @@ function CreateUserModal({
 
     if (!email.trim())    return setLocalError('El email es requerido.')
     if (!password)        return setLocalError('La contraseña es requerida.')
-    if (password.length < 6) return setLocalError('La contraseña debe tener al menos 6 caracteres.')
+    if (password.length < 8) return setLocalError('La contraseña debe tener al menos 8 caracteres.')
     if (password !== confirm) return setLocalError('Las contraseñas no coinciden.')
 
     startTransition(async () => {
@@ -290,7 +290,7 @@ function CreateUserModal({
                 required
                 value={password}
                 onChange={(e) => { setPassword(e.target.value); setLocalError(null) }}
-                placeholder="Mínimo 6 caracteres"
+                placeholder="Mínimo 8 caracteres"
                 className={inputCls}
                 autoComplete="new-password"
               />

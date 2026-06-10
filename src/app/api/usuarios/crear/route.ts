@@ -11,7 +11,44 @@ import type { UserRole } from '@/lib/auth'
 
 const VALID_ROLES: UserRole[] = ['admin', 'sales', 'finance']
 
+// ── helpers ───────────────────────────────────────────────────────────────────
+
+/** Serialize any error object to a loggable string, including Supabase extras. */
+function serializeError(e: unknown): string {
+  if (!e) return String(e)
+  try { return JSON.stringify(e, null, 2) } catch { return String(e) }
+}
+
+/** Build a user-readable message from a Supabase Auth error. */
+function authErrMsg(e: { message?: string; status?: number; code?: string; [k: string]: unknown }): string {
+  const msg = (e.message ?? '').toLowerCase()
+  if (msg.includes('already registered') || msg.includes('already exists') || msg.includes('duplicate')) {
+    return 'Ya existe un usuario con ese email.'
+  }
+  if (msg.includes('invalid email')) return `Email inválido.`
+  if (msg.includes('password') || msg.includes('weak')) {
+    return 'La contraseña no cumple los requisitos. Prueba con una más larga que incluya letras y números.'
+  }
+  if (msg.includes('database error')) {
+    return `Error interno de base de datos. Detalle: ${e.message ?? 'desconocido'}`
+  }
+  return e.message ?? 'Error desconocido al crear el usuario.'
+}
+
+// ── route ─────────────────────────────────────────────────────────────────────
+
 export async function POST(req: Request) {
+  // ── Service-role check ────────────────────────────────────────────────────
+  const supabaseUrl = process.env.SUPABASE_URL
+  const serviceKey  = process.env.SUPABASE_SERVICE_ROLE_KEY ?? process.env.SUPABASE_SERVICE_KEY
+  if (!supabaseUrl || !serviceKey) {
+    console.error('[crear-usuario] MISSING ENV VARS — SUPABASE_URL:', !!supabaseUrl, ' SERVICE_KEY:', !!serviceKey)
+    return NextResponse.json(
+      { ok: false, error: 'Configuración de servidor incompleta (faltan variables de entorno de Supabase).' },
+      { status: 500 }
+    )
+  }
+
   // ── Auth check ────────────────────────────────────────────────────────────
   try {
     const me = await requireAuth()
@@ -37,8 +74,8 @@ export async function POST(req: Request) {
 
   if (!email)    return NextResponse.json({ ok: false, error: 'El email es requerido' },      { status: 400 })
   if (!password) return NextResponse.json({ ok: false, error: 'La contraseña es requerida' }, { status: 400 })
-  if (password.length < 6) {
-    return NextResponse.json({ ok: false, error: 'La contraseña debe tener al menos 6 caracteres' }, { status: 400 })
+  if (password.length < 8) {
+    return NextResponse.json({ ok: false, error: 'La contraseña debe tener al menos 8 caracteres' }, { status: 400 })
   }
   if (!VALID_ROLES.includes(role)) {
     return NextResponse.json({ ok: false, error: `Rol inválido: ${role}` }, { status: 400 })
@@ -47,7 +84,9 @@ export async function POST(req: Request) {
   const db = getSupabaseClient()
   const displayName = name || email.split('@')[0]
 
-  // ── Create auth user (no email required, account confirmed immediately) ───
+  console.log('[crear-usuario] Attempting createUser for:', email, '| role:', role, '| url:', supabaseUrl.slice(0, 40))
+
+  // ── Create auth user (confirmed immediately, no email sent) ───────────────
   const { data, error: createError } = await db.auth.admin.createUser({
     email,
     password,
@@ -56,24 +95,22 @@ export async function POST(req: Request) {
   })
 
   if (createError) {
-    console.error('[crear-usuario] createUser error:', createError)
-    let msg = createError.message
-    if (msg.toLowerCase().includes('already registered') || msg.toLowerCase().includes('already exists')) {
-      msg = 'Ya existe un usuario con ese email.'
-    } else if (msg.toLowerCase().includes('invalid email')) {
-      msg = `Email inválido: ${email}`
-    } else if (msg.toLowerCase().includes('password')) {
-      msg = 'La contraseña no cumple los requisitos de seguridad (mínimo 6 caracteres).'
-    }
-    return NextResponse.json({ ok: false, error: msg }, { status: 422 })
+    console.error('[crear-usuario] createUser FAILED:\n', serializeError(createError))
+    return NextResponse.json(
+      { ok: false, error: authErrMsg(createError as unknown as Record<string, unknown>) },
+      { status: 422 }
+    )
   }
 
   if (!data?.user) {
+    console.error('[crear-usuario] createUser returned no user and no error')
     return NextResponse.json(
-      { ok: false, error: 'Supabase no devolvió el usuario. Revisa los logs del proyecto.' },
+      { ok: false, error: 'Supabase no devolvió el usuario. Revisa los logs del proyecto en Vercel.' },
       { status: 500 }
     )
   }
+
+  console.log('[crear-usuario] Auth user created OK, id:', data.user.id)
 
   // ── Upsert profile ────────────────────────────────────────────────────────
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -83,14 +120,18 @@ export async function POST(req: Request) {
       email,
       full_name: displayName,
       role,
-      status:    'active',
+      // status only if the column exists (migration 20260609000003 must be run in Supabase Dashboard)
+      status: 'active',
     },
     { onConflict: 'id' }
   )
 
   if (profileError) {
-    console.error('[crear-usuario] profile upsert error:', profileError)
-    // Non-fatal: user was created, profile will be auto-created on first login
+    // Log but don't fail — the auth user was created successfully.
+    // If status column doesn't exist yet, the row will be auto-created on first login.
+    console.error('[crear-usuario] profile upsert error (non-fatal):\n', serializeError(profileError))
+  } else {
+    console.log('[crear-usuario] Profile upserted OK for:', email)
   }
 
   return NextResponse.json({ ok: true, userId: data.user.id })
