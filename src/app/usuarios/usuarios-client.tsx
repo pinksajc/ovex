@@ -5,7 +5,6 @@ import {
   updateUserRoleAction,
   updateUserStatusAction,
   deleteUsuarioAction,
-  reinviteAction,
 } from '@/app/actions/usuarios'
 import type { WorkspaceMember, UserRole } from '@/lib/auth'
 import { ROLE_LABEL, ROLE_COLOR, ROLES } from '@/lib/permissions'
@@ -99,14 +98,6 @@ function UserRow({
     })
   }
 
-  function handleReinvite() {
-    startTransition(async () => {
-      const res = await reinviteAction(member.email)
-      if (res.ok) onSuccess('Invitación reenviada')
-      else onError(res.error)
-    })
-  }
-
   function handleDelete() {
     if (!confirm(`¿Eliminar a ${member.name ?? member.email}? Esta acción no se puede deshacer.`)) return
     startTransition(async () => {
@@ -162,18 +153,6 @@ function UserRow({
       {/* Acciones */}
       <td className="py-3.5 pr-6 pl-4 text-right">
         <div className="flex items-center justify-end gap-2">
-          {/* Re-invite only for pending */}
-          {member.status === 'pending' && (currentUserRole === 'owner' || currentUserRole === 'admin') && (
-            <button
-              onClick={handleReinvite}
-              disabled={isPending}
-              title="Reenviar invitación"
-              className="text-[11px] text-zinc-500 hover:text-zinc-800 border border-zinc-200 px-2 py-1 rounded transition-colors disabled:opacity-40"
-            >
-              Reenviar
-            </button>
-          )}
-
           {/* Activate/Deactivate */}
           {canModify && member.status !== 'pending' && (
             <button
@@ -208,9 +187,9 @@ function UserRow({
   )
 }
 
-// ── Invite modal ──────────────────────────────────────────────────────────────
+// ── Create user modal ─────────────────────────────────────────────────────────
 
-function InviteModal({
+function CreateUserModal({
   onClose,
   onSuccess,
   onError,
@@ -219,30 +198,39 @@ function InviteModal({
   onSuccess: (msg: string) => void
   onError: (msg: string) => void
 }) {
-  const [name, setName] = useState('')
-  const [email, setEmail] = useState('')
-  const [role, setRole] = useState<UserRole>('sales')
+  const [name,     setName]     = useState('')
+  const [email,    setEmail]    = useState('')
+  const [password, setPassword] = useState('')
+  const [confirm,  setConfirm]  = useState('')
+  const [role,     setRole]     = useState<UserRole>('sales')
+  const [localError, setLocalError] = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
-    if (!email.trim()) return
+    setLocalError(null)
+
+    if (!email.trim())    return setLocalError('El email es requerido.')
+    if (!password)        return setLocalError('La contraseña es requerida.')
+    if (password.length < 6) return setLocalError('La contraseña debe tener al menos 6 caracteres.')
+    if (password !== confirm) return setLocalError('Las contraseñas no coinciden.')
+
     startTransition(async () => {
       try {
-        const res = await fetch('/api/usuarios/invitar', {
+        const res = await fetch('/api/usuarios/crear', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email: email.trim(), name: name.trim(), role }),
+          body: JSON.stringify({ email: email.trim(), password, name: name.trim(), role }),
         })
         const json = await res.json() as { ok: boolean; error?: string }
         if (json.ok) {
-          onSuccess(`Invitación enviada a ${email.trim()}`)
+          onSuccess('Usuario creado correctamente')
           onClose()
         } else {
-          onError(json.error ?? 'Error enviando invitación')
+          setLocalError(json.error ?? 'Error al crear el usuario')
         }
       } catch {
-        onError('Error de red al enviar la invitación. Inténtalo de nuevo.')
+        setLocalError('Error de red. Inténtalo de nuevo.')
       }
     })
   }
@@ -253,13 +241,22 @@ function InviteModal({
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
       <div className="bg-white rounded-2xl shadow-xl w-full max-w-md mx-4">
         <div className="px-6 pt-6 pb-0 flex items-center justify-between">
-          <h2 className="text-lg font-semibold text-zinc-900">Invitar usuario</h2>
+          <h2 className="text-lg font-semibold text-zinc-900">Crear usuario</h2>
           <button onClick={onClose} className="text-zinc-400 hover:text-zinc-700 transition-colors text-xl leading-none">×</button>
         </div>
 
         <form onSubmit={handleSubmit} className="px-6 pt-5 pb-6 space-y-4">
+          {/* Inline error */}
+          {localError && (
+            <div className="bg-red-50 border border-red-200 text-red-700 text-xs px-3 py-2.5 rounded-lg">
+              {localError}
+            </div>
+          )}
+
           <div>
-            <label className="block text-xs font-medium text-zinc-700 mb-1.5">Nombre <span className="text-zinc-400">(opcional)</span></label>
+            <label className="block text-xs font-medium text-zinc-700 mb-1.5">
+              Nombre <span className="text-zinc-400">(opcional)</span>
+            </label>
             <input
               type="text"
               value={name}
@@ -270,7 +267,9 @@ function InviteModal({
           </div>
 
           <div>
-            <label className="block text-xs font-medium text-zinc-700 mb-1.5">Email <span className="text-red-500">*</span></label>
+            <label className="block text-xs font-medium text-zinc-700 mb-1.5">
+              Email <span className="text-red-500">*</span>
+            </label>
             <input
               type="email"
               required
@@ -279,6 +278,37 @@ function InviteModal({
               placeholder="usuario@empresa.com"
               className={inputCls}
             />
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-medium text-zinc-700 mb-1.5">
+                Contraseña <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="password"
+                required
+                value={password}
+                onChange={(e) => { setPassword(e.target.value); setLocalError(null) }}
+                placeholder="Mínimo 6 caracteres"
+                className={inputCls}
+                autoComplete="new-password"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-zinc-700 mb-1.5">
+                Confirmar <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="password"
+                required
+                value={confirm}
+                onChange={(e) => { setConfirm(e.target.value); setLocalError(null) }}
+                placeholder="Repetir contraseña"
+                className={`${inputCls} ${confirm && confirm !== password ? 'border-red-300 focus:ring-red-300' : ''}`}
+                autoComplete="new-password"
+              />
+            </div>
           </div>
 
           <div>
@@ -293,8 +323,8 @@ function InviteModal({
               ))}
             </select>
             <p className="mt-1.5 text-[11px] text-zinc-400">
-              {role === 'admin' && 'Acceso completo a todos los módulos excepto cashflow.'}
-              {role === 'sales' && 'Acceso a deals, pipeline y ofertas.'}
+              {role === 'admin'   && 'Acceso completo a todos los módulos excepto cashflow.'}
+              {role === 'sales'   && 'Acceso a deals, pipeline y ofertas.'}
               {role === 'finance' && 'Acceso a facturas y cashflow.'}
             </p>
           </div>
@@ -309,10 +339,10 @@ function InviteModal({
             </button>
             <button
               type="submit"
-              disabled={isPending || !email.trim()}
+              disabled={isPending || !email.trim() || !password || !confirm}
               className="flex-1 px-4 py-2.5 text-sm font-semibold bg-zinc-900 text-white rounded-lg hover:bg-zinc-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {isPending ? 'Enviando…' : 'Enviar invitación'}
+              {isPending ? 'Creando…' : 'Crear usuario'}
             </button>
           </div>
         </form>
@@ -376,7 +406,7 @@ export function UsuariosClient({ members, currentUserId, currentUserRole }: Prop
           onClick={() => setModalOpen(true)}
           className="inline-flex items-center gap-1.5 bg-zinc-900 text-white text-sm font-medium px-4 py-2 rounded-lg hover:bg-zinc-700 transition-colors shrink-0"
         >
-          + Invitar usuario
+          + Crear usuario
         </button>
       </div>
 
@@ -444,9 +474,9 @@ export function UsuariosClient({ members, currentUserId, currentUserRole }: Prop
         </table>
       </div>
 
-      {/* ── Invite modal ── */}
+      {/* ── Create user modal ── */}
       {modalOpen && (
-        <InviteModal
+        <CreateUserModal
           onClose={() => setModalOpen(false)}
           onSuccess={(msg) => showToast('success', msg)}
           onError={(msg) => showToast('error', msg)}
