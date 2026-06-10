@@ -12,6 +12,7 @@ import {
   ReferenceDot,
 } from 'recharts'
 import type { Invoice } from '@/types'
+import { chartColors } from '@/lib/design-tokens'
 
 export interface BillingPoint {
   month: string
@@ -47,8 +48,15 @@ function CustomTooltip({
     projected: 'Proyectado',
   }
   return (
-    <div className="bg-white rounded-xl shadow-lg px-4 py-3 border border-zinc-100 text-xs">
-      <p className="font-semibold text-zinc-700 mb-1">{label}</p>
+    <div
+      className="rounded-lg px-4 py-3 border text-xs"
+      style={{
+        background: chartColors.tooltipBg,
+        borderColor: chartColors.tooltipBorder,
+        color: chartColors.tooltipText,
+      }}
+    >
+      <p className="font-medium mb-1.5" style={{ color: chartColors.tooltipText }}>{label}</p>
       {payload.map((p) => (
         <p key={p.name} style={{ color: p.color }} className="font-mono">
           {labelMap[p.name] ?? p.name}: {formatEur(p.value)}
@@ -158,36 +166,36 @@ export function BillingChart({
   return (
     <div>
       {/* Date range inputs */}
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-2 mb-4">
         <input
           type="date"
           value={dateFrom}
           onChange={(e) => setDateFrom(e.target.value)}
-          className="text-xs bg-zinc-100 border-0 rounded-lg px-3 py-1.5 text-zinc-600 focus:outline-none focus:ring-1 focus:ring-zinc-300"
+          className="text-[13px] bg-base border border-border-subtle rounded-[6px] px-3 h-9 text-text-secondary focus:outline-none focus:ring-2 focus:ring-accent/40"
         />
-        <span className="text-xs text-zinc-400">—</span>
+        <span className="text-[13px] text-text-tertiary">—</span>
         <input
           type="date"
           value={dateTo}
           onChange={(e) => setDateTo(e.target.value)}
-          className="text-xs bg-zinc-100 border-0 rounded-lg px-3 py-1.5 text-zinc-600 focus:outline-none focus:ring-1 focus:ring-zinc-300"
+          className="text-[13px] bg-base border border-border-subtle rounded-[6px] px-3 h-9 text-text-secondary focus:outline-none focus:ring-2 focus:ring-accent/40"
         />
       </div>
 
       {/* Chart */}
       <ResponsiveContainer width="100%" height={220}>
         <LineChart data={data} margin={{ top: 10, right: 20, left: 0, bottom: 0 }}>
-          <CartesianGrid strokeDasharray="0" stroke="#f0f0f0" vertical={false} />
+          <CartesianGrid strokeDasharray="0" stroke={chartColors.grid} vertical={false} />
           <XAxis
             dataKey="month"
-            tick={{ fontSize: 11, fill: '#a1a1aa' }}
+            tick={{ fontSize: 11, fill: chartColors.axis }}
             axisLine={false}
             tickLine={false}
             dy={6}
           />
           <YAxis
             tickFormatter={formatEur}
-            tick={{ fontSize: 11, fill: '#a1a1aa' }}
+            tick={{ fontSize: 11, fill: chartColors.axis }}
             axisLine={false}
             tickLine={false}
             dx={-4}
@@ -195,14 +203,14 @@ export function BillingChart({
           />
           <Tooltip content={<CustomTooltip />} />
 
-          {/* Facturado — solid blue */}
+          {/* Facturado — solid accent */}
           <Line
             type="monotone"
             dataKey="facturado"
-            stroke="#0071e3"
+            stroke={chartColors.primary}
             strokeWidth={2.5}
             dot={false}
-            activeDot={{ r: 4, fill: '#0071e3', strokeWidth: 0 }}
+            activeDot={{ r: 4, fill: chartColors.primary, strokeWidth: 0 }}
             connectNulls={false}
           />
 
@@ -210,23 +218,23 @@ export function BillingChart({
           <Line
             type="monotone"
             dataKey="cobrado"
-            stroke="#34c759"
+            stroke={chartColors.success}
             strokeWidth={2.5}
             dot={false}
-            activeDot={{ r: 4, fill: '#34c759', strokeWidth: 0 }}
+            activeDot={{ r: 4, fill: chartColors.success, strokeWidth: 0 }}
             connectNulls={false}
           />
 
-          {/* Proyectado — dashed blue */}
+          {/* Proyectado — dashed accent */}
           <Line
             type="monotone"
             dataKey="projected"
-            stroke="#0071e3"
+            stroke={chartColors.primary}
             strokeWidth={2}
             strokeDasharray="5 4"
             strokeOpacity={0.4}
             dot={false}
-            activeDot={{ r: 4, fill: '#0071e3', strokeWidth: 0 }}
+            activeDot={{ r: 4, fill: chartColors.primary, strokeWidth: 0 }}
             connectNulls={false}
           />
 
@@ -236,8 +244,8 @@ export function BillingChart({
               x={lastReal.month}
               y={lastReal.facturado}
               r={5}
-              fill="#0071e3"
-              stroke="white"
+              fill={chartColors.primary}
+              stroke={chartColors.tooltipBg}
               strokeWidth={2}
             />
           )}

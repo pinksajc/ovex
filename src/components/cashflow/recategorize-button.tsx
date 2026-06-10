@@ -41,16 +41,16 @@ export function RecategorizeButton() {
             ? state.message
             : 'Recategorizar todo'
         }
-        className={`rounded-full p-2 transition-colors disabled:cursor-not-allowed ${
+        className={`rounded-[6px] p-2 transition-colors disabled:cursor-not-allowed ${
           state.status === 'done'
-            ? 'text-emerald-600 bg-emerald-50 hover:bg-emerald-100'
+            ? 'text-success bg-success/10 hover:bg-success/15'
             : state.status === 'error'
-            ? 'text-red-500 bg-red-50 hover:bg-red-100'
-            : 'text-zinc-400 hover:text-zinc-700 hover:bg-zinc-100'
+            ? 'text-danger bg-danger/10 hover:bg-danger/15'
+            : 'text-text-tertiary hover:text-text-secondary hover:bg-hover'
         }`}
       >
         {isRunning ? (
-          <span className="block w-4 h-4 border-2 border-zinc-300 border-t-zinc-600 rounded-full animate-spin" />
+          <span className="block w-4 h-4 border-2 border-border-strong border-t-accent rounded-full animate-spin" />
         ) : (
           <IconRefresh className="w-4 h-4" />
         )}
@@ -58,10 +58,10 @@ export function RecategorizeButton() {
 
       {/* Ephemeral badge (done / error) */}
       {(state.status === 'done' || state.status === 'error') && (
-        <span className={`absolute left-1/2 -translate-x-1/2 top-full mt-1.5 whitespace-nowrap text-[10px] font-semibold px-2 py-1 rounded-md shadow-sm pointer-events-none ${
+        <span className={`absolute left-1/2 -translate-x-1/2 top-full mt-1.5 whitespace-nowrap text-[10px] font-semibold px-2 py-1 rounded-[4px] shadow-sm pointer-events-none ${
           state.status === 'done'
-            ? 'text-emerald-700 bg-emerald-50 border border-emerald-200'
-            : 'text-red-600 bg-red-50 border border-red-200'
+            ? 'text-success bg-success/10 border border-success/20'
+            : 'text-danger bg-danger/10 border border-danger/20'
         }`}>
           {state.status === 'done' ? `✓ ${state.updated} actualizadas` : state.message}
         </span>
