@@ -678,7 +678,7 @@ export function Simulator({ deal, initialConfig, loadedConfigId }: SimulatorProp
             <div className="mt-3 bg-zinc-50 rounded-lg px-4 py-3 space-y-2">
               <p className="text-xs font-mono text-zinc-500">
                 {activePlan === 'elite'
-                  ? `${eliteIncludesDelivery ? (PLANS.elite.deliveryIncludedPrice ?? 349) : PLANS.elite.priceMonthly}€ × ${locations} local${locations > 1 ? 'es' : ''} (${eliteIncludesDelivery ? 'con delivery' : 'sin delivery'})`
+                  ? `${eliteIncludesDelivery ? (PLANS.elite.deliveryIncludedPrice ?? 349) : PLANS.elite.priceMonthly}€ × ${locations} local${locations > 1 ? 'es' : ''} (${eliteIncludesDelivery ? 'con integración de delivery' : 'sin integración de delivery'})`
                   : PLANS[activePlan].priceMonthly > 0
                     ? `${PLANS[activePlan].priceMonthly}€ × ${locations} local${locations > 1 ? 'es' : ''}`
                     : ''
@@ -765,7 +765,7 @@ export function Simulator({ deal, initialConfig, loadedConfigId }: SimulatorProp
                   <p className="text-[10px] text-amber-700 mt-0.5">
                     {eliteIncludesDelivery
                       ? `Order Hub Enterprise · ${PLANS.elite.deliveryIncludedPrice ?? 349}€/local/mes (sin fee variable ni pedidos adicionales)`
-                      : `Sin delivery · ${PLANS.elite.priceMonthly}€/local/mes`}
+                      : `Sin integración de delivery · ${PLANS.elite.priceMonthly}€/local/mes`}
                   </p>
                 </div>
                 <button

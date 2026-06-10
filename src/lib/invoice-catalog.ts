@@ -26,8 +26,8 @@ export const SERVICES: ServiceItem[] = [
   { id: 'ros_growth_variable',  label: 'ROS Plan Growth — Fee variable',  group: 'ROS', unit: 'pedidos', defaultPrice: 0.05 },
   { id: 'ros_pro_fixed',        label: 'ROS Plan Pro — Fee fijo',        group: 'ROS', unit: 'locales', defaultPrice: 35 },
   { id: 'ros_pro_variable',     label: 'ROS Plan Pro — Fee variable',    group: 'ROS', unit: 'pedidos', defaultPrice: 0.03 },
-  { id: 'ros_elite_no_delivery',   label: 'ROS Elite — Sin delivery',   group: 'ROS', unit: 'locales', defaultPrice: 299 },
-  { id: 'ros_elite_with_delivery', label: 'ROS Elite — Con delivery',   group: 'ROS', unit: 'locales', defaultPrice: 349 },
+  { id: 'ros_elite_no_delivery',   label: 'ROS Elite — Sin integración de delivery',   group: 'ROS', unit: 'locales', defaultPrice: 299 },
+  { id: 'ros_elite_with_delivery', label: 'ROS Elite — Con integración de delivery',   group: 'ROS', unit: 'locales', defaultPrice: 349 },
 
   // ---- ADD-ONS ----
   { id: 'addon_delivery_start',      label: 'Integración delivery — Order Hub Start',      group: 'ADD-ONS', unit: 'local/mes', defaultPrice: 29,   deliveryPlanKey: 'start'      },
