@@ -18,20 +18,20 @@ export function DateRangeFilter({ from, to }: DateRangeFilterProps) {
   }
 
   return (
-    <div className="flex items-center gap-2 text-xs text-zinc-500">
-      <span className="font-medium text-zinc-400 uppercase tracking-widest text-[10px]">Desde</span>
+    <div className="flex items-center gap-2 text-[13px] text-text-tertiary">
+      <span className="font-medium text-text-tertiary uppercase tracking-widest text-[11px]">Desde</span>
       <input
         type="date"
         value={from}
         onChange={(e) => update('from', e.target.value)}
-        className="bg-zinc-100 border-0 rounded-lg px-2.5 py-1.5 text-xs text-zinc-700 focus:outline-none focus:ring-2 focus:ring-zinc-300"
+        className="bg-base border border-border-subtle rounded-[6px] px-2.5 h-9 text-[13px] text-text-secondary focus:outline-none focus:ring-2 focus:ring-accent/40"
       />
-      <span className="font-medium text-zinc-400 uppercase tracking-widest text-[10px]">Hasta</span>
+      <span className="font-medium text-text-tertiary uppercase tracking-widest text-[11px]">Hasta</span>
       <input
         type="date"
         value={to}
         onChange={(e) => update('to', e.target.value)}
-        className="bg-zinc-100 border-0 rounded-lg px-2.5 py-1.5 text-xs text-zinc-700 focus:outline-none focus:ring-2 focus:ring-zinc-300"
+        className="bg-base border border-border-subtle rounded-[6px] px-2.5 h-9 text-[13px] text-text-secondary focus:outline-none focus:ring-2 focus:ring-accent/40"
       />
     </div>
   )

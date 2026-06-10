@@ -60,7 +60,7 @@ function CategoryCell({
           onChange={handleChange}
           onBlur={() => setEditing(false)}
           autoFocus
-          className="text-xs border border-blue-300 rounded-md px-2 py-1 bg-white focus:outline-none focus:ring-1 focus:ring-blue-400"
+          className="text-xs border border-border-strong rounded-[4px] px-2 py-1 bg-elevated text-text-primary focus:outline-none focus:ring-1 focus:ring-accent/40"
         >
           {CASHFLOW_CATEGORIES.map((c) => (
             <option key={c} value={c}>{c}</option>
@@ -69,7 +69,7 @@ function CategoryCell({
       ) : (
         <button
           onClick={() => setEditing(true)}
-          className="group flex items-center gap-1.5 text-xs text-zinc-500 hover:text-zinc-900 transition-colors"
+          className="group flex items-center gap-1.5 text-xs text-text-tertiary hover:text-text-primary transition-colors"
         >
           <span>{optimistic}</span>
           <PencilIcon className="w-3 h-3 opacity-0 group-hover:opacity-50 transition-opacity shrink-0" />
@@ -77,7 +77,7 @@ function CategoryCell({
       )}
       {toast && (
         <div className="absolute left-0 top-full mt-1 z-10 pointer-events-none">
-          <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-1 rounded-md shadow-sm whitespace-nowrap">
+          <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-success bg-success/10 border border-success/20 px-2 py-1 rounded-[4px] shadow-sm whitespace-nowrap">
             ✓ Regla guardada
           </span>
         </div>
@@ -90,28 +90,28 @@ function CategoryCell({
 
 function TxRow({ t }: { t: CashflowTransaction }) {
   return (
-    <tr className="border-b border-zinc-50 hover:bg-zinc-50/50 transition-colors">
-      <td className="px-5 py-3 text-xs text-zinc-500 whitespace-nowrap font-mono">
+    <tr className="border-b border-border-subtle hover:bg-hover transition-colors duration-150">
+      <td className="px-5 py-3 text-xs text-text-tertiary whitespace-nowrap font-mono">
         {formatDate(t.date)}
       </td>
-      <td className="px-5 py-3 text-xs text-zinc-700 max-w-xs truncate">
+      <td className="px-5 py-3 text-xs text-text-secondary max-w-xs truncate">
         {t.description}
       </td>
       <td className={`px-5 py-3 text-xs font-semibold font-mono text-right whitespace-nowrap ${
-        t.type === 'income' ? 'text-emerald-600' : 'text-red-500'
+        t.type === 'income' ? 'text-success' : 'text-danger'
       }`}>
         {formatEur(t.amount)}
       </td>
       <td className="px-5 py-3">
         <CategoryCell id={t.id} description={t.description} category={t.category} />
       </td>
-      <td className="px-5 py-3 text-xs text-zinc-400 whitespace-nowrap">
+      <td className="px-5 py-3 text-xs text-text-tertiary whitespace-nowrap">
         {t.state
           ? t.state
-          : <span className="inline-block text-[10px] font-semibold px-1.5 py-0.5 rounded bg-zinc-100 text-zinc-400">MANUAL</span>
+          : <span className="inline-block text-[10px] font-semibold px-1.5 py-0.5 rounded-[4px] bg-hover text-text-tertiary">MANUAL</span>
         }
       </td>
-      <td className="px-5 py-3 text-xs font-mono text-zinc-400 text-right whitespace-nowrap">
+      <td className="px-5 py-3 text-xs font-mono text-text-tertiary text-right whitespace-nowrap">
         {t.balance != null
           ? `${_EUR2.format(t.balance)} €`
           : '—'}
@@ -200,25 +200,25 @@ export function TransactionsTable({ transactions }: { transactions: CashflowTran
   const allCategories = Array.from(new Set(transactions.map((t) => t.category))).sort()
 
   return (
-    <div className="bg-white rounded-2xl shadow-sm">
+    <div className="bg-surface border border-border-subtle rounded-lg">
       {/* Filters */}
-      <div className="p-5 border-b border-zinc-100 flex flex-wrap items-center gap-3">
+      <div className="p-5 border-b border-border-subtle flex flex-wrap items-center gap-3">
         <input
           type="text"
           placeholder="Buscar descripción…"
           value={search}
           onChange={(e) => { setSearch(e.target.value); setPage(1) }}
-          className="text-xs bg-zinc-100 border-0 rounded-lg px-3 py-2 text-zinc-700 placeholder:text-zinc-400 focus:outline-none focus:ring-1 focus:ring-zinc-300 w-52"
+          className="text-[13px] bg-base border border-border-subtle rounded-[6px] px-3 h-9 text-text-primary placeholder:text-text-tertiary focus:outline-none focus:ring-2 focus:ring-accent/40 w-52"
         />
 
         {/* Type filter */}
-        <div className="flex items-center bg-zinc-100 rounded-lg p-0.5">
+        <div className="flex items-center bg-elevated border border-border-subtle rounded-[6px] p-0.5">
           {(['all', 'income', 'expense'] as const).map((v) => (
             <button
               key={v}
               onClick={() => { setType(v); setPage(1) }}
-              className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
-                typeFilter === v ? 'bg-white text-zinc-900 shadow-sm' : 'text-zinc-500 hover:text-zinc-700'
+              className={`px-3 h-7 rounded-[4px] text-xs font-medium transition-colors duration-150 ${
+                typeFilter === v ? 'bg-hover text-text-primary' : 'text-text-tertiary hover:text-text-secondary'
               }`}
             >
               {v === 'all' ? 'Todo' : v === 'income' ? 'Ingresos' : 'Gastos'}
@@ -230,7 +230,7 @@ export function TransactionsTable({ transactions }: { transactions: CashflowTran
         <select
           value={catFilter}
           onChange={(e) => { setCat(e.target.value); setPage(1) }}
-          className="text-xs bg-zinc-100 border-0 rounded-lg px-3 py-2 text-zinc-600 focus:outline-none focus:ring-1 focus:ring-zinc-300"
+          className="text-[13px] bg-base border border-border-subtle rounded-[6px] px-3 h-9 text-text-secondary focus:outline-none focus:ring-2 focus:ring-accent/40"
         >
           <option value="all">Todas las categorías</option>
           {allCategories.map((c) => (
@@ -243,30 +243,30 @@ export function TransactionsTable({ transactions }: { transactions: CashflowTran
           type="date"
           value={dateFrom}
           onChange={(e) => { setDateFrom(e.target.value); setPage(1) }}
-          className="text-xs bg-zinc-100 border-0 rounded-lg px-3 py-2 text-zinc-600 focus:outline-none focus:ring-1 focus:ring-zinc-300"
+          className="text-[13px] bg-base border border-border-subtle rounded-[6px] px-2.5 h-9 text-text-secondary focus:outline-none focus:ring-2 focus:ring-accent/40"
         />
-        <span className="text-xs text-zinc-400">—</span>
+        <span className="text-xs text-text-tertiary">—</span>
         <input
           type="date"
           value={dateTo}
           onChange={(e) => { setDateTo(e.target.value); setPage(1) }}
-          className="text-xs bg-zinc-100 border-0 rounded-lg px-3 py-2 text-zinc-600 focus:outline-none focus:ring-1 focus:ring-zinc-300"
+          className="text-[13px] bg-base border border-border-subtle rounded-[6px] px-2.5 h-9 text-text-secondary focus:outline-none focus:ring-2 focus:ring-accent/40"
         />
 
         {/* Group toggle */}
-        <div className="flex items-center bg-zinc-100 rounded-lg p-0.5">
+        <div className="flex items-center bg-elevated border border-border-subtle rounded-[6px] p-0.5">
           <button
             onClick={() => { setGrouped(false) }}
-            className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
-              !grouped ? 'bg-white text-zinc-900 shadow-sm' : 'text-zinc-500 hover:text-zinc-700'
+            className={`px-3 h-7 rounded-[4px] text-xs font-medium transition-colors duration-150 ${
+              !grouped ? 'bg-hover text-text-primary' : 'text-text-tertiary hover:text-text-secondary'
             }`}
           >
             Ver todas
           </button>
           <button
             onClick={() => { setGrouped(true); setExpCats(new Set()) }}
-            className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
-              grouped ? 'bg-white text-zinc-900 shadow-sm' : 'text-zinc-500 hover:text-zinc-700'
+            className={`px-3 h-7 rounded-[4px] text-xs font-medium transition-colors duration-150 ${
+              grouped ? 'bg-hover text-text-primary' : 'text-text-tertiary hover:text-text-secondary'
             }`}
           >
             Agrupar por categoría
@@ -278,23 +278,23 @@ export function TransactionsTable({ transactions }: { transactions: CashflowTran
             <div className="flex items-center gap-1.5">
               <button
                 onClick={expandAll}
-                className="text-[11px] text-zinc-400 hover:text-zinc-700 transition-colors"
+                className="text-[11px] text-text-tertiary hover:text-text-secondary transition-colors"
               >
                 Expandir todo
               </button>
-              <span className="text-zinc-300">·</span>
+              <span className="text-text-tertiary">·</span>
               <button
                 onClick={collapseAll}
-                className="text-[11px] text-zinc-400 hover:text-zinc-700 transition-colors"
+                className="text-[11px] text-text-tertiary hover:text-text-secondary transition-colors"
               >
                 Colapsar todo
               </button>
             </div>
           )}
-          <div className="text-xs text-zinc-400">
-            <span className="font-semibold text-emerald-600">+{formatEur(sumIncome)}</span>
+          <div className="text-xs text-text-tertiary">
+            <span className="font-semibold text-success">+{formatEur(sumIncome)}</span>
             {' · '}
-            <span className="font-semibold text-red-500">{formatEur(sumExpense)}</span>
+            <span className="font-semibold text-danger">{formatEur(sumExpense)}</span>
             {' · '}
             {filtered.length} registros
           </div>
@@ -305,13 +305,13 @@ export function TransactionsTable({ transactions }: { transactions: CashflowTran
       <div className="overflow-x-auto">
         <table className="w-full min-w-[700px] text-sm">
           <thead>
-            <tr className="border-b border-zinc-100">
-              <th className="px-5 py-3 text-left text-[10px] font-semibold uppercase tracking-widest text-zinc-400 whitespace-nowrap w-28">Fecha</th>
-              <th className="px-5 py-3 text-left text-[10px] font-semibold uppercase tracking-widest text-zinc-400">Descripción</th>
-              <th className="px-5 py-3 text-right text-[10px] font-semibold uppercase tracking-widest text-zinc-400 whitespace-nowrap w-32">Importe</th>
-              <th className="px-5 py-3 text-left text-[10px] font-semibold uppercase tracking-widest text-zinc-400 whitespace-nowrap w-44">Categoría</th>
-              <th className="px-5 py-3 text-left text-[10px] font-semibold uppercase tracking-widest text-zinc-400 whitespace-nowrap w-28">Estado</th>
-              <th className="px-5 py-3 text-right text-[10px] font-semibold uppercase tracking-widest text-zinc-400 whitespace-nowrap w-32">Saldo</th>
+            <tr className="border-b border-border-subtle bg-hover">
+              <th className="px-5 py-3 text-left text-[11px] font-medium uppercase tracking-wider text-text-tertiary whitespace-nowrap w-28">Fecha</th>
+              <th className="px-5 py-3 text-left text-[11px] font-medium uppercase tracking-wider text-text-tertiary">Descripción</th>
+              <th className="px-5 py-3 text-right text-[11px] font-medium uppercase tracking-wider text-text-tertiary whitespace-nowrap w-32">Importe</th>
+              <th className="px-5 py-3 text-left text-[11px] font-medium uppercase tracking-wider text-text-tertiary whitespace-nowrap w-44">Categoría</th>
+              <th className="px-5 py-3 text-left text-[11px] font-medium uppercase tracking-wider text-text-tertiary whitespace-nowrap w-28">Estado</th>
+              <th className="px-5 py-3 text-right text-[11px] font-medium uppercase tracking-wider text-text-tertiary whitespace-nowrap w-32">Saldo</th>
             </tr>
           </thead>
           <tbody>
@@ -319,7 +319,7 @@ export function TransactionsTable({ transactions }: { transactions: CashflowTran
               // ── Grouped view ────────────────────────────────────────────────
               groupedData.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="px-5 py-12 text-center text-sm text-zinc-400">
+                  <td colSpan={6} className="px-5 py-12 text-center text-[13px] text-text-tertiary">
                     Sin transacciones para los filtros seleccionados
                   </td>
                 </tr>
@@ -333,24 +333,24 @@ export function TransactionsTable({ transactions }: { transactions: CashflowTran
                       <tr
                         key={`grp-${group.category}`}
                         onClick={() => toggleCat(group.category)}
-                        className="border-b border-zinc-100 bg-zinc-50/70 hover:bg-zinc-100/60 cursor-pointer transition-colors select-none"
+                        className="border-b border-border-subtle bg-elevated hover:bg-hover cursor-pointer transition-colors duration-150 select-none"
                       >
                         <td className="px-5 py-3" colSpan={2}>
                           <div className="flex items-center gap-2">
                             <ChevronIcon
                               open={isExpanded}
-                              className="w-3.5 h-3.5 text-zinc-400 shrink-0 transition-transform"
+                              className="w-3.5 h-3.5 text-text-tertiary shrink-0 transition-transform"
                             />
-                            <span className="text-xs font-semibold text-zinc-700">
+                            <span className="text-xs font-semibold text-text-primary">
                               {group.category}
                             </span>
-                            <span className="text-[10px] text-zinc-400">
+                            <span className="text-[11px] text-text-tertiary">
                               {group.count} transacción{group.count !== 1 ? 'es' : ''}
                             </span>
                           </div>
                         </td>
                         <td className={`px-5 py-3 text-xs font-bold font-mono text-right whitespace-nowrap ${
-                          isIncome ? 'text-emerald-600' : 'text-red-500'
+                          isIncome ? 'text-success' : 'text-danger'
                         }`}>
                           {formatEur(group.total)}
                         </td>
@@ -368,7 +368,7 @@ export function TransactionsTable({ transactions }: { transactions: CashflowTran
               // ── Flat view ────────────────────────────────────────────────────
               paged.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="px-5 py-12 text-center text-sm text-zinc-400">
+                  <td colSpan={6} className="px-5 py-12 text-center text-[13px] text-text-tertiary">
                     Sin transacciones para los filtros seleccionados
                   </td>
                 </tr>
@@ -382,22 +382,22 @@ export function TransactionsTable({ transactions }: { transactions: CashflowTran
 
       {/* Pagination (flat view only) */}
       {!grouped && totalPages > 1 && (
-        <div className="px-5 py-4 border-t border-zinc-100 flex items-center justify-between">
-          <p className="text-xs text-zinc-400">
+        <div className="px-5 py-4 border-t border-border-subtle flex items-center justify-between">
+          <p className="text-xs text-text-tertiary">
             Página {safePage} de {totalPages} · {filtered.length} registros
           </p>
           <div className="flex items-center gap-1">
             <button
               disabled={safePage === 1}
               onClick={() => setPage((p) => Math.max(1, p - 1))}
-              className="px-3 py-1.5 text-xs border border-zinc-200 rounded-md text-zinc-500 hover:bg-zinc-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+              className="px-3 h-8 text-xs border border-border-subtle rounded-[6px] text-text-tertiary hover:bg-hover hover:text-text-secondary disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
             >
               ← Anterior
             </button>
             <button
               disabled={safePage === totalPages}
               onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-              className="px-3 py-1.5 text-xs border border-zinc-200 rounded-md text-zinc-500 hover:bg-zinc-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+              className="px-3 h-8 text-xs border border-border-subtle rounded-[6px] text-text-tertiary hover:bg-hover hover:text-text-secondary disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
             >
               Siguiente →
             </button>

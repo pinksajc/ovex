@@ -129,12 +129,12 @@ export default async function CashflowPage({
     .reduce((s, t) => s + t.amount, 0)
 
   return (
-    <div className="min-h-full bg-[#f5f5f7] p-8 space-y-5">
+    <div className="min-h-full bg-base p-6 space-y-6">
       {/* ── Header ─────────────────────────────────────────────────────────── */}
-      <div className="mb-2 flex items-start justify-between gap-4">
+      <div className="flex items-start justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-zinc-900 tracking-tight">Flujo de Caja</h1>
-          <p className="text-sm text-zinc-400 mt-0.5">
+          <h1 className="text-xl font-semibold text-text-primary tracking-tight">Flujo de Caja</h1>
+          <p className="text-[13px] text-text-tertiary mt-0.5">
             {allTransactions.length} transacciones · datos de Revolut
           </p>
         </div>
@@ -165,21 +165,23 @@ export default async function CashflowPage({
             <CfKpi
               label="Saldo neto"
               value={formatCurrency(Math.abs(netBalance))}
-              color={netBalance >= 0 ? '#34c759' : '#ff3b30'}
+              success={netBalance >= 0}
+              danger={netBalance < 0}
               prefix={netBalance >= 0 ? '+' : '−'}
               sub="Total ingresos − gastos del período"
             />
             <CfKpi
               label="Total préstamos"
               value={formatCurrency(Math.abs(prestamosNet))}
-              color={prestamosNet >= 0 ? '#ff9f0a' : '#ff3b30'}
+              warning={prestamosNet >= 0}
+              danger={prestamosNet < 0}
               prefix={prestamosNet >= 0 ? '+' : '−'}
               sub="Préstamos netos del período"
             />
             <CfKpi
               label={`Ingresos ${now.toLocaleDateString('es-ES', { month: 'long' })}`}
               value={formatCurrency(thisMonthIncome)}
-              color="#0071e3"
+              accent
               sub={`Ingresos ${now.toLocaleDateString('es-ES', { month: 'long' })} (sin traspasos)`}
             />
           </div>
@@ -211,26 +213,33 @@ export default async function CashflowPage({
 function CfKpi({
   label,
   value,
-  color = '#18181b',
   prefix,
   sub,
+  accent,
+  success,
+  warning,
+  danger,
 }: {
   label: string
   value: string
-  color?: string
   prefix?: string
   sub?: string
+  accent?: boolean
+  success?: boolean
+  warning?: boolean
+  danger?: boolean
 }) {
+  const valueColor = accent ? '#A9A2F2' : success ? '#4ADE80' : warning ? '#FBBF24' : danger ? '#F87171' : '#EDEDEF'
   return (
-    <div className="bg-white rounded-2xl shadow-sm p-5">
-      <p className="text-xs font-semibold uppercase tracking-widest text-zinc-400 mb-3 leading-tight">
+    <div className="bg-surface border border-border-subtle rounded-lg p-5">
+      <p className="text-[12px] font-medium uppercase tracking-widest text-text-tertiary mb-3 leading-tight">
         {label}
       </p>
-      <p className="text-2xl font-bold tracking-tight leading-none" style={{ color }}>
+      <p className="text-[28px] font-semibold font-mono tracking-tight leading-none" style={{ color: valueColor }}>
         {prefix && <span className="mr-0.5">{prefix}</span>}
         {value}
       </p>
-      {sub && <p className="text-[10px] text-zinc-400 mt-2 leading-tight">{sub}</p>}
+      {sub && <p className="text-[11px] text-text-tertiary mt-2 leading-tight">{sub}</p>}
     </div>
   )
 }

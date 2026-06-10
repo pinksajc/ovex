@@ -12,6 +12,7 @@ import {
   ReferenceLine,
 } from 'recharts'
 import type { CashflowTransaction } from '@/types'
+import { chartColors, colors } from '@/lib/design-tokens'
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
@@ -40,11 +41,11 @@ function IncomeExpenseTooltip({ active, payload, label }: {
   const expense = payload.find((p) => p.name === 'expense')?.value ?? 0
   const neto    = income - expense
   return (
-    <div className="bg-white rounded-xl shadow-lg px-4 py-3 border border-zinc-100 text-xs space-y-0.5">
-      <p className="font-semibold text-zinc-700 mb-1.5">{label}</p>
-      <p className="font-mono" style={{ color: '#34c759' }}>Ingresos: {eur(income)}</p>
-      <p className="font-mono" style={{ color: '#ff3b30' }}>Gastos: {eur(expense)}</p>
-      <p className="font-mono font-semibold" style={{ color: neto >= 0 ? '#0071e3' : '#ff3b30' }}>
+    <div className="rounded-[6px] px-4 py-3 text-xs space-y-0.5 border" style={{ background: chartColors.tooltipBg, borderColor: chartColors.tooltipBorder }}>
+      <p className="font-semibold mb-1.5" style={{ color: chartColors.tooltipText }}>{label}</p>
+      <p className="font-mono" style={{ color: colors.success }}>Ingresos: {eur(income)}</p>
+      <p className="font-mono" style={{ color: colors.danger }}>Gastos: {eur(expense)}</p>
+      <p className="font-mono font-semibold" style={{ color: neto >= 0 ? colors.success : colors.danger }}>
         Neto: {neto >= 0 ? '+' : '−'}{eur(Math.abs(neto))}
       </p>
     </div>
@@ -57,9 +58,9 @@ function LineTooltip({ active, payload, label }: {
   if (!active || !payload?.length) return null
   const val = payload[0]?.value ?? 0
   return (
-    <div className="bg-white rounded-xl shadow-lg px-4 py-3 border border-zinc-100 text-xs">
-      <p className="font-semibold text-zinc-700 mb-1">{label}</p>
-      <p className="font-mono" style={{ color: val >= 0 ? '#0071e3' : '#ff3b30' }}>
+    <div className="rounded-[6px] px-4 py-3 text-xs border" style={{ background: chartColors.tooltipBg, borderColor: chartColors.tooltipBorder }}>
+      <p className="font-semibold mb-1" style={{ color: chartColors.tooltipText }}>{label}</p>
+      <p className="font-mono" style={{ color: val >= 0 ? colors.success : colors.danger }}>
         Saldo: {eur(val)}
       </p>
     </div>
@@ -92,37 +93,37 @@ export function IncomeExpenseChart({ transactions }: { transactions: CashflowTra
   if (data.length === 0) return <EmptyChart label="Ingresos vs Gastos por mes" />
 
   return (
-    <div className="bg-white rounded-2xl shadow-sm p-6">
+    <div className="bg-surface border border-border-subtle rounded-lg p-6">
       <div className="flex items-center justify-between mb-4">
-        <p className="text-xs font-semibold uppercase tracking-widest text-zinc-400">
+        <p className="text-[11px] font-medium uppercase tracking-widest text-text-tertiary">
           Ingresos vs Gastos · mensual
         </p>
         <div className="flex items-center gap-4">
-          <LegendDot color="#34c759" label="Ingresos" />
-          <LegendDot color="#ff3b30" label="Gastos" />
+          <LegendDot color={colors.success} label="Ingresos" />
+          <LegendDot color={colors.danger} label="Gastos" />
         </div>
       </div>
       <ResponsiveContainer width="100%" height={200}>
         <LineChart data={data} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
-          <CartesianGrid strokeDasharray="0" stroke="#f0f0f0" vertical={false} />
-          <XAxis dataKey="month" tick={{ fontSize: 10, fill: '#a1a1aa' }} axisLine={false} tickLine={false} dy={4} />
-          <YAxis tickFormatter={eurAxis} tick={{ fontSize: 10, fill: '#a1a1aa' }} axisLine={false} tickLine={false} dx={-4} width={40} />
+          <CartesianGrid strokeDasharray="0" stroke={chartColors.grid} vertical={false} />
+          <XAxis dataKey="month" tick={{ fontSize: 10, fill: chartColors.axis }} axisLine={false} tickLine={false} dy={4} />
+          <YAxis tickFormatter={eurAxis} tick={{ fontSize: 10, fill: chartColors.axis }} axisLine={false} tickLine={false} dx={-4} width={40} />
           <Tooltip content={<IncomeExpenseTooltip />} />
           <Line
             type="monotone"
             dataKey="income"
-            stroke="#34c759"
+            stroke={colors.success}
             strokeWidth={2.5}
-            dot={{ r: 3, fill: '#34c759', strokeWidth: 0 }}
-            activeDot={{ r: 5, fill: '#34c759', strokeWidth: 0 }}
+            dot={{ r: 3, fill: colors.success, strokeWidth: 0 }}
+            activeDot={{ r: 5, fill: colors.success, strokeWidth: 0 }}
           />
           <Line
             type="monotone"
             dataKey="expense"
-            stroke="#ff3b30"
+            stroke={colors.danger}
             strokeWidth={2.5}
-            dot={{ r: 3, fill: '#ff3b30', strokeWidth: 0 }}
-            activeDot={{ r: 5, fill: '#ff3b30', strokeWidth: 0 }}
+            dot={{ r: 3, fill: colors.danger, strokeWidth: 0 }}
+            activeDot={{ r: 5, fill: colors.danger, strokeWidth: 0 }}
           />
         </LineChart>
       </ResponsiveContainer>
@@ -133,8 +134,8 @@ export function IncomeExpenseChart({ transactions }: { transactions: CashflowTra
 // ── Donut chart: gastos por categoría ─────────────────────────────────────────
 
 const CAT_COLORS = [
-  '#ff3b30', '#ff9f0a', '#ffcc00', '#34c759',
-  '#0071e3', '#5856d6', '#af52de', '#ff2d55', '#a1a1aa',
+  '#F87171', '#FB923C', '#FBBF24', '#4ADE80',
+  '#60A5FA', '#A78BFA', '#C084FC', '#F472B6', '#62626B',
 ]
 
 /**
@@ -185,23 +186,23 @@ export function ExpenseCategoryDonut({ transactions }: { transactions: CashflowT
   })
 
   return (
-    <div className="bg-white rounded-2xl shadow-sm p-6 relative">
-      <p className="text-xs font-semibold uppercase tracking-widest text-zinc-400 mb-5">
+    <div className="bg-surface border border-border-subtle rounded-lg p-6 relative">
+      <p className="text-[11px] font-medium uppercase tracking-widest text-text-tertiary mb-5">
         Gastos por categoría
       </p>
       {total === 0 ? (
-        <p className="text-sm text-zinc-400 py-8 text-center">Sin gastos</p>
+        <p className="text-[13px] text-text-tertiary py-8 text-center">Sin gastos</p>
       ) : (
         <>
           {/* Hover tooltip — anchored top-right of the card */}
           {hovered && (
-            <div className="absolute top-5 right-5 z-10 pointer-events-none bg-white rounded-xl shadow-lg border border-zinc-100 px-3 py-2.5 text-xs" style={{ minWidth: 168 }}>
+            <div className="absolute top-5 right-5 z-10 pointer-events-none rounded-[6px] border px-3 py-2.5 text-xs" style={{ minWidth: 168, background: chartColors.tooltipBg, borderColor: chartColors.tooltipBorder }}>
               <div className="flex items-center gap-1.5 mb-1.5">
                 <span className="w-2 h-2 rounded-full shrink-0" style={{ background: hovered.color }} />
-                <span className="font-semibold text-zinc-700 truncate max-w-[130px]">{hovered.label}</span>
+                <span className="font-semibold truncate max-w-[130px]" style={{ color: colors.textPrimary }}>{hovered.label}</span>
               </div>
-              <p className="font-mono text-zinc-600">{eur(hovered.amount)}</p>
-              <p className="text-zinc-400 mt-0.5">{hovered.pct.toFixed(1)}% del total</p>
+              <p className="font-mono" style={{ color: colors.textSecondary }}>{eur(hovered.amount)}</p>
+              <p className="mt-0.5" style={{ color: colors.textTertiary }}>{hovered.pct.toFixed(1)}% del total</p>
             </div>
           )}
 
@@ -227,10 +228,10 @@ export function ExpenseCategoryDonut({ transactions }: { transactions: CashflowT
                   })}
                 />
               ))}
-              <text x={cx} y={cy + 1} textAnchor="middle" fontSize={13} fontWeight="700" fill="#18181b">
+              <text x={cx} y={cy + 1} textAnchor="middle" fontSize={13} fontWeight="700" fill={colors.textPrimary}>
                 {eurAxis(total)}
               </text>
-              <text x={cx} y={cy + 16} textAnchor="middle" fontSize={9} fill="#a1a1aa" fontWeight="500">
+              <text x={cx} y={cy + 16} textAnchor="middle" fontSize={9} fill={colors.textTertiary} fontWeight="500">
                 total gasto
               </text>
             </svg>
@@ -248,9 +249,9 @@ export function ExpenseCategoryDonut({ transactions }: { transactions: CashflowT
                 >
                   <div className="flex items-center gap-2 min-w-0">
                     <span className="w-2 h-2 rounded-full shrink-0" style={{ background: seg.color }} />
-                    <span className="text-xs text-zinc-600 truncate">{seg.label}</span>
+                    <span className="text-xs text-text-secondary truncate">{seg.label}</span>
                   </div>
-                  <span className="text-xs font-mono text-zinc-400 shrink-0">{eur(seg.amount)}</span>
+                  <span className="text-xs font-mono text-text-tertiary shrink-0">{eur(seg.amount)}</span>
                 </div>
               ))}
             </div>
@@ -305,24 +306,24 @@ export function BalanceTrendChart({ transactions }: { transactions: CashflowTran
   const hasNegative = data.some((d) => d.balance < 0)
 
   return (
-    <div className="bg-white rounded-2xl shadow-sm p-6">
-      <p className="text-xs font-semibold uppercase tracking-widest text-zinc-400 mb-4">
+    <div className="bg-surface border border-border-subtle rounded-lg p-6">
+      <p className="text-[11px] font-medium uppercase tracking-widest text-text-tertiary mb-4">
         Saldo acumulado · mes a mes
       </p>
       <ResponsiveContainer width="100%" height={200}>
         <LineChart data={data} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
-          <CartesianGrid strokeDasharray="0" stroke="#f0f0f0" vertical={false} />
-          <XAxis dataKey="month" tick={{ fontSize: 10, fill: '#a1a1aa' }} axisLine={false} tickLine={false} dy={4} />
-          <YAxis tickFormatter={eurAxis} tick={{ fontSize: 10, fill: '#a1a1aa' }} axisLine={false} tickLine={false} dx={-4} width={44} />
+          <CartesianGrid strokeDasharray="0" stroke={chartColors.grid} vertical={false} />
+          <XAxis dataKey="month" tick={{ fontSize: 10, fill: chartColors.axis }} axisLine={false} tickLine={false} dy={4} />
+          <YAxis tickFormatter={eurAxis} tick={{ fontSize: 10, fill: chartColors.axis }} axisLine={false} tickLine={false} dx={-4} width={44} />
           <Tooltip content={<LineTooltip />} />
-          {hasNegative && <ReferenceLine y={0} stroke="#e4e4e7" strokeWidth={1} />}
+          {hasNegative && <ReferenceLine y={0} stroke={colors.borderStrong} strokeWidth={1} />}
           <Line
             type="monotone"
             dataKey="balance"
-            stroke="#0071e3"
+            stroke={colors.accent}
             strokeWidth={2.5}
             dot={false}
-            activeDot={{ r: 4, fill: '#0071e3', strokeWidth: 0 }}
+            activeDot={{ r: 4, fill: colors.accent, strokeWidth: 0 }}
           />
         </LineChart>
       </ResponsiveContainer>
@@ -334,9 +335,9 @@ export function BalanceTrendChart({ transactions }: { transactions: CashflowTran
 
 function EmptyChart({ label }: { label: string }) {
   return (
-    <div className="bg-white rounded-2xl shadow-sm p-6">
-      <p className="text-xs font-semibold uppercase tracking-widest text-zinc-400 mb-4">{label}</p>
-      <div className="h-[200px] flex items-center justify-center text-sm text-zinc-400">
+    <div className="bg-surface border border-border-subtle rounded-lg p-6">
+      <p className="text-[11px] font-medium uppercase tracking-widest text-text-tertiary mb-4">{label}</p>
+      <div className="h-[200px] flex items-center justify-center text-[13px] text-text-tertiary">
         Sin datos
       </div>
     </div>
@@ -347,7 +348,7 @@ function LegendDot({ color, label }: { color: string; label: string }) {
   return (
     <div className="flex items-center gap-1.5">
       <span className="w-2.5 h-2.5 rounded-sm inline-block" style={{ background: color }} />
-      <span className="text-xs text-zinc-400">{label}</span>
+      <span className="text-xs text-text-tertiary">{label}</span>
     </div>
   )
 }

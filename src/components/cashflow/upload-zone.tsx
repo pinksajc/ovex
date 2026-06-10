@@ -173,16 +173,16 @@ export function UploadZone() {
   )
 
   return (
-    <div className="bg-white rounded-2xl shadow-sm p-6">
+    <div className="bg-surface border border-border-subtle rounded-lg p-6">
       <div className="flex items-center justify-between mb-4">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-widest text-zinc-400">Importar CSV</p>
-          <p className="text-sm text-zinc-500 mt-0.5">Formato Revolut · detecta duplicados automáticamente</p>
+          <p className="text-[11px] font-medium uppercase tracking-widest text-text-tertiary">Importar CSV</p>
+          <p className="text-[13px] text-text-tertiary mt-0.5">Formato Revolut · detecta duplicados automáticamente</p>
         </div>
         {state.status === 'success' && (
           <button
             onClick={() => setState({ status: 'idle' })}
-            className="text-xs text-zinc-400 hover:text-zinc-700 border border-zinc-200 px-3 py-1.5 rounded-lg transition-colors"
+            className="text-xs text-text-tertiary hover:text-text-secondary border border-border-subtle px-3 h-8 rounded-[6px] transition-colors"
           >
             Importar otro
           </button>
@@ -190,29 +190,29 @@ export function UploadZone() {
       </div>
 
       {state.status === 'success' ? (
-        <div className="flex items-center gap-3 bg-emerald-50 border border-emerald-200 rounded-xl px-5 py-4">
-          <span className="text-emerald-500 text-xl">✓</span>
+        <div className="flex items-center gap-3 bg-success/8 border border-success/20 rounded-[6px] px-5 py-4">
+          <span className="text-success text-xl">✓</span>
           <div>
-            <p className="text-sm font-semibold text-emerald-800">
+            <p className="text-[13px] font-semibold text-success">
               {state.inserted} transaccion{state.inserted !== 1 ? 'es' : ''} importada{state.inserted !== 1 ? 's' : ''}
             </p>
             {state.skipped > 0 && (
-              <p className="text-xs text-emerald-600/70 mt-0.5">
+              <p className="text-xs text-success/70 mt-0.5">
                 {state.skipped} omitida{state.skipped !== 1 ? 's' : ''} por duplicado
               </p>
             )}
           </div>
         </div>
       ) : state.status === 'error' ? (
-        <div className="flex items-center gap-3 bg-red-50 border border-red-200 rounded-xl px-5 py-4">
-          <span className="text-red-400 text-xl">✗</span>
+        <div className="flex items-center gap-3 bg-danger/8 border border-danger/20 rounded-[6px] px-5 py-4">
+          <span className="text-danger text-xl">✗</span>
           <div>
-            <p className="text-sm font-semibold text-red-700">Error al importar</p>
-            <p className="text-xs text-red-500 mt-0.5">{state.message}</p>
+            <p className="text-[13px] font-semibold text-danger">Error al importar</p>
+            <p className="text-xs text-danger/70 mt-0.5">{state.message}</p>
           </div>
           <button
             onClick={() => setState({ status: 'idle' })}
-            className="ml-auto text-xs text-red-400 hover:text-red-700"
+            className="ml-auto text-xs text-danger/70 hover:text-danger"
           >
             Reintentar
           </button>
@@ -223,10 +223,10 @@ export function UploadZone() {
           onDragLeave={() => setDragging(false)}
           onDrop={onDrop}
           onClick={() => inputRef.current?.click()}
-          className={`relative border-2 border-dashed rounded-xl px-6 py-10 flex flex-col items-center justify-center gap-3 cursor-pointer transition-colors select-none ${
+          className={`relative border-2 border-dashed rounded-[6px] px-6 py-10 flex flex-col items-center justify-center gap-3 cursor-pointer transition-colors select-none ${
             dragging
-              ? 'border-blue-400 bg-blue-50/50'
-              : 'border-zinc-200 hover:border-zinc-300 bg-zinc-50/50 hover:bg-zinc-100/50'
+              ? 'border-accent bg-accent/5'
+              : 'border-border-strong hover:border-border-strong bg-elevated hover:bg-hover'
           }`}
         >
           <input
@@ -239,8 +239,8 @@ export function UploadZone() {
 
           {state.status === 'parsing' || state.status === 'uploading' ? (
             <>
-              <div className="w-8 h-8 border-2 border-zinc-300 border-t-blue-500 rounded-full animate-spin" />
-              <p className="text-sm text-zinc-500">
+              <div className="w-8 h-8 border-2 border-border-strong border-t-accent rounded-full animate-spin" />
+              <p className="text-[13px] text-text-tertiary">
                 {state.status === 'parsing'
                   ? 'Procesando CSV…'
                   : `Importando ${state.count} transacciones…`}
@@ -248,12 +248,12 @@ export function UploadZone() {
             </>
           ) : (
             <>
-              <IconUpload className="w-8 h-8 text-zinc-300" />
+              <IconUpload className="w-8 h-8 text-text-tertiary" />
               <div className="text-center">
-                <p className="text-sm font-medium text-zinc-700">
+                <p className="text-[13px] font-medium text-text-secondary">
                   Arrastra un CSV de Revolut o haz clic para seleccionarlo
                 </p>
-                <p className="text-xs text-zinc-400 mt-1">
+                <p className="text-xs text-text-tertiary mt-1">
                   Columnas: Type · Started Date · Completed Date · Description · Amount · Currency · State · Balance
                 </p>
               </div>

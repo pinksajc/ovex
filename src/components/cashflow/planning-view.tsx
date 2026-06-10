@@ -19,6 +19,7 @@ import {
   confirmSuggestedRecurringAction,
 } from '@/app/actions/cashflow-planned'
 import { CASHFLOW_CATEGORIES } from '@/lib/cashflow-categories'
+import { chartColors, colors } from '@/lib/design-tokens'
 import type { PlannedItem, SuggestedRecurring } from '@/lib/supabase/cashflow-planned'
 
 // ── Slim invoice shape needed for planning ─────────────────────────────────────
@@ -135,15 +136,15 @@ function AddItemModal({ type, onSave, onClose, saving, error }: AddModalProps) {
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center p-4"
-      style={{ background: 'rgba(0,0,0,0.4)', backdropFilter: 'blur(4px)' }}
+      style={{ background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)' }}
       onClick={(e) => { if (e.target === e.currentTarget && !saving) onClose() }}
     >
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md">
-        <div className="px-6 py-4 border-b border-zinc-100 flex items-center justify-between">
-          <h2 className="text-sm font-semibold text-zinc-900">
+      <div className="bg-surface border border-border-subtle rounded-lg shadow-2xl w-full max-w-md">
+        <div className="px-6 py-4 border-b border-border-subtle flex items-center justify-between">
+          <h2 className="text-[13px] font-semibold text-text-primary">
             {type === 'income' ? '+ Ingreso esperado' : '+ Gasto planificado'}
           </h2>
-          <button onClick={onClose} disabled={saving} className="text-zinc-400 hover:text-zinc-700">
+          <button onClick={onClose} disabled={saving} className="text-text-tertiary hover:text-text-secondary transition-colors">
             <XIcon className="w-4 h-4" />
           </button>
         </div>
@@ -151,40 +152,40 @@ function AddItemModal({ type, onSave, onClose, saving, error }: AddModalProps) {
         <form onSubmit={handleSubmit} className="px-6 py-5 space-y-4">
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-[11px] font-semibold uppercase tracking-wider text-zinc-400 mb-2">
+              <label className="block text-[11px] font-medium uppercase tracking-wider text-text-tertiary mb-2">
                 Fecha esperada
               </label>
               <input
                 type="date" value={date} onChange={(e) => setDate(e.target.value)} required
-                className="w-full text-sm bg-zinc-100 border-0 rounded-lg px-3 py-2 text-zinc-700 focus:outline-none focus:ring-2 focus:ring-zinc-300"
+                className="w-full text-[13px] bg-base border border-border-subtle rounded-[6px] px-3 h-9 text-text-primary focus:outline-none focus:ring-2 focus:ring-accent/40"
               />
             </div>
             <div>
-              <label className="block text-[11px] font-semibold uppercase tracking-wider text-zinc-400 mb-2">
+              <label className="block text-[11px] font-medium uppercase tracking-wider text-text-tertiary mb-2">
                 Importe (€)
               </label>
               <input
                 type="number" min="0.01" step="0.01" value={amount}
                 onChange={(e) => setAmount(e.target.value)} required placeholder="0"
-                className="w-full text-sm bg-zinc-100 border-0 rounded-lg px-3 py-2 text-zinc-700 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-zinc-300"
+                className="w-full text-[13px] bg-base border border-border-subtle rounded-[6px] px-3 h-9 text-text-primary placeholder:text-text-tertiary focus:outline-none focus:ring-2 focus:ring-accent/40"
               />
             </div>
           </div>
 
           <div>
-            <label className="block text-[11px] font-semibold uppercase tracking-wider text-zinc-400 mb-2">Descripción</label>
+            <label className="block text-[11px] font-medium uppercase tracking-wider text-text-tertiary mb-2">Descripción</label>
             <input
               type="text" value={description} onChange={(e) => setDescription(e.target.value)} required
               placeholder={type === 'income' ? 'Ej. Pago cliente ABC' : 'Ej. Suscripción mensual'}
-              className="w-full text-sm bg-zinc-100 border-0 rounded-lg px-3 py-2 text-zinc-700 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-zinc-300"
+              className="w-full text-[13px] bg-base border border-border-subtle rounded-[6px] px-3 h-9 text-text-primary placeholder:text-text-tertiary focus:outline-none focus:ring-2 focus:ring-accent/40"
             />
           </div>
 
           <div>
-            <label className="block text-[11px] font-semibold uppercase tracking-wider text-zinc-400 mb-2">Categoría</label>
+            <label className="block text-[11px] font-medium uppercase tracking-wider text-text-tertiary mb-2">Categoría</label>
             <select
               value={category} onChange={(e) => setCategory(e.target.value)}
-              className="w-full text-sm bg-zinc-100 border-0 rounded-lg px-3 py-2 text-zinc-700 focus:outline-none focus:ring-2 focus:ring-zinc-300"
+              className="w-full text-[13px] bg-base border border-border-subtle rounded-[6px] px-3 h-9 text-text-secondary focus:outline-none focus:ring-2 focus:ring-accent/40"
             >
               {CASHFLOW_CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
             </select>
@@ -194,19 +195,19 @@ function AddItemModal({ type, onSave, onClose, saving, error }: AddModalProps) {
             <label className="flex items-center gap-2.5 cursor-pointer select-none">
               <div
                 onClick={() => setRecurring(!isRecurring)}
-                className={`w-9 h-5 rounded-full transition-colors relative ${isRecurring ? 'bg-zinc-900' : 'bg-zinc-200'}`}
+                className={`w-9 h-5 rounded-full transition-colors relative ${isRecurring ? 'bg-accent' : 'bg-border-strong'}`}
               >
                 <span className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${isRecurring ? 'translate-x-4' : 'translate-x-0.5'}`} />
               </div>
-              <span className="text-xs text-zinc-600">¿Es recurrente? (mensual)</span>
+              <span className="text-xs text-text-secondary">¿Es recurrente? (mensual)</span>
             </label>
           )}
 
-          {error && <p className="text-xs text-red-500 bg-red-50 px-3 py-2 rounded-lg">{error}</p>}
+          {error && <p className="text-xs text-danger bg-danger/8 border border-danger/20 px-3 py-2 rounded-[6px]">{error}</p>}
 
           <div className="flex items-center justify-end gap-3 pt-1">
-            <button type="button" onClick={onClose} disabled={saving} className="text-sm text-zinc-500 hover:text-zinc-700 px-2 py-1.5">Cancelar</button>
-            <button type="submit" disabled={saving} className="text-sm font-medium text-white bg-zinc-900 hover:bg-zinc-700 px-5 py-2 rounded-lg disabled:opacity-50 transition-colors">
+            <button type="button" onClick={onClose} disabled={saving} className="text-[13px] text-text-tertiary hover:text-text-secondary px-2 py-1.5 transition-colors">Cancelar</button>
+            <button type="submit" disabled={saving} className="text-[13px] font-medium text-base bg-accent hover:bg-accent-hover px-5 h-9 rounded-[6px] disabled:opacity-50 transition-colors">
               {saving ? 'Guardando…' : 'Guardar'}
             </button>
           </div>
@@ -224,9 +225,9 @@ function ProjectionTooltip({ active, payload, label }: { active?: boolean; paylo
   if (!active || !payload?.length) return null
   const bal = payload[0]?.value ?? 0
   return (
-    <div className="bg-white rounded-xl shadow-lg px-4 py-3 border border-zinc-100 text-xs">
-      <p className="font-semibold text-zinc-700 mb-1">{label}</p>
-      <p className="font-mono" style={{ color: bal > 5000 ? '#34c759' : bal > 1000 ? '#ff9f0a' : '#ff3b30' }}>
+    <div className="rounded-[6px] px-4 py-3 text-xs border" style={{ background: chartColors.tooltipBg, borderColor: chartColors.tooltipBorder }}>
+      <p className="font-semibold mb-1" style={{ color: chartColors.tooltipText }}>{label}</p>
+      <p className="font-mono" style={{ color: bal > 5000 ? colors.success : bal > 1000 ? colors.warning : colors.danger }}>
         Saldo: {formatEurFull(bal)}
       </p>
     </div>
@@ -235,7 +236,7 @@ function ProjectionTooltip({ active, payload, label }: { active?: boolean; paylo
 
 // ── Semáforo dot ───────────────────────────────────────────────────────────────
 
-const SEMAFORO_COLORS = { green: '#34c759', yellow: '#ff9f0a', red: '#ff3b30' }
+const SEMAFORO_COLORS = { green: colors.success, yellow: colors.warning, red: colors.danger }
 
 function Semaforo({ status }: { status: 'green' | 'yellow' | 'red' }) {
   return (
@@ -325,14 +326,14 @@ export function PlanningView({
       <div className="grid grid-cols-2 gap-5">
 
         {/* Ingresos esperados */}
-        <div className="bg-white rounded-2xl shadow-sm p-6">
+        <div className="bg-surface border border-border-subtle rounded-lg p-6">
           <div className="flex items-center justify-between mb-4">
-            <p className="text-xs font-semibold uppercase tracking-widest text-zinc-400">
+            <p className="text-[11px] font-medium uppercase tracking-widest text-text-tertiary">
               Ingresos esperados
             </p>
             <button
               onClick={() => { setSaveError(null); setAddModal('income') }}
-              className="inline-flex items-center gap-1 text-xs font-medium text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 px-2.5 py-1.5 rounded-lg transition-colors"
+              className="inline-flex items-center gap-1 text-xs font-medium text-success bg-success/10 hover:bg-success/15 border border-success/20 px-2.5 h-7 rounded-[6px] transition-colors"
             >
               <PlusIcon className="w-3 h-3" /> Añadir
             </button>
@@ -341,22 +342,22 @@ export function PlanningView({
           <div className="space-y-2">
             {/* Pending invoices (from orvex) */}
             {pendingInvoices.length === 0 && plannedItems.filter((p) => p.type === 'income').length === 0 && (
-              <p className="text-xs text-zinc-400 py-4 text-center">Sin ingresos esperados</p>
+              <p className="text-xs text-text-tertiary py-4 text-center">Sin ingresos esperados</p>
             )}
 
             {pendingInvoices.map((inv) => (
-              <div key={inv.id} className="flex items-center justify-between gap-3 py-2 border-b border-zinc-50">
+              <div key={inv.id} className="flex items-center justify-between gap-3 py-2 border-b border-border-subtle">
                 <div className="min-w-0">
-                  <p className="text-xs font-medium text-zinc-700 truncate">
+                  <p className="text-xs font-medium text-text-primary truncate">
                     {inv.number} · {inv.clientName}
                   </p>
-                  <p className="text-[10px] text-zinc-400">
+                  <p className="text-[11px] text-text-tertiary">
                     Vence: {inv.dueAt ? new Date(inv.dueAt + 'T00:00:00').toLocaleDateString('es-ES', { day: '2-digit', month: 'short' }) : '—'}
                     {' · '}
-                    <span className="text-amber-600 font-medium">pendiente de cobro</span>
+                    <span className="text-warning font-medium">pendiente de cobro</span>
                   </p>
                 </div>
-                <span className="text-xs font-semibold font-mono text-emerald-600 shrink-0">
+                <span className="text-xs font-semibold font-mono text-success shrink-0">
                   +{formatEurFull(inv.amountTotal)}
                 </span>
               </div>
@@ -364,20 +365,20 @@ export function PlanningView({
 
             {/* Manual planned incomes */}
             {plannedItems.filter((p) => p.type === 'income').map((item) => (
-              <div key={item.id} className="flex items-center justify-between gap-3 py-2 border-b border-zinc-50">
+              <div key={item.id} className="flex items-center justify-between gap-3 py-2 border-b border-border-subtle">
                 <div className="min-w-0">
-                  <p className="text-xs font-medium text-zinc-700 truncate">{item.description}</p>
-                  <p className="text-[10px] text-zinc-400">
+                  <p className="text-xs font-medium text-text-primary truncate">{item.description}</p>
+                  <p className="text-[11px] text-text-tertiary">
                     {new Date(item.date + 'T00:00:00').toLocaleDateString('es-ES', { day: '2-digit', month: 'short', year: '2-digit' })}
                     {' · '}{item.category}
                     {item.isRecurring && ' · 🔄 recurrente'}
                   </p>
                 </div>
                 <div className="flex items-center gap-2 shrink-0">
-                  <span className="text-xs font-semibold font-mono text-emerald-600">
+                  <span className="text-xs font-semibold font-mono text-success">
                     +{formatEurFull(item.amount)}
                   </span>
-                  <button onClick={() => handleDelete(item.id)} className="text-zinc-300 hover:text-red-400 transition-colors">
+                  <button onClick={() => handleDelete(item.id)} className="text-text-tertiary hover:text-danger transition-colors">
                     <TrashIcon className="w-3.5 h-3.5" />
                   </button>
                 </div>
@@ -387,14 +388,14 @@ export function PlanningView({
         </div>
 
         {/* Gastos planificados */}
-        <div className="bg-white rounded-2xl shadow-sm p-6">
+        <div className="bg-surface border border-border-subtle rounded-lg p-6">
           <div className="flex items-center justify-between mb-4">
-            <p className="text-xs font-semibold uppercase tracking-widest text-zinc-400">
+            <p className="text-[11px] font-medium uppercase tracking-widest text-text-tertiary">
               Gastos planificados
             </p>
             <button
               onClick={() => { setSaveError(null); setAddModal('expense') }}
-              className="inline-flex items-center gap-1 text-xs font-medium text-red-700 bg-red-50 hover:bg-red-100 border border-red-200 px-2.5 py-1.5 rounded-lg transition-colors"
+              className="inline-flex items-center gap-1 text-xs font-medium text-danger bg-danger/10 hover:bg-danger/15 border border-danger/20 px-2.5 h-7 rounded-[6px] transition-colors"
             >
               <PlusIcon className="w-3 h-3" /> Añadir
             </button>
@@ -403,25 +404,25 @@ export function PlanningView({
           <div className="space-y-2">
             {/* Suggested recurring */}
             {visibleSuggestions.map((s) => (
-              <div key={s.description} className="flex items-start justify-between gap-3 py-2 border-b border-zinc-50">
+              <div key={s.description} className="flex items-start justify-between gap-3 py-2 border-b border-border-subtle">
                 <div className="min-w-0">
                   <div className="flex items-center gap-1.5 mb-0.5">
-                    <span className="text-[9px] font-semibold uppercase tracking-wider text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded">sugerido</span>
+                    <span className="text-[9px] font-semibold uppercase tracking-wider text-warning bg-warning/10 px-1.5 py-0.5 rounded-[3px]">sugerido</span>
                   </div>
-                  <p className="text-xs font-medium text-zinc-700 truncate">{s.description}</p>
-                  <p className="text-[10px] text-zinc-400">{s.category} · ~{formatEurFull(s.averageAmount)}/mes</p>
+                  <p className="text-xs font-medium text-text-primary truncate">{s.description}</p>
+                  <p className="text-[11px] text-text-tertiary">{s.category} · ~{formatEurFull(s.averageAmount)}/mes</p>
                 </div>
                 <div className="flex items-center gap-1.5 shrink-0">
                   <button
                     onClick={() => handleConfirm(s)}
                     disabled={pendingConfirm.has(s.description)}
-                    className="text-[11px] font-medium text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 px-2 py-1 rounded-md transition-colors disabled:opacity-50"
+                    className="text-[11px] font-medium text-success bg-success/10 hover:bg-success/15 border border-success/20 px-2 h-6 rounded-[4px] transition-colors disabled:opacity-50"
                   >
                     Confirmar
                   </button>
                   <button
                     onClick={() => setIgnored((p) => new Set(p).add(s.description))}
-                    className="text-[11px] font-medium text-zinc-500 bg-zinc-100 hover:bg-zinc-200 px-2 py-1 rounded-md transition-colors"
+                    className="text-[11px] font-medium text-text-tertiary bg-hover hover:bg-elevated px-2 h-6 rounded-[4px] transition-colors"
                   >
                     Ignorar
                   </button>
@@ -431,24 +432,24 @@ export function PlanningView({
 
             {/* Manual planned expenses */}
             {plannedItems.filter((p) => p.type === 'expense').length === 0 && visibleSuggestions.length === 0 && (
-              <p className="text-xs text-zinc-400 py-4 text-center">Sin gastos planificados</p>
+              <p className="text-xs text-text-tertiary py-4 text-center">Sin gastos planificados</p>
             )}
 
             {plannedItems.filter((p) => p.type === 'expense').map((item) => (
-              <div key={item.id} className="flex items-center justify-between gap-3 py-2 border-b border-zinc-50">
+              <div key={item.id} className="flex items-center justify-between gap-3 py-2 border-b border-border-subtle">
                 <div className="min-w-0">
-                  <p className="text-xs font-medium text-zinc-700 truncate">{item.description}</p>
-                  <p className="text-[10px] text-zinc-400">
+                  <p className="text-xs font-medium text-text-primary truncate">{item.description}</p>
+                  <p className="text-[11px] text-text-tertiary">
                     {new Date(item.date + 'T00:00:00').toLocaleDateString('es-ES', { day: '2-digit', month: 'short', year: '2-digit' })}
                     {' · '}{item.category}
                     {item.isRecurring && ' · 🔄 recurrente'}
                   </p>
                 </div>
                 <div className="flex items-center gap-2 shrink-0">
-                  <span className="text-xs font-semibold font-mono text-red-500">
+                  <span className="text-xs font-semibold font-mono text-danger">
                     −{formatEurFull(item.amount)}
                   </span>
-                  <button onClick={() => handleDelete(item.id)} className="text-zinc-300 hover:text-red-400 transition-colors">
+                  <button onClick={() => handleDelete(item.id)} className="text-text-tertiary hover:text-danger transition-colors">
                     <TrashIcon className="w-3.5 h-3.5" />
                   </button>
                 </div>
@@ -459,29 +460,29 @@ export function PlanningView({
       </div>
 
       {/* ── Row 2: Projection table ──────────────────────────────────────────── */}
-      <div className="bg-white rounded-2xl shadow-sm p-6">
-        <p className="text-xs font-semibold uppercase tracking-widest text-zinc-400 mb-4">
+      <div className="bg-surface border border-border-subtle rounded-lg p-6">
+        <p className="text-[11px] font-medium uppercase tracking-widest text-text-tertiary mb-4">
           Proyección mes a mes · próximos 6 meses
         </p>
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-zinc-100">
-                <th className="pb-3 text-left text-[10px] font-semibold uppercase tracking-widest text-zinc-400">Mes</th>
-                <th className="pb-3 text-right text-[10px] font-semibold uppercase tracking-widest text-zinc-400">Ingresos esp.</th>
-                <th className="pb-3 text-right text-[10px] font-semibold uppercase tracking-widest text-zinc-400">Gastos plan.</th>
-                <th className="pb-3 text-right text-[10px] font-semibold uppercase tracking-widest text-zinc-400">Saldo proy.</th>
-                <th className="pb-3 text-center text-[10px] font-semibold uppercase tracking-widest text-zinc-400 w-16"></th>
+              <tr className="border-b border-border-subtle">
+                <th className="pb-3 text-left text-[11px] font-medium uppercase tracking-wider text-text-tertiary">Mes</th>
+                <th className="pb-3 text-right text-[11px] font-medium uppercase tracking-wider text-text-tertiary">Ingresos esp.</th>
+                <th className="pb-3 text-right text-[11px] font-medium uppercase tracking-wider text-text-tertiary">Gastos plan.</th>
+                <th className="pb-3 text-right text-[11px] font-medium uppercase tracking-wider text-text-tertiary">Saldo proy.</th>
+                <th className="pb-3 text-center text-[11px] font-medium uppercase tracking-wider text-text-tertiary w-16"></th>
               </tr>
             </thead>
             <tbody>
               {projection.map((p) => (
-                <tr key={p.monthKey} className="border-b border-zinc-50 hover:bg-zinc-50/50 transition-colors">
-                  <td className="py-3 text-xs font-medium text-zinc-700 capitalize">{p.label}</td>
-                  <td className="py-3 text-xs font-mono text-right text-emerald-600">
+                <tr key={p.monthKey} className="border-b border-border-subtle hover:bg-hover transition-colors duration-150">
+                  <td className="py-3 text-xs font-medium text-text-primary capitalize">{p.label}</td>
+                  <td className="py-3 text-xs font-mono text-right text-success">
                     {p.income > 0 ? `+${formatEurFull(p.income)}` : '—'}
                   </td>
-                  <td className="py-3 text-xs font-mono text-right text-red-500">
+                  <td className="py-3 text-xs font-mono text-right text-danger">
                     {p.expense > 0 ? `−${formatEurFull(p.expense)}` : '—'}
                   </td>
                   <td className="py-3 text-xs font-mono font-semibold text-right" style={{ color: SEMAFORO_COLORS[p.status] }}>
@@ -495,28 +496,28 @@ export function PlanningView({
             </tbody>
           </table>
         </div>
-        <p className="text-[10px] text-zinc-400 mt-3">
+        <p className="text-[11px] text-text-tertiary mt-3">
           🟢 &gt;5.000 € · 🟡 1.000–5.000 € · 🔴 &lt;1.000 €
           {' · '}Saldo inicial: {formatEurFull(currentBalance)}
         </p>
       </div>
 
       {/* ── Row 3: Projection chart ──────────────────────────────────────────── */}
-      <div className="bg-white rounded-2xl shadow-sm p-6">
-        <p className="text-xs font-semibold uppercase tracking-widest text-zinc-400 mb-4">
+      <div className="bg-surface border border-border-subtle rounded-lg p-6">
+        <p className="text-[11px] font-medium uppercase tracking-widest text-text-tertiary mb-4">
           Saldo proyectado
         </p>
         <ResponsiveContainer width="100%" height={200}>
           <LineChart data={projection} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
             {/* Background zones */}
-            <ReferenceArea y1={5000} fill="#34c75908" stroke="none" />
-            <ReferenceArea y1={1000} y2={5000} fill="#ff9f0a08" stroke="none" />
-            <ReferenceArea y2={1000} fill="#ff3b3008" stroke="none" />
-            <CartesianGrid strokeDasharray="0" stroke="#f0f0f0" vertical={false} />
-            <XAxis dataKey="label" tick={{ fontSize: 10, fill: '#a1a1aa' }} axisLine={false} tickLine={false} dy={4} />
+            <ReferenceArea y1={5000} fill={`${colors.success}08`} stroke="none" />
+            <ReferenceArea y1={1000} y2={5000} fill={`${colors.warning}08`} stroke="none" />
+            <ReferenceArea y2={1000} fill={`${colors.danger}08`} stroke="none" />
+            <CartesianGrid strokeDasharray="0" stroke={chartColors.grid} vertical={false} />
+            <XAxis dataKey="label" tick={{ fontSize: 10, fill: chartColors.axis }} axisLine={false} tickLine={false} dy={4} />
             <YAxis
               tickFormatter={(v: number) => formatEur(v)}
-              tick={{ fontSize: 10, fill: '#a1a1aa' }}
+              tick={{ fontSize: 10, fill: chartColors.axis }}
               axisLine={false}
               tickLine={false}
               dx={-4}
@@ -524,16 +525,16 @@ export function PlanningView({
               domain={[yMin - yPad, yMax + yPad]}
             />
             <Tooltip content={<ProjectionTooltip />} />
-            <ReferenceLine y={1000} stroke="#ff9f0a" strokeDasharray="4 2" strokeWidth={1} />
-            <ReferenceLine y={5000} stroke="#34c759" strokeDasharray="4 2" strokeWidth={1} />
+            <ReferenceLine y={1000} stroke={colors.warning} strokeDasharray="4 2" strokeWidth={1} />
+            <ReferenceLine y={5000} stroke={colors.success} strokeDasharray="4 2" strokeWidth={1} />
             <Line
               type="monotone"
               dataKey="balance"
-              stroke="#0071e3"
+              stroke={colors.accent}
               strokeWidth={2.5}
               strokeDasharray="6 3"
-              dot={{ r: 4, fill: '#0071e3', strokeWidth: 0 }}
-              activeDot={{ r: 6, fill: '#0071e3', strokeWidth: 0 }}
+              dot={{ r: 4, fill: colors.accent, strokeWidth: 0 }}
+              activeDot={{ r: 6, fill: colors.accent, strokeWidth: 0 }}
             />
           </LineChart>
         </ResponsiveContainer>
