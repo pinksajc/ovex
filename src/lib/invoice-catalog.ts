@@ -5,7 +5,7 @@
 export interface ServiceItem {
   id: string
   label: string
-  group: 'ROS' | 'ADD-ONS' | 'REN' | 'HARDWARE' | 'OTROS'
+  group: 'ROS' | 'ADD-ONS' | 'REN' | 'HARDWARE' | 'OTROS' | 'WHISPR'
   unit: string
   /** Label shown below the Cantidad input (e.g. "locales", "uds", "pedidos") */
   qtyUnit?: string
@@ -68,6 +68,13 @@ export const SERVICES: ServiceItem[] = [
   { id: 'bouncepad', label: 'Bouncepad Kiosk — Vendido', group: 'HARDWARE', unit: 'ud', defaultPrice: 200 },
   { id: 'counter_stand', label: 'Counter Stand — Vendido', group: 'HARDWARE', unit: 'ud', defaultPrice: 120 },
 
+  // ---- WHISPR ----
+  { id: 'whispr_starter',       label: 'Whispr Starter',              group: 'WHISPR', unit: 'mes', defaultPrice: 49 },
+  { id: 'whispr_professional',  label: 'Whispr Professional',         group: 'WHISPR', unit: 'mes', defaultPrice: 99 },
+  { id: 'whispr_enterprise',    label: 'Whispr Enterprise',           group: 'WHISPR', unit: 'mes', defaultPrice: 0, priceEditable: true },
+  { id: 'whispr_starter_annual',      label: 'Whispr Starter — Anual',      group: 'WHISPR', unit: 'mes', defaultPrice: 39.20, note: '-20%' },
+  { id: 'whispr_professional_annual', label: 'Whispr Professional — Anual', group: 'WHISPR', unit: 'mes', defaultPrice: 79.20, note: '-20%' },
+
   // ---- OTROS ----
   { id: 'travel', label: 'Desplazamientos y dietas', group: 'OTROS', unit: 'ud', defaultPrice: 0, priceEditable: true },
   { id: 'custom', label: 'Línea personalizada', group: 'OTROS', unit: '', unitEditable: true, defaultPrice: 0, priceEditable: true, custom: true },
@@ -75,5 +82,5 @@ export const SERVICES: ServiceItem[] = [
 
 export const SERVICE_MAP = new Map<string, ServiceItem>(SERVICES.map((s) => [s.id, s]))
 
-export const SERVICE_GROUPS = ['ROS', 'ADD-ONS', 'REN', 'HARDWARE', 'OTROS'] as const
+export const SERVICE_GROUPS = ['ROS', 'ADD-ONS', 'REN', 'HARDWARE', 'WHISPR', 'OTROS'] as const
 export type ServiceGroup = (typeof SERVICE_GROUPS)[number]

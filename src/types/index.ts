@@ -4,6 +4,8 @@
 
 export type PlanTier = 'starter' | 'growth' | 'pro'
 
+export type WhisprPlanId = 'none' | 'starter' | 'professional' | 'enterprise'
+
 export type DeliveryPlanId = 'start' | 'go' | 'pro'
 
 export type AddonId =

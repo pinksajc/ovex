@@ -252,3 +252,43 @@ export const PLAN_FEATURES: Record<PlanTier, string[]> = {
     'CSM dedicado',
   ],
 }
+
+// ---- WHISPR ----
+
+export type WhisprPlanId = 'none' | 'starter' | 'professional' | 'enterprise'
+
+export interface WhisprPlanConfig {
+  id: WhisprPlanId
+  label: string
+  description: string
+  priceMonthly: number  // 0 for enterprise (custom)
+  features: string[]
+}
+
+export const WHISPR_PLANS: Record<WhisprPlanId, WhisprPlanConfig> = {
+  none: { id: 'none', label: 'Ninguno', description: '', priceMonthly: 0, features: [] },
+  starter: {
+    id: 'starter',
+    label: 'Starter',
+    description: 'Hasta 50 empleados',
+    priceMonthly: 49,
+    features: ['Canal de quejas con marca propia', 'Chat cifrado bidireccional', 'Control de plazos automático', 'Soporte email'],
+  },
+  professional: {
+    id: 'professional',
+    label: 'Professional',
+    description: 'Hasta 250 empleados',
+    priceMonthly: 99,
+    features: ['Todo lo de Starter', 'Múltiples gestores y roles', 'Matriz de acceso por departamento', 'Notificaciones email', 'Soporte prioritario'],
+  },
+  enterprise: {
+    id: 'enterprise',
+    label: 'Enterprise',
+    description: 'Empleados ilimitados',
+    priceMonthly: 0, // custom price
+    features: ['Multi-establecimiento', 'Integraciones personalizadas', 'Gestor dedicado', 'SLA garantizado'],
+  },
+}
+
+export const WHISPR_PLAN_ORDER: WhisprPlanId[] = ['none', 'starter', 'professional', 'enterprise']
+export const WHISPR_ANNUAL_DISCOUNT = 0.20

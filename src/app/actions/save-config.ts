@@ -33,6 +33,9 @@ export interface SaveConfigPayload {
   deliveryPlan?: DeliveryPlanId
   itemDiscounts?: { plan?: number; delivery?: number; addons?: Record<string, number>; hardware?: Record<string, number> }
   itemPriceOverrides?: { plan?: number | null; delivery?: number | null; hardware?: Record<string, number | null> }
+  whisprPlan?: string
+  whisprBilling?: 'monthly' | 'annual'
+  whisprEnterprisePrice?: number
 }
 
 export interface SaveConfigResult {
@@ -74,6 +77,9 @@ export async function saveConfigAction(
       deliveryIncludedOrders: DELIVERY_PLANS[payload.deliveryPlan ?? 'start'].includedOrders,
       itemDiscounts: payload.itemDiscounts ?? { plan: 0, delivery: 0, addons: {}, hardware: {} },
       itemPriceOverrides: payload.itemPriceOverrides ?? { plan: null, delivery: null, hardware: {} },
+      whisprPlan: payload.whisprPlan ?? 'none',
+      whisprBilling: payload.whisprBilling ?? 'monthly',
+      whisprEnterprisePrice: payload.whisprEnterprisePrice ?? 0,
     }
 
     // Fetch current active config to reuse its id/version (avoids always writing v1)
