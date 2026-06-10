@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { createAuthBrowserClient } from '@/lib/supabase/auth'
 import type { AuthUser } from '@/lib/auth'
+import { OrvexLogo } from '@/components/ui/orvex-logo'
 
 const NAV = [
   { href: '/dashboard', label: 'Dashboard', icon: IconDashboard },
@@ -27,17 +28,25 @@ export function Sidebar({ user }: { user: AuthUser }) {
     router.refresh()
   }
 
+  const initials = (user.name ?? user.email)
+    .split(' ')
+    .slice(0, 2)
+    .map((s) => s[0])
+    .join('')
+    .toUpperCase()
+
   return (
-    <aside className="w-56 shrink-0 bg-zinc-900 flex flex-col h-full">
+    <aside
+      className="w-56 shrink-0 flex flex-col h-full border-r border-border-subtle"
+      style={{ background: '#101013' }}
+    >
       {/* Brand */}
-      <div className="px-5 py-5 border-b border-zinc-800">
-        <span className="text-white font-semibold text-sm tracking-tight">
-          Orvex
-        </span>
+      <div className="px-5 py-4 border-b border-border-subtle">
+        <OrvexLogo size="md" />
       </div>
 
       {/* Nav */}
-      <nav className="flex-1 px-3 py-4 space-y-0.5">
+      <nav className="flex-1 px-2 py-3 space-y-0.5 overflow-y-auto">
         {NAV.map(({ href, label, icon: Icon }) => {
           const active =
             href === '/dashboard'
@@ -52,13 +61,15 @@ export function Sidebar({ user }: { user: AuthUser }) {
             <Link
               key={href}
               href={href}
-              className={`flex items-center gap-2.5 px-3 py-2 rounded-md text-sm transition-colors ${
+              className={`flex items-center gap-2.5 px-3 rounded-[6px] text-[13px] transition-colors duration-150 h-8 ${
                 active
-                  ? 'bg-zinc-800 text-white'
-                  : 'text-zinc-400 hover:bg-zinc-800/60 hover:text-zinc-100'
+                  ? 'bg-accent-muted text-accent-text'
+                  : 'text-text-secondary hover:bg-hover hover:text-text-primary'
               }`}
             >
-              <Icon className="w-4 h-4 shrink-0" />
+              <Icon
+                className={`w-4 h-4 shrink-0 ${active ? 'text-accent' : ''}`}
+              />
               {label}
             </Link>
           )
@@ -67,20 +78,22 @@ export function Sidebar({ user }: { user: AuthUser }) {
         {/* Owner-only: Flujo de Caja */}
         {(user.role === 'owner' || user.role === 'admin') && (
           <>
-            <div className="pt-3 pb-1 px-3">
-              <span className="text-[9px] font-semibold uppercase tracking-widest text-zinc-600">
+            <div className="pt-4 pb-1.5 px-3">
+              <span className="text-[11px] font-medium uppercase tracking-widest text-text-tertiary">
                 Finanzas
               </span>
             </div>
             <Link
               href="/cashflow"
-              className={`flex items-center gap-2.5 px-3 py-2 rounded-md text-sm transition-colors ${
+              className={`flex items-center gap-2.5 px-3 rounded-[6px] text-[13px] transition-colors duration-150 h-8 ${
                 pathname.startsWith('/cashflow')
-                  ? 'bg-zinc-800 text-white'
-                  : 'text-zinc-400 hover:bg-zinc-800/60 hover:text-zinc-100'
+                  ? 'bg-accent-muted text-accent-text'
+                  : 'text-text-secondary hover:bg-hover hover:text-text-primary'
               }`}
             >
-              <IconCashflow className="w-4 h-4 shrink-0" />
+              <IconCashflow
+                className={`w-4 h-4 shrink-0 ${pathname.startsWith('/cashflow') ? 'text-accent' : ''}`}
+              />
               Flujo de Caja
             </Link>
           </>
@@ -89,8 +102,8 @@ export function Sidebar({ user }: { user: AuthUser }) {
         {/* Admin-only section */}
         {(user.role === 'admin' || user.role === 'owner') && (
           <>
-            <div className="pt-3 pb-1 px-3">
-              <span className="text-[9px] font-semibold uppercase tracking-widest text-zinc-600">
+            <div className="pt-4 pb-1.5 px-3">
+              <span className="text-[11px] font-medium uppercase tracking-widest text-text-tertiary">
                 Admin
               </span>
             </div>
@@ -100,13 +113,15 @@ export function Sidebar({ user }: { user: AuthUser }) {
                 <Link
                   key={href}
                   href={href}
-                  className={`flex items-center gap-2.5 px-3 py-2 rounded-md text-sm transition-colors ${
+                  className={`flex items-center gap-2.5 px-3 rounded-[6px] text-[13px] transition-colors duration-150 h-8 ${
                     active
-                      ? 'bg-zinc-800 text-white'
-                      : 'text-zinc-400 hover:bg-zinc-800/60 hover:text-zinc-100'
+                      ? 'bg-accent-muted text-accent-text'
+                      : 'text-text-secondary hover:bg-hover hover:text-text-primary'
                   }`}
                 >
-                  <Icon className="w-4 h-4 shrink-0" />
+                  <Icon
+                    className={`w-4 h-4 shrink-0 ${active ? 'text-accent' : ''}`}
+                  />
                   {label}
                 </Link>
               )
@@ -116,28 +131,31 @@ export function Sidebar({ user }: { user: AuthUser }) {
       </nav>
 
       {/* User profile + logout */}
-      <div className="px-4 py-4 border-t border-zinc-800">
-        <div className="flex items-start gap-2.5 px-1 mb-3">
-          <div className="w-7 h-7 rounded-full bg-zinc-700 flex items-center justify-center shrink-0 mt-0.5">
-            <span className="text-xs font-semibold text-zinc-300">
-              {(user.name ?? user.email).charAt(0).toUpperCase()}
+      <div className="px-3 py-3 border-t border-border-subtle">
+        <div className="flex items-start gap-2.5 px-1 mb-2">
+          <div
+            className="w-7 h-7 rounded-full flex items-center justify-center shrink-0 mt-0.5"
+            style={{ background: 'rgba(124,114,232,0.12)' }}
+          >
+            <span className="text-[11px] font-semibold text-accent-text font-mono">
+              {initials}
             </span>
           </div>
           <div className="min-w-0 flex-1">
-            <p className="text-xs font-semibold text-zinc-200 truncate leading-snug">
+            <p className="text-[13px] font-medium text-text-primary truncate leading-snug">
               {user.name ?? user.email.split('@')[0]}
             </p>
-            <p className="text-[10px] text-zinc-500 truncate leading-snug">
+            <p className="text-[11px] text-text-tertiary truncate leading-snug">
               {user.email}
             </p>
-            <span className="inline-block mt-1 text-[9px] font-semibold uppercase tracking-widest text-zinc-600 bg-zinc-800 px-1.5 py-0.5 rounded">
+            <span className="inline-block mt-1 text-[10px] font-medium uppercase tracking-wide text-text-tertiary bg-border-subtle px-1.5 py-0.5 rounded-[4px]">
               {user.role}
             </span>
           </div>
         </div>
         <button
           onClick={handleSignOut}
-          className="w-full text-left px-3 py-1.5 rounded-md text-xs text-zinc-500 hover:bg-zinc-800 hover:text-zinc-300 transition-colors"
+          className="w-full text-left px-3 py-1.5 rounded-[6px] text-[13px] text-text-tertiary hover:bg-hover hover:text-text-secondary transition-colors duration-150"
         >
           Cerrar sesión →
         </button>
@@ -243,22 +261,6 @@ function IconCashflow({ className }: { className?: string }) {
       <rect x="1" y="3" width="14" height="10" rx="1.5" />
       <path d="M1 6h14" strokeLinecap="round" />
       <path d="M4 10h2M10 10h2" strokeLinecap="round" />
-    </svg>
-  )
-}
-
-function IconQuote({ className }: { className?: string }) {
-  return (
-    <svg
-      className={className}
-      viewBox="0 0 16 16"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.5"
-    >
-      <rect x="2" y="1" width="12" height="14" rx="1.5" />
-      <path d="M5 5h6M5 8h4" strokeLinecap="round" />
-      <path d="M5 11h2.5M9.5 11l1 1.5 1-1.5" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
   )
 }
