@@ -4,6 +4,7 @@ import './globals.css'
 import { Sidebar } from '@/components/layout/sidebar'
 import { getCurrentUser } from '@/lib/auth'
 import { getPendingBillingPresupuestos } from '@/lib/supabase/presupuestos'
+import { getPendingApprovalsCount } from '@/lib/supabase/approvals'
 
 const geistSans = Geist({
   variable: '--font-geist-sans',
@@ -31,10 +32,15 @@ export default async function RootLayout({
 
   // Billing badge — only for owner/admin; fail silently so layout never breaks
   let pendingBillingCount = 0
+  let pendingGestionesCount = 0
   if (showShell && (user.role === 'owner' || user.role === 'admin')) {
     try {
-      const pending = await getPendingBillingPresupuestos()
-      pendingBillingCount = pending.length
+      const [pending, gestionesCount] = await Promise.all([
+        getPendingBillingPresupuestos(),
+        getPendingApprovalsCount(),
+      ])
+      pendingBillingCount   = pending.length
+      pendingGestionesCount = gestionesCount
     } catch {
       // ignore
     }
@@ -46,7 +52,7 @@ export default async function RootLayout({
       className={`${geistSans.variable} ${geistMono.variable} h-full`}
     >
       <body className={`h-full antialiased bg-zinc-50 ${showShell ? 'flex' : ''}`}>
-        {showShell && <Sidebar user={user} pendingBillingCount={pendingBillingCount} />}
+        {showShell && <Sidebar user={user} pendingBillingCount={pendingBillingCount} pendingGestionesCount={pendingGestionesCount} />}
         <main className={showShell ? 'flex-1 overflow-y-auto' : 'min-h-screen'}>
           {children}
         </main>

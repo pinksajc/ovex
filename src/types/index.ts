@@ -277,6 +277,9 @@ export interface InvoiceLineItem {
   locationGroupAddress?: string
 }
 
+export type ApprovalStatus = 'pending_approval' | 'approved' | 'rejected' | 'changes_requested'
+export type ApprovalType   = 'standard' | 'discount'
+
 export interface Invoice {
   id: string
   number: string
@@ -301,6 +304,12 @@ export interface Invoice {
   rectifiesId: string | null
   convertedFromId: string | null
   createdAt: string
+  // Approval flow
+  approvalStatus: ApprovalStatus
+  approvalType: ApprovalType
+  approvalNotes: string | null
+  approvedBy: string | null
+  approvedAt: string | null
 }
 
 export interface CreateInvoiceInput {
@@ -390,6 +399,12 @@ export interface Presupuesto {
   version: number                     // starts at 1, incremented per new version
   createdAt: string
   updatedAt: string
+  // Approval flow
+  approvalStatus: ApprovalStatus
+  approvalType: ApprovalType
+  approvalNotes: string | null
+  approvedBy: string | null
+  approvedAt: string | null
 }
 
 export interface CreatePresupuestoInput {

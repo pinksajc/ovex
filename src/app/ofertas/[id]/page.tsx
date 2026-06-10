@@ -3,6 +3,7 @@ import Link from 'next/link'
 import { getPresupuesto, getPresupuestosByDeal } from '@/lib/supabase/presupuestos'
 import { getInvoicesByDeal } from '@/lib/supabase/invoices'
 import { getDealById } from '@/lib/supabase/deals'
+import { getCurrentUser } from '@/lib/auth'
 import { OfertaActions } from './actions'
 import { RequiresSignatureToggle } from './requires-signature-toggle'
 import { ContractSection } from './contract-section'
@@ -10,6 +11,7 @@ import { NuevaVersionButton } from './nueva-version-button'
 import { ClientHistoryCard } from '@/components/deals/client-history-card'
 import { OfertaPageShell } from './oferta-page-shell'
 import { GenerarContratoButton } from './generar-contrato-button'
+import { APPROVAL_CHIP, isDownloadBlocked } from '@/lib/approvals'
 import type { PresupuestoStatus } from '@/types'
 
 const STATUS_LABELS: Record<PresupuestoStatus, string> = {
@@ -48,11 +50,18 @@ function Row({ label, value }: { label: string; value: React.ReactNode }) {
 
 export default async function OfertaDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
-  const presupuesto = await getPresupuesto(id).catch(() => null)
+  const [presupuesto, currentUser] = await Promise.all([
+    getPresupuesto(id).catch(() => null),
+    getCurrentUser(),
+  ])
   if (!presupuesto) notFound()
 
   const vatAmount = presupuesto.amountNet * (presupuesto.vatRate / 100)
   const canEdit = presupuesto.status === 'draft' || presupuesto.status === 'sent'
+
+  // Approval
+  const approvalChip  = APPROVAL_CHIP[presupuesto.approvalStatus]
+  const downloadBlock = isDownloadBlocked(presupuesto.status, presupuesto.approvalStatus, currentUser?.role ?? 'sales')
 
   // Fetch deal-level data when linked to a deal
   const [dealPresupuestos, dealFacturas, deal] = presupuesto.dealId
@@ -80,12 +89,27 @@ export default async function OfertaDetailPage({ params }: { params: Promise<{ i
       {/* Header */}
       <div className="mb-6 flex items-start justify-between gap-4 flex-wrap">
         <div>
-          <div className="flex items-center gap-3 mb-1">
+          <div className="flex items-center gap-3 mb-1 flex-wrap">
             <h1 className="text-2xl font-semibold text-zinc-900 font-mono tracking-tight">{presupuesto.number}</h1>
             <span className={`text-[10px] font-semibold uppercase tracking-wide px-2.5 py-1 rounded-full ${STATUS_COLORS[presupuesto.status]}`}>
               {STATUS_LABELS[presupuesto.status]}
             </span>
+            {approvalChip && (
+              <span className={`text-[10px] font-semibold uppercase tracking-wide px-2.5 py-1 rounded-full border ${approvalChip.cls}`}>
+                {approvalChip.label}
+              </span>
+            )}
           </div>
+          {/* Approval notes banner */}
+          {(presupuesto.approvalStatus === 'rejected' || presupuesto.approvalStatus === 'changes_requested') && presupuesto.approvalNotes && (
+            <div className={`mt-2 text-xs px-3 py-2 rounded-lg border ${
+              presupuesto.approvalStatus === 'rejected'
+                ? 'bg-red-50 border-red-200 text-red-800'
+                : 'bg-amber-50 border-amber-200 text-amber-800'
+            }`}>
+              <strong>Motivo:</strong> {presupuesto.approvalNotes}
+            </div>
+          )}
           <p className="text-sm text-zinc-500">{presupuesto.clientName}</p>
         </div>
 
@@ -111,17 +135,30 @@ export default async function OfertaDetailPage({ params }: { params: Promise<{ i
               Editar
             </Link>
           )}
-          <a
-            href={pdfDownloadUrl}
-            download
-            className="inline-flex items-center gap-1.5 text-xs font-medium border border-zinc-200 text-zinc-700 hover:bg-zinc-50 hover:border-zinc-400 px-3 py-1.5 rounded-lg transition-colors"
-          >
-            <svg className="w-3.5 h-3.5" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5">
-              <path d="M7 1v8M4 6l3 3 3-3" strokeLinecap="round" strokeLinejoin="round" />
-              <path d="M2 11h10" strokeLinecap="round" />
-            </svg>
-            Descargar oferta
-          </a>
+          {downloadBlock ? (
+            <span
+              title="Pendiente de aprobación — un admin u owner debe aprobar antes de descargar"
+              className="inline-flex items-center gap-1.5 text-xs font-medium border border-zinc-100 text-zinc-300 px-3 py-1.5 rounded-lg cursor-not-allowed select-none"
+            >
+              <svg className="w-3.5 h-3.5" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5">
+                <path d="M7 1v8M4 6l3 3 3-3" strokeLinecap="round" strokeLinejoin="round" />
+                <path d="M2 11h10" strokeLinecap="round" />
+              </svg>
+              Descargar oferta
+            </span>
+          ) : (
+            <a
+              href={pdfDownloadUrl}
+              download
+              className="inline-flex items-center gap-1.5 text-xs font-medium border border-zinc-200 text-zinc-700 hover:bg-zinc-50 hover:border-zinc-400 px-3 py-1.5 rounded-lg transition-colors"
+            >
+              <svg className="w-3.5 h-3.5" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5">
+                <path d="M7 1v8M4 6l3 3 3-3" strokeLinecap="round" strokeLinejoin="round" />
+                <path d="M2 11h10" strokeLinecap="round" />
+              </svg>
+              Descargar oferta
+            </a>
+          )}
           <a
             href={`/api/ofertas/generate-pdf?id=${presupuesto.id}`}
             target="_blank"

@@ -14,6 +14,7 @@ export type Module =
   | 'facturas'
   | 'cashflow'
   | 'usuarios'
+  | 'gestiones'
 
 /**
  * Which roles may access each module.
@@ -27,6 +28,7 @@ export const MODULE_ROLES: Record<Module, readonly Role[]> = {
   facturas:  ['owner', 'admin', 'finance'],
   cashflow:  ['owner', 'admin', 'finance'],
   usuarios:  ['owner', 'admin'],
+  gestiones: ['owner', 'admin'],
 }
 
 export function canAccess(role: string | undefined | null, module: Module): boolean {

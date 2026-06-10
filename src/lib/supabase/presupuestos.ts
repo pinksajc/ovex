@@ -56,6 +56,12 @@ interface PresupuestoRow {
   version?: number | null
   created_at: string
   updated_at: string
+  // Approval flow (added in migration 20260610000003)
+  approval_status?: string | null
+  approval_type?: string | null
+  approval_notes?: string | null
+  approved_by?: string | null
+  approved_at?: string | null
 }
 
 function parseLineItems(raw: unknown): InvoiceLineItem[] {
@@ -95,6 +101,11 @@ function rowToPresupuesto(row: PresupuestoRow): Presupuesto {
     version: row.version ?? 1,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
+    approvalStatus: (row.approval_status ?? 'pending_approval') as import('@/types').ApprovalStatus,
+    approvalType:   (row.approval_type   ?? 'standard')         as import('@/types').ApprovalType,
+    approvalNotes:  row.approval_notes  ?? null,
+    approvedBy:     row.approved_by     ?? null,
+    approvedAt:     row.approved_at     ?? null,
   }
 }
 

@@ -1,8 +1,10 @@
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import { getInvoice } from '@/lib/supabase/invoices'
+import { getCurrentUser } from '@/lib/auth'
 import { InvoiceActions, ConvertProformaButton, DeleteInvoiceButton } from './actions'
 import { FacturaPageShell } from './factura-page-shell'
+import { APPROVAL_CHIP, isDownloadBlocked } from '@/lib/approvals'
 import type { Invoice, InvoiceStatus } from '@/types'
 
 const STATUS_LABELS: Record<InvoiceStatus, string> = {
@@ -41,10 +43,16 @@ function Row({ label, value }: { label: string; value: React.ReactNode }) {
 
 export default async function FacturaDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
-  const invoice = await getInvoice(id).catch(() => null)
+  const [invoice, currentUser] = await Promise.all([
+    getInvoice(id).catch(() => null),
+    getCurrentUser(),
+  ])
   if (!invoice) notFound()
 
   const vatAmount = invoice.amountNet * (invoice.vatRate / 100)
+
+  const approvalChip  = APPROVAL_CHIP[invoice.approvalStatus]
+  const downloadBlock = isDownloadBlocked(invoice.status, invoice.approvalStatus, currentUser?.role ?? 'sales')
 
   let rectifiedInvoice: Invoice | null = null
   if (invoice.rectifiesId) {
@@ -82,6 +90,11 @@ export default async function FacturaDetailPage({ params }: { params: Promise<{ 
           Factura Proforma
         </span>
       )}
+      {approvalChip && (
+        <span className={`text-[10px] font-semibold uppercase tracking-wide px-2.5 py-1 rounded-full border ${approvalChip.cls}`}>
+          {approvalChip.label}
+        </span>
+      )}
     </>
   )
 
@@ -93,6 +106,17 @@ export default async function FacturaDetailPage({ params }: { params: Promise<{ 
       before={beforeSlot}
       after={afterSlot}
     >
+      {/* Approval notes banner */}
+      {(invoice.approvalStatus === 'rejected' || invoice.approvalStatus === 'changes_requested') && invoice.approvalNotes && (
+        <div className={`mb-4 text-xs px-3 py-2 rounded-lg border ${
+          invoice.approvalStatus === 'rejected'
+            ? 'bg-red-50 border-red-200 text-red-800'
+            : 'bg-amber-50 border-amber-200 text-amber-800'
+        }`}>
+          <strong>Motivo:</strong> {invoice.approvalNotes}
+        </div>
+      )}
+
       {/* Client name subtitle + action buttons row */}
       <div className="flex items-start justify-between gap-4 flex-wrap mb-6 -mt-4">
         <p className="text-sm text-zinc-500">{invoice.clientName}</p>
@@ -112,17 +136,30 @@ export default async function FacturaDetailPage({ params }: { params: Promise<{ 
           )}
 
           {/* PDF download */}
-          <a
-            href={pdfDownloadUrl}
-            download
-            className="inline-flex items-center gap-1.5 text-xs font-medium border border-zinc-200 text-zinc-700 hover:bg-zinc-50 hover:border-zinc-400 px-3 py-1.5 rounded-lg transition-colors"
-          >
-            <svg className="w-3.5 h-3.5" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5">
-              <path d="M7 1v8M4 6l3 3 3-3" strokeLinecap="round" strokeLinejoin="round" />
-              <path d="M2 11h10" strokeLinecap="round" />
-            </svg>
-            Descargar PDF
-          </a>
+          {downloadBlock ? (
+            <span
+              title="Pendiente de aprobación — un admin u owner debe aprobar antes de descargar"
+              className="inline-flex items-center gap-1.5 text-xs font-medium border border-zinc-100 text-zinc-300 px-3 py-1.5 rounded-lg cursor-not-allowed select-none"
+            >
+              <svg className="w-3.5 h-3.5" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5">
+                <path d="M7 1v8M4 6l3 3 3-3" strokeLinecap="round" strokeLinejoin="round" />
+                <path d="M2 11h10" strokeLinecap="round" />
+              </svg>
+              Descargar PDF
+            </span>
+          ) : (
+            <a
+              href={pdfDownloadUrl}
+              download
+              className="inline-flex items-center gap-1.5 text-xs font-medium border border-zinc-200 text-zinc-700 hover:bg-zinc-50 hover:border-zinc-400 px-3 py-1.5 rounded-lg transition-colors"
+            >
+              <svg className="w-3.5 h-3.5" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5">
+                <path d="M7 1v8M4 6l3 3 3-3" strokeLinecap="round" strokeLinejoin="round" />
+                <path d="M2 11h10" strokeLinecap="round" />
+              </svg>
+              Descargar PDF
+            </a>
+          )}
         </div>
       </div>
 

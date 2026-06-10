@@ -35,6 +35,12 @@ interface InvoiceRow {
     address: string | null
     cost_center: string | null
   } | null
+  // Approval flow (added in migration 20260610000003)
+  approval_status?: string | null
+  approval_type?: string | null
+  approval_notes?: string | null
+  approved_by?: string | null
+  approved_at?: string | null
 }
 
 function parseLineItems(raw: unknown): InvoiceLineItem[] {
@@ -71,6 +77,11 @@ function rowToInvoice(row: InvoiceRow): Invoice {
     rectifiesId: row.rectifies_id,
     convertedFromId: row.converted_from_id,
     createdAt: row.created_at,
+    approvalStatus: (row.approval_status ?? 'pending_approval') as import('@/types').ApprovalStatus,
+    approvalType:   (row.approval_type   ?? 'standard')         as import('@/types').ApprovalType,
+    approvalNotes:  row.approval_notes  ?? null,
+    approvedBy:     row.approved_by     ?? null,
+    approvedAt:     row.approved_at     ?? null,
   }
 }
 
@@ -154,6 +165,11 @@ export async function getInvoicesByDeal(dealId: string): Promise<Invoice[]> {
       rectifiesId: null,
       convertedFromId: null,
       createdAt: row.issued_at ?? '',
+      approvalStatus: 'approved' as import('@/types').ApprovalStatus,
+      approvalType: 'standard' as import('@/types').ApprovalType,
+      approvalNotes: null,
+      approvedBy: null,
+      approvedAt: null,
     })
   )
 }

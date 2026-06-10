@@ -27,10 +27,19 @@ const FINANCE_NAV: NavItem[] = [
 ]
 
 const ADMIN_NAV: NavItem[] = [
-  { href: '/usuarios', label: 'Usuarios', icon: IconUsers, module: 'usuarios' },
+  { href: '/gestiones', label: 'Gestiones', icon: IconGestiones, module: 'gestiones' },
+  { href: '/usuarios',  label: 'Usuarios',  icon: IconUsers,     module: 'usuarios'  },
 ]
 
-export function Sidebar({ user, pendingBillingCount = 0 }: { user: AuthUser; pendingBillingCount?: number }) {
+export function Sidebar({
+  user,
+  pendingBillingCount = 0,
+  pendingGestionesCount = 0,
+}: {
+  user: AuthUser
+  pendingBillingCount?: number
+  pendingGestionesCount?: number
+}) {
   const pathname = usePathname()
   const router = useRouter()
 
@@ -51,7 +60,10 @@ export function Sidebar({ user, pendingBillingCount = 0 }: { user: AuthUser; pen
         ? pathname === '/dashboard'
         : pathname.startsWith(href)
 
-    const showBadge = href === '/facturas' && pendingBillingCount > 0
+    const badge =
+      href === '/facturas'  && pendingBillingCount  > 0 ? pendingBillingCount  :
+      href === '/gestiones' && pendingGestionesCount > 0 ? pendingGestionesCount :
+      0
 
     return (
       <Link
@@ -65,9 +77,9 @@ export function Sidebar({ user, pendingBillingCount = 0 }: { user: AuthUser; pen
       >
         <Icon className="w-4 h-4 shrink-0" />
         <span className="flex-1">{label}</span>
-        {showBadge && (
+        {badge > 0 && (
           <span className="ml-auto min-w-[18px] h-[18px] flex items-center justify-center rounded-full bg-red-500 text-white text-[9px] font-bold px-1">
-            {pendingBillingCount}
+            {badge}
           </span>
         )}
       </Link>
@@ -254,6 +266,22 @@ function IconQuote({ className }: { className?: string }) {
       <rect x="2" y="1" width="12" height="14" rx="1.5" />
       <path d="M5 5h6M5 8h4" strokeLinecap="round" />
       <path d="M5 11h2.5M9.5 11l1 1.5 1-1.5" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  )
+}
+
+function IconGestiones({ className }: { className?: string }) {
+  return (
+    <svg
+      className={className}
+      viewBox="0 0 16 16"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.5"
+    >
+      <path d="M2 4h12M2 8h8M2 12h5" strokeLinecap="round" />
+      <circle cx="13" cy="11" r="2.5" />
+      <path d="M12 11l.8.8 1.7-1.6" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
   )
 }
