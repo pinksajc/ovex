@@ -1,7 +1,9 @@
 'use client'
 
 import { useState, useTransition } from 'react'
+import { useRouter } from 'next/navigation'
 import { updateDueDateAction } from '@/app/actions/invoices'
+import type { InvoiceStatus } from '@/types'
 
 function formatDate(s: string | null) {
   if (!s) return '—'
@@ -16,9 +18,11 @@ interface Props {
   invoiceId: string
   dueAt: string | null
   dueDateEnabled: boolean
+  invoiceStatus: InvoiceStatus
 }
 
-export function DueDateEditor({ invoiceId, dueAt, dueDateEnabled }: Props) {
+export function DueDateEditor({ invoiceId, dueAt, dueDateEnabled, invoiceStatus }: Props) {
+  const router = useRouter()
   const [editing, setEditing] = useState(false)
   const [value, setValue] = useState(dueAt?.slice(0, 10) ?? '')
   const [currentDueAt, setCurrentDueAt] = useState(dueAt)
@@ -31,12 +35,14 @@ export function DueDateEditor({ invoiceId, dueAt, dueDateEnabled }: Props) {
   const handleSave = () => {
     setError(null)
     startTransition(async () => {
-      const result = await updateDueDateAction(invoiceId, value || null)
+      const result = await updateDueDateAction(invoiceId, value || null, invoiceStatus)
       if (result.ok) {
         setCurrentDueAt(value || null)
         setEditing(false)
         setSaved(true)
         setTimeout(() => setSaved(false), 2500)
+        // Refresh the server component so the status badge reflects the new status
+        router.refresh()
       } else {
         setError(result.error ?? 'Error al guardar')
       }

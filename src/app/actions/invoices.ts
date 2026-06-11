@@ -7,6 +7,7 @@ import { insertCashflowTransactions } from '@/lib/supabase/cashflow'
 import { logApprovalEvent } from '@/lib/supabase/events'
 import type { CreateInvoiceInput, UpdateInvoiceInput, InvoiceStatus } from '@/types'
 
+
 export async function createInvoiceAction(input: CreateInvoiceInput): Promise<{ error?: string }> {
   try {
     // Validate issue date is not before the most recent existing invoice
@@ -107,12 +108,13 @@ export async function updateInvoiceStatusAction(
 export async function updateDueDateAction(
   id: string,
   dueAt: string | null,
-): Promise<{ ok: boolean; error?: string }> {
+  currentStatus: InvoiceStatus,
+): Promise<{ ok: boolean; newStatus?: InvoiceStatus; error?: string }> {
   try {
-    await updateInvoiceDueDate(id, dueAt)
+    const newStatus = await updateInvoiceDueDate(id, dueAt, currentStatus)
     revalidatePath('/facturas')
     revalidatePath(`/facturas/${id}`)
-    return { ok: true }
+    return { ok: true, newStatus }
   } catch (err) {
     return { ok: false, error: err instanceof Error ? err.message : 'Error desconocido' }
   }
