@@ -1,6 +1,7 @@
 'use server'
 
 import { revalidateTag, revalidatePath } from 'next/cache'
+import { requireAuth } from '@/lib/auth'
 import { upsertContactOverride } from '@/lib/supabase/contact-overrides'
 
 export async function updateContactAction(
@@ -10,6 +11,7 @@ export async function updateContactAction(
   email: string,
   dealId?: string,
 ): Promise<{ ok: true } | { ok: false; error: string }> {
+  await requireAuth()
   if (!dealId) return { ok: false, error: 'dealId requerido' }
   try {
     await upsertContactOverride(dealId, firstName, lastName, email)

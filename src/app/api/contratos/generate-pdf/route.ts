@@ -8,9 +8,14 @@
 //   &inline=1               (optional — Content-Disposition: inline instead of attachment)
 
 import { NextResponse } from 'next/server'
+import { getCurrentUser } from '@/lib/auth'
 
 export async function GET(req: Request) {
   try {
+    // Auth guard
+    const me = await getCurrentUser()
+    if (!me) return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
+
     const { searchParams } = new URL(req.url)
     const id          = searchParams.get('id')
     const duracion    = Number(searchParams.get('duracion') ?? '12')

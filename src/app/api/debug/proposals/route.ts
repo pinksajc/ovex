@@ -1,11 +1,21 @@
 import { NextResponse } from 'next/server'
+import { getCurrentUser } from '@/lib/auth'
 
 /**
  * GET /api/debug/proposals
  * Verifica la conectividad con la tabla proposals en Supabase.
- * Solo accesible en desarrollo o con query param ?secret=
+ * Owner-only.
  */
 export async function GET(request: Request) {
+  // Owner-only guard
+  const me = await getCurrentUser()
+  if (!me) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+  if (me.role !== 'owner') {
+    return NextResponse.json({ error: 'owner only' }, { status: 403 })
+  }
+
   const steps: Record<string, unknown> = {}
 
   // 1. Env vars
@@ -13,7 +23,7 @@ export async function GET(request: Request) {
   const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY
   steps.env = {
     SUPABASE_URL: supabaseUrl ? `set (${supabaseUrl})` : 'MISSING',
-    SUPABASE_SERVICE_ROLE_KEY: supabaseKey ? `set (${supabaseKey.slice(0, 20)}...)` : 'MISSING',
+    SUPABASE_SERVICE_ROLE_KEY: supabaseKey ? 'set' : 'MISSING',
   }
 
   if (!supabaseUrl || !supabaseKey) {

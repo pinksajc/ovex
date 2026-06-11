@@ -3,9 +3,14 @@
 // The UI calls the server action directly; this route is for external integrations.
 
 import { NextResponse } from 'next/server'
+import { getCurrentUser } from '@/lib/auth'
 
 export async function POST(req: Request) {
   try {
+    // Auth guard — only authenticated users may trigger signature flows
+    const me = await getCurrentUser()
+    if (!me) return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
+
     const { dealId, configId, signerName, signerEmail } = (await req.json()) as {
       dealId: string
       configId: string

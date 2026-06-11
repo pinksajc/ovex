@@ -1,6 +1,7 @@
 'use server'
 
 import { revalidatePath, revalidateTag } from 'next/cache'
+import { requireAuth } from '@/lib/auth'
 import { logEvent } from '@/lib/supabase/events'
 
 export interface SendForSignatureResult {
@@ -31,6 +32,7 @@ export async function markSentForSignatureAction(
   signerName: string,
   signerEmail: string
 ): Promise<SendForSignatureResult> {
+  await requireAuth()
   const tag = `[mark-sent deal=${dealId} cfg=${configId}]`
 
   // ── Temporary env debug log ───────────────────────────────────────────────

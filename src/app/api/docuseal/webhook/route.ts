@@ -18,9 +18,31 @@ import { logEvent } from '@/lib/supabase/events'
 export async function POST(req: Request) {
   const body = await req.text()
 
-  // ── Signature verification (temporarily disabled) ──────────────────────
-  // TODO: re-enable once DOCUSEAL_WEBHOOK_SECRET is confirmed working
-  console.log('[docuseal-webhook] signature verification skipped (disabled)')
+  // ── Signature verification ────────────────────────────────────────────────
+  // When DOCUSEAL_WEBHOOK_SECRET is configured, verify the HMAC-SHA256 signature
+  // sent by DocuSeal in the X-DocuSeal-Signature header.
+  const webhookSecret = process.env.DOCUSEAL_WEBHOOK_SECRET
+  if (webhookSecret) {
+    const signature = req.headers.get('x-docuseal-signature') ?? ''
+    const encoder = new TextEncoder()
+    const key = await crypto.subtle.importKey(
+      'raw',
+      encoder.encode(webhookSecret),
+      { name: 'HMAC', hash: 'SHA-256' },
+      false,
+      ['sign'],
+    )
+    const sigBuffer = await crypto.subtle.sign('HMAC', key, encoder.encode(body))
+    const expected = Array.from(new Uint8Array(sigBuffer))
+      .map((b) => b.toString(16).padStart(2, '0'))
+      .join('')
+    if (signature !== expected) {
+      console.warn('[docuseal-webhook] invalid signature — rejecting request')
+      return NextResponse.json({ error: 'Invalid signature' }, { status: 401 })
+    }
+  } else {
+    console.warn('[docuseal-webhook] DOCUSEAL_WEBHOOK_SECRET not set — signature verification skipped')
+  }
 
   // ── Parse ───────────────────────────────────────────────────────────────
   let payload: DocuSealWebhookPayload
