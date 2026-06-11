@@ -198,6 +198,19 @@ export async function getInvoice(id: string): Promise<Invoice | null> {
 }
 
 /**
+ * Looks up an invoice by its human-readable number (e.g. "F-2026-0007").
+ * Returns the UUID, or null if not found.
+ */
+export async function getInvoiceIdByNumber(number: string): Promise<string | null> {
+  const db = getSupabaseClient()
+  const { data } = await invoicesTable(db)
+    .select('id')
+    .eq('number', number.trim().toUpperCase())
+    .maybeSingle()
+  return (data as { id: string } | null)?.id ?? null
+}
+
+/**
  * Returns the most recent issued_at date across all invoices (facturas + proformas),
  * or null if no invoices exist yet.
  */

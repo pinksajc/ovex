@@ -350,15 +350,16 @@ export function NewInvoiceForm({
         {type === 'rectificativa' && (
           <div>
             <label className="block text-xs font-medium text-zinc-700 mb-1">
-              Factura que rectifica (ID)
+              Factura que rectifica
             </label>
             <input
               type="text"
               value={rectifiesId}
               onChange={(e) => setRectifiesId(e.target.value)}
-              placeholder="UUID de la factura original"
+              placeholder="Ej. F-2026-0007"
               className="w-full border border-zinc-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-zinc-300"
             />
+            <p className="text-[11px] text-zinc-400 mt-1">Introduce el número de factura (no el UUID interno)</p>
           </div>
         )}
       </div>
