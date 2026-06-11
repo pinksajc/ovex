@@ -344,12 +344,37 @@ export async function convertProformaToInvoice(proformaId: string): Promise<Invo
 }
 
 /**
- * Updates only the due_at field of an invoice (inline edit on detail page).
+ * Updates due_at and, if applicable, recalculates status:
+ *   overdue  + future date  → issued
+ *   issued   + past/today   → overdue
+ *   paid                    → status never touched
+ * Returns the effective new status (may equal currentStatus if unchanged).
  */
-export async function updateInvoiceDueDate(id: string, dueAt: string | null): Promise<void> {
+export async function updateInvoiceDueDate(
+  id: string,
+  dueAt: string | null,
+  currentStatus: import('@/types').InvoiceStatus,
+): Promise<import('@/types').InvoiceStatus> {
+  const newStatus = computeStatusFromDueDate(dueAt, currentStatus)
   const db = getSupabaseClient()
   const { error } = await invoicesTable(db)
-    .update({ due_at: dueAt })
+    .update({ due_at: dueAt, status: newStatus })
     .eq('id', id)
   if (error) throw new Error(`updateInvoiceDueDate: ${error.message}`)
+  return newStatus
+}
+
+function computeStatusFromDueDate(
+  dueAt: string | null,
+  currentStatus: import('@/types').InvoiceStatus,
+): import('@/types').InvoiceStatus {
+  // Paid invoices are never auto-changed
+  if (currentStatus === 'paid') return currentStatus
+  // No due date — nothing to compute
+  if (!dueAt) return currentStatus
+  const today = new Date().toISOString().slice(0, 10)
+  const isPastOrToday = dueAt <= today
+  if (isPastOrToday && currentStatus === 'issued') return 'overdue'
+  if (!isPastOrToday && currentStatus === 'overdue') return 'issued'
+  return currentStatus
 }

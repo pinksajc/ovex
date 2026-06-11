@@ -201,6 +201,7 @@ export default async function FacturaDetailPage({ params }: { params: Promise<{ 
                     invoiceId={invoice.id}
                     dueAt={invoice.dueAt}
                     dueDateEnabled={invoice.dueDateEnabled}
+                    invoiceStatus={invoice.status}
                   />
                 }
               />
