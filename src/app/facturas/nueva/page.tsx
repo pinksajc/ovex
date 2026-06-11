@@ -1,5 +1,6 @@
 import { getDeals } from '@/lib/deals'
 import { getCurrentUser } from '@/lib/auth'
+import { getMaxInvoiceIssuedAt } from '@/lib/supabase/invoices'
 import { NewInvoiceForm } from './form'
 
 export default async function NuevaFacturaPage({
@@ -24,6 +25,9 @@ export default async function NuevaFacturaPage({
   // Pre-populate from deal_id if provided
   const preselectedDeal = deal_id ? deals.find((d) => d.id === deal_id) : undefined
 
+  // Minimum allowed issue date: the most recent issued_at across all invoices
+  const minIssuedAt = await getMaxInvoiceIssuedAt().catch(() => null)
+
   return (
     <div className="p-8 max-w-2xl mx-auto">
       <div className="mb-8">
@@ -36,6 +40,7 @@ export default async function NuevaFacturaPage({
         initialClientName={preselectedDeal?.company.name}
         initialClientCif={preselectedDeal?.company.cif}
         initialClientAddress={preselectedDeal?.company.address}
+        minIssuedAt={minIssuedAt}
       />
     </div>
   )

@@ -197,6 +197,21 @@ export async function getInvoice(id: string): Promise<Invoice | null> {
   return rowToInvoice(data as InvoiceRow)
 }
 
+/**
+ * Returns the most recent issued_at date across all invoices (facturas + proformas),
+ * or null if no invoices exist yet.
+ */
+export async function getMaxInvoiceIssuedAt(): Promise<string | null> {
+  const db = getSupabaseClient()
+  const { data } = await invoicesTable(db)
+    .select('issued_at')
+    .not('issued_at', 'is', null)
+    .order('issued_at', { ascending: false })
+    .limit(1)
+    .maybeSingle()
+  return (data as { issued_at: string | null } | null)?.issued_at ?? null
+}
+
 // =========================================
 // WRITES
 // =========================================

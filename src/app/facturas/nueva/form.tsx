@@ -75,6 +75,8 @@ interface Props {
   initialClientName?: string
   initialClientCif?: string
   initialClientAddress?: string
+  /** ISO date string (YYYY-MM-DD) — the earliest date the user may select */
+  minIssuedAt?: string | null
 }
 
 // ---- component ----
@@ -85,6 +87,7 @@ export function NewInvoiceForm({
   initialClientName,
   initialClientCif,
   initialClientAddress,
+  minIssuedAt,
 }: Props) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
@@ -245,6 +248,16 @@ export function NewInvoiceForm({
     const filledLines = lines.filter((l) => l.type === 'line' && l.description.trim())
     if (filledLines.length === 0) return setError('Añade al menos una línea con descripción.')
     if (base <= 0) return setError('La base imponible debe ser mayor que 0.')
+
+    // Validate issue date is not before the most recent existing invoice
+    if (minIssuedAt && issuedAt && issuedAt < minIssuedAt) {
+      const formatted = new Date(minIssuedAt + 'T00:00:00').toLocaleDateString('es-ES', {
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric',
+      })
+      return setError(`La fecha no puede ser anterior a la última factura emitida (${formatted})`)
+    }
 
     const concept =
       filledLines.length === 1
@@ -533,9 +546,20 @@ export function NewInvoiceForm({
             <input
               type="date"
               value={issuedAt}
+              min={minIssuedAt ?? undefined}
               onChange={(e) => setIssuedAt(e.target.value)}
               className="w-full border border-zinc-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-zinc-300"
             />
+            {minIssuedAt && (
+              <p className="mt-1 text-[10px] text-zinc-400">
+                Mínimo:{' '}
+                {new Date(minIssuedAt + 'T00:00:00').toLocaleDateString('es-ES', {
+                  day: '2-digit',
+                  month: '2-digit',
+                  year: 'numeric',
+                })}
+              </p>
+            )}
           </div>
           <div>
             <div className="flex items-center justify-between mb-1">

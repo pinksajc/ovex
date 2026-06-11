@@ -2,13 +2,26 @@
 
 import { redirect } from 'next/navigation'
 import { revalidatePath } from 'next/cache'
-import { createInvoice, updateInvoice, updateInvoiceStatus, getInvoice, convertProformaToInvoice, deleteInvoice } from '@/lib/supabase/invoices'
+import { createInvoice, updateInvoice, updateInvoiceStatus, getInvoice, convertProformaToInvoice, deleteInvoice, getMaxInvoiceIssuedAt } from '@/lib/supabase/invoices'
 import { insertCashflowTransactions } from '@/lib/supabase/cashflow'
 import { logApprovalEvent } from '@/lib/supabase/events'
 import type { CreateInvoiceInput, UpdateInvoiceInput, InvoiceStatus } from '@/types'
 
 export async function createInvoiceAction(input: CreateInvoiceInput): Promise<{ error?: string }> {
   try {
+    // Validate issue date is not before the most recent existing invoice
+    if (input.issuedAt) {
+      const maxDate = await getMaxInvoiceIssuedAt()
+      if (maxDate && input.issuedAt < maxDate) {
+        const formatted = new Date(maxDate + 'T00:00:00').toLocaleDateString('es-ES', {
+          day: '2-digit',
+          month: '2-digit',
+          year: 'numeric',
+        })
+        return { error: `La fecha no puede ser anterior a la última factura emitida (${formatted})` }
+      }
+    }
+
     const invoice = await createInvoice(input)
 
     // Log "pending approval" event if linked to a deal
