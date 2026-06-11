@@ -93,6 +93,7 @@ export function Sidebar({
         <span className="text-white font-semibold text-sm tracking-tight">
           Orvex
         </span>
+        <p className="text-zinc-500 text-[11px] font-normal mt-0.5">by Platomico</p>
       </div>
 
       {/* Nav */}
