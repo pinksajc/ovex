@@ -1,6 +1,7 @@
 'use server'
 
 import { revalidateTag, revalidatePath } from 'next/cache'
+import { requireAuth } from '@/lib/auth'
 import { updateDealCompany } from '@/lib/supabase/deals'
 
 export async function updateCompanyAction(
@@ -11,6 +12,7 @@ export async function updateCompanyAction(
   address: string,
   city: string,
 ): Promise<{ ok: true } | { ok: false; error: string }> {
+  await requireAuth()
   if (!dealId) return { ok: false, error: 'dealId requerido' }
   if (!name.trim()) return { ok: false, error: 'El nombre es obligatorio' }
   try {

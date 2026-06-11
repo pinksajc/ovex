@@ -3,11 +3,13 @@
 import { redirect } from 'next/navigation'
 import { revalidatePath } from 'next/cache'
 import { isRedirectError } from 'next/dist/client/components/redirect-error'
+import { requireAuth } from '@/lib/auth'
 import { createPresupuesto, updatePresupuesto, updatePresupuestoStatus, updatePresupuestoSignatureRequired, getPresupuesto, createPresupuestoVersion, deletePresupuesto } from '@/lib/supabase/presupuestos'
 import { logApprovalEvent } from '@/lib/supabase/events'
 import type { CreatePresupuestoInput, UpdatePresupuestoInput, PresupuestoStatus } from '@/types'
 
 export async function createPresupuestoAction(input: CreatePresupuestoInput): Promise<{ error?: string }> {
+  await requireAuth()
   try {
     const presupuesto = await createPresupuesto(input)
 
@@ -33,6 +35,7 @@ export async function updatePresupuestoAction(
   id: string,
   input: UpdatePresupuestoInput
 ): Promise<{ error?: string }> {
+  await requireAuth()
   try {
     await updatePresupuesto(id, input)
     revalidatePath('/ofertas')
@@ -49,6 +52,7 @@ export async function updatePresupuestoStatusAction(
   id: string,
   status: PresupuestoStatus
 ): Promise<{ ok: boolean; error?: string }> {
+  await requireAuth()
   try {
     await updatePresupuestoStatus(id, status)
 
@@ -69,6 +73,7 @@ export async function toggleRequiresSignatureAction(
   id: string,
   value: boolean,
 ): Promise<{ ok: boolean; error?: string }> {
+  await requireAuth()
   try {
     await updatePresupuestoSignatureRequired(id, value)
     revalidatePath(`/ofertas/${id}`)
@@ -81,6 +86,7 @@ export async function toggleRequiresSignatureAction(
 export async function createVersionAction(
   presupuestoId: string
 ): Promise<{ ok: boolean; id?: string; error?: string }> {
+  await requireAuth()
   try {
     const newPq = await createPresupuestoVersion(presupuestoId)
     revalidatePath('/ofertas')
@@ -95,6 +101,7 @@ export async function createVersionAction(
 export async function deletePresupuestoAction(
   id: string
 ): Promise<{ ok: boolean; error?: string }> {
+  await requireAuth()
   try {
     await deletePresupuesto(id)
     revalidatePath('/ofertas')
@@ -111,6 +118,7 @@ export async function acceptContratoAction(
   acceptanceDate: string,
   additionalNotes: string,
 ): Promise<{ ok: boolean; error?: string }> {
+  await requireAuth()
   try {
     const pq = await getPresupuesto(id)
     if (!pq) return { ok: false, error: 'Oferta no encontrada' }

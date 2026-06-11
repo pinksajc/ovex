@@ -4,11 +4,13 @@ import { redirect } from 'next/navigation'
 import { revalidatePath } from 'next/cache'
 import { createInvoice, updateInvoice, updateInvoiceStatus, getInvoice, convertProformaToInvoice, deleteInvoice, getMaxInvoiceIssuedAt, updateInvoiceDueDate } from '@/lib/supabase/invoices'
 import { insertCashflowTransactions } from '@/lib/supabase/cashflow'
+import { requireAuth } from '@/lib/auth'
 import { logApprovalEvent } from '@/lib/supabase/events'
 import type { CreateInvoiceInput, UpdateInvoiceInput, InvoiceStatus } from '@/types'
 
 
 export async function createInvoiceAction(input: CreateInvoiceInput): Promise<{ error?: string }> {
+  await requireAuth()
   try {
     // Validate issue date is not before the most recent existing invoice
     if (input.issuedAt) {
@@ -46,6 +48,7 @@ export async function updateInvoiceAction(
   id: string,
   input: UpdateInvoiceInput
 ): Promise<{ error?: string }> {
+  await requireAuth()
   try {
     await updateInvoice(id, input)
     revalidatePath('/facturas')
@@ -60,6 +63,7 @@ export async function updateInvoiceAction(
 export async function convertProformaAction(
   proformaId: string,
 ): Promise<{ ok: boolean; invoiceId?: string; error?: string }> {
+  await requireAuth()
   try {
     const invoice = await convertProformaToInvoice(proformaId)
     revalidatePath('/facturas')
@@ -74,6 +78,7 @@ export async function updateInvoiceStatusAction(
   id: string,
   status: InvoiceStatus
 ): Promise<{ ok: boolean; error?: string }> {
+  await requireAuth()
   try {
     // Fetch before updating so we know the previous status and have invoice details
     const invoice = await getInvoice(id)
@@ -110,6 +115,7 @@ export async function updateDueDateAction(
   dueAt: string | null,
   currentStatus: InvoiceStatus,
 ): Promise<{ ok: boolean; newStatus?: InvoiceStatus; error?: string }> {
+  await requireAuth()
   try {
     const newStatus = await updateInvoiceDueDate(id, dueAt, currentStatus)
     revalidatePath('/facturas')
@@ -123,6 +129,7 @@ export async function updateDueDateAction(
 export async function deleteInvoiceAction(
   id: string,
 ): Promise<{ ok: boolean; error?: string }> {
+  await requireAuth()
   try {
     await deleteInvoice(id)
     revalidatePath('/facturas')

@@ -2,6 +2,7 @@
 
 import { saveProposal } from '@/lib/deals'
 import { revalidatePath, revalidateTag } from 'next/cache'
+import { requireAuth } from '@/lib/auth'
 import { logEvent } from '@/lib/supabase/events'
 import type { ProposalSections } from '@/types'
 
@@ -17,6 +18,7 @@ export async function saveProposalAction(
   configId: string,
   sections: ProposalSections
 ): Promise<SaveProposalResult> {
+  await requireAuth()
   console.log('[saveProposalAction] start', { attioDealId, configId })
   try {
     const { proposal, persisted } = await saveProposal(attioDealId, configId, sections)

@@ -5,9 +5,14 @@
 // Body: { dealId: string, configId: string }
 
 import { NextResponse } from 'next/server'
+import { getCurrentUser } from '@/lib/auth'
 
 export async function POST(req: Request) {
   try {
+    // Auth guard
+    const me = await getCurrentUser()
+    if (!me) return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
+
     const { dealId, configId } = (await req.json()) as {
       dealId: string
       configId: string

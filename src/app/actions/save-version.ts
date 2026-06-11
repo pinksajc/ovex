@@ -1,6 +1,7 @@
 'use server'
 
 import { revalidateTag, revalidatePath } from 'next/cache'
+import { requireAuth } from '@/lib/auth'
 import { calculateEconomics } from '@/lib/pricing/engine'
 import { DELIVERY_PLANS } from '@/lib/pricing/catalog'
 import { saveNewConfigVersion } from '@/lib/deals'
@@ -47,6 +48,7 @@ export interface SaveVersionResult {
 export async function saveNewVersionAction(
   payload: SaveVersionPayload
 ): Promise<SaveVersionResult> {
+  await requireAuth()
   try {
     const economics = {
       ...calculateEconomics({

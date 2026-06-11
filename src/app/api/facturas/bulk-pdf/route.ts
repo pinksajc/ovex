@@ -3,6 +3,7 @@
 
 import JSZip from 'jszip'
 import { NextResponse } from 'next/server'
+import { getCurrentUser } from '@/lib/auth'
 
 const MAX_IDS = 50
 
@@ -18,6 +19,10 @@ function slugify(s: string, maxLen = 40) {
 
 export async function GET(req: Request) {
   try {
+    // Auth guard
+    const me = await getCurrentUser()
+    if (!me) return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
+
     const { searchParams } = new URL(req.url)
     const idsParam = searchParams.get('ids')
     if (!idsParam) {
