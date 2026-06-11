@@ -5,19 +5,20 @@ import { useRouter } from 'next/navigation'
 import { updateInvoiceStatusAction, convertProformaAction, deleteInvoiceAction } from '@/app/actions/invoices'
 import type { InvoiceStatus } from '@/types'
 
-const TRANSITIONS: Record<InvoiceStatus, { label: string; next: InvoiceStatus; color: string; confirm?: boolean }[]> = {
+const TRANSITIONS: Record<InvoiceStatus, { label: string; next: InvoiceStatus; color: string; confirm?: boolean; toast?: string }[]> = {
   draft: [
-    { label: 'Marcar como Emitida', next: 'issued', color: 'border-blue-200 text-blue-700 hover:bg-blue-50' },
+    { label: 'Marcar como Emitida', next: 'issued',  color: 'border-blue-200 text-blue-700 hover:bg-blue-50' },
   ],
   issued: [
-    { label: 'Marcar como Pagada', next: 'paid', color: 'border-emerald-200 text-emerald-700 hover:bg-emerald-50' },
+    { label: 'Marcar como Pagada',  next: 'paid',    color: 'border-emerald-200 text-emerald-700 hover:bg-emerald-50' },
     { label: 'Marcar como Vencida', next: 'overdue', color: 'border-red-200 text-red-700 hover:bg-red-50' },
   ],
   paid: [
-    { label: 'Revertir a Emitida', next: 'issued', color: 'border-amber-200 text-amber-700 hover:bg-amber-50', confirm: true },
+    { label: 'Revertir a Emitida',  next: 'issued',  color: 'border-amber-200 text-amber-700 hover:bg-amber-50', confirm: true },
   ],
   overdue: [
-    { label: 'Marcar como Pagada', next: 'paid', color: 'border-emerald-200 text-emerald-700 hover:bg-emerald-50' },
+    { label: 'Marcar como Pagada',  next: 'paid',    color: 'border-emerald-200 text-emerald-700 hover:bg-emerald-50' },
+    { label: 'Revertir a Emitida',  next: 'issued',  color: 'border-amber-200 text-amber-700 hover:bg-amber-50', toast: 'Factura revertida a emitida' },
   ],
   converted: [], // no transitions — proforma was converted
 }
@@ -165,10 +166,10 @@ export function InvoiceActions({ invoiceId, currentStatus }: { invoiceId: string
     <>
       <div className="space-y-2">
         {error && <p className="text-xs text-red-600">{error}</p>}
-        {actions.map(({ label, next, color, confirm }) => (
+        {actions.map(({ label, next, color, confirm, toast: actionToast }) => (
           <button
             key={next}
-            onClick={() => confirm ? setConfirming(true) : handleAction(next)}
+            onClick={() => confirm ? setConfirming(true) : handleAction(next, actionToast)}
             disabled={isPending}
             className={`w-full text-left px-3 py-2 rounded-lg border text-xs font-medium transition-colors disabled:opacity-50 ${color}`}
           >
