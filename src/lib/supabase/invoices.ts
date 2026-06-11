@@ -198,6 +198,19 @@ export async function getInvoice(id: string): Promise<Invoice | null> {
 }
 
 /**
+ * Resolves a UUID to its human-readable invoice number (e.g. "F-2026-0007").
+ * Returns null if not found.
+ */
+export async function getInvoiceNumberById(id: string): Promise<string | null> {
+  const db = getSupabaseClient()
+  const { data } = await invoicesTable(db)
+    .select('number')
+    .eq('id', id)
+    .maybeSingle()
+  return (data as { number: string } | null)?.number ?? null
+}
+
+/**
  * Looks up an invoice by its human-readable number (e.g. "F-2026-0007").
  * Returns the UUID, or null if not found.
  */

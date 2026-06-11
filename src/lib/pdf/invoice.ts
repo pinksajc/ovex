@@ -7,6 +7,7 @@ import fs from 'fs'
 import path from 'path'
 import type { Invoice, InvoiceLineItem } from '@/types'
 import { renderHtmlToPdf } from './generate'
+import { getInvoiceNumberById } from '@/lib/supabase/invoices'
 
 // ---- Logo ----
 function readLogoDataUri(): string {
@@ -123,6 +124,14 @@ function renderLineRows(items: InvoiceLineItem[], hasDiscount: boolean): string 
 // ---- Invoice HTML ----
 export async function generateInvoicePdf(invoice: Invoice): Promise<Buffer> {
   const logo = readLogoDataUri()
+
+  // Resolve the rectified invoice number for display (rectifiesId is a UUID)
+  let rectifiesNumber: string | null = null
+  if (invoice.type === 'rectificativa' && invoice.rectifiesId) {
+    rectifiesNumber = await getInvoiceNumberById(invoice.rectifiesId).catch(() => null)
+    // Fall back to showing the raw value if lookup fails
+    if (!rectifiesNumber) rectifiesNumber = invoice.rectifiesId
+  }
 
   const items = invoice.lineItems ?? []
   const regularItems = items.filter((i) => i.type === 'line')
@@ -310,13 +319,9 @@ export async function generateInvoicePdf(invoice: Invoice): Promise<Buffer> {
     line-height: 1.6;
   }
   .rect-notice {
-    background: #fffbeb;
-    border: 1px solid #fde68a;
-    border-radius: 6px;
-    padding: 10px 14px;
-    margin-bottom: 20px;
-    font-size: 9px;
-    color: #92400e;
+    color: #94a3b8;
+    font-size: 11px;
+    margin-bottom: 18px;
   }
 </style>
 </head>
@@ -345,10 +350,8 @@ export async function generateInvoicePdf(invoice: Invoice): Promise<Buffer> {
   </div>` : ''}
 </div>
 
-${invoice.type === 'rectificativa' && invoice.rectifiesId ? `
-<div class="rect-notice">
-  ⚠️ Esta es una factura rectificativa. Rectifica la factura con referencia: <strong>${esc(invoice.rectifiesId)}</strong>
-</div>` : ''}
+${rectifiesNumber ? `
+<div class="rect-notice">Factura rectificativa de ${esc(rectifiesNumber)}</div>` : ''}
 
 <!-- Emisor + Cliente en dos columnas -->
 <div class="parties-row">
