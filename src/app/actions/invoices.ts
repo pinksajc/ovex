@@ -2,7 +2,7 @@
 
 import { redirect } from 'next/navigation'
 import { revalidatePath } from 'next/cache'
-import { createInvoice, updateInvoice, updateInvoiceStatus, getInvoice, convertProformaToInvoice, deleteInvoice, getMaxInvoiceIssuedAt } from '@/lib/supabase/invoices'
+import { createInvoice, updateInvoice, updateInvoiceStatus, getInvoice, convertProformaToInvoice, deleteInvoice, getMaxInvoiceIssuedAt, updateInvoiceDueDate } from '@/lib/supabase/invoices'
 import { insertCashflowTransactions } from '@/lib/supabase/cashflow'
 import { logApprovalEvent } from '@/lib/supabase/events'
 import type { CreateInvoiceInput, UpdateInvoiceInput, InvoiceStatus } from '@/types'
@@ -103,6 +103,20 @@ export async function updateInvoiceStatusAction(
   }
 }
 
+
+export async function updateDueDateAction(
+  id: string,
+  dueAt: string | null,
+): Promise<{ ok: boolean; error?: string }> {
+  try {
+    await updateInvoiceDueDate(id, dueAt)
+    revalidatePath('/facturas')
+    revalidatePath(`/facturas/${id}`)
+    return { ok: true }
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : 'Error desconocido' }
+  }
+}
 
 export async function deleteInvoiceAction(
   id: string,

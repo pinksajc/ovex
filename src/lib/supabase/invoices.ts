@@ -342,3 +342,14 @@ export async function convertProformaToInvoice(proformaId: string): Promise<Invo
 
   return rowToInvoice(data as InvoiceRow)
 }
+
+/**
+ * Updates only the due_at field of an invoice (inline edit on detail page).
+ */
+export async function updateInvoiceDueDate(id: string, dueAt: string | null): Promise<void> {
+  const db = getSupabaseClient()
+  const { error } = await invoicesTable(db)
+    .update({ due_at: dueAt })
+    .eq('id', id)
+  if (error) throw new Error(`updateInvoiceDueDate: ${error.message}`)
+}

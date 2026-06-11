@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useCallback } from 'react'
 import Link from 'next/link'
 import { FilterSearchBar } from '@/components/ui/filter-search-bar'
 import type { Invoice, InvoiceStatus } from '@/types'
@@ -64,6 +64,10 @@ export function FacturasContent({
   const [invDesde, setInvDesde] = useState('')
   const [invHasta, setInvHasta] = useState('')
 
+  // ── Bulk selection ────────────────────────────────────────────────────────
+  const [selected, setSelected] = useState<Set<string>>(new Set())
+  const [downloading, setDownloading] = useState(false)
+
   const filteredInvoices = invoices.filter((inv) => {
     if (tab === 'proforma' && inv.type !== 'proforma') return false
     if (tab !== 'all' && tab !== 'proforma' && inv.status !== tab) return false
@@ -76,6 +80,62 @@ export function FacturasContent({
     if (t === 'all') return invoices.length
     if (t === 'proforma') return invoices.filter((i) => i.type === 'proforma').length
     return invoices.filter((i) => i.status === t).length
+  }
+
+  const toggleOne = useCallback((id: string) => {
+    setSelected((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }, [])
+
+  const allVisibleSelected =
+    filteredInvoices.length > 0 && filteredInvoices.every((i) => selected.has(i.id))
+
+  const toggleAll = () => {
+    if (allVisibleSelected) {
+      setSelected((prev) => {
+        const next = new Set(prev)
+        filteredInvoices.forEach((i) => next.delete(i.id))
+        return next
+      })
+    } else {
+      setSelected((prev) => {
+        const next = new Set(prev)
+        filteredInvoices.forEach((i) => next.add(i.id))
+        return next
+      })
+    }
+  }
+
+  const clearSelection = () => setSelected(new Set())
+
+  const handleBulkDownload = async () => {
+    if (selected.size === 0 || downloading) return
+    setDownloading(true)
+    try {
+      const ids = Array.from(selected).join(',')
+      const res = await fetch(`/api/facturas/bulk-pdf?ids=${encodeURIComponent(ids)}`)
+      if (!res.ok) throw new Error('Error al generar los PDFs')
+      const blob = await res.blob()
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      const today = new Date().toISOString().slice(0, 10)
+      a.download = `facturas-orvex-${today}.zip`
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      URL.revokeObjectURL(url)
+      clearSelection()
+    } catch (err) {
+      console.error('[bulk-download]', err)
+      alert('Error al generar los PDFs. Inténtalo de nuevo.')
+    } finally {
+      setDownloading(false)
+    }
   }
 
   return (
@@ -149,6 +209,16 @@ export function FacturasContent({
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-zinc-100">
+                {/* Checkbox header */}
+                <th className="px-4 py-3 w-8">
+                  <input
+                    type="checkbox"
+                    checked={allVisibleSelected}
+                    onChange={toggleAll}
+                    className="rounded border-zinc-300 text-zinc-900 focus:ring-0 cursor-pointer"
+                    title={allVisibleSelected ? 'Deseleccionar todo' : 'Seleccionar todo'}
+                  />
+                </th>
                 <th className="text-left px-5 py-3 text-[10px] font-semibold text-zinc-400 uppercase tracking-widest">Número</th>
                 <th className="text-left px-5 py-3 text-[10px] font-semibold text-zinc-400 uppercase tracking-widest">Cliente</th>
                 <th className="text-left px-4 py-3 text-[10px] font-semibold text-zinc-400 uppercase tracking-widest">Concepto</th>
@@ -159,7 +229,19 @@ export function FacturasContent({
             </thead>
             <tbody className="divide-y divide-zinc-50">
               {filteredInvoices.map((inv) => (
-                <tr key={inv.id} className="hover:bg-zinc-50 transition-colors">
+                <tr
+                  key={inv.id}
+                  className={`hover:bg-zinc-50 transition-colors ${selected.has(inv.id) ? 'bg-blue-50/40' : ''}`}
+                >
+                  {/* Row checkbox */}
+                  <td className="px-4 py-3">
+                    <input
+                      type="checkbox"
+                      checked={selected.has(inv.id)}
+                      onChange={() => toggleOne(inv.id)}
+                      className="rounded border-zinc-300 text-zinc-900 focus:ring-0 cursor-pointer"
+                    />
+                  </td>
                   <td className="px-5 py-3">
                     <Link href={`/facturas/${inv.id}`} className="font-mono font-semibold text-zinc-900 hover:text-blue-700 text-xs">
                       {inv.number}
@@ -191,6 +273,45 @@ export function FacturasContent({
               ))}
             </tbody>
           </table>
+        </div>
+      )}
+
+      {/* ── Floating bulk-action bar ─────────────────────────────────────── */}
+      {selected.size > 0 && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 flex items-center gap-3 bg-zinc-900 text-white rounded-2xl shadow-2xl px-5 py-3">
+          <span className="text-sm font-medium tabular-nums">
+            {selected.size} factura{selected.size !== 1 ? 's' : ''} seleccionada{selected.size !== 1 ? 's' : ''}
+          </span>
+          <div className="h-4 w-px bg-zinc-700" />
+          <button
+            onClick={handleBulkDownload}
+            disabled={downloading}
+            className="inline-flex items-center gap-1.5 text-sm font-medium text-white hover:text-zinc-200 disabled:opacity-50 transition-colors"
+          >
+            {downloading ? (
+              <>
+                <svg className="w-4 h-4 animate-spin" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83" strokeLinecap="round" />
+                </svg>
+                Generando PDFs…
+              </>
+            ) : (
+              <>
+                <svg className="w-4 h-4" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M8 2v8M5 7l3 3 3-3" />
+                  <path d="M2 12h12" />
+                </svg>
+                Descargar PDFs
+              </>
+            )}
+          </button>
+          <div className="h-4 w-px bg-zinc-700" />
+          <button
+            onClick={clearSelection}
+            className="text-sm text-zinc-400 hover:text-zinc-200 transition-colors"
+          >
+            Cancelar
+          </button>
         </div>
       )}
     </div>

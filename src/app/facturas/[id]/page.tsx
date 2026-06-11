@@ -5,6 +5,7 @@ import { getCurrentUser } from '@/lib/auth'
 import { InvoiceActions, ConvertProformaButton, DeleteInvoiceButton } from './actions'
 import { FacturaPageShell } from './factura-page-shell'
 import { APPROVAL_CHIP, isDownloadBlocked } from '@/lib/approvals'
+import { DueDateEditor } from '@/components/facturas/due-date-editor'
 import type { Invoice, InvoiceStatus } from '@/types'
 
 const STATUS_LABELS: Record<InvoiceStatus, string> = {
@@ -193,7 +194,16 @@ export default async function FacturaDetailPage({ params }: { params: Promise<{ 
             <h2 className="text-[10px] font-semibold text-zinc-400 uppercase tracking-widest mb-3">Fechas</h2>
             <Row label="Fecha emisión" value={formatDate(invoice.issuedAt)} />
             {invoice.dueDateEnabled && (
-              <Row label="Fecha vencimiento" value={formatDate(invoice.dueAt)} />
+              <Row
+                label="Fecha vencimiento"
+                value={
+                  <DueDateEditor
+                    invoiceId={invoice.id}
+                    dueAt={invoice.dueAt}
+                    dueDateEnabled={invoice.dueDateEnabled}
+                  />
+                }
+              />
             )}
             <Row label="Creada" value={formatDate(invoice.createdAt)} />
           </div>
