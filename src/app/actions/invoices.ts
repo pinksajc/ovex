@@ -2,7 +2,7 @@
 
 import { redirect } from 'next/navigation'
 import { revalidatePath } from 'next/cache'
-import { createInvoice, updateInvoice, updateInvoiceStatus, getInvoice, convertProformaToInvoice, deleteInvoice, getMaxInvoiceIssuedAt, updateInvoiceDueDate } from '@/lib/supabase/invoices'
+import { createInvoice, updateInvoice, updateInvoiceStatus, getInvoice, convertProformaToInvoice, deleteInvoice, getMaxInvoiceIssuedAt, updateInvoiceDueDate, getInvoiceIdByNumber } from '@/lib/supabase/invoices'
 import { insertCashflowTransactions } from '@/lib/supabase/cashflow'
 import { requireAuth } from '@/lib/auth'
 import { logApprovalEvent } from '@/lib/supabase/events'
@@ -25,7 +25,21 @@ export async function createInvoiceAction(input: CreateInvoiceInput): Promise<{ 
       }
     }
 
-    const invoice = await createInvoice(input)
+    // Resolve rectifiesId: users enter the invoice number (e.g. F-2026-0007),
+    // not the internal UUID. Detect non-UUID values and look up the real ID.
+    let resolvedInput = input
+    if (input.rectifiesId) {
+      const looksLikeUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(input.rectifiesId)
+      if (!looksLikeUUID) {
+        const resolvedId = await getInvoiceIdByNumber(input.rectifiesId)
+        if (!resolvedId) {
+          return { error: `No se encontró la factura ${input.rectifiesId.toUpperCase()}` }
+        }
+        resolvedInput = { ...input, rectifiesId: resolvedId }
+      }
+    }
+
+    const invoice = await createInvoice(resolvedInput)
 
     // Log "pending approval" event if linked to a deal
     if (invoice.dealId) {
@@ -40,6 +54,7 @@ export async function createInvoiceAction(input: CreateInvoiceInput): Promise<{ 
   } catch (err) {
     // redirect() throws internally — rethrow it
     if (err instanceof Error && err.message === 'NEXT_REDIRECT') throw err
+    console.error('[createInvoiceAction]', err)
     return { error: err instanceof Error ? err.message : 'Error desconocido' }
   }
 }
