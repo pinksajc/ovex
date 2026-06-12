@@ -81,9 +81,11 @@ function rowToDeal(row: DealRow): Deal {
 }
 
 export async function listDeals(ownerId?: string): Promise<Deal[]> {
+  // Cap at 200 rows to prevent unbounded fetches — add pagination if ever needed
   let query = table()
     .select('id, company_name, company_cif, company_address, company_city, brand_name, contact_first_name, contact_last_name, contact_email, contact_phone, stage, owner_id, created_at, updated_at')
     .order('created_at', { ascending: false })
+    .limit(200)
   if (ownerId) query = query.eq('owner_id', ownerId)
   const { data, error } = await query
   if (error) throw new Error(`Supabase listDeals: ${error.message}`)

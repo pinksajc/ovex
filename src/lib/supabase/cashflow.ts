@@ -45,10 +45,13 @@ function rowToTx(row: CashflowRow): CashflowTransaction {
 
 export async function getCashflowTransactions(): Promise<CashflowTransaction[]> {
   const db = getSupabaseClient()
+  // Cap at 2000 rows — date filtering happens in-memory so we need the full history,
+  // but a hard cap prevents unbounded fetches if the table grows very large
   const { data, error } = await table(db)
     .select('id, date, description, amount, type, category, currency, state, balance, source_file, created_at')
     .order('date', { ascending: false })
     .order('created_at', { ascending: false })
+    .limit(2000)
 
   if (error) throw new Error(`getCashflowTransactions: ${error.message}`)
 

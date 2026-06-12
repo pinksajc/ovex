@@ -4,6 +4,7 @@
 // Never import in client components.
 // =========================================
 
+import { cache } from 'react'
 import { cookies } from 'next/headers'
 import { createAuthServerClient } from '@/lib/supabase/auth'
 import { getSupabaseClient } from '@/lib/supabase/client'
@@ -23,8 +24,11 @@ export interface AuthUser {
  * Returns the current authenticated user with their role.
  * Returns null ONLY when the user is genuinely not authenticated.
  * Never returns null due to DB / profile errors — falls back to role='sales'.
+ *
+ * Wrapped with React.cache so multiple RSC calls within the same render tree
+ * (e.g. layout + page both calling getCurrentUser) share one result.
  */
-export async function getCurrentUser(): Promise<AuthUser | null> {
+export const getCurrentUser = cache(async function getCurrentUser(): Promise<AuthUser | null> {
   // ── Env guard ──────────────────────────────────────────────────────────────
   try {
     const { getAuthEnv } = await import('@/lib/supabase/auth-env')
@@ -170,7 +174,7 @@ export async function getCurrentUser(): Promise<AuthUser | null> {
     role: isOwnerByEnv ? 'owner' : isAdminByEnv ? 'admin' : ((profile.role as UserRole) ?? 'sales'),
     mustChangePassword: profile.must_change_password === true,
   }
-}
+})
 
 /**
  * Returns current user or throws. Use in protected server actions.

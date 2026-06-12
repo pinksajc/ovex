@@ -7,6 +7,10 @@ import { BillingChart } from './billing-chart'
 import Link from 'next/link'
 import type { Deal } from '@/types'
 
+// Dashboard aggregates data that doesn't change in real time — revalidate every
+// 60 s for a balance of freshness vs. server load.
+export const revalidate = 60
+
 // ── Stage config ──────────────────────────────────────────────────────────────
 const STAGE_ORDER = [
   'prospecting',
