@@ -116,15 +116,18 @@ export async function getInvoices(): Promise<Invoice[]> {
 
   // Try with location join first; fall back to plain select if company_locations
   // table hasn't been migrated yet — prevents a crash on the invoice list page.
+  // Cap at 200 rows to prevent unbounded fetches — add pagination if ever needed
   const { data, error } = await invoicesTable(db)
     .select(SELECT_WITH_LOCATION)
     .order('created_at', { ascending: false })
+    .limit(200)
 
   if (error) {
     console.error('[getInvoices] location join failed, falling back to plain select:', error.message)
     const { data: fallback, error: fallbackError } = await invoicesTable(db)
       .select('*')
       .order('created_at', { ascending: false })
+      .limit(200)
     if (fallbackError) throw fallbackError
     return (fallback as InvoiceRow[]).map(rowToInvoice)
   }

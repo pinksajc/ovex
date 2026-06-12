@@ -134,9 +134,11 @@ async function generatePresupuestoNumber(): Promise<string> {
 
 export async function getPresupuestos(): Promise<Presupuesto[]> {
   const db = getSupabaseClient()
+  // Cap at 200 rows to prevent unbounded fetches — add pagination if ever needed
   const { data, error } = await presupuestosTable(db)
     .select('*')
     .order('created_at', { ascending: false })
+    .limit(200)
 
   if (error) throw error
   return (data as PresupuestoRow[]).map(rowToPresupuesto)
