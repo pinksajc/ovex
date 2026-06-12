@@ -151,7 +151,8 @@ export function OfertasList({
       const matches =
         o.number.toLowerCase().includes(lq) ||
         o.clientName.toLowerCase().includes(lq) ||
-        (o.clientCif?.toLowerCase().includes(lq) ?? false)
+        (o.clientCif?.toLowerCase().includes(lq) ?? false) ||
+        (o.brandName?.toLowerCase().includes(lq) ?? false)
       if (!matches) return false
     }
     if (!inDateRange(o.createdAt ?? null, desde, hasta)) return false
@@ -242,6 +243,7 @@ export function OfertasList({
               <tr className="border-b border-zinc-100">
                 <th className="text-left px-5 py-3 text-[10px] font-semibold text-zinc-400 uppercase tracking-widest">Número</th>
                 <th className="text-left px-5 py-3 text-[10px] font-semibold text-zinc-400 uppercase tracking-widest">Cliente</th>
+                <th className="text-left px-4 py-3 text-[10px] font-semibold text-zinc-400 uppercase tracking-widest">Marca</th>
                 <th className="text-left px-4 py-3 text-[10px] font-semibold text-zinc-400 uppercase tracking-widest">Concepto</th>
                 <th className="text-right px-4 py-3 text-[10px] font-semibold text-zinc-400 uppercase tracking-widest">Total</th>
                 <th className="text-left px-4 py-3 text-[10px] font-semibold text-zinc-400 uppercase tracking-widest">Estado</th>
@@ -261,6 +263,9 @@ export function OfertasList({
                   <td className="px-5 py-3">
                     <p className="text-xs font-medium text-zinc-800">{o.clientName}</p>
                     {o.clientCif && <p className="text-[10px] text-zinc-400">{o.clientCif}</p>}
+                  </td>
+                  <td className="px-4 py-3">
+                    <p className="text-xs text-zinc-700">{o.brandName ?? o.clientName}</p>
                   </td>
                   <td className="px-4 py-3 max-w-xs">
                     <p className="text-xs text-zinc-600 truncate">{o.concept}</p>
