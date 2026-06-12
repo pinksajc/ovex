@@ -3,6 +3,7 @@ import Link from 'next/link'
 import { getPresupuesto, getPresupuestosByDeal } from '@/lib/supabase/presupuestos'
 import { getInvoicesByDeal } from '@/lib/supabase/invoices'
 import { getDealById } from '@/lib/supabase/deals'
+import { listLocationsByDeal } from '@/lib/supabase/company-locations'
 import { getCurrentUser } from '@/lib/auth'
 import { OfertaActions } from './actions'
 import { RequiresSignatureToggle } from './requires-signature-toggle'
@@ -66,13 +67,16 @@ export default async function OfertaDetailPage({ params }: { params: Promise<{ i
   const downloadBlock = isDownloadBlocked(presupuesto.status, presupuesto.approvalStatus, currentUser?.role ?? 'sales')
 
   // Fetch deal-level data when linked to a deal
-  const [dealPresupuestos, dealFacturas, deal] = presupuesto.dealId
+  const [dealPresupuestos, dealFacturas, deal, dealLocations] = presupuesto.dealId
     ? await Promise.all([
         getPresupuestosByDeal(presupuesto.dealId).catch(() => []),
         getInvoicesByDeal(presupuesto.dealId).catch(() => []),
         getDealById(presupuesto.dealId).catch(() => null),
+        listLocationsByDeal(presupuesto.dealId).catch(() => []),
       ])
-    : [[], [], null]
+    : [[], [], null, []]
+
+  const locationCount = dealLocations.length
 
   const pdfDownloadUrl = `/api/presupuestos/generate-pdf?id=${presupuesto.id}`
 
@@ -202,6 +206,7 @@ export default async function OfertaDetailPage({ params }: { params: Promise<{ i
       <DealSummary
         lineItems={presupuesto.lineItems}
         dealType={presupuesto.dealType ?? null}
+        locationCount={locationCount}
       />
 
       <div className="grid grid-cols-2 gap-5">
