@@ -409,6 +409,8 @@ export interface Presupuesto {
   approvedAt: string | null
   // Enriched at read-time from the linked deal (not a DB column on presupuestos)
   brandName?: string | null
+  // Computed from line_items at read-time — null when no classifiable services
+  dealType?: import('@/lib/deal-type').DealType | null
 }
 
 export interface CreatePresupuestoInput {

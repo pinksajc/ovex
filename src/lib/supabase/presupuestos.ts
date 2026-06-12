@@ -28,6 +28,7 @@
 
 import { getSupabaseClient } from './client'
 import type { Presupuesto, CreatePresupuestoInput, UpdatePresupuestoInput, PresupuestoStatus, InvoiceLineItem } from '@/types'
+import { detectDealType } from '@/lib/deal-type'
 
 // ---- Row → Presupuesto ----
 
@@ -106,6 +107,7 @@ function rowToPresupuesto(row: PresupuestoRow): Presupuesto {
     approvalNotes:  row.approval_notes  ?? null,
     approvedBy:     row.approved_by     ?? null,
     approvedAt:     row.approved_at     ?? null,
+    dealType:       detectDealType(lineItems),
   }
 }
 
