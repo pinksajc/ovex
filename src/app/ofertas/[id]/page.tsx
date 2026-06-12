@@ -110,7 +110,12 @@ export default async function OfertaDetailPage({ params }: { params: Promise<{ i
               <strong>Motivo:</strong> {presupuesto.approvalNotes}
             </div>
           )}
-          <p className="text-sm text-zinc-500">{presupuesto.clientName}</p>
+          <p className="text-sm text-zinc-500">
+            {deal?.company?.brandName ?? presupuesto.clientName}
+            {deal?.company?.brandName && deal.company.brandName !== presupuesto.clientName && (
+              <span className="ml-2 text-xs text-zinc-400">· {presupuesto.clientName}</span>
+            )}
+          </p>
         </div>
 
         <div className="flex items-center gap-2 flex-wrap">

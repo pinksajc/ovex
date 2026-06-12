@@ -407,6 +407,8 @@ export interface Presupuesto {
   approvalNotes: string | null
   approvedBy: string | null
   approvedAt: string | null
+  // Enriched at read-time from the linked deal (not a DB column on presupuestos)
+  brandName?: string | null
 }
 
 export interface CreatePresupuestoInput {

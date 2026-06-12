@@ -116,6 +116,24 @@ function presupuestosTable(db: ReturnType<typeof getSupabaseClient>) {
   return (db as unknown as { from(t: string): any }).from('presupuestos')
 }
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function dealsTable(db: ReturnType<typeof getSupabaseClient>) {
+  return (db as unknown as { from(t: string): any }).from('deals')
+}
+
+/** Batch-fetch brand_name for a list of deal IDs. Returns a Map of id → brandName. */
+async function getBrandNamesForDeals(dealIds: string[]): Promise<Map<string, string | null>> {
+  if (dealIds.length === 0) return new Map()
+  const db = getSupabaseClient()
+  const { data } = await dealsTable(db)
+    .select('id, brand_name')
+    .in('id', dealIds)
+  if (!data) return new Map()
+  return new Map(
+    (data as { id: string; brand_name: string | null }[]).map((r) => [r.id, r.brand_name])
+  )
+}
+
 async function generatePresupuestoNumber(): Promise<string> {
   const db = getSupabaseClient()
   const year = new Date().getFullYear()
@@ -141,7 +159,15 @@ export async function getPresupuestos(): Promise<Presupuesto[]> {
     .limit(200)
 
   if (error) throw error
-  return (data as PresupuestoRow[]).map(rowToPresupuesto)
+  const presupuestos = (data as PresupuestoRow[]).map(rowToPresupuesto)
+
+  // Enrich with brand names from linked deals (one batch query)
+  const dealIds = [...new Set(presupuestos.map((p) => p.dealId).filter(Boolean))] as string[]
+  const brandMap = await getBrandNamesForDeals(dealIds).catch(() => new Map<string, string | null>())
+  return presupuestos.map((p) => ({
+    ...p,
+    brandName: p.dealId ? (brandMap.get(p.dealId) ?? null) : null,
+  }))
 }
 
 export async function getPresupuesto(id: string): Promise<Presupuesto | null> {
