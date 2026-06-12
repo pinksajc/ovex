@@ -11,7 +11,7 @@ export type DealType = 'fixed' | 'variable' | 'mixed'
  * Service IDs that represent per-order (variable) fees.
  * Source: invoice-catalog.ts — unit: 'pedidos' or '% GMV'
  */
-const VARIABLE_IDS = new Set([
+export const VARIABLE_IDS = new Set([
   'ros_starter_variable',
   'ros_growth_variable',
   'ros_pro_variable',
@@ -26,7 +26,7 @@ const VARIABLE_IDS = new Set([
  * Service IDs that should be excluded from classification
  * (one-off travel costs, fully custom lines with no inherent nature).
  */
-const IGNORE_IDS = new Set(['travel', 'custom'])
+export const IGNORE_IDS = new Set(['travel', 'custom'])
 
 /**
  * Derives the deal type from a presupuesto's line items.

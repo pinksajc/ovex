@@ -13,6 +13,7 @@ import { OfertaPageShell } from './oferta-page-shell'
 import { GenerarContratoButton } from './generar-contrato-button'
 import { APPROVAL_CHIP, isDownloadBlocked } from '@/lib/approvals'
 import { DEAL_TYPE_LABELS, DEAL_TYPE_COLORS } from '@/lib/deal-type'
+import { DealSummary } from '@/components/ofertas/deal-summary'
 import type { PresupuestoStatus } from '@/types'
 
 const STATUS_LABELS: Record<PresupuestoStatus, string> = {
@@ -196,6 +197,12 @@ export default async function OfertaDetailPage({ params }: { params: Promise<{ i
           title="Historial con este cliente"
         />
       )}
+
+      {/* Deal summary — fixed / variable / mixed breakdown */}
+      <DealSummary
+        lineItems={presupuesto.lineItems}
+        dealType={presupuesto.dealType ?? null}
+      />
 
       <div className="grid grid-cols-2 gap-5">
         {/* Left */}
