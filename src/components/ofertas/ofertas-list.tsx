@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { FilterSearchBar } from '@/components/ui/filter-search-bar'
 import { deletePresupuestoAction } from '@/app/actions/presupuestos'
+import { DEAL_TYPE_LABELS, DEAL_TYPE_COLORS } from '@/lib/deal-type'
 import type { Presupuesto, PresupuestoStatus } from '@/types'
 
 const STATUS_LABELS: Record<PresupuestoStatus, string> = {
@@ -244,6 +245,7 @@ export function OfertasList({
                 <th className="text-left px-5 py-3 text-[10px] font-semibold text-zinc-400 uppercase tracking-widest">Número</th>
                 <th className="text-left px-5 py-3 text-[10px] font-semibold text-zinc-400 uppercase tracking-widest">Cliente</th>
                 <th className="text-left px-4 py-3 text-[10px] font-semibold text-zinc-400 uppercase tracking-widest">Marca</th>
+                <th className="text-left px-4 py-3 text-[10px] font-semibold text-zinc-400 uppercase tracking-widest">Acuerdo</th>
                 <th className="text-left px-4 py-3 text-[10px] font-semibold text-zinc-400 uppercase tracking-widest">Concepto</th>
                 <th className="text-right px-4 py-3 text-[10px] font-semibold text-zinc-400 uppercase tracking-widest">Total</th>
                 <th className="text-left px-4 py-3 text-[10px] font-semibold text-zinc-400 uppercase tracking-widest">Estado</th>
@@ -266,6 +268,15 @@ export function OfertasList({
                   </td>
                   <td className="px-4 py-3">
                     <p className="text-xs text-zinc-700">{o.brandName ?? o.clientName}</p>
+                  </td>
+                  <td className="px-4 py-3">
+                    {o.dealType ? (
+                      <span className={`inline-block text-[10px] font-semibold uppercase tracking-wide px-2 py-0.5 rounded-full ${DEAL_TYPE_COLORS[o.dealType]}`}>
+                        {DEAL_TYPE_LABELS[o.dealType]}
+                      </span>
+                    ) : (
+                      <span className="text-[10px] text-zinc-300">—</span>
+                    )}
                   </td>
                   <td className="px-4 py-3 max-w-xs">
                     <p className="text-xs text-zinc-600 truncate">{o.concept}</p>

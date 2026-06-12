@@ -12,6 +12,7 @@ import { ClientHistoryCard } from '@/components/deals/client-history-card'
 import { OfertaPageShell } from './oferta-page-shell'
 import { GenerarContratoButton } from './generar-contrato-button'
 import { APPROVAL_CHIP, isDownloadBlocked } from '@/lib/approvals'
+import { DEAL_TYPE_LABELS, DEAL_TYPE_COLORS } from '@/lib/deal-type'
 import type { PresupuestoStatus } from '@/types'
 
 const STATUS_LABELS: Record<PresupuestoStatus, string> = {
@@ -94,6 +95,11 @@ export default async function OfertaDetailPage({ params }: { params: Promise<{ i
             <span className={`text-[10px] font-semibold uppercase tracking-wide px-2.5 py-1 rounded-full ${STATUS_COLORS[presupuesto.status]}`}>
               {STATUS_LABELS[presupuesto.status]}
             </span>
+            {presupuesto.dealType && (
+              <span className={`text-[10px] font-semibold uppercase tracking-wide px-2.5 py-1 rounded-full ${DEAL_TYPE_COLORS[presupuesto.dealType]}`}>
+                {DEAL_TYPE_LABELS[presupuesto.dealType]}
+              </span>
+            )}
             {approvalChip && (
               <span className={`text-[10px] font-semibold uppercase tracking-wide px-2.5 py-1 rounded-full border ${approvalChip.cls}`}>
                 {approvalChip.label}
