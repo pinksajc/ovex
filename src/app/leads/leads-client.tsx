@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useTransition, useMemo } from 'react'
+import { useState, useEffect, useTransition, useMemo, useCallback, useRef } from 'react'
 import type { AuthUser } from '@/lib/auth'
 import type { AttioDeal, AttioDealStage } from '@/app/api/leads/attio/route'
 import type { DealStage } from '@/types'
@@ -161,23 +161,68 @@ function ConvertModal({
 export function LeadsClient({ currentUser, members, convertedNames }: Props) {
   const [activeStage, setActiveStage] = useState<AttioDealStage | 'all'>('all')
   const [query, setQuery]     = useState('')
-  const [loading, setLoading] = useState(true)
+  const [loading, setLoading] = useState(true)      // true while first page in flight
+  const [loadingMore, setLoadingMore] = useState(false) // true while background pages load
   const [error, setError]     = useState<string | null>(null)
   const [deals, setDeals]     = useState<AttioDeal[]>([])
   const [converted, setConverted] = useState<Set<string>>(convertedNames)
   const [modal, setModal]     = useState<AttioDeal | null>(null)
   const [toast, setToast]     = useState<string | null>(null)
+  const abortRef = useRef<AbortController | null>(null)
+
+  type PageResponse = { deals?: AttioDeal[]; error?: string; hasMore?: boolean; nextOffset?: number }
+
+  const fetchAllPages = useCallback(async () => {
+    abortRef.current?.abort()
+    const ctrl = new AbortController()
+    abortRef.current = ctrl
+
+    setLoading(true)
+    setError(null)
+
+    try {
+      // Page 0 — show immediately
+      const r0 = await fetch('/api/leads/attio?offset=0', { signal: ctrl.signal })
+      const d0 = await r0.json() as PageResponse
+      if (d0.error) { setError(d0.error); return }
+      setDeals(d0.deals ?? [])
+      setLoading(false)
+
+      if (!d0.hasMore) return
+
+      // Remaining pages — background
+      setLoadingMore(true)
+      let nextOffset = d0.nextOffset ?? (d0.deals?.length ?? 0)
+
+      while (nextOffset > 0) {
+        const r = await fetch(`/api/leads/attio?offset=${nextOffset}`, { signal: ctrl.signal })
+        const d = await r.json() as PageResponse
+        if (d.error) break
+        const batch = d.deals ?? []
+        if (batch.length > 0) {
+          setDeals((prev) => {
+            // Deduplicate by attioId in case of overlap
+            const ids = new Set(prev.map((x) => x.attioId))
+            const fresh = batch.filter((x) => !ids.has(x.attioId))
+            return [...prev, ...fresh]
+          })
+        }
+        if (!d.hasMore) break
+        nextOffset = d.nextOffset ?? (nextOffset + batch.length)
+      }
+    } catch (e) {
+      if ((e as { name?: string }).name === 'AbortError') return
+      setError(String(e))
+    } finally {
+      setLoading(false)
+      setLoadingMore(false)
+    }
+  }, [])
 
   useEffect(() => {
-    fetch('/api/leads/attio')
-      .then((r) => r.json())
-      .then((d: { deals?: AttioDeal[]; error?: string }) => {
-        if (d.error) { setError(d.error); return }
-        setDeals(d.deals ?? [])
-      })
-      .catch((e) => setError(String(e)))
-      .finally(() => setLoading(false))
-  }, [])
+    fetchAllPages()
+    return () => abortRef.current?.abort()
+  }, [fetchAllPages])
 
   // Derive unique stages preserving canonical order
   const stages = useMemo(() => {
@@ -218,7 +263,12 @@ export function LeadsClient({ currentUser, members, convertedNames }: Props) {
         <div>
           <h1 className="text-2xl font-semibold text-zinc-900 tracking-tight">Leads</h1>
           <p className="text-zinc-500 text-sm mt-1">
-            {loading ? 'Cargando desde Attio…' : `Pipeline de Attio · ${deals.length} deal${deals.length !== 1 ? 's' : ''}`}
+            {loading
+              ? 'Cargando desde Attio…'
+              : loadingMore
+                ? `Pipeline de Attio · ${deals.length} deal${deals.length !== 1 ? 's' : ''} (cargando más…)`
+                : `Pipeline de Attio · ${deals.length} deal${deals.length !== 1 ? 's' : ''}`
+            }
           </p>
         </div>
         {/* Search */}

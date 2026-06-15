@@ -111,24 +111,29 @@ function normalizeStage(raw: { slug: string; label: string } | null): { slug: st
 
 // ── Fetch ─────────────────────────────────────────────────────────────────────
 
-async function fetchAllDeals(): Promise<AttioDeal[]> {
-  // Single request — 100 most recent deals, cached for 5 minutes.
-  // Attio has 259+ records but the UI only needs a recent slice.
+const PAGE_SIZE = 200 // Attio's maximum per request
+
+/**
+ * Fetches one page of deals from Attio (max 200 records).
+ * Returns the raw records and whether there may be more pages.
+ */
+async function fetchPage(offset: number): Promise<{ records: AttioRecord[]; hasMore: boolean }> {
   const res = await fetch(`${ATTIO_BASE}/objects/deals/records/query`, {
     method: 'POST',
     headers: attioHeaders(),
-    body: JSON.stringify({ limit: 100 }),
+    body: JSON.stringify({ limit: PAGE_SIZE, offset }),
     next: { revalidate: 300 },
   })
-
   if (!res.ok) {
     const body = await res.text()
     throw new Error(`Attio deals [${res.status}]: ${body}`)
   }
-
   const json = await res.json() as { data: AttioRecord[] }
-  const all: AttioRecord[] = json.data ?? []
+  const records = json.data ?? []
+  return { records, hasMore: records.length === PAGE_SIZE }
+}
 
+function mapRecords(all: AttioRecord[]): AttioDeal[] {
   // Log field keys for diagnostics (kept brief — full record omitted)
   if (all.length > 0) {
     console.log('[leads/attio] KEYS:', Object.keys(all[0].values))
@@ -221,14 +226,20 @@ async function fetchAllDeals(): Promise<AttioDeal[]> {
 // Cache the route response for 5 minutes (matches Attio fetch cache)
 export const revalidate = 300
 
-export async function GET() {
+export async function GET(req: Request) {
   try {
     const user = await requireAuth()
     if (!canAccess(user.role, 'leads')) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
-    const deals = await fetchAllDeals()
-    return NextResponse.json({ deals, total: deals.length })
+    const { searchParams } = new URL(req.url)
+    const offset = Math.max(0, parseInt(searchParams.get('offset') ?? '0', 10))
+
+    const { records, hasMore } = await fetchPage(offset)
+    const deals = mapRecords(records)
+
+    console.log(`[leads/attio] offset=${offset} returned=${deals.length} hasMore=${hasMore}`)
+    return NextResponse.json({ deals, hasMore, offset, nextOffset: offset + deals.length })
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err)
     console.error('[leads/attio]', msg)
