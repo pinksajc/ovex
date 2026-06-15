@@ -2,7 +2,6 @@
 
 import { useState, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
-import Image from 'next/image'
 import { createAuthBrowserClient } from '@/lib/supabase/auth'
 
 function LoginForm() {
@@ -49,7 +48,6 @@ function LoginForm() {
             <span className="font-bold text-xl tracking-tight text-white">rvex</span>
           </div>
           <p className="text-[10px] text-zinc-500 mt-0.5 font-medium tracking-widest uppercase">Sales OS</p>
-          <p className="mt-1 font-medium uppercase" style={{ fontSize: 11, letterSpacing: 2, color: '#62626B' }}>by Platomico</p>
         </div>
 
         {/* Form — vertically centred */}
@@ -154,20 +152,25 @@ function LoginForm() {
           </div>
         </div>
 
-        {/* Bottom spacer */}
-        <div className="h-10" />
+        {/* Footer */}
+        <p style={{ fontSize: 11, letterSpacing: 1.5, color: '#62626B' }}>
+          © 2026 Orvex · by Platomico
+        </p>
       </div>
 
-      {/* ── Right panel — background image (hidden on mobile) ───── */}
-      <div className="hidden md:block md:w-1/2 relative" aria-hidden="true">
-        <Image
-          src="/fondo_login.png"
-          alt=""
-          fill
-          style={{ objectFit: 'cover', objectPosition: 'center' }}
-          priority
-        />
-      </div>
+      {/* ── Right panel — CSS orb background (hidden on mobile) ─── */}
+      <div
+        className="hidden md:block md:w-1/2"
+        style={{
+          background: [
+            'radial-gradient(ellipse 70% 60% at 25% 35%, rgba(124,114,232,0.22) 0%, transparent 65%)',
+            'radial-gradient(ellipse 55% 50% at 75% 65%, rgba(59,130,246,0.18) 0%, transparent 60%)',
+            'radial-gradient(ellipse 40% 35% at 55% 20%, rgba(124,114,232,0.10) 0%, transparent 55%)',
+            '#0E0E11',
+          ].join(', '),
+        }}
+        aria-hidden="true"
+      />
     </div>
   )
 }
