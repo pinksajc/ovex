@@ -54,16 +54,13 @@ async function fetchCompanies(): Promise<AttioCompany[]> {
   const res = await fetch(`${ATTIO_BASE}/objects/companies/records/query`, {
     method: 'POST',
     headers: attioHeaders(),
-    body: JSON.stringify({
-      limit: 200,
-      sorts: [{ attribute: 'created_at', field: 'created_at', direction: 'desc' }],
-    }),
+    body: JSON.stringify({ limit: 200 }),
     next: { revalidate: 60 },
   })
   if (!res.ok) throw new Error(`Attio companies: ${res.status} ${await res.text()}`)
   const json = await res.json() as { data: Array<{ id: { record_id: string }; values: Record<string, unknown>; created_at?: string }> }
 
-  return json.data.map((r) => ({
+  const records = json.data.map((r) => ({
     type: 'company' as const,
     attioId:   r.id.record_id,
     name:      pickValue(r.values.name) ?? '(sin nombre)',
@@ -72,22 +69,25 @@ async function fetchCompanies(): Promise<AttioCompany[]> {
     country:   pickValue(r.values.primary_location_country ?? r.values.country),
     createdAt: r.created_at ?? (r.values.created_at as { active_value?: { value?: string } })?.active_value?.value ?? '',
   }))
+
+  return records.sort((a, b) =>
+    a.createdAt && b.createdAt
+      ? new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+      : a.name.localeCompare(b.name)
+  )
 }
 
 async function fetchPeople(): Promise<AttioPerson[]> {
   const res = await fetch(`${ATTIO_BASE}/objects/people/records/query`, {
     method: 'POST',
     headers: attioHeaders(),
-    body: JSON.stringify({
-      limit: 200,
-      sorts: [{ attribute: 'created_at', field: 'created_at', direction: 'desc' }],
-    }),
+    body: JSON.stringify({ limit: 200 }),
     next: { revalidate: 60 },
   })
   if (!res.ok) throw new Error(`Attio people: ${res.status} ${await res.text()}`)
   const json = await res.json() as { data: Array<{ id: { record_id: string }; values: Record<string, unknown>; created_at?: string }> }
 
-  return json.data.map((r) => ({
+  const records = json.data.map((r) => ({
     type: 'person' as const,
     attioId:   r.id.record_id,
     name:      pickValue(r.values.name) ?? '(sin nombre)',
@@ -96,6 +96,12 @@ async function fetchPeople(): Promise<AttioPerson[]> {
     company:   pickValue(r.values.company_name ?? r.values.primary_company),
     createdAt: r.created_at ?? (r.values.created_at as { active_value?: { value?: string } })?.active_value?.value ?? '',
   }))
+
+  return records.sort((a, b) =>
+    a.createdAt && b.createdAt
+      ? new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+      : a.name.localeCompare(b.name)
+  )
 }
 
 export async function GET() {
