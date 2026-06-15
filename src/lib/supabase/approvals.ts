@@ -22,12 +22,14 @@ export async function getPendingApprovals(): Promise<ApprovalItem[]> {
       .select('id, number, client_name, amount_total, approval_status, approval_type, approval_notes, line_items, status, created_at')
       .eq('approval_status', 'pending_approval')
       .eq('status', 'draft')
-      .order('created_at', { ascending: false }),
+      .order('created_at', { ascending: false })
+      .limit(100),
     invoicesTable()
       .select('id, number, client_name, amount_total, approval_status, approval_type, approval_notes, line_items, status, created_at')
       .eq('approval_status', 'pending_approval')
       .eq('status', 'draft')
-      .order('created_at', { ascending: false }),
+      .order('created_at', { ascending: false })
+      .limit(100),
   ])
 
   const presupuestoItems: ApprovalItem[] = (presupuestosRes.data ?? []).map(
@@ -169,11 +171,13 @@ export async function getApprovalHistory(): Promise<HistoryItem[]> {
     presupuestosTable()
       .select('id, number, client_name, amount_total, approval_status, approval_notes, approved_by, approved_at, created_at')
       .in('approval_status', STATUSES)
-      .order('approved_at', { ascending: false, nullsFirst: false }),
+      .order('approved_at', { ascending: false, nullsFirst: false })
+      .limit(100),
     invoicesTable()
       .select('id, number, client_name, amount_total, approval_status, approval_notes, approved_by, approved_at, created_at')
       .in('approval_status', STATUSES)
-      .order('approved_at', { ascending: false, nullsFirst: false }),
+      .order('approved_at', { ascending: false, nullsFirst: false })
+      .limit(100),
   ])
 
   // Collect unique approver UUIDs for name resolution

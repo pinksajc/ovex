@@ -109,37 +109,29 @@ function normalizeStage(raw: { slug: string; label: string } | null): { slug: st
   return { slug: raw.slug, label }
 }
 
-// ── Pagination ────────────────────────────────────────────────────────────────
+// ── Fetch ─────────────────────────────────────────────────────────────────────
 
 async function fetchAllDeals(): Promise<AttioDeal[]> {
-  const PAGE = 200
-  let offset = 0
-  const all: AttioRecord[] = []
+  // Single request — 100 most recent deals, cached for 5 minutes.
+  // Attio has 259+ records but the UI only needs a recent slice.
+  const res = await fetch(`${ATTIO_BASE}/objects/deals/records/query`, {
+    method: 'POST',
+    headers: attioHeaders(),
+    body: JSON.stringify({ limit: 100 }),
+    next: { revalidate: 300 },
+  })
 
-  for (;;) {
-    const res = await fetch(`${ATTIO_BASE}/objects/deals/records/query`, {
-      method: 'POST',
-      headers: attioHeaders(),
-      body: JSON.stringify({ limit: PAGE, offset }),
-      cache: 'no-store',
-    })
-
-    if (!res.ok) {
-      const body = await res.text()
-      throw new Error(`Attio deals [${res.status}]: ${body}`)
-    }
-
-    const json = await res.json() as { data: AttioRecord[] }
-    const page = json.data ?? []
-    all.push(...page)
-    if (page.length < PAGE) break
-    offset += PAGE
+  if (!res.ok) {
+    const body = await res.text()
+    throw new Error(`Attio deals [${res.status}]: ${body}`)
   }
 
-  // Log field keys of first record to Vercel logs for diagnostics
+  const json = await res.json() as { data: AttioRecord[] }
+  const all: AttioRecord[] = json.data ?? []
+
+  // Log field keys for diagnostics (kept brief — full record omitted)
   if (all.length > 0) {
     console.log('[leads/attio] KEYS:', Object.keys(all[0].values))
-    console.log('[leads/attio] first record:', JSON.stringify(all[0], null, 2))
   }
 
   const deals: AttioDeal[] = all.map((r) => {
@@ -225,6 +217,9 @@ async function fetchAllDeals(): Promise<AttioDeal[]> {
 }
 
 // ── Handler ───────────────────────────────────────────────────────────────────
+
+// Cache the route response for 5 minutes (matches Attio fetch cache)
+export const revalidate = 300
 
 export async function GET() {
   try {

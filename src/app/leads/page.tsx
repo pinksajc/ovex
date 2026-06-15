@@ -4,6 +4,10 @@ import { canAccess } from '@/lib/permissions'
 import { getDeals } from '@/lib/deals'
 import { LeadsClient } from './leads-client'
 
+// Members list and internal deals are cached at the data layer (60 s).
+// Match the page revalidation to that window.
+export const revalidate = 60
+
 export default async function LeadsPage() {
   const user = await getCurrentUser()
   if (!user) redirect('/login')
