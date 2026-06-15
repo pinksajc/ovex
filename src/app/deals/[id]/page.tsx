@@ -228,7 +228,7 @@ export default async function DealPage({
           <ContactEditor
             dealId={deal.id}
             name={deal.contact.name}
-            email={deal.contact.email}
+            emails={deal.contact.emails}
             phone={deal.contact.phone}
           />
         </div>

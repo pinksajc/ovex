@@ -6,6 +6,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getSupabaseClient } from '@/lib/supabase/client'
 import { getValidAccessToken } from '@/lib/supabase/gmail-tokens'
 import { createComment, gmailMessageAlreadyImported } from '@/lib/supabase/deal-comments'
+import { getContactOverridesForDeals } from '@/lib/supabase/contact-overrides'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -67,27 +68,6 @@ function fmtDate(iso: string): string {
 
 // ── Gmail fetch helpers ───────────────────────────────────────────────────────
 
-async function searchGmailMessages(
-  accessToken: string,
-  contactEmail: string,
-  afterDate: Date,
-): Promise<GmailMessage[]> {
-  const afterUnix = Math.floor(afterDate.getTime() / 1000)
-  const q = encodeURIComponent(
-    `(from:${contactEmail} OR to:${contactEmail}) after:${afterUnix}`,
-  )
-  const res = await fetch(
-    `https://gmail.googleapis.com/gmail/v1/users/me/messages?q=${q}&maxResults=20`,
-    { headers: { Authorization: `Bearer ${accessToken}` } },
-  )
-  if (!res.ok) {
-    const body = await res.text()
-    throw new Error(`Gmail list [${res.status}]: ${body}`)
-  }
-  const json = await res.json() as { messages?: GmailMessage[] }
-  return json.messages ?? []
-}
-
 async function fetchMessageDetail(
   accessToken: string,
   messageId: string,
@@ -126,12 +106,22 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: dealsError.message }, { status: 500 })
   }
 
+  const dealRows = deals as DealRow[]
+  const dealIds = dealRows.map((d) => d.id)
+  const overrideMap = await getContactOverridesForDeals(dealIds).catch(() => new Map())
+
   const afterDate = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) // 7 days ago
   const summary: { dealId: string; imported: number; skipped: number; error?: string }[] = []
   let totalImported = 0
 
-  for (const deal of (deals as DealRow[])) {
+  for (const deal of dealRows) {
     const { id: dealId, contact_email: contactEmail, owner_id: ownerId } = deal
+    // Use all emails from contact_overrides if available; fall back to deals.contact_email
+    const override = overrideMap.get(dealId)
+    const emailsToSearch: string[] = override?.emails.length
+      ? override.emails
+      : contactEmail ? [contactEmail] : []
+    if (emailsToSearch.length === 0) continue
 
     // Get valid Gmail access token for the owner (auto-refreshes if needed)
     let accessToken: string | null
@@ -143,10 +133,23 @@ export async function GET(req: NextRequest) {
     }
     if (!accessToken) continue
 
-    // Search Gmail
+    // Search Gmail for all contact emails (dedup by message id across iterations)
     let messages: GmailMessage[]
     try {
-      messages = await searchGmailMessages(accessToken, contactEmail, afterDate)
+      // Build combined query: (from:e1 OR to:e1 OR from:e2 OR to:e2 ...) after:unix
+      const afterUnix = Math.floor(afterDate.getTime() / 1000)
+      const emailParts = emailsToSearch.map((e) => `from:${e} OR to:${e}`).join(' OR ')
+      const q = encodeURIComponent(`(${emailParts}) after:${afterUnix}`)
+      const res = await fetch(
+        `https://gmail.googleapis.com/gmail/v1/users/me/messages?q=${q}&maxResults=20`,
+        { headers: { Authorization: `Bearer ${accessToken}` } },
+      )
+      if (!res.ok) {
+        const body = await res.text()
+        throw new Error(`Gmail list [${res.status}]: ${body}`)
+      }
+      const json = await res.json() as { messages?: GmailMessage[] }
+      messages = json.messages ?? []
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err)
       console.error(`[gmail-sync] deal=${dealId} search error: ${msg}`)
@@ -197,7 +200,7 @@ export async function GET(req: NextRequest) {
     }
 
     if (imported > 0) {
-      console.log(`[gmail-sync] deal=${dealId} contact=${contactEmail} imported=${imported} skipped=${skipped}`)
+      console.log(`[gmail-sync] deal=${dealId} emails=${emailsToSearch.join(',')} imported=${imported} skipped=${skipped}`)
     }
     summary.push({ dealId, imported, skipped })
   }

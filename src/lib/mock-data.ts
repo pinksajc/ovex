@@ -27,6 +27,7 @@ export const MOCK_DEALS: Deal[] = [
     contact: {
       name: 'Carlos Martínez',
       email: 'carlos@burgerroll.es',
+      emails: ['carlos@burgerroll.es'],
       phone: '+34 611 234 567',
     },
     owner: 'Antonio',
@@ -77,6 +78,7 @@ export const MOCK_DEALS: Deal[] = [
     contact: {
       name: 'Laura Sánchez',
       email: 'laura@sushipalace.es',
+      emails: ['laura@sushipalace.es'],
       phone: '+34 622 345 678',
     },
     owner: 'Antonio',
@@ -126,6 +128,7 @@ export const MOCK_DEALS: Deal[] = [
     contact: {
       name: 'Pedro García',
       email: 'pedro@rinconmediterraneo.es',
+      emails: ['pedro@rinconmediterraneo.es'],
     },
     owner: 'Ana',
     closeProbability: 25,
@@ -174,6 +177,7 @@ export const MOCK_DEALS: Deal[] = [
     contact: {
       name: 'María López',
       email: 'maria.lopez@fastfoodexpress.es',
+      emails: ['maria.lopez@fastfoodexpress.es'],
       phone: '+34 633 456 789',
     },
     owner: 'Antonio',
