@@ -1,8 +1,7 @@
 'use client'
 
-import { useState, useTransition } from 'react'
+import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { addCommentAction } from '@/app/actions/deal-comments'
 import type { GmailEmailResult } from '@/app/api/deals/[id]/gmail-search/route'
 
 interface Props {
@@ -13,14 +12,17 @@ interface Props {
 
 function formatEmailDate(iso: string): string {
   const d = new Date(iso)
-  return d.toLocaleDateString('es-ES', { day: 'numeric', month: 'short', year: 'numeric' })
-    + ' ' + d.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })
+  return (
+    d.toLocaleDateString('es-ES', { day: 'numeric', month: 'short', year: 'numeric' }) +
+    ' ' +
+    d.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })
+  )
 }
 
 export function GmailSearchPanel({ dealId, contactEmail, gmailConnected }: Props) {
   const router = useRouter()
   const [isSearching, setIsSearching] = useState(false)
-  const [isImporting, startImport] = useTransition()
+  const [isImporting, setIsImporting] = useState(false)
   const [emails, setEmails] = useState<GmailEmailResult[] | null>(null)
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [searchError, setSearchError] = useState<string | null>(null)
@@ -41,7 +43,7 @@ export function GmailSearchPanel({ dealId, contactEmail, gmailConnected }: Props
 
     try {
       const res = await fetch(`/api/deals/${dealId}/gmail-search`)
-      const json = await res.json() as { emails?: GmailEmailResult[]; error?: string }
+      const json = (await res.json()) as { emails?: GmailEmailResult[]; error?: string }
 
       if (!res.ok || json.error) {
         setSearchError(json.error ?? 'Error al buscar emails')
@@ -64,34 +66,48 @@ export function GmailSearchPanel({ dealId, contactEmail, gmailConnected }: Props
     })
   }
 
-  function handleImport() {
+  async function handleImport() {
     if (!emails) return
     const toImport = emails.filter((e) => selected.has(e.id))
     if (toImport.length === 0) return
 
-    startImport(async () => {
-      let ok = 0
-      let firstError: string | null = null
-      for (const email of toImport) {
-        const content = `**${email.subject}**\n\nDe: ${email.from}\nFecha: ${formatEmailDate(email.date)}\n\n${email.snippet}`
-        const res = await addCommentAction(dealId, 'email', content)
-        if (res.ok) {
-          ok++
-        } else {
-          firstError = res.error ?? 'Error al importar'
-          console.error('[gmail-import] addCommentAction failed:', res.error)
-        }
+    setSearchError(null)
+    setIsImporting(true)
+
+    try {
+      const res = await fetch(`/api/deals/${dealId}/gmail-import`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ emails: toImport }),
+      })
+
+      const json = (await res.json()) as {
+        comments_created?: number
+        error?: string
+        errors?: string[]
       }
-      if (ok > 0) {
-        showToast(`${ok} email${ok !== 1 ? 's' : ''} importado${ok !== 1 ? 's' : ''}`)
-        setOpen(false)
-        setEmails(null)
-        setSelected(new Set())
-        router.refresh()
-      } else {
-        setSearchError(firstError ?? 'No se pudo importar ningún email')
+
+      console.log('[gmail-import] response', res.status, json)
+
+      if (!res.ok || !json.comments_created) {
+        setSearchError(
+          json.error ?? 'No se pudo importar ningún email. Inténtalo de nuevo.',
+        )
+        return
       }
-    })
+
+      const n = json.comments_created
+      showToast(`${n} email${n !== 1 ? 's' : ''} importado${n !== 1 ? 's' : ''}`)
+      setOpen(false)
+      setEmails(null)
+      setSelected(new Set())
+      router.refresh()
+    } catch (err) {
+      console.error('[gmail-import] fetch error:', err)
+      setSearchError('Error de red al importar. Inténtalo de nuevo.')
+    } finally {
+      setIsImporting(false)
+    }
   }
 
   // ── Not connected ──────────────────────────────────────────────────────────
@@ -123,7 +139,7 @@ export function GmailSearchPanel({ dealId, contactEmail, gmailConnected }: Props
       {/* Trigger button */}
       <button
         onClick={handleSearch}
-        disabled={isSearching}
+        disabled={isSearching || isImporting}
         className="inline-flex items-center gap-1.5 text-xs font-medium border border-zinc-200 text-zinc-600 hover:border-zinc-400 hover:text-zinc-900 px-3 py-1.5 rounded-lg transition-colors disabled:opacity-50"
       >
         {isSearching ? (
@@ -151,7 +167,9 @@ export function GmailSearchPanel({ dealId, contactEmail, gmailConnected }: Props
               <span className="text-xs font-semibold text-zinc-700">Emails de {contactEmail}</span>
               {emails !== null && (
                 <span className="ml-2 text-[11px] text-zinc-400">
-                  {emails.length === 0 ? 'Sin resultados' : `${emails.length} encontrado${emails.length !== 1 ? 's' : ''}`}
+                  {emails.length === 0
+                    ? 'Sin resultados'
+                    : `${emails.length} encontrado${emails.length !== 1 ? 's' : ''}`}
                 </span>
               )}
             </div>
@@ -230,12 +248,25 @@ export function GmailSearchPanel({ dealId, contactEmail, gmailConnected }: Props
                   {isImporting ? (
                     <>
                       <svg className="animate-spin w-3.5 h-3.5" viewBox="0 0 24 24" fill="none">
-                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
+                        <circle
+                          className="opacity-25"
+                          cx="12"
+                          cy="12"
+                          r="10"
+                          stroke="currentColor"
+                          strokeWidth="4"
+                        />
+                        <path
+                          className="opacity-75"
+                          fill="currentColor"
+                          d="M4 12a8 8 0 018-8v8H4z"
+                        />
                       </svg>
                       Importando…
                     </>
-                  ) : 'Importar seleccionados'}
+                  ) : (
+                    'Importar seleccionados'
+                  )}
                 </button>
               </div>
             </>
@@ -249,7 +280,13 @@ export function GmailSearchPanel({ dealId, contactEmail, gmailConnected }: Props
 function GmailIcon() {
   return (
     <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-      <path d="M3 8l9 6 9-6M3 8v10a1 1 0 001 1h4v-7h8v7h4a1 1 0 001-1V8M3 8a1 1 0 011-1h16a1 1 0 011 1" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+      <path
+        d="M3 8l9 6 9-6M3 8v10a1 1 0 001 1h4v-7h8v7h4a1 1 0 001-1V8M3 8a1 1 0 011-1h16a1 1 0 011 1"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
     </svg>
   )
 }
