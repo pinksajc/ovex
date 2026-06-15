@@ -9,6 +9,16 @@ export interface AddCommentResult {
   error?: string
 }
 
+function extractMsg(err: unknown): string {
+  if (err instanceof Error) return err.message
+  if (err && typeof err === 'object') {
+    const e = err as Record<string, unknown>
+    // Supabase PostgrestError has message / details / hint / code
+    return String(e.message ?? e.details ?? e.hint ?? e.code ?? JSON.stringify(err))
+  }
+  return String(err)
+}
+
 export async function addCommentAction(
   dealId: string,
   type: CommentType,
@@ -21,7 +31,9 @@ export async function addCommentAction(
     await createComment({ dealId, userId: user.id, type, content: trimmed })
     return { ok: true }
   } catch (err) {
-    return { ok: false, error: err instanceof Error ? err.message : 'Error desconocido' }
+    const msg = extractMsg(err)
+    console.error('[addCommentAction]', msg, err)
+    return { ok: false, error: msg }
   }
 }
 
@@ -36,6 +48,8 @@ export async function deleteCommentAction(commentId: string): Promise<DeleteComm
     await deleteComment(commentId, user.id)
     return { ok: true }
   } catch (err) {
-    return { ok: false, error: err instanceof Error ? err.message : 'Error desconocido' }
+    const msg = extractMsg(err)
+    console.error('[deleteCommentAction]', msg, err)
+    return { ok: false, error: msg }
   }
 }

@@ -71,16 +71,26 @@ export function GmailSearchPanel({ dealId, contactEmail, gmailConnected }: Props
 
     startImport(async () => {
       let ok = 0
+      let firstError: string | null = null
       for (const email of toImport) {
         const content = `**${email.subject}**\n\nDe: ${email.from}\nFecha: ${formatEmailDate(email.date)}\n\n${email.snippet}`
         const res = await addCommentAction(dealId, 'email', content)
-        if (res.ok) ok++
+        if (res.ok) {
+          ok++
+        } else {
+          firstError = res.error ?? 'Error al importar'
+          console.error('[gmail-import] addCommentAction failed:', res.error)
+        }
       }
-      showToast(`${ok} email${ok !== 1 ? 's' : ''} importado${ok !== 1 ? 's' : ''}`)
-      setOpen(false)
-      setEmails(null)
-      setSelected(new Set())
-      router.refresh()
+      if (ok > 0) {
+        showToast(`${ok} email${ok !== 1 ? 's' : ''} importado${ok !== 1 ? 's' : ''}`)
+        setOpen(false)
+        setEmails(null)
+        setSelected(new Set())
+        router.refresh()
+      } else {
+        setSearchError(firstError ?? 'No se pudo importar ningún email')
+      }
     })
   }
 
