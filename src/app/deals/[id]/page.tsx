@@ -16,6 +16,8 @@ import { DealTimeline } from '@/components/deals/deal-timeline'
 import { ClientHistoryCard } from '@/components/deals/client-history-card'
 import { getApprovalEventsByDeal } from '@/lib/supabase/events'
 import { CloseProbabilitySelector } from '@/components/deals/close-probability-selector'
+import { DealCommentsPanel } from '@/components/deals/deal-comments-panel'
+import { getCommentsByDeal } from '@/lib/supabase/deal-comments'
 import type { DealStage, PresupuestoStatus, InvoiceStatus, DeliveryPlanId, AddonId } from '@/types'
 
 const PRESUPUESTO_STATUS_LABELS: Record<PresupuestoStatus, string> = {
@@ -77,13 +79,14 @@ export default async function DealPage({
 }) {
   const { id } = await params
   const user = await getCurrentUser()
-  const [deal, members, presupuestos, facturas, locations, approvalEvents] = await Promise.all([
+  const [deal, members, presupuestos, facturas, locations, approvalEvents, comments] = await Promise.all([
     getDeal(id, user ?? undefined),
     getWorkspaceMembers(),
     getPresupuestosByDeal(id).catch(() => []),
     getInvoicesByDeal(id).catch(() => []),
     listLocationsByDeal(id).catch(() => []),
     getApprovalEventsByDeal(id).catch(() => []),
+    getCommentsByDeal(id).catch(() => []),
   ])
 
   if (!deal) notFound()
@@ -394,6 +397,15 @@ export default async function DealPage({
           )}
         </div>
       )}
+
+      {/* Seguimiento */}
+      <div className="mt-6">
+        <DealCommentsPanel
+          dealId={deal.id}
+          currentUserId={user?.id ?? ''}
+          initialComments={comments}
+        />
+      </div>
     </div>
   )
 }
