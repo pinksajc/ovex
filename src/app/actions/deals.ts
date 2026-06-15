@@ -2,10 +2,16 @@
 
 import { revalidatePath } from 'next/cache'
 import { requireAuth } from '@/lib/auth'
-import { deleteDeals } from '@/lib/supabase/deals'
+import { deleteDeals, updateDealCloseProbability } from '@/lib/supabase/deals'
 
 function assertOwner(role: string) {
   if (role !== 'owner' && role !== 'admin') throw new Error('No autorizado')
+}
+
+export async function updateCloseProbabilityAction(dealId: string, value: number): Promise<void> {
+  await requireAuth()
+  if (![0, 25, 50, 75, 100].includes(value)) throw new Error('Invalid probability value')
+  await updateDealCloseProbability(dealId, value)
 }
 
 export interface BulkDeleteDealsResult {

@@ -123,16 +123,20 @@ function dealsTable(db: ReturnType<typeof getSupabaseClient>) {
   return (db as unknown as { from(t: string): any }).from('deals')
 }
 
-/** Batch-fetch brand_name for a list of deal IDs. Returns a Map of id → brandName. */
-async function getBrandNamesForDeals(dealIds: string[]): Promise<Map<string, string | null>> {
+/** Batch-fetch brand_name + close_probability for a list of deal IDs. */
+async function getDealMetaForPresupuestos(
+  dealIds: string[],
+): Promise<Map<string, { brandName: string | null; closeProbability: number }>> {
   if (dealIds.length === 0) return new Map()
   const db = getSupabaseClient()
   const { data } = await dealsTable(db)
-    .select('id, brand_name')
+    .select('id, brand_name, close_probability')
     .in('id', dealIds)
   if (!data) return new Map()
   return new Map(
-    (data as { id: string; brand_name: string | null }[]).map((r) => [r.id, r.brand_name])
+    (data as { id: string; brand_name: string | null; close_probability: number | null }[]).map(
+      (r) => [r.id, { brandName: r.brand_name, closeProbability: r.close_probability ?? 25 }],
+    ),
   )
 }
 
@@ -163,13 +167,19 @@ export async function getPresupuestos(): Promise<Presupuesto[]> {
   if (error) throw error
   const presupuestos = (data as PresupuestoRow[]).map(rowToPresupuesto)
 
-  // Enrich with brand names from linked deals (one batch query)
+  // Enrich with brand name + close probability from linked deals (one batch query)
   const dealIds = [...new Set(presupuestos.map((p) => p.dealId).filter(Boolean))] as string[]
-  const brandMap = await getBrandNamesForDeals(dealIds).catch(() => new Map<string, string | null>())
-  return presupuestos.map((p) => ({
-    ...p,
-    brandName: p.dealId ? (brandMap.get(p.dealId) ?? null) : null,
-  }))
+  const dealMetaMap = await getDealMetaForPresupuestos(dealIds).catch(
+    () => new Map<string, { brandName: string | null; closeProbability: number }>(),
+  )
+  return presupuestos.map((p) => {
+    const meta = p.dealId ? dealMetaMap.get(p.dealId) : undefined
+    return {
+      ...p,
+      brandName: meta?.brandName ?? null,
+      closeProbability: meta?.closeProbability ?? null,
+    }
+  })
 }
 
 export async function getPresupuesto(id: string): Promise<Presupuesto | null> {

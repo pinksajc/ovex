@@ -8,6 +8,14 @@ import { deletePresupuestoAction } from '@/app/actions/presupuestos'
 import { DEAL_TYPE_LABELS, DEAL_TYPE_COLORS } from '@/lib/deal-type'
 import type { Presupuesto, PresupuestoStatus } from '@/types'
 
+const PROB_COLORS: Record<number, string> = {
+  0:   'bg-zinc-100 text-zinc-500',
+  25:  'bg-red-50 text-red-600',
+  50:  'bg-orange-50 text-orange-600',
+  75:  'bg-blue-50 text-blue-700',
+  100: 'bg-emerald-50 text-emerald-700',
+}
+
 const STATUS_LABELS: Record<PresupuestoStatus, string> = {
   draft: 'Borrador',
   sent: 'Enviado',
@@ -246,6 +254,7 @@ export function OfertasList({
                 <th className="text-left px-5 py-3 text-[10px] font-semibold text-zinc-400 uppercase tracking-widest">Cliente</th>
                 <th className="text-left px-4 py-3 text-[10px] font-semibold text-zinc-400 uppercase tracking-widest">Marca</th>
                 <th className="text-left px-4 py-3 text-[10px] font-semibold text-zinc-400 uppercase tracking-widest">Acuerdo</th>
+                <th className="text-left px-4 py-3 text-[10px] font-semibold text-zinc-400 uppercase tracking-widest">Prob.</th>
                 <th className="text-left px-4 py-3 text-[10px] font-semibold text-zinc-400 uppercase tracking-widest">Concepto</th>
                 <th className="text-right px-4 py-3 text-[10px] font-semibold text-zinc-400 uppercase tracking-widest">Total</th>
                 <th className="text-left px-4 py-3 text-[10px] font-semibold text-zinc-400 uppercase tracking-widest">Estado</th>
@@ -273,6 +282,15 @@ export function OfertasList({
                     {o.dealType ? (
                       <span className={`inline-block text-[10px] font-semibold uppercase tracking-wide px-2 py-0.5 rounded-full ${DEAL_TYPE_COLORS[o.dealType]}`}>
                         {DEAL_TYPE_LABELS[o.dealType]}
+                      </span>
+                    ) : (
+                      <span className="text-[10px] text-zinc-300">—</span>
+                    )}
+                  </td>
+                  <td className="px-4 py-3">
+                    {o.closeProbability != null ? (
+                      <span className={`inline-block text-[10px] font-semibold px-2 py-0.5 rounded-full ${PROB_COLORS[o.closeProbability] ?? 'bg-zinc-100 text-zinc-500'}`}>
+                        {o.closeProbability}%
                       </span>
                     ) : (
                       <span className="text-[10px] text-zinc-300">—</span>
