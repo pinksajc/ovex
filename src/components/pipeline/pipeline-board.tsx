@@ -6,6 +6,14 @@ import { getActiveConfig } from '@/lib/deals'
 import { formatCurrency } from '@/lib/format'
 import type { Deal, DealStage } from '@/types'
 
+const PROB_COLORS: Record<number, string> = {
+  0:   'bg-zinc-100 text-zinc-500',
+  25:  'bg-red-50 text-red-600',
+  50:  'bg-orange-50 text-orange-600',
+  75:  'bg-blue-50 text-blue-700',
+  100: 'bg-emerald-50 text-emerald-700',
+}
+
 const STAGE_ORDER: DealStage[] = [
   'prospecting',
   'qualified',
@@ -162,14 +170,19 @@ function DealCard({ deal }: { deal: Deal }) {
       )}
       <div className="flex items-center justify-between mt-2">
         <span className="text-[10px] text-zinc-400">{deal.owner.split(' ')[0]}</span>
-        {deal.commercialStatus === 'proposal_created' && (
-          <span className="text-[10px] bg-zinc-900 text-white px-1.5 py-0.5 rounded-full">
-            Propuesta
+        <div className="flex items-center gap-1">
+          <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full ${PROB_COLORS[deal.closeProbability] ?? 'bg-zinc-100 text-zinc-500'}`}>
+            {deal.closeProbability}%
           </span>
-        )}
-        {deal.commercialStatus === 'no_config' && (
-          <span className="text-[10px] text-zinc-300">Sin config</span>
-        )}
+          {deal.commercialStatus === 'proposal_created' && (
+            <span className="text-[10px] bg-zinc-900 text-white px-1.5 py-0.5 rounded-full">
+              Propuesta
+            </span>
+          )}
+          {deal.commercialStatus === 'no_config' && (
+            <span className="text-[10px] text-zinc-300">Sin config</span>
+          )}
+        </div>
       </div>
     </Link>
   )

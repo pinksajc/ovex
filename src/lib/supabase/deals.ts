@@ -36,6 +36,7 @@ interface DealRow {
   company_address: string | null
   company_city?: string | null   // optional — column may not exist yet in all envs
   brand_name?: string | null
+  close_probability?: number | null
   contact_first_name: string | null
   contact_last_name: string | null
   contact_email: string | null
@@ -67,6 +68,7 @@ function rowToDeal(row: DealRow): Deal {
       phone: row.contact_phone ?? undefined,
     },
     owner: row.owner_id ?? 'Sin asignar', // resolved to name upstream
+    closeProbability: row.close_probability ?? 25,
     stage: (row.stage as DealStage) ?? 'prospecting',
     configurations: [],        // loaded separately
     activeConfigId: undefined, // loaded separately
@@ -83,7 +85,7 @@ function rowToDeal(row: DealRow): Deal {
 export async function listDeals(ownerId?: string): Promise<Deal[]> {
   // Cap at 200 rows to prevent unbounded fetches — add pagination if ever needed
   let query = table()
-    .select('id, company_name, company_cif, company_address, company_city, brand_name, contact_first_name, contact_last_name, contact_email, contact_phone, stage, owner_id, created_at, updated_at')
+    .select('id, company_name, company_cif, company_address, company_city, brand_name, close_probability, contact_first_name, contact_last_name, contact_email, contact_phone, stage, owner_id, created_at, updated_at')
     .order('created_at', { ascending: false })
     .limit(200)
   if (ownerId) query = query.eq('owner_id', ownerId)
@@ -122,6 +124,13 @@ export interface UpdateCompanyInput {
   cif?: string
   address?: string
   city?: string
+}
+
+export async function updateDealCloseProbability(id: string, value: number): Promise<void> {
+  const { error } = await table()
+    .update({ close_probability: value, updated_at: new Date().toISOString() })
+    .eq('id', id)
+  if (error) throw new Error(`Supabase updateDealCloseProbability: ${error.message}`)
 }
 
 export async function updateDealStage(id: string, stage: DealStage): Promise<void> {

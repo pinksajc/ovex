@@ -30,6 +30,7 @@ export const MOCK_DEALS: Deal[] = [
       phone: '+34 611 234 567',
     },
     owner: 'Antonio',
+    closeProbability: 75,
     stage: 'negotiation',
     configurations: [
       {
@@ -79,6 +80,7 @@ export const MOCK_DEALS: Deal[] = [
       phone: '+34 622 345 678',
     },
     owner: 'Antonio',
+    closeProbability: 50,
     stage: 'proposal_sent',
     configurations: [
       {
@@ -126,6 +128,7 @@ export const MOCK_DEALS: Deal[] = [
       email: 'pedro@rinconmediterraneo.es',
     },
     owner: 'Ana',
+    closeProbability: 25,
     stage: 'qualified',
     configurations: [
       {
@@ -174,6 +177,7 @@ export const MOCK_DEALS: Deal[] = [
       phone: '+34 633 456 789',
     },
     owner: 'Antonio',
+    closeProbability: 25,
     stage: 'prospecting',
     configurations: [
       {

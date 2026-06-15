@@ -17,6 +17,14 @@ import { DEAL_TYPE_LABELS, DEAL_TYPE_COLORS } from '@/lib/deal-type'
 import { DealSummary } from '@/components/ofertas/deal-summary'
 import type { PresupuestoStatus } from '@/types'
 
+const PROB_BADGE_COLORS: Record<number, string> = {
+  0:   'bg-zinc-100 text-zinc-500',
+  25:  'bg-red-50 text-red-600',
+  50:  'bg-orange-50 text-orange-600',
+  75:  'bg-blue-50 text-blue-700',
+  100: 'bg-emerald-50 text-emerald-700',
+}
+
 const STATUS_LABELS: Record<PresupuestoStatus, string> = {
   draft: 'Borrador',
   sent: 'Enviado',
@@ -103,6 +111,11 @@ export default async function OfertaDetailPage({ params }: { params: Promise<{ i
             {presupuesto.dealType && (
               <span className={`text-[10px] font-semibold uppercase tracking-wide px-2.5 py-1 rounded-full ${DEAL_TYPE_COLORS[presupuesto.dealType]}`}>
                 {DEAL_TYPE_LABELS[presupuesto.dealType]}
+              </span>
+            )}
+            {deal?.closeProbability != null && (
+              <span className={`text-[10px] font-semibold px-2.5 py-1 rounded-full ${PROB_BADGE_COLORS[deal.closeProbability] ?? 'bg-zinc-100 text-zinc-500'}`}>
+                {deal.closeProbability}%
               </span>
             )}
             {approvalChip && (

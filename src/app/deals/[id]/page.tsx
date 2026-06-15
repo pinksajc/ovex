@@ -15,6 +15,7 @@ import { DealLocationsPanel } from '@/components/deals/deal-locations-panel'
 import { DealTimeline } from '@/components/deals/deal-timeline'
 import { ClientHistoryCard } from '@/components/deals/client-history-card'
 import { getApprovalEventsByDeal } from '@/lib/supabase/events'
+import { CloseProbabilitySelector } from '@/components/deals/close-probability-selector'
 import type { DealStage, PresupuestoStatus, InvoiceStatus, DeliveryPlanId, AddonId } from '@/types'
 
 const PRESUPUESTO_STATUS_LABELS: Record<PresupuestoStatus, string> = {
@@ -189,6 +190,14 @@ export default async function DealPage({
             Abrir Simulador →
           </Link>
         </div>
+      </div>
+
+      {/* Probabilidad de cierre */}
+      <div className="bg-white border border-zinc-200 rounded-xl p-5 mb-6">
+        <h3 className="text-xs font-medium text-zinc-500 uppercase tracking-wide mb-3">
+          Probabilidad de cierre
+        </h3>
+        <CloseProbabilitySelector dealId={deal.id} initialValue={deal.closeProbability} />
       </div>
 
       {/* Grid */}
