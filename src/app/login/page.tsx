@@ -38,11 +38,11 @@ function LoginForm() {
 
       {/* ── Left panel — dark form ──────────────────────────────── */}
       <div
-        className="flex-1 flex flex-col px-8 py-10 md:px-14"
-        style={{ background: '#0E0E11' }}
+        className="flex-1 relative flex items-center justify-center px-8 md:px-14"
+        style={{ background: '#0E0E11', minHeight: '100vh' }}
       >
-        {/* Logo */}
-        <div>
+        {/* Logo — top-left absolute */}
+        <div className="absolute top-10 left-8 md:left-14">
           <div className="flex items-baseline gap-0.5">
             <span className="font-bold text-xl tracking-tight" style={{ color: '#7C72E8' }}>O</span>
             <span className="font-bold text-xl tracking-tight text-white">rvex</span>
@@ -50,9 +50,8 @@ function LoginForm() {
           <p className="text-[10px] text-zinc-500 mt-0.5 font-medium tracking-widest uppercase">Sales OS</p>
         </div>
 
-        {/* Form — vertically centred */}
-        <div className="flex-1 flex items-center justify-center">
-          <div className="w-full max-w-sm">
+        {/* Form — perfectly centred */}
+        <div className="w-full max-w-sm">
             <h1 className="text-2xl font-semibold text-white tracking-tight mb-1">
               Accede a tu cuenta
             </h1>
@@ -149,11 +148,10 @@ function LoginForm() {
                 ) : 'Acceder'}
               </button>
             </form>
-          </div>
         </div>
 
-        {/* Footer */}
-        <p style={{ fontSize: 11, letterSpacing: 1.5, color: '#62626B' }}>
+        {/* Footer — bottom-left absolute */}
+        <p className="absolute bottom-8 left-8 md:left-14" style={{ fontSize: 11, letterSpacing: 1.5, color: '#62626B' }}>
           © 2026 Orvex · by Platomico
         </p>
       </div>
