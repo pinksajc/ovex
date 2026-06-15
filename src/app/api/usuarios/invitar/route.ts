@@ -1,5 +1,5 @@
 // POST /api/usuarios/invitar
-// Body: { email: string, name?: string, role: 'admin' | 'sales' | 'finance' }
+// Body: { email: string, name?: string, role: 'admin' | 'growth_manager' | 'sales' | 'finance' }
 //
 // Requires: authenticated user with role owner or admin.
 // Uses service_role client — must stay server-side only.
@@ -9,7 +9,7 @@ import { requireAuth } from '@/lib/auth'
 import { getSupabaseClient } from '@/lib/supabase/client'
 import type { UserRole } from '@/lib/auth'
 
-const VALID_INVITE_ROLES: UserRole[] = ['admin', 'sales', 'finance']
+const VALID_INVITE_ROLES: UserRole[] = ['admin', 'growth_manager', 'sales', 'finance']
 
 export async function POST(req: Request) {
   // ── Auth check ────────────────────────────────────────────────────────────

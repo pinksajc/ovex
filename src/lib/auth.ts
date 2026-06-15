@@ -9,7 +9,7 @@ import { cookies } from 'next/headers'
 import { createAuthServerClient } from '@/lib/supabase/auth'
 import { getSupabaseClient } from '@/lib/supabase/client'
 
-export type UserRole = 'owner' | 'admin' | 'sales' | 'finance'
+export type UserRole = 'owner' | 'admin' | 'growth_manager' | 'sales' | 'finance'
 
 export interface AuthUser {
   id: string

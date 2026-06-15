@@ -69,7 +69,8 @@ function UserRow({
   const canModify =
     !isSelf &&
     member.role !== 'owner' &&
-    !(currentUserRole === 'admin' && member.role === 'admin')
+    !(currentUserRole === 'admin' && member.role === 'admin') &&
+    !(currentUserRole === 'growth_manager' && (member.role === 'admin' || member.role === 'growth_manager'))
 
   const canDelete = currentUserRole === 'owner' && !isSelf && member.role !== 'owner'
 
@@ -323,9 +324,10 @@ function CreateUserModal({
               ))}
             </select>
             <p className="mt-1.5 text-[11px] text-zinc-400">
-              {role === 'admin'   && 'Acceso completo a todos los módulos excepto cashflow.'}
-              {role === 'sales'   && 'Acceso a deals, pipeline y ofertas.'}
-              {role === 'finance' && 'Acceso a facturas y cashflow.'}
+              {role === 'admin'          && 'Acceso a todos los módulos excepto cashflow.'}
+              {role === 'growth_manager' && 'Acceso a dashboard, deals, pipeline, ofertas, facturas, gestiones y usuarios.'}
+              {role === 'sales'          && 'Acceso a dashboard, deals, pipeline y ofertas.'}
+              {role === 'finance'        && 'Acceso a facturas, cashflow, deals, pipeline y ofertas.'}
             </p>
           </div>
 

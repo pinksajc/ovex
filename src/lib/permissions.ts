@@ -3,7 +3,7 @@
 // Import in server components, layouts, middleware, and the sidebar.
 // =========================================
 
-export const ROLES = ['owner', 'admin', 'sales', 'finance'] as const
+export const ROLES = ['owner', 'admin', 'growth_manager', 'sales', 'finance'] as const
 export type Role = typeof ROLES[number]
 
 export type Module =
@@ -18,17 +18,25 @@ export type Module =
 
 /**
  * Which roles may access each module.
- * owner always has full access.
+ *
+ * dashboard:  owner · admin · growth_manager · sales · finance
+ * deals:      owner · admin · growth_manager · sales · finance
+ * pipeline:   owner · admin · growth_manager · sales · finance
+ * ofertas:    owner · admin · growth_manager · sales · finance
+ * facturas:   owner · admin · growth_manager · finance
+ * cashflow:   owner · finance                               (admin loses access)
+ * gestiones:  owner · admin · growth_manager
+ * usuarios:   owner · admin · growth_manager
  */
 export const MODULE_ROLES: Record<Module, readonly Role[]> = {
-  dashboard: ['owner', 'admin', 'sales', 'finance'],
-  deals:     ['owner', 'admin', 'sales'],
-  pipeline:  ['owner', 'admin', 'sales'],
-  ofertas:   ['owner', 'admin', 'sales'],
-  facturas:  ['owner', 'admin', 'finance'],
-  cashflow:  ['owner', 'admin', 'finance'],
-  usuarios:  ['owner', 'admin'],
-  gestiones: ['owner', 'admin'],
+  dashboard: ['owner', 'admin', 'growth_manager', 'sales', 'finance'],
+  deals:     ['owner', 'admin', 'growth_manager', 'sales', 'finance'],
+  pipeline:  ['owner', 'admin', 'growth_manager', 'sales', 'finance'],
+  ofertas:   ['owner', 'admin', 'growth_manager', 'sales', 'finance'],
+  facturas:  ['owner', 'admin', 'growth_manager', 'finance'],
+  cashflow:  ['owner', 'finance'],
+  gestiones: ['owner', 'admin', 'growth_manager'],
+  usuarios:  ['owner', 'admin', 'growth_manager'],
 }
 
 export function canAccess(role: string | undefined | null, module: Module): boolean {
@@ -37,15 +45,17 @@ export function canAccess(role: string | undefined | null, module: Module): bool
 }
 
 export const ROLE_LABEL: Record<string, string> = {
-  owner:   'Owner',
-  admin:   'Admin',
-  sales:   'Sales',
-  finance: 'Finance',
+  owner:          'Owner',
+  admin:          'Admin',
+  growth_manager: 'Growth Manager',
+  sales:          'Sales',
+  finance:        'Finance',
 }
 
 export const ROLE_COLOR: Record<string, string> = {
-  owner:   'bg-amber-50 text-amber-700',
-  admin:   'bg-violet-50 text-violet-700',
-  sales:   'bg-blue-50 text-blue-700',
-  finance: 'bg-emerald-50 text-emerald-700',
+  owner:          'bg-amber-50 text-amber-700',
+  admin:          'bg-violet-50 text-violet-700',
+  growth_manager: 'bg-teal-50 text-teal-700',
+  sales:          'bg-blue-50 text-blue-700',
+  finance:        'bg-emerald-50 text-emerald-700',
 }
