@@ -38,11 +38,11 @@ function LoginForm() {
 
       {/* ── Left panel — dark form ──────────────────────────────── */}
       <div
-        className="flex-1 relative flex items-center justify-center px-8 md:px-14"
+        className="flex-1 relative flex items-center justify-center"
         style={{ background: '#0E0E11', minHeight: '100vh' }}
       >
         {/* Logo — top-left absolute */}
-        <div className="absolute top-10 left-8 md:left-14">
+        <div style={{ position: 'absolute', top: 40, left: 40 }}>
           <div className="flex items-baseline gap-0.5">
             <span className="font-bold text-xl tracking-tight" style={{ color: '#7C72E8' }}>O</span>
             <span className="font-bold text-xl tracking-tight text-white">rvex</span>
@@ -50,108 +50,111 @@ function LoginForm() {
           <p className="text-[10px] text-zinc-500 mt-0.5 font-medium tracking-widest uppercase">Sales OS</p>
         </div>
 
-        {/* Form — perfectly centred */}
-        <div className="w-full max-w-sm">
-            <h1 className="text-2xl font-semibold text-white tracking-tight mb-1">
+        {/* Form block — perfectly centred unit */}
+        <form
+          onSubmit={handleSubmit}
+          style={{ display: 'flex', flexDirection: 'column', gap: 24, width: '100%', maxWidth: 380, padding: '0 24px' }}
+        >
+          <div>
+            <h1 className="text-2xl font-semibold text-white tracking-tight" style={{ marginBottom: 4 }}>
               Accede a tu cuenta
             </h1>
-            <p className="text-sm text-zinc-400 mb-8">
+            <p className="text-sm text-zinc-400">
               Introduce tus credenciales para continuar
             </p>
+          </div>
 
-            <form onSubmit={handleSubmit} className="space-y-5">
-              {/* Email */}
-              <div>
-                <label className="block text-xs font-medium text-zinc-400 mb-1.5 uppercase tracking-widest">
-                  Email
-                </label>
-                <input
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  required
-                  autoFocus
-                  autoComplete="email"
-                  placeholder="tu@empresa.com"
-                  className="w-full px-4 py-3 text-sm text-white rounded-lg border transition-all focus:outline-none placeholder:text-zinc-600"
-                  style={{ background: '#1C1C21', borderColor: '#33333B' }}
-                  onFocus={(e) => {
-                    e.currentTarget.style.borderColor = '#7C72E8'
-                    e.currentTarget.style.boxShadow = '0 0 0 2px rgba(124,114,232,0.2)'
-                  }}
-                  onBlur={(e) => {
-                    e.currentTarget.style.borderColor = '#33333B'
-                    e.currentTarget.style.boxShadow = 'none'
-                  }}
-                />
-              </div>
+          {/* Email */}
+          <div>
+            <label className="block text-xs font-medium text-zinc-400 mb-1.5 uppercase tracking-widest">
+              Email
+            </label>
+            <input
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              required
+              autoFocus
+              autoComplete="email"
+              placeholder="tu@empresa.com"
+              className="w-full px-4 py-3 text-sm text-white rounded-lg border transition-all focus:outline-none placeholder:text-zinc-600"
+              style={{ background: '#1C1C21', borderColor: '#33333B' }}
+              onFocus={(e) => {
+                e.currentTarget.style.borderColor = '#7C72E8'
+                e.currentTarget.style.boxShadow = '0 0 0 2px rgba(124,114,232,0.2)'
+              }}
+              onBlur={(e) => {
+                e.currentTarget.style.borderColor = '#33333B'
+                e.currentTarget.style.boxShadow = 'none'
+              }}
+            />
+          </div>
 
-              {/* Password */}
-              <div>
-                <label className="block text-xs font-medium text-zinc-400 mb-1.5 uppercase tracking-widest">
-                  Contraseña
-                </label>
-                <div className="relative">
-                  <input
-                    type={showPassword ? 'text' : 'password'}
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    required
-                    autoComplete="current-password"
-                    className="w-full px-4 py-3 pr-11 text-sm text-white rounded-lg border transition-all focus:outline-none"
-                    style={{ background: '#1C1C21', borderColor: '#33333B' }}
-                    onFocus={(e) => {
-                      e.currentTarget.style.borderColor = '#7C72E8'
-                      e.currentTarget.style.boxShadow = '0 0 0 2px rgba(124,114,232,0.2)'
-                    }}
-                    onBlur={(e) => {
-                      e.currentTarget.style.borderColor = '#33333B'
-                      e.currentTarget.style.boxShadow = 'none'
-                    }}
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword((v) => !v)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-zinc-300 transition-colors"
-                    tabIndex={-1}
-                    aria-label={showPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}
-                  >
-                    {showPassword ? <EyeOffIcon /> : <EyeIcon />}
-                  </button>
-                </div>
-              </div>
-
-              {/* Error */}
-              {error && (
-                <div
-                  className="text-xs text-red-400 rounded-lg px-4 py-3 border"
-                  style={{ background: 'rgba(127,29,29,0.25)', borderColor: 'rgba(153,27,27,0.4)' }}
-                >
-                  {error}
-                </div>
-              )}
-
-              {/* Submit */}
+          {/* Password */}
+          <div>
+            <label className="block text-xs font-medium text-zinc-400 mb-1.5 uppercase tracking-widest">
+              Contraseña
+            </label>
+            <div className="relative">
+              <input
+                type={showPassword ? 'text' : 'password'}
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required
+                autoComplete="current-password"
+                className="w-full px-4 py-3 pr-11 text-sm text-white rounded-lg border transition-all focus:outline-none"
+                style={{ background: '#1C1C21', borderColor: '#33333B' }}
+                onFocus={(e) => {
+                  e.currentTarget.style.borderColor = '#7C72E8'
+                  e.currentTarget.style.boxShadow = '0 0 0 2px rgba(124,114,232,0.2)'
+                }}
+                onBlur={(e) => {
+                  e.currentTarget.style.borderColor = '#33333B'
+                  e.currentTarget.style.boxShadow = 'none'
+                }}
+              />
               <button
-                type="submit"
-                disabled={loading}
-                className="w-full text-white text-sm font-semibold py-3 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                style={{ background: '#7C72E8' }}
-                onMouseEnter={(e) => { if (!loading) e.currentTarget.style.background = '#8F86F0' }}
-                onMouseLeave={(e) => { if (!loading) e.currentTarget.style.background = '#7C72E8' }}
+                type="button"
+                onClick={() => setShowPassword((v) => !v)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-zinc-300 transition-colors"
+                tabIndex={-1}
+                aria-label={showPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}
               >
-                {loading ? (
-                  <span className="inline-flex items-center gap-2 justify-center">
-                    <span className="w-3.5 h-3.5 rounded-full border-2 border-white/30 border-t-white animate-spin" />
-                    Accediendo…
-                  </span>
-                ) : 'Acceder'}
+                {showPassword ? <EyeOffIcon /> : <EyeIcon />}
               </button>
-            </form>
-        </div>
+            </div>
+          </div>
+
+          {/* Error */}
+          {error && (
+            <div
+              className="text-xs text-red-400 rounded-lg px-4 py-3 border"
+              style={{ background: 'rgba(127,29,29,0.25)', borderColor: 'rgba(153,27,27,0.4)' }}
+            >
+              {error}
+            </div>
+          )}
+
+          {/* Submit */}
+          <button
+            type="submit"
+            disabled={loading}
+            className="w-full text-white text-sm font-semibold py-3 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            style={{ background: '#7C72E8' }}
+            onMouseEnter={(e) => { if (!loading) e.currentTarget.style.background = '#8F86F0' }}
+            onMouseLeave={(e) => { if (!loading) e.currentTarget.style.background = '#7C72E8' }}
+          >
+            {loading ? (
+              <span className="inline-flex items-center gap-2 justify-center">
+                <span className="w-3.5 h-3.5 rounded-full border-2 border-white/30 border-t-white animate-spin" />
+                Accediendo…
+              </span>
+            ) : 'Acceder'}
+          </button>
+        </form>
 
         {/* Footer — bottom-left absolute */}
-        <p className="absolute bottom-8 left-8 md:left-14" style={{ fontSize: 11, letterSpacing: 1.5, color: '#62626B' }}>
+        <p style={{ position: 'absolute', bottom: 24, left: 40, fontSize: 11, letterSpacing: 1.5, color: '#62626B' }}>
           © 2026 Orvex · by Platomico
         </p>
       </div>
