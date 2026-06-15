@@ -11,6 +11,7 @@ function LoginForm() {
 
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [showPassword, setShowPassword] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
 
@@ -33,69 +34,134 @@ function LoginForm() {
   }
 
   return (
-    <div className="min-h-screen bg-zinc-50 flex items-center justify-center">
-      <div className="w-full max-w-sm px-4">
-        <div className="bg-white border border-zinc-200 rounded-2xl p-8 shadow-sm">
+    <div className="min-h-screen flex">
 
-          {/* Brand */}
-          <div className="flex items-center gap-2 mb-8">
-            <div className="w-7 h-7 bg-zinc-900 rounded-lg flex items-center justify-center shrink-0">
-              <span className="text-white text-xs font-bold">O</span>
-            </div>
-            <span className="font-semibold text-zinc-900 text-sm">Orvex</span>
-            <span className="text-zinc-300 text-xs ml-auto">Sales OS</span>
+      {/* ── Left panel — dark form ──────────────────────────────── */}
+      <div
+        className="flex-1 flex flex-col px-8 py-10 md:px-14"
+        style={{ background: '#0E0E11' }}
+      >
+        {/* Logo */}
+        <div>
+          <div className="flex items-baseline gap-0.5">
+            <span className="font-bold text-xl tracking-tight" style={{ color: '#7C72E8' }}>O</span>
+            <span className="font-bold text-xl tracking-tight text-white">rvex</span>
           </div>
-
-          <h1 className="text-lg font-semibold text-zinc-900 mb-1">Accede a tu cuenta</h1>
-          <p className="text-sm text-zinc-400 mb-6">Introduce tus credenciales para continuar</p>
-
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div>
-              <label className="block text-xs font-medium text-zinc-600 mb-1.5">Email</label>
-              <input
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                required
-                autoFocus
-                autoComplete="email"
-                placeholder="tu@platomico.com"
-                className="w-full px-3 py-2 text-sm border border-zinc-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-zinc-900 focus:border-transparent transition-all placeholder:text-zinc-300"
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-zinc-600 mb-1.5">Contraseña</label>
-              <input
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-                autoComplete="current-password"
-                className="w-full px-3 py-2 text-sm border border-zinc-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-zinc-900 focus:border-transparent transition-all"
-              />
-            </div>
-
-            {error && (
-              <div className="text-xs text-red-600 bg-red-50 border border-red-100 rounded-lg px-3 py-2">
-                {error}
-              </div>
-            )}
-
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full bg-zinc-900 text-white text-sm font-medium py-2.5 rounded-lg hover:bg-zinc-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed mt-2"
-            >
-              {loading ? (
-                <span className="inline-flex items-center gap-2 justify-center">
-                  <span className="w-3 h-3 rounded-full border border-white/40 border-t-white animate-spin" />
-                  Accediendo…
-                </span>
-              ) : 'Acceder'}
-            </button>
-          </form>
+          <p className="text-[10px] text-zinc-500 mt-0.5 font-medium tracking-widest uppercase">Sales OS</p>
         </div>
+
+        {/* Form — vertically centred */}
+        <div className="flex-1 flex items-center justify-center">
+          <div className="w-full max-w-sm">
+            <h1 className="text-2xl font-semibold text-white tracking-tight mb-1">
+              Accede a tu cuenta
+            </h1>
+            <p className="text-sm text-zinc-400 mb-8">
+              Introduce tus credenciales para continuar
+            </p>
+
+            <form onSubmit={handleSubmit} className="space-y-5">
+              {/* Email */}
+              <div>
+                <label className="block text-xs font-medium text-zinc-400 mb-1.5 uppercase tracking-widest">
+                  Email
+                </label>
+                <input
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  required
+                  autoFocus
+                  autoComplete="email"
+                  placeholder="tu@empresa.com"
+                  className="w-full px-4 py-3 text-sm text-white rounded-lg border transition-all focus:outline-none placeholder:text-zinc-600"
+                  style={{ background: '#1C1C21', borderColor: '#33333B' }}
+                  onFocus={(e) => {
+                    e.currentTarget.style.borderColor = '#7C72E8'
+                    e.currentTarget.style.boxShadow = '0 0 0 2px rgba(124,114,232,0.2)'
+                  }}
+                  onBlur={(e) => {
+                    e.currentTarget.style.borderColor = '#33333B'
+                    e.currentTarget.style.boxShadow = 'none'
+                  }}
+                />
+              </div>
+
+              {/* Password */}
+              <div>
+                <label className="block text-xs font-medium text-zinc-400 mb-1.5 uppercase tracking-widest">
+                  Contraseña
+                </label>
+                <div className="relative">
+                  <input
+                    type={showPassword ? 'text' : 'password'}
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    required
+                    autoComplete="current-password"
+                    className="w-full px-4 py-3 pr-11 text-sm text-white rounded-lg border transition-all focus:outline-none"
+                    style={{ background: '#1C1C21', borderColor: '#33333B' }}
+                    onFocus={(e) => {
+                      e.currentTarget.style.borderColor = '#7C72E8'
+                      e.currentTarget.style.boxShadow = '0 0 0 2px rgba(124,114,232,0.2)'
+                    }}
+                    onBlur={(e) => {
+                      e.currentTarget.style.borderColor = '#33333B'
+                      e.currentTarget.style.boxShadow = 'none'
+                    }}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword((v) => !v)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-zinc-300 transition-colors"
+                    tabIndex={-1}
+                    aria-label={showPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}
+                  >
+                    {showPassword ? <EyeOffIcon /> : <EyeIcon />}
+                  </button>
+                </div>
+              </div>
+
+              {/* Error */}
+              {error && (
+                <div
+                  className="text-xs text-red-400 rounded-lg px-4 py-3 border"
+                  style={{ background: 'rgba(127,29,29,0.25)', borderColor: 'rgba(153,27,27,0.4)' }}
+                >
+                  {error}
+                </div>
+              )}
+
+              {/* Submit */}
+              <button
+                type="submit"
+                disabled={loading}
+                className="w-full text-white text-sm font-semibold py-3 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                style={{ background: '#7C72E8' }}
+                onMouseEnter={(e) => { if (!loading) e.currentTarget.style.background = '#8F86F0' }}
+                onMouseLeave={(e) => { if (!loading) e.currentTarget.style.background = '#7C72E8' }}
+              >
+                {loading ? (
+                  <span className="inline-flex items-center gap-2 justify-center">
+                    <span className="w-3.5 h-3.5 rounded-full border-2 border-white/30 border-t-white animate-spin" />
+                    Accediendo…
+                  </span>
+                ) : 'Acceder'}
+              </button>
+            </form>
+          </div>
+        </div>
+
+        {/* Bottom spacer */}
+        <div className="h-10" />
       </div>
+
+      {/* ── Right panel — background image (hidden on mobile) ───── */}
+      <div
+        className="hidden md:block md:w-1/2 bg-cover bg-center bg-no-repeat"
+        style={{ backgroundImage: "url('/fondo_login.png')" }}
+        aria-hidden="true"
+      />
     </div>
   )
 }
@@ -105,5 +171,24 @@ export default function LoginPage() {
     <Suspense>
       <LoginForm />
     </Suspense>
+  )
+}
+
+/* ── Icons ────────────────────────────────────────────────────────────────── */
+
+function EyeIcon() {
+  return (
+    <svg className="w-4 h-4" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
+      <path d="M1 8s2.5-5 7-5 7 5 7 5-2.5 5-7 5-7-5-7-5z" />
+      <circle cx="8" cy="8" r="2" />
+    </svg>
+  )
+}
+
+function EyeOffIcon() {
+  return (
+    <svg className="w-4 h-4" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
+      <path d="M2 2l12 12M6.5 6.6A2 2 0 0010 9.8M4.2 4.3C2.7 5.4 1.5 7 1.5 7s2.5 5 6.5 5c1.3 0 2.4-.4 3.3-1M6 3.2C6.6 3.1 7.3 3 8 3c4 0 6.5 5 6.5 5s-.6 1.2-1.7 2.3" strokeLinecap="round" />
+    </svg>
   )
 }

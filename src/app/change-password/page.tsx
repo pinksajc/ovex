@@ -13,56 +13,103 @@ export default async function ChangePasswordPage({
   const { error } = await searchParams
 
   return (
-    <div className="min-h-screen bg-zinc-50 flex items-center justify-center p-4">
-      <div className="bg-white border border-zinc-200 rounded-2xl p-8 w-full max-w-sm shadow-sm">
-        <div className="mb-6">
-          <h1 className="text-xl font-semibold text-zinc-900 tracking-tight">Cambia tu contraseña</h1>
-          <p className="text-sm text-zinc-400 mt-1">
-            Por seguridad, debes establecer una contraseña personal antes de continuar.
-          </p>
+    <div className="min-h-screen flex">
+
+      {/* ── Left panel — dark form ──────────────────────────────── */}
+      <div
+        className="flex-1 flex flex-col px-8 py-10 md:px-14"
+        style={{ background: '#0E0E11' }}
+      >
+        {/* Logo */}
+        <div>
+          <div className="flex items-baseline gap-0.5">
+            <span className="font-bold text-xl tracking-tight" style={{ color: '#7C72E8' }}>O</span>
+            <span className="font-bold text-xl tracking-tight text-white">rvex</span>
+          </div>
+          <p className="text-[10px] text-zinc-500 mt-0.5 font-medium tracking-widest uppercase">Sales OS</p>
         </div>
 
-        {error && (
-          <div className="mb-5 bg-red-50 border border-red-200 text-red-700 text-sm px-4 py-3 rounded-lg">
-            {error}
-          </div>
-        )}
+        {/* Form — vertically centred */}
+        <div className="flex-1 flex items-center justify-center">
+          <div className="w-full max-w-sm">
+            <h1 className="text-2xl font-semibold text-white tracking-tight mb-1">
+              Cambia tu contraseña
+            </h1>
+            <p className="text-sm text-zinc-400 mb-8">
+              Por seguridad, establece una contraseña personal antes de continuar.
+            </p>
 
-        <form action={changePasswordAction} className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-zinc-700 mb-1.5">
-              Nueva contraseña <span className="text-red-500">*</span>
-            </label>
-            <input
-              type="password"
-              name="password"
-              required
-              minLength={8}
-              placeholder="Mín. 8 caracteres"
-              className="w-full text-sm border border-zinc-300 rounded-lg px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-zinc-400 focus:border-transparent transition"
-            />
+            {error && (
+              <div
+                className="text-xs text-red-400 rounded-lg px-4 py-3 border mb-6"
+                style={{ background: 'rgba(127,29,29,0.25)', borderColor: 'rgba(153,27,27,0.4)' }}
+              >
+                {error}
+              </div>
+            )}
+
+            <form action={changePasswordAction} className="space-y-5">
+              {/* New password */}
+              <div>
+                <label className="block text-xs font-medium text-zinc-400 mb-1.5 uppercase tracking-widest">
+                  Nueva contraseña <span style={{ color: '#7C72E8' }}>*</span>
+                </label>
+                <input
+                  type="password"
+                  name="password"
+                  required
+                  minLength={8}
+                  placeholder="Mín. 8 caracteres"
+                  className="w-full px-4 py-3 text-sm text-white rounded-lg border transition-all focus:outline-none placeholder:text-zinc-600"
+                  style={{ background: '#1C1C21', borderColor: '#33333B' }}
+                />
+              </div>
+
+              {/* Confirm password */}
+              <div>
+                <label className="block text-xs font-medium text-zinc-400 mb-1.5 uppercase tracking-widest">
+                  Confirmar contraseña <span style={{ color: '#7C72E8' }}>*</span>
+                </label>
+                <input
+                  type="password"
+                  name="password2"
+                  required
+                  minLength={8}
+                  placeholder="Repite la contraseña"
+                  className="w-full px-4 py-3 text-sm text-white rounded-lg border transition-all focus:outline-none placeholder:text-zinc-600"
+                  style={{ background: '#1C1C21', borderColor: '#33333B' }}
+                />
+              </div>
+
+              {/* Submit */}
+              <SubmitButton />
+            </form>
           </div>
-          <div>
-            <label className="block text-sm font-medium text-zinc-700 mb-1.5">
-              Confirmar contraseña <span className="text-red-500">*</span>
-            </label>
-            <input
-              type="password"
-              name="password2"
-              required
-              minLength={8}
-              placeholder="Repite la contraseña"
-              className="w-full text-sm border border-zinc-300 rounded-lg px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-zinc-400 focus:border-transparent transition"
-            />
-          </div>
-          <button
-            type="submit"
-            className="w-full bg-zinc-900 text-white text-sm font-medium px-5 py-2.5 rounded-lg hover:bg-zinc-700 transition-colors mt-2"
-          >
-            Guardar contraseña →
-          </button>
-        </form>
+        </div>
+
+        {/* Bottom spacer */}
+        <div className="h-10" />
       </div>
+
+      {/* ── Right panel — background image (hidden on mobile) ───── */}
+      <div
+        className="hidden md:block md:w-1/2 bg-cover bg-center bg-no-repeat"
+        style={{ backgroundImage: "url('/fondo_login.png')" }}
+        aria-hidden="true"
+      />
     </div>
+  )
+}
+
+/* ── Client submit button (for hover effect) ───────────────────────────── */
+function SubmitButton() {
+  return (
+    <button
+      type="submit"
+      className="w-full text-white text-sm font-semibold py-3 rounded-lg transition-colors"
+      style={{ background: '#7C72E8' }}
+    >
+      Guardar contraseña →
+    </button>
   )
 }
