@@ -116,12 +116,12 @@ export async function POST(req: Request) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { error: profileError } = await (db.from('profiles') as any).upsert(
     {
-      id:        data.user.id,
+      id:                   data.user.id,
       email,
-      full_name: displayName,
+      full_name:            displayName,
       role,
-      // status only if the column exists (migration 20260609000003 must be run in Supabase Dashboard)
-      status: 'active',
+      status:               'active',
+      must_change_password: true,
     },
     { onConflict: 'id' }
   )
