@@ -25,7 +25,7 @@ export type Module =
  * pipeline:   owner · admin · growth_manager · sales · finance
  * ofertas:    owner · admin · growth_manager · sales · finance
  * facturas:   owner · admin · growth_manager · finance
- * cashflow:   owner · finance                               (admin loses access)
+ * cashflow:   owner · admin · finance
  * leads:      owner · admin · growth_manager
  * gestiones:  owner · admin · growth_manager
  * usuarios:   owner · admin · growth_manager
@@ -37,7 +37,7 @@ export const MODULE_ROLES: Record<Module, readonly Role[]> = {
   pipeline:  ['owner', 'admin', 'growth_manager', 'sales', 'finance'],
   ofertas:   ['owner', 'admin', 'growth_manager', 'sales', 'finance'],
   facturas:  ['owner', 'admin', 'growth_manager', 'finance'],
-  cashflow:  ['owner', 'finance'],
+  cashflow:  ['owner', 'admin', 'finance'],
   gestiones: ['owner', 'admin', 'growth_manager'],
   usuarios:  ['owner', 'admin', 'growth_manager'],
 }
