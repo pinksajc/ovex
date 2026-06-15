@@ -37,8 +37,8 @@ export default async function ChangePasswordPage({
               type="password"
               name="password"
               required
-              minLength={6}
-              placeholder="Mín. 6 caracteres"
+              minLength={8}
+              placeholder="Mín. 8 caracteres"
               className="w-full text-sm border border-zinc-300 rounded-lg px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-zinc-400 focus:border-transparent transition"
             />
           </div>
@@ -50,7 +50,7 @@ export default async function ChangePasswordPage({
               type="password"
               name="password2"
               required
-              minLength={6}
+              minLength={8}
               placeholder="Repite la contraseña"
               className="w-full text-sm border border-zinc-300 rounded-lg px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-zinc-400 focus:border-transparent transition"
             />

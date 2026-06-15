@@ -13,8 +13,8 @@ export async function changePasswordAction(formData: FormData): Promise<void> {
   const password  = (formData.get('password')  as string | null)?.trim() ?? ''
   const password2 = (formData.get('password2') as string | null)?.trim() ?? ''
 
-  if (!password || password.length < 6) {
-    redirect('/change-password?error=' + encodeURIComponent('La contraseña debe tener al menos 6 caracteres.'))
+  if (!password || password.length < 8) {
+    redirect('/change-password?error=' + encodeURIComponent('La contraseña debe tener al menos 8 caracteres.'))
   }
 
   if (password !== password2) {
