@@ -2,6 +2,7 @@
 
 import { useState, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
+import Image from 'next/image'
 import { createAuthBrowserClient } from '@/lib/supabase/auth'
 
 function LoginForm() {
@@ -48,6 +49,7 @@ function LoginForm() {
             <span className="font-bold text-xl tracking-tight text-white">rvex</span>
           </div>
           <p className="text-[10px] text-zinc-500 mt-0.5 font-medium tracking-widest uppercase">Sales OS</p>
+          <p className="mt-1 font-medium uppercase" style={{ fontSize: 11, letterSpacing: 2, color: '#62626B' }}>by Platomico</p>
         </div>
 
         {/* Form — vertically centred */}
@@ -157,11 +159,15 @@ function LoginForm() {
       </div>
 
       {/* ── Right panel — background image (hidden on mobile) ───── */}
-      <div
-        className="hidden md:block md:w-1/2 bg-cover bg-center bg-no-repeat"
-        style={{ backgroundImage: "url('/fondo_login.png')" }}
-        aria-hidden="true"
-      />
+      <div className="hidden md:block md:w-1/2 relative" aria-hidden="true">
+        <Image
+          src="/fondo_login.png"
+          alt=""
+          fill
+          style={{ objectFit: 'cover', objectPosition: 'center' }}
+          priority
+        />
+      </div>
     </div>
   )
 }
