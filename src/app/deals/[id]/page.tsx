@@ -18,8 +18,6 @@ import { getApprovalEventsByDeal } from '@/lib/supabase/events'
 import { CloseProbabilitySelector } from '@/components/deals/close-probability-selector'
 import { DealCommentsPanel } from '@/components/deals/deal-comments-panel'
 import { getCommentsByDeal } from '@/lib/supabase/deal-comments'
-import { GmailSearchPanel } from '@/components/deals/gmail-search-panel'
-import { getGmailToken } from '@/lib/supabase/gmail-tokens'
 import type { DealStage, PresupuestoStatus, InvoiceStatus, DeliveryPlanId, AddonId } from '@/types'
 
 const PRESUPUESTO_STATUS_LABELS: Record<PresupuestoStatus, string> = {
@@ -81,7 +79,7 @@ export default async function DealPage({
 }) {
   const { id } = await params
   const user = await getCurrentUser()
-  const [deal, members, presupuestos, facturas, locations, approvalEvents, comments, gmailToken] = await Promise.all([
+  const [deal, members, presupuestos, facturas, locations, approvalEvents, comments] = await Promise.all([
     getDeal(id, user ?? undefined),
     getWorkspaceMembers(),
     getPresupuestosByDeal(id).catch(() => []),
@@ -89,7 +87,6 @@ export default async function DealPage({
     listLocationsByDeal(id).catch(() => []),
     getApprovalEventsByDeal(id).catch(() => []),
     getCommentsByDeal(id).catch(() => []),
-    user ? getGmailToken(user.id).catch(() => null) : Promise.resolve(null),
   ])
 
   if (!deal) notFound()
@@ -407,8 +404,6 @@ export default async function DealPage({
           dealId={deal.id}
           currentUserId={user?.id ?? ''}
           initialComments={comments}
-          gmailConnected={!!gmailToken}
-          contactEmail={deal.contact?.email ?? null}
         />
       </div>
     </div>

@@ -4,7 +4,6 @@ import { useState, useTransition, useRef, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { addCommentAction, deleteCommentAction } from '@/app/actions/deal-comments'
 import type { DealComment, CommentType } from '@/lib/supabase/deal-comments'
-import { GmailSearchPanel } from '@/components/deals/gmail-search-panel'
 
 // ── Contact type config ────────────────────────────────────────────────────
 
@@ -48,13 +47,11 @@ interface Props {
   dealId: string
   currentUserId: string
   initialComments: DealComment[]
-  gmailConnected: boolean
-  contactEmail: string | null
 }
 
 // ── Component ──────────────────────────────────────────────────────────────
 
-export function DealCommentsPanel({ dealId, currentUserId, initialComments, gmailConnected, contactEmail }: Props) {
+export function DealCommentsPanel({ dealId, currentUserId, initialComments }: Props) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
   const [isDeleting, startDeleteTransition] = useTransition()
@@ -92,6 +89,7 @@ export function DealCommentsPanel({ dealId, currentUserId, initialComments, gmai
       type,
       content: content.trim(),
       createdAt: new Date().toISOString(),
+      gmailMessageId: null,
     }
 
     setComments((prev) => [optimistic, ...prev])
@@ -124,15 +122,10 @@ export function DealCommentsPanel({ dealId, currentUserId, initialComments, gmai
   return (
     <div className="bg-white border border-zinc-200 rounded-xl p-5">
       {/* Header */}
-      <div className="flex items-center justify-between gap-3 mb-4 flex-wrap">
+      <div className="mb-4">
         <h3 className="text-[10px] font-semibold text-zinc-400 uppercase tracking-widest">
           Seguimiento
         </h3>
-        <GmailSearchPanel
-          dealId={dealId}
-          contactEmail={contactEmail}
-          gmailConnected={gmailConnected}
-        />
       </div>
 
       {/* Add form */}
@@ -248,6 +241,11 @@ function CommentCard({
           <span className="text-[10px] font-semibold text-zinc-500 uppercase tracking-wide">
             {typeLabel(comment.type)}
           </span>
+          {comment.gmailMessageId && (
+            <span className="text-[9px] font-semibold uppercase tracking-wide px-1.5 py-0.5 rounded-full bg-blue-50 text-blue-600">
+              Gmail
+            </span>
+          )}
           <span className="text-[10px] text-zinc-400">{relativeDate(comment.createdAt)}</span>
           {comment.userName && (
             <span className="text-[10px] text-zinc-400">· {comment.userName}</span>

@@ -16,6 +16,8 @@ export interface DealComment {
   type: CommentType
   content: string
   createdAt: string
+  /** Set when imported by the Gmail cron — used for deduplication and badge */
+  gmailMessageId: string | null
 }
 
 interface CommentRow {
@@ -25,6 +27,7 @@ interface CommentRow {
   type: string
   content: string
   created_at: string
+  gmail_message_id?: string | null
   profiles?: { name: string | null } | null
 }
 
@@ -47,6 +50,7 @@ function rowToComment(row: CommentRow, nameMap?: Map<string, string>): DealComme
     type: row.type as CommentType,
     content: row.content,
     createdAt: row.created_at,
+    gmailMessageId: row.gmail_message_id ?? null,
   }
 }
 
@@ -55,7 +59,7 @@ export async function getCommentsByDeal(dealId: string): Promise<DealComment[]> 
 
   // Fetch comments without profiles join (FK points to auth.users, not profiles)
   const { data, error } = await commentsTable(db)
-    .select('id, deal_id, user_id, type, content, created_at')
+    .select('id, deal_id, user_id, type, content, created_at, gmail_message_id')
     .eq('deal_id', dealId)
     .order('created_at', { ascending: false })
     .limit(200)
@@ -83,6 +87,7 @@ export interface CreateCommentInput {
   userId: string
   type: CommentType
   content: string
+  gmailMessageId?: string
 }
 
 export async function createComment(input: CreateCommentInput): Promise<DealComment> {
@@ -98,8 +103,9 @@ export async function createComment(input: CreateCommentInput): Promise<DealComm
       user_id: input.userId,
       type: input.type,
       content: input.content,
+      ...(input.gmailMessageId ? { gmail_message_id: input.gmailMessageId } : {}),
     })
-    .select('id, deal_id, user_id, type, content, created_at')
+    .select('id, deal_id, user_id, type, content, created_at, gmail_message_id')
     .single()
 
   if (error) {
@@ -108,6 +114,16 @@ export async function createComment(input: CreateCommentInput): Promise<DealComm
   }
   console.log('[createComment] ok, id=', (data as CommentRow).id)
   return rowToComment(data as CommentRow)
+}
+
+/** Returns true if a comment with this gmail_message_id already exists */
+export async function gmailMessageAlreadyImported(gmailMessageId: string): Promise<boolean> {
+  const db = getSupabaseClient()
+  const { data } = await commentsTable(db)
+    .select('id')
+    .eq('gmail_message_id', gmailMessageId)
+    .maybeSingle()
+  return data !== null
 }
 
 export async function deleteComment(id: string, userId: string): Promise<void> {
