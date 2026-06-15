@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getCurrentUser } from '@/lib/auth'
 import { getValidAccessToken } from '@/lib/supabase/gmail-tokens'
-import { getDealById } from '@/lib/supabase/deals'
+import { getDeal } from '@/lib/deals'
 
 export interface GmailEmailResult {
   id: string
@@ -64,11 +64,12 @@ export async function GET(
 
   const { id: dealId } = await params
 
-  // Get deal to read contact email
-  const deal = await getDealById(dealId).catch(() => null)
+  // Use getDeal (not getDealById) so contact_overrides are applied — the email
+  // visible in the UI may come from contact_overrides, not from deals.contact_email
+  const deal = await getDeal(dealId, user).catch(() => null)
   if (!deal) return NextResponse.json({ error: 'Deal no encontrado' }, { status: 404 })
 
-  const contactEmail = deal.contact?.email
+  const contactEmail = deal.contact?.email?.trim()
   if (!contactEmail) {
     return NextResponse.json({ error: 'El deal no tiene email de contacto' }, { status: 400 })
   }
