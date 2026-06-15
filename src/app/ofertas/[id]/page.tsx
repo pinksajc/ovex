@@ -114,9 +114,18 @@ export default async function OfertaDetailPage({ params }: { params: Promise<{ i
               </span>
             )}
             {deal?.closeProbability != null && (
-              <span className={`text-[10px] font-semibold px-2.5 py-1 rounded-full ${PROB_BADGE_COLORS[deal.closeProbability] ?? 'bg-zinc-100 text-zinc-500'}`}>
-                {deal.closeProbability}%
-              </span>
+              <>
+                <span className={`text-[10px] font-semibold px-2.5 py-1 rounded-full ${PROB_BADGE_COLORS[deal.closeProbability] ?? 'bg-zinc-100 text-zinc-500'}`}>
+                  {deal.closeProbability}%
+                </span>
+                <Link
+                  href={`/deals/${presupuesto.dealId}`}
+                  className="text-[10px] font-medium text-zinc-400 hover:text-zinc-700 transition-colors"
+                  title="Editar probabilidad en el deal"
+                >
+                  Editar en deal →
+                </Link>
+              </>
             )}
             {approvalChip && (
               <span className={`text-[10px] font-semibold uppercase tracking-wide px-2.5 py-1 rounded-full border ${approvalChip.cls}`}>
