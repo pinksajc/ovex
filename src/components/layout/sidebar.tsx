@@ -16,6 +16,7 @@ interface NavItem {
 // All modules — filtered at render time based on user.role
 const MAIN_NAV: NavItem[] = [
   { href: '/dashboard', label: 'Dashboard', icon: IconDashboard, module: 'dashboard' },
+  { href: '/leads',     label: 'Leads',     icon: IconLeads,     module: 'leads'     },
   { href: '/deals',     label: 'Deals',     icon: IconDeals,     module: 'deals'     },
   { href: '/pipeline',  label: 'Pipeline',  icon: IconPipeline,  module: 'pipeline'  },
   { href: '/ofertas',   label: 'Ofertas',   icon: IconQuote,     module: 'ofertas'   },
@@ -267,6 +268,16 @@ function IconQuote({ className }: { className?: string }) {
       <rect x="2" y="1" width="12" height="14" rx="1.5" />
       <path d="M5 5h6M5 8h4" strokeLinecap="round" />
       <path d="M5 11h2.5M9.5 11l1 1.5 1-1.5" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  )
+}
+
+function IconLeads({ className }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
+      <circle cx="6" cy="5" r="2.5" />
+      <path d="M1 14c0-3 2-4.5 5-4.5s5 1.5 5 4.5" strokeLinecap="round" />
+      <path d="M11 2.5a2.5 2.5 0 010 5M15 14c0-2.5-1.5-4-3.5-4.5" strokeLinecap="round" />
     </svg>
   )
 }

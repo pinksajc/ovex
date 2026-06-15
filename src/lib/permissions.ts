@@ -9,6 +9,7 @@ export type Role = typeof ROLES[number]
 export type Module =
   | 'dashboard'
   | 'deals'
+  | 'leads'
   | 'pipeline'
   | 'ofertas'
   | 'facturas'
@@ -25,12 +26,14 @@ export type Module =
  * ofertas:    owner · admin · growth_manager · sales · finance
  * facturas:   owner · admin · growth_manager · finance
  * cashflow:   owner · finance                               (admin loses access)
+ * leads:      owner · admin · growth_manager
  * gestiones:  owner · admin · growth_manager
  * usuarios:   owner · admin · growth_manager
  */
 export const MODULE_ROLES: Record<Module, readonly Role[]> = {
   dashboard: ['owner', 'admin', 'growth_manager', 'sales', 'finance'],
   deals:     ['owner', 'admin', 'growth_manager', 'sales', 'finance'],
+  leads:     ['owner', 'admin', 'growth_manager'],
   pipeline:  ['owner', 'admin', 'growth_manager', 'sales', 'finance'],
   ofertas:   ['owner', 'admin', 'growth_manager', 'sales', 'finance'],
   facturas:  ['owner', 'admin', 'growth_manager', 'finance'],
