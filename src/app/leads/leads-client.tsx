@@ -182,7 +182,9 @@ export function LeadsClient({ currentUser, members, convertedNames }: Props) {
   // Derive unique stages preserving canonical order
   const stages = useMemo(() => {
     const seen = new Map<string, string>() // slug → label
-    for (const d of deals) if (!seen.has(d.stage)) seen.set(d.stage, d.stageLabel)
+    for (const d of deals) {
+      if (d.stage && d.stageLabel && !seen.has(d.stage)) seen.set(d.stage, d.stageLabel)
+    }
     return [...seen.entries()].sort(([a], [b]) => {
       const ia = STAGE_ORDER.indexOf(a), ib = STAGE_ORDER.indexOf(b)
       if (ia === -1 && ib === -1) return a.localeCompare(b)

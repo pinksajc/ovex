@@ -1,5 +1,5 @@
 // GET /api/leads/attio
-// Fetches Deals from Attio pipeline with full pagination.
+// Fetches all Deals from the Attio pipeline with full pagination.
 
 import { NextResponse } from 'next/server'
 import { requireAuth } from '@/lib/auth'
@@ -18,22 +18,20 @@ function attioHeaders() {
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
-export type AttioDealStage = 'lead' | 'in_progress' | 'negotiating' | 'won' | 'lost' | string
+export type AttioDealStage = string
 
 export type AttioDeal = {
   attioId: string
   name: string
-  stage: AttioDealStage
-  stageLabel: string
+  stage: AttioDealStage       // raw slug, e.g. "in_progress"
+  stageLabel: string          // display label, e.g. "In Progress"
   value: number | null
   currency: string
   ownerName: string | null
   createdAt: string
 }
 
-export type AttioLead = AttioDeal  // keep alias for leads-client compat
-
-// ── Value extraction ──────────────────────────────────────────────────────────
+// ── Field extraction — exact Attio v2 shapes ─────────────────────────────────
 
 type AttioRecord = {
   id: { record_id: string }
@@ -41,93 +39,74 @@ type AttioRecord = {
   values: Record<string, unknown>
 }
 
-/** Pull the first scalar value from any Attio attribute shape. */
-function pick(attr: unknown): unknown {
-  if (attr === null || attr === undefined) return null
-  // Array form: [{ value: ... }, ...]
-  if (Array.isArray(attr)) return attr.length > 0 ? attr[0].value ?? attr[0] : null
-  // Object form: { active_value: { value: ... } } or { value: ... }
-  const a = attr as Record<string, unknown>
-  if ('active_value' in a) return (a.active_value as Record<string, unknown>)?.value ?? null
-  if ('value' in a) return a.value
-  return null
+/** Text field: values.name = [{ value: "Goconut" }] */
+function str(field: unknown): string | null {
+  if (!Array.isArray(field) || field.length === 0) return null
+  const v = (field[0] as Record<string, unknown>).value
+  return v != null ? String(v) : null
 }
 
-function pickStr(attr: unknown): string | null {
-  const v = pick(attr)
-  if (v === null || v === undefined) return null
-  if (typeof v === 'string') return v || null
-  if (typeof v === 'object' && v !== null) {
-    const o = v as Record<string, unknown>
-    // name object
-    const name = o.original_full_name ?? o.full_name ?? o.full_domain ?? o.display_value ?? o.title ?? o.name ?? null
-    return name ? String(name) : null
+/**
+ * Status field: values.stage = [{ status: { title: "Lead" } }]
+ * Also handles option fields and plain string values.
+ */
+function stageFromField(field: unknown): { slug: string; label: string } | null {
+  if (!Array.isArray(field) || field.length === 0) return null
+  const entry = field[0] as Record<string, unknown>
+  if (entry.status && typeof entry.status === 'object') {
+    const status = entry.status as Record<string, unknown>
+    const title = String(status.title ?? status.label ?? status.name ?? '')
+    const id    = String(status.id ?? status.slug ?? title)
+    return { slug: slugify(id || title), label: title || id }
   }
-  return String(v)
-}
-
-function pickNum(attr: unknown): number | null {
-  const v = pick(attr)
-  if (v === null || v === undefined) return null
-  if (typeof v === 'number') return v
-  if (typeof v === 'object' && v !== null) {
-    const o = v as Record<string, unknown>
-    const n = o.currency_value ?? o.amount ?? o.value ?? null
-    return n !== null ? Number(n) : null
+  if (entry.option && typeof entry.option === 'object') {
+    const option = entry.option as Record<string, unknown>
+    const title = String(option.title ?? option.label ?? option.name ?? '')
+    return title ? { slug: slugify(title), label: title } : null
   }
-  const n = Number(v)
-  return isNaN(n) ? null : n
-}
-
-function pickCurrency(attr: unknown): string {
-  const v = pick(attr)
-  if (typeof v === 'object' && v !== null) {
-    return String((v as Record<string, unknown>).currency_code ?? 'EUR')
-  }
-  return 'EUR'
-}
-
-/** Resolve stage slug → display label. */
-function stageLabel(raw: string): string {
-  const map: Record<string, string> = {
-    lead:         'Lead',
-    in_progress:  'In Progress',
-    inprogress:   'In Progress',
-    negotiating:  'Negotiating',
-    won:          'Won',
-    lost:         'Lost',
-    closed_won:   'Won',
-    closed_lost:  'Lost',
-  }
-  return map[raw.toLowerCase().replace(/[^a-z]/g, '_')] ?? raw
-}
-
-/** Extract stage slug from various Attio attribute shapes. */
-function pickStage(attr: unknown): string {
-  const v = pick(attr)
-  if (v === null || v === undefined) return 'lead'
-  if (typeof v === 'string') return v
-  if (typeof v === 'object' && v !== null) {
-    const o = v as Record<string, unknown>
-    // status attribute shape: { status: 'lead' } or { id: {...}, title: 'Lead' }
-    return String(o.status ?? o.slug ?? o.id?.toString() ?? o.title ?? 'lead')
-  }
-  return String(v)
-}
-
-/** Extract owner display name from owner/assignee attribute. */
-function pickOwner(attr: unknown): string | null {
-  const v = pick(attr)
-  if (v === null || v === undefined) return null
-  if (typeof v === 'string') return v
-  if (typeof v === 'object' && v !== null) {
-    const o = v as Record<string, unknown>
-    return String(
-      o.name ?? o.display_name ?? o.full_name ??
-      o.original_full_name ?? o.email ?? ''
-    ) || null
+  if (typeof entry.value === 'string' && entry.value) {
+    return { slug: slugify(entry.value), label: entry.value }
   }
   return null
+}
+
+/** Currency field: values.value = [{ currency_value: 900, currency_code: "EUR" }] */
+function currency(field: unknown): { amount: number | null; code: string } {
+  if (!Array.isArray(field) || field.length === 0) return { amount: null, code: 'EUR' }
+  const entry = field[0] as Record<string, unknown>
+  const amt   = entry.currency_value ?? entry.amount ?? entry.value ?? null
+  const code  = String(entry.currency_code ?? 'EUR')
+  return { amount: amt !== null ? Number(amt) : null, code }
+}
+
+/** Actor reference: values.owner = [{ referenced_actor_name: "Antonio Casanova" }] */
+function actor(field: unknown): string | null {
+  if (!Array.isArray(field) || field.length === 0) return null
+  const entry = field[0] as Record<string, unknown>
+  const name  = entry.referenced_actor_name ?? entry.name ?? entry.display_name ?? entry.email ?? null
+  return name !== null ? String(name) : null
+}
+
+function slugify(s: string) {
+  return s.toLowerCase().replace(/\s+/g, '_').replace(/[^a-z0-9_]/g, '')
+}
+
+const STAGE_LABEL_MAP: Record<string, string> = {
+  lead:        'Lead',
+  in_progress: 'In Progress',
+  inprogress:  'In Progress',
+  negotiating: 'Negotiating',
+  negotiation: 'Negotiating',
+  won:         'Won',
+  closed_won:  'Won',
+  lost:        'Lost',
+  closed_lost: 'Lost',
+}
+
+function normalizeStage(raw: { slug: string; label: string } | null): { slug: string; label: string } {
+  if (!raw) return { slug: 'unknown', label: 'Unknown' }
+  const label = STAGE_LABEL_MAP[raw.slug] ?? raw.label ?? raw.slug
+  return { slug: raw.slug, label }
 }
 
 // ── Pagination ────────────────────────────────────────────────────────────────
@@ -142,7 +121,6 @@ async function fetchAllDeals(): Promise<AttioDeal[]> {
       method: 'POST',
       headers: attioHeaders(),
       body: JSON.stringify({ limit: PAGE, offset }),
-      // no cache — always fresh in production
       cache: 'no-store',
     })
 
@@ -154,57 +132,91 @@ async function fetchAllDeals(): Promise<AttioDeal[]> {
     const json = await res.json() as { data: AttioRecord[] }
     const page = json.data ?? []
     all.push(...page)
-
-    if (page.length < PAGE) break   // last page
+    if (page.length < PAGE) break
     offset += PAGE
   }
 
-  // Debug: log first record structure once so we can verify field names in Vercel logs
+  // Log field keys of first record to Vercel logs for diagnostics
   if (all.length > 0) {
-    console.log('[leads/attio] first record sample:', JSON.stringify(all[0], null, 2))
+    console.log('[leads/attio] KEYS:', Object.keys(all[0].values))
+    console.log('[leads/attio] first record:', JSON.stringify(all[0], null, 2))
   }
 
   const deals: AttioDeal[] = all.map((r) => {
     const v = r.values
 
-    // Try common deal name fields
     const name =
-      pickStr(v.name) ??
-      pickStr(v.deal_name) ??
-      pickStr(v.title) ??
-      pickStr(v.company) ??
-      pickStr(v.associated_company) ??
+      str(v.name) ??
+      str(v.deal_name) ??
+      str(v.title) ??
+      str(v.company) ??
       '(sin nombre)'
 
-    // Try common stage fields
-    const rawStage = pickStage(
-      v.stage ?? v.deal_stage ?? v.status ?? v.pipeline_stage ?? null
+    let stageRaw =
+      stageFromField(v.stage) ??
+      stageFromField(v.pipeline_stage) ??
+      stageFromField(v.deal_stage) ??
+      stageFromField(v.status)
+
+    // Dynamic fallback: iterate all fields looking for status/option shape
+    if (!stageRaw) {
+      for (const val of Object.values(v)) {
+        const arr = Array.isArray(val) ? val : []
+        const first = arr[0] as Record<string, unknown> | undefined
+        if (!first) continue
+        if (first.status && typeof first.status === 'object') {
+          const s = first.status as Record<string, unknown>
+          const title = String(s.title ?? s.label ?? s.name ?? '')
+          if (title) { stageRaw = { slug: slugify(title), label: title }; break }
+        }
+        if (first.option && typeof first.option === 'object') {
+          const o = first.option as Record<string, unknown>
+          const title = String(o.title ?? o.label ?? o.name ?? '')
+          if (title) { stageRaw = { slug: slugify(title), label: title }; break }
+        }
+      }
+    }
+
+    const rawStage = normalizeStage(stageRaw)
+
+    const { amount, code } = currency(
+      Array.isArray(v.value) ? v.value :
+      Array.isArray(v.deal_value) ? v.deal_value :
+      Array.isArray(v.amount) ? v.amount :
+      null
     )
 
-    // Try common value/amount fields
-    const amount = pickNum(v.value ?? v.deal_value ?? v.amount ?? v.arr ?? null)
-    const currency = pickCurrency(v.value ?? v.deal_value ?? v.amount ?? null)
+    let ownerName =
+      actor(v.owner) ??
+      actor(v.assignee) ??
+      actor(v.deal_owner) ??
+      actor(v.owners) ??
+      actor(v.assigned_to)
 
-    // Try common owner fields
-    const owner = pickOwner(
-      v.owner ?? v.assignee ?? v.assigned_to ?? v.deal_owner ?? v.owners ?? null
-    )
-
-    const createdAt = r.created_at ?? pickStr(v.created_at) ?? ''
+    // Dynamic fallback: find any field with referenced_actor_name
+    if (!ownerName) {
+      for (const val of Object.values(v)) {
+        const arr = Array.isArray(val) ? val : []
+        const first = arr[0] as Record<string, unknown> | undefined
+        if (first?.referenced_actor_name != null) {
+          ownerName = String(first.referenced_actor_name)
+          break
+        }
+      }
+    }
 
     return {
       attioId:    r.id.record_id,
       name,
-      stage:      rawStage,
-      stageLabel: stageLabel(rawStage),
+      stage:      rawStage.slug,
+      stageLabel: rawStage.label,
       value:      amount,
-      currency,
-      ownerName:  owner,
-      createdAt,
+      currency:   code,
+      ownerName,
+      createdAt:  r.created_at ?? '',
     }
   })
 
-  // Sort: newest first, fallback alphabetical
   return deals.sort((a, b) =>
     a.createdAt && b.createdAt
       ? new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
@@ -220,7 +232,6 @@ export async function GET() {
     if (!canAccess(user.role, 'leads')) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
-
     const deals = await fetchAllDeals()
     return NextResponse.json({ deals, total: deals.length })
   } catch (err) {
