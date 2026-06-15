@@ -1,5 +1,5 @@
 // POST /api/usuarios/crear
-// Body: { email: string, password: string, name?: string, role: 'admin' | 'sales' | 'finance' }
+// Body: { email: string, password: string, name?: string, role: 'admin' | 'growth_manager' | 'sales' | 'finance' }
 //
 // Uses service_role to create the user directly — no invitation email sent.
 // email_confirm: true bypasses the email verification step.
@@ -9,7 +9,7 @@ import { requireAuth } from '@/lib/auth'
 import { getSupabaseClient } from '@/lib/supabase/client'
 import type { UserRole } from '@/lib/auth'
 
-const VALID_ROLES: UserRole[] = ['admin', 'sales', 'finance']
+const VALID_ROLES: UserRole[] = ['admin', 'growth_manager', 'sales', 'finance']
 
 // ── helpers ───────────────────────────────────────────────────────────────────
 
