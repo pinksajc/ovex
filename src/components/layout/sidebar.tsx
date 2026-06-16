@@ -93,9 +93,9 @@ export function Sidebar({
       <div className="px-5 py-5 border-b border-zinc-800">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
-          src="/orvex_new_logo.png"
+          src="/orvex_logo_transparent.png"
           alt="Orvex"
-          style={{ width: '130px', height: 'auto', display: 'block' }}
+          style={{ width: '120px', height: 'auto', display: 'block' }}
         />
       </div>
 

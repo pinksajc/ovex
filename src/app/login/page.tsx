@@ -45,7 +45,7 @@ function LoginForm() {
         <div style={{ position: 'absolute', top: 40, left: 40 }}>
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
-            src="/orvex_new_logo.png"
+            src="/orvex_logo_transparent.png"
             alt="Orvex"
             style={{ width: '120px', height: 'auto', display: 'block' }}
           />
