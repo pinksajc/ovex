@@ -155,7 +155,8 @@ export interface Deal {
 
   contact: {
     name: string
-    email: string
+    email: string      // primary (first) email
+    emails: string[]   // full list — at least one element
     phone?: string
     personRecordId?: string
   }

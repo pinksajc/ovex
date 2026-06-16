@@ -65,6 +65,7 @@ function rowToDeal(row: DealRow): Deal {
     contact: {
       name: contactName,
       email: row.contact_email ?? '',
+      emails: row.contact_email ? [row.contact_email] : [],
       phone: row.contact_phone ?? undefined,
     },
     owner: row.owner_id ?? 'Sin asignar', // resolved to name upstream

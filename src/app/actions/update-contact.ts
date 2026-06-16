@@ -8,13 +8,13 @@ export async function updateContactAction(
   _personRecordId: string,
   firstName: string,
   lastName: string,
-  email: string,
+  emails: string[],
   dealId?: string,
 ): Promise<{ ok: true } | { ok: false; error: string }> {
   await requireAuth()
   if (!dealId) return { ok: false, error: 'dealId requerido' }
   try {
-    await upsertContactOverride(dealId, firstName, lastName, email)
+    await upsertContactOverride(dealId, firstName, lastName, emails)
     revalidateTag('attio-deals', 'max')
     revalidatePath('/deals')
     revalidatePath(`/deals/${dealId}`)

@@ -262,6 +262,7 @@ async function enrichWithCommercialStatus(deals: Deal[]): Promise<Deal[]> {
             ...deal.contact,
             name: `${override.firstName} ${override.lastName}`.trim() || deal.contact.name,
             email: override.email || deal.contact.email,
+            emails: override.emails.length > 0 ? override.emails : deal.contact.emails,
           }
         : deal.contact
 
