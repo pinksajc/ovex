@@ -1,6 +1,7 @@
 'use client'
 
 import Link from 'next/link'
+import Image from 'next/image'
 import { usePathname, useRouter } from 'next/navigation'
 import { createAuthBrowserClient } from '@/lib/supabase/auth'
 import type { AuthUser } from '@/lib/auth'
@@ -91,10 +92,14 @@ export function Sidebar({
     <aside className="w-56 shrink-0 bg-zinc-900 flex flex-col h-full">
       {/* Brand */}
       <div className="px-5 py-5 border-b border-zinc-800">
-        <span className="text-white font-semibold text-sm tracking-tight">
-          Orvex
-        </span>
-        <p className="text-zinc-500 text-[11px] font-normal mt-0.5">by Platomico</p>
+        <Image
+          src="/orvex-wordmark.png"
+          alt="Orvex"
+          width={100}
+          height={28}
+          className="invert"
+          priority
+        />
       </div>
 
       {/* Nav */}
