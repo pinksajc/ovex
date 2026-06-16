@@ -96,8 +96,8 @@ export function Sidebar({
           src="/orvex-wordmark.png"
           alt="Orvex"
           width={100}
-          height={28}
-          className="invert"
+          height={32}
+          style={{ filter: 'brightness(0) invert(1)' }}
           priority
         />
       </div>
