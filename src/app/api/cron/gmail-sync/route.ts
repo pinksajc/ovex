@@ -91,6 +91,13 @@ export async function GET(req: NextRequest) {
   }
 
   const db = getSupabaseClient()
+
+  // Diagnostic: count users with gmail_tokens
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const tokensTable = (db as unknown as { from(t: string): any }).from('gmail_tokens')
+  const { count: tokenCount } = await tokensTable.select('*', { count: 'exact', head: true }).catch(() => ({ count: 0 }))
+  console.log(`[gmail-sync] start — users with gmail tokens: ${tokenCount ?? 'unknown'}`)
+
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const dealsTable = (db as unknown as { from(t: string): any }).from('deals')
 
@@ -107,6 +114,7 @@ export async function GET(req: NextRequest) {
   }
 
   const dealRows = deals as DealRow[]
+  console.log(`[gmail-sync] deals with contact email: ${dealRows.length}`)
   const dealIds = dealRows.map((d) => d.id)
   const overrideMap = await getContactOverridesForDeals(dealIds).catch(() => new Map())
 
