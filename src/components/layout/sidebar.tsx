@@ -93,15 +93,9 @@ export function Sidebar({
       <div className="px-5 py-5 border-b border-zinc-800">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
-          src="/orvex-wordmark.png"
+          src="/orvex-logo.png"
           alt="Orvex"
-          style={{
-            width: '48px',
-            height: '48px',
-            objectFit: 'contain',
-            filter: 'brightness(0) invert(1)',
-            display: 'block',
-          }}
+          style={{ width: '120px', height: 'auto', display: 'block' }}
         />
       </div>
 
