@@ -43,11 +43,18 @@ function LoginForm() {
       >
         {/* Logo — top-left absolute */}
         <div style={{ position: 'absolute', top: 40, left: 40 }}>
-          <div className="flex items-baseline gap-0.5">
-            <span className="font-bold text-xl tracking-tight" style={{ color: '#7C72E8' }}>O</span>
-            <span className="font-bold text-xl tracking-tight text-white">rvex</span>
-          </div>
-          <p className="text-[10px] text-zinc-500 mt-0.5 font-medium tracking-widest uppercase">Sales OS</p>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src="/orvex-wordmark.png"
+            alt="Orvex"
+            style={{
+              width: '48px',
+              height: '48px',
+              objectFit: 'contain',
+              filter: 'brightness(0) invert(1)',
+              display: 'block',
+            }}
+          />
         </div>
 
         {/* Form block — perfectly centred unit */}
