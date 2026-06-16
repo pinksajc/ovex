@@ -90,18 +90,21 @@ export function Sidebar({
   return (
     <aside className="w-56 shrink-0 bg-zinc-900 flex flex-col h-full">
       {/* Brand */}
-      <div className="px-5 py-5 border-b border-zinc-800">
+      <div className="px-5 py-5 border-b border-zinc-800 flex items-center gap-2.5">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src="/orvex-wordmark.png"
-          alt="Orvex"
+          alt=""
           style={{
-            width: '90px',
-            height: 'auto',
+            width: '28px',
+            height: '28px',
+            objectFit: 'contain',
             filter: 'brightness(0) invert(1)',
             display: 'block',
+            flexShrink: 0,
           }}
         />
+        <span className="text-white font-semibold text-sm tracking-tight">Orvex</span>
       </div>
 
       {/* Nav */}
