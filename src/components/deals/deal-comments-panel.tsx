@@ -4,6 +4,7 @@ import { useState, useTransition, useRef, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { addCommentAction, deleteCommentAction } from '@/app/actions/deal-comments'
 import type { DealComment, CommentType } from '@/lib/supabase/deal-comments'
+import { GmailSearchPanel } from './gmail-search-panel'
 
 // ── Contact type config ────────────────────────────────────────────────────
 
@@ -47,11 +48,13 @@ interface Props {
   dealId: string
   currentUserId: string
   initialComments: DealComment[]
+  gmailConnected: boolean
+  contactEmail: string | null | undefined
 }
 
 // ── Component ──────────────────────────────────────────────────────────────
 
-export function DealCommentsPanel({ dealId, currentUserId, initialComments }: Props) {
+export function DealCommentsPanel({ dealId, currentUserId, initialComments, gmailConnected, contactEmail }: Props) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
   const [isDeleting, startDeleteTransition] = useTransition()
@@ -122,10 +125,15 @@ export function DealCommentsPanel({ dealId, currentUserId, initialComments }: Pr
   return (
     <div className="bg-white border border-zinc-200 rounded-xl p-5">
       {/* Header */}
-      <div className="mb-4">
+      <div className="flex items-center justify-between mb-4">
         <h3 className="text-[10px] font-semibold text-zinc-400 uppercase tracking-widest">
           Seguimiento
         </h3>
+        <GmailSearchPanel
+          dealId={dealId}
+          contactEmail={contactEmail}
+          gmailConnected={gmailConnected}
+        />
       </div>
 
       {/* Add form */}
