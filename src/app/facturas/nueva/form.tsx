@@ -125,6 +125,7 @@ export function NewInvoiceForm({
   const total = base + vatAmount
 
   const [showServicePicker, setShowServicePicker] = useState(false)
+  const [servicePickerGroup, setServicePickerGroup] = useState<{ id: string; name: string; address?: string | null } | undefined>(undefined)
 
   // ---- line mutators ----
   const updateLine = useCallback((id: string, patch: Partial<FormLine>) => {
@@ -141,8 +142,26 @@ export function NewInvoiceForm({
     )
   }, [])
 
-  function addLine() {
-    setLines((prev) => [...prev, emptyLine()])
+  function addLine(locationGroup?: { id: string; name: string; address?: string | null }) {
+    const base = emptyLine()
+    if (locationGroup) {
+      base.locationGroupId = locationGroup.id
+      base.locationGroupName = locationGroup.name
+      base.locationGroupAddress = locationGroup.address ?? undefined
+    }
+    setLines((prev) => {
+      if (locationGroup) {
+        // Insert after the last line of this group
+        const idx = [...prev].reverse().findIndex((l) => l.locationGroupId === locationGroup.id)
+        if (idx !== -1) {
+          const insertAt = prev.length - idx
+          const next = [...prev]
+          next.splice(insertAt, 0, base)
+          return next
+        }
+      }
+      return [...prev, base]
+    })
   }
 
   function addDiscount() {
@@ -156,7 +175,7 @@ export function NewInvoiceForm({
     })
   }
 
-  function addServiceLine(serviceId: string) {
+  function addServiceLine(serviceId: string, locationGroup?: { id: string; name: string; address?: string | null }) {
     const svc = SERVICE_MAP.get(serviceId)
     if (!svc) return
     let autoPeriod: string | undefined
@@ -174,10 +193,26 @@ export function NewInvoiceForm({
       serviceId,
       unit: svc.unit,
       period: autoPeriod,
+      ...(locationGroup ? {
+        locationGroupId: locationGroup.id,
+        locationGroupName: locationGroup.name,
+        locationGroupAddress: locationGroup.address ?? undefined,
+      } : {}),
     }
     setLines((prev) => {
       const onlyPlaceholder = prev.length === 1 && !prev[0].description && !prev[0].locationGroupId
-      return onlyPlaceholder ? [newLine] : [...prev, newLine]
+      if (onlyPlaceholder && !locationGroup) return [newLine]
+      if (locationGroup) {
+        // Insert after the last line of this group
+        const idx = [...prev].reverse().findIndex((l) => l.locationGroupId === locationGroup.id)
+        if (idx !== -1) {
+          const insertAt = prev.length - idx
+          const next = [...prev]
+          next.splice(insertAt, 0, newLine)
+          return next
+        }
+      }
+      return [...prev, newLine]
     })
   }
 
@@ -488,6 +523,8 @@ export function NewInvoiceForm({
           subtotal={subtotal}
           onUpdate={updateLine}
           onRemove={removeLine}
+          onAddLine={(group) => addLine(group)}
+          onAddService={(group) => { setServicePickerGroup(group); setShowServicePicker(true) }}
         />
 
         {/* Add buttons */}
@@ -501,7 +538,7 @@ export function NewInvoiceForm({
           </button>
           <button
             type="button"
-            onClick={addLine}
+            onClick={() => addLine()}
             className="text-xs text-zinc-400 hover:text-zinc-700 border border-zinc-200 hover:border-zinc-300 px-3 py-1.5 rounded-lg transition-colors"
           >
             ＋ Línea vacía
@@ -626,8 +663,8 @@ export function NewInvoiceForm({
       {/* Service picker modal */}
       {showServicePicker && (
         <ServicePickerModal
-          onPick={(serviceId) => { addServiceLine(serviceId); setShowServicePicker(false) }}
-          onClose={() => setShowServicePicker(false)}
+          onPick={(serviceId) => { addServiceLine(serviceId, servicePickerGroup); setShowServicePicker(false); setServicePickerGroup(undefined) }}
+          onClose={() => { setShowServicePicker(false); setServicePickerGroup(undefined) }}
         />
       )}
     </form>
@@ -1074,11 +1111,15 @@ function GroupedLinesView({
   subtotal,
   onUpdate,
   onRemove,
+  onAddLine,
+  onAddService,
 }: {
   lines: FormLine[]
   subtotal: number
   onUpdate: (id: string, patch: Partial<FormLine>) => void
   onRemove: (id: string) => void
+  onAddLine?: (group?: { id: string; name: string; address?: string | null }) => void
+  onAddService?: (group?: { id: string; name: string; address?: string | null }) => void
 }) {
   const hasGroups = lines.some((l) => l.locationGroupId)
 
@@ -1111,6 +1152,7 @@ function GroupedLinesView({
         const groupLines = lines.filter((l) => (l.locationGroupId ?? undefined) === gid)
         const groupName = groupLines[0]?.locationGroupName ?? (gid ? gid : 'General')
         const groupAddr = groupLines[0]?.locationGroupAddress
+        const group = gid ? { id: gid, name: groupName, address: groupAddr } : undefined
 
         return (
           <div key={gid ?? '__ungrouped__'}>
@@ -1129,6 +1171,25 @@ function GroupedLinesView({
                 )
               )}
             </div>
+            {/* Per-group add buttons */}
+            {group && (
+              <div className="px-5 py-2 flex items-center gap-2 border-b border-zinc-100 bg-white">
+                <button
+                  type="button"
+                  onClick={() => onAddService?.(group)}
+                  className="text-[11px] font-medium text-zinc-500 hover:text-zinc-800 border border-zinc-200 hover:border-zinc-400 bg-white px-2.5 py-1 rounded-md transition-colors"
+                >
+                  ＋ Servicio
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onAddLine?.(group)}
+                  className="text-[11px] text-zinc-400 hover:text-zinc-600 border border-zinc-100 hover:border-zinc-300 px-2.5 py-1 rounded-md transition-colors"
+                >
+                  ＋ Línea vacía
+                </button>
+              </div>
+            )}
           </div>
         )
       })}
