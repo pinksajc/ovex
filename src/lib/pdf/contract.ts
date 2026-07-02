@@ -462,10 +462,9 @@ export async function generateContractPdf(
     </div>
 
     <div class="clause">
-      <div class="clause-num">Cláusula 1ª — Objeto del Contrato</div>
+      <div class="clause-num">1. Objeto</div>
       <div class="clause-body">
-        El presente contrato tiene por objeto la prestación, por parte de Platomico, S.L. al Cliente,
-        de los servicios tecnológicos descritos a continuación, en los términos y condiciones pactados.
+        Platomico presta al Cliente los servicios de su plataforma tecnológica para hostelería y, en su caso, suministra el hardware asociado. El Cliente contrata únicamente los servicios y módulos que seleccione. La contratación de módulos adicionales, o la baja de los existentes, se formaliza por escrito sin necesidad de firmar un nuevo contrato, rigiéndose siempre por estas mismas condiciones.
       </div>
     </div>
 
@@ -511,89 +510,138 @@ export async function generateContractPdf(
 
 
 <!-- ══════════════════════════════════════════════════════════════════════
-     PÁGINA 3 — CONDICIONES
+     PÁGINAS 3+ — CONDICIONES GENERALES (flujo automático)
 ══════════════════════════════════════════════════════════════════════ -->
-<div class="pg">
+<div class="pg" style="break-after:auto;page-break-after:auto;">
   ${WM}
   <div class="ct">
 
     <div class="pg-header">
       ${logoHtml}
-      <span class="pg-header-label">Contrato de Prestación de Servicios · Condiciones</span>
+      <span class="pg-header-label">Contrato de Prestación de Servicios · Condiciones generales</span>
     </div>
 
     <div class="clause">
-      <div class="clause-num">Cláusula 2ª — Duración y Vigencia</div>
+      <div class="clause-num">2. Duración y renovación</div>
       <div class="clause-body">
-        El presente contrato tendrá una duración de <strong>${duracionMeses} meses</strong>, con fecha de inicio
-        el <strong>${startStr}</strong> y fecha de vencimiento el <strong>${endStr}</strong>.
-        Transcurrido dicho período, el contrato se renovará automáticamente por períodos anuales
-        salvo que cualquiera de las partes lo notifique por escrito con al menos 30 días de antelación.
+        El contrato entra en vigor el <strong>${startStr}</strong> y tiene una duración de <strong>${duracionMeses} meses</strong>, con vencimiento el <strong>${endStr}</strong>. Se prorroga automáticamente por períodos iguales al inicial, salvo que cualquiera de las partes comunique su voluntad de no renovar con al menos 30 días naturales de antelación al vencimiento.
       </div>
-      <div class="highlight-box">
-        Inicio: ${startStr} &nbsp;·&nbsp; Fin: ${endStr}
-      </div>
+      <div class="highlight-box">Inicio: ${startStr} &nbsp;·&nbsp; Vencimiento: ${endStr} &nbsp;·&nbsp; Duración: ${duracionMeses} meses</div>
     </div>
 
     <div class="clause">
-      <div class="clause-num">Cláusula 3ª — Período de Permanencia</div>
+      <div class="clause-num">3. Precio y pago</div>
       <div class="clause-body">
-        El Cliente se compromete a mantener activos los servicios contratados durante un período
-        mínimo de permanencia de <strong>${permanenciaMeses} meses</strong> desde la fecha de inicio del contrato.
-        La baja anticipada durante dicho período implicará la facturación de las mensualidades restantes.
+        Las cuotas se facturan por mensualidades, en euros y sin incluir IVA ni otros impuestos aplicables. El pago vence a fin de mes y se realiza mediante <strong>${esc(formaPago)}</strong>
+        ${formaPago.toLowerCase().includes('transferencia') ? ` al IBAN <strong>ES69 1583 0001 1993 4722 6761</strong> (Platomico, S.L.)` : ''}.
+        El impago a vencimiento devenga automáticamente el interés de demora previsto en la Ley 3/2004 de lucha contra la morosidad, sin necesidad de requerimiento previo. Un retraso superior a 30 días faculta a Platomico para suspender el servicio, previa comunicación, sin que ello exima al Cliente de pagar lo devengado. Platomico puede revisar los precios en cada renovación avisando con 30 días de antelación; si el Cliente no acepta la revisión, puede resolver el contrato antes del nuevo período sin penalización, salvo permanencia vigente.
       </div>
     </div>
 
     <div class="clause">
-      <div class="clause-num">Cláusula 4ª — Precio y Forma de Pago</div>
+      <div class="clause-num">4. Obligaciones de Platomico</div>
       <div class="clause-body">
-        El precio de los servicios contratados es el detallado en la Cláusula 1ª.
-        La forma de pago acordada es <strong>${esc(formaPago)}</strong>.<br/>
-        Los pagos se realizarán al número de cuenta:
-        <strong>IBAN: ES69 1583 0001 1993 4722 6761</strong> (Platomico, S.L.),
-        en los plazos indicados en cada factura.
+        Platomico prestará los servicios con diligencia y conforme a los estándares del sector: pondrá los módulos contratados en funcionamiento, dará soporte según la cláusula 5, aplicará las actualizaciones y mejoras, adoptará medidas de seguridad razonables y tratará los datos conforme a la cláusula 7. El servicio se presta como software como servicio (SaaS); las interrupciones imputables a terceros (conectividad, pasarelas de pago, plataformas integradas) no serán responsabilidad de Platomico si actuó con la diligencia debida.
       </div>
     </div>
 
     <div class="clause">
-      <div class="clause-num">Cláusula 5ª — Facturación</div>
+      <div class="clause-num">5. Soporte y niveles de servicio (SLA)</div>
       <div class="clause-body">
-        Platomico emitirá factura mensualmente a mes vencido. El plazo de pago será de
-        30 días desde la fecha de emisión de la factura. El impago de cualquier factura
-        devengará intereses de demora conforme a la legislación vigente.
+        Platomico presta soporte técnico por los canales y en el horario pactados, priorizando la franja de servicio de hostelería. Las incidencias críticas —las que impiden cobrar, facturar o registrar ventas— se atienden con carácter preferente; las no críticas, dentro del siguiente día hábil. El incumplimiento grave y reiterado del SLA faculta al Cliente para resolver el contrato conforme a la cláusula 11, sin compensación por baja anticipada.
       </div>
     </div>
 
     <div class="clause">
-      <div class="clause-num">Cláusula 6ª — Soporte Técnico</div>
+      <div class="clause-num">6. Obligaciones del Cliente</div>
       <div class="clause-body">
-        El soporte técnico se prestará durante el horario indicado en el plan contratado.
-        Las incidencias podrán reportarse a través de los canales habilitados por Platomico.
-        Platomico se compromete a atender las incidencias críticas en un plazo máximo de 4 horas hábiles.
+        El Cliente se compromete a pagar puntualmente, usar el servicio conforme a la ley y al contrato, disponer de la conectividad y los equipos mínimos necesarios, custodiar sus credenciales de acceso y ser responsable de su uso, no ceder ni revender el servicio a terceros no autorizados, y facilitar información veraz y actualizada.
       </div>
     </div>
 
     <div class="clause">
-      <div class="clause-num">Cláusula 7ª — Protección de Datos</div>
+      <div class="clause-num">7. Protección de datos</div>
       <div class="clause-body">
-        El tratamiento de datos de carácter personal se realizará conforme al Reglamento (UE) 2016/679
-        (RGPD) y la Ley Orgánica 3/2018 (LOPDGDD). Platomico actuará como Encargado del Tratamiento
-        respecto de los datos del Cliente y suscribirá el correspondiente Acuerdo de Tratamiento de Datos.
+        El tratamiento de datos se rige por el RGPD y la LOPDGDD. Cuando, para prestar el servicio, Platomico trate datos personales de los que el Cliente sea responsable (clientes finales, empleados, pedidos), actuará como encargado del tratamiento conforme al art. 28 del RGPD: tratará los datos solo según las instrucciones documentadas del Cliente, mantendrá la confidencialidad, aplicará medidas de seguridad apropiadas, asistirá al Cliente en la atención de los derechos de los interesados, y devolverá o suprimirá los datos al terminar. La subcontratación a subencargados (alojamiento, infraestructura) queda sujeta a las mismas obligaciones, informándose al Cliente y permitiéndole oponerse por motivos justificados.
       </div>
     </div>
 
     <div class="clause">
-      <div class="clause-num">Cláusula 8ª — Ley Aplicable y Jurisdicción</div>
+      <div class="clause-num">8. Propiedad intelectual</div>
       <div class="clause-body">
-        El presente contrato se regirá e interpretará de acuerdo con la legislación española.
-        Para la resolución de cualquier controversia derivada de este contrato, ambas partes se
-        someten a los Juzgados y Tribunales de <strong>Madrid</strong>, con renuncia a cualquier otro fuero.
+        El software, la plataforma, los módulos y las marcas son titularidad exclusiva de Platomico o de sus licenciantes. El contrato no cede esos derechos, sino que concede al Cliente una licencia de uso no exclusiva, intransferible y limitada a la vigencia del contrato. El Cliente no podrá copiar, descompilar ni hacer ingeniería inversa del software. Los datos de negocio que el Cliente introduzca o genere son de su titularidad, sin perjuicio de la licencia que otorga a Platomico para tratarlos en lo necesario para prestar el servicio y, de forma agregada y anonimizada, para mejorar la plataforma. El uso de la marca de la otra parte con fines promocionales requiere autorización previa por escrito.
+      </div>
+    </div>
+
+    <div class="clause">
+      <div class="clause-num">9. Permanencia</div>
+      <div class="clause-body">
+        ${permanenciaMeses > 0
+          ? `Las partes han acordado un período de permanencia de <strong>${permanenciaMeses} meses</strong> desde la fecha de inicio, vinculado al importe subvencionado o con descuento que queda cuantificado en la oferta asociada. La compensación por baja anticipada es decreciente y proporcional al tiempo ya cumplido, reduciéndose mes a mes, y nunca supera el importe subvencionado pendiente de amortizar. No se aplica si la baja se debe a un incumplimiento de Platomico.`
+          : `Por defecto, el contrato no impone permanencia. Solo cuando Platomico suministre hardware o instalación de forma subvencionada o con descuento podrá pactarse un compromiso de permanencia, sujeto a estas reglas: se vincula exclusivamente al importe subvencionado, que quedará cuantificado; la compensación por baja anticipada es decreciente y proporcional al tiempo ya cumplido, reduciéndose mes a mes; y nunca supera el importe subvencionado pendiente de amortizar. No se aplica si la baja se debe a un incumplimiento de Platomico.`
+        }
+      </div>
+    </div>
+
+    <div class="clause">
+      <div class="clause-num">10. Confidencialidad</div>
+      <div class="clause-body">
+        Ambas partes mantendrán la confidencialidad de la información a la que accedan por el contrato (condiciones económicas, información técnica, comercial o de negocio), durante su vigencia y los 3 años siguientes. No se considera confidencial la información que sea o pase a ser pública sin incumplimiento, la que ya obrara legítimamente en poder de la parte receptora, o aquella cuya divulgación imponga la ley o una autoridad competente.
+      </div>
+    </div>
+
+    <div class="clause">
+      <div class="clause-num">11. Resolución</div>
+      <div class="clause-body">
+        El contrato puede resolverse por mutuo acuerdo, por fin de vigencia sin renovación, por incumplimiento grave no subsanado en 15 días desde el requerimiento escrito, o por las causas legales. Platomico podrá resolver, en particular, por impago reiterado o uso ilícito del servicio; el Cliente, por incumplimiento grave y no subsanado de Platomico, incluido el del SLA. A la terminación, Platomico pondrá a disposición del Cliente sus datos de negocio en un formato de uso común que permita su portabilidad.
+      </div>
+    </div>
+
+    <div class="clause">
+      <div class="clause-num">12. Responsabilidad</div>
+      <div class="clause-body">
+        Platomico responde de los daños directos y probados causados por incumplimiento doloso o gravemente negligente. Salvo en los casos en que la ley no lo permita (dolo, daños a las personas), su responsabilidad total acumulada se limita al importe de las cuotas pagadas por el Cliente en los 12 meses anteriores al hecho que la origine. No responde del lucro cesante, la pérdida de negocio, los daños indirectos, ni de las interrupciones imputables a terceros, a la conectividad del Cliente o a fuerza mayor.
+      </div>
+    </div>
+
+    <div class="clause">
+      <div class="clause-num">13. Fuerza mayor</div>
+      <div class="clause-body">
+        Ninguna parte responde por el incumplimiento de sus obligaciones —salvo las de pago ya devengadas— cuando se deba a causas de fuerza mayor o caso fortuito, es decir, hechos imprevisibles o inevitables ajenos a su control. La parte afectada lo comunicará cuanto antes y ambas colaborarán para minimizar los efectos.
+      </div>
+    </div>
+
+    <div class="clause">
+      <div class="clause-num">14. Cesión y subcontratación</div>
+      <div class="clause-body">
+        El Cliente no podrá ceder su posición en el contrato sin el consentimiento previo y por escrito de Platomico. Platomico podrá subcontratar total o parcialmente la prestación del servicio, respondiendo en todo caso frente al Cliente de su correcta ejecución y sujetándose, en materia de datos, a la cláusula 7.
+      </div>
+    </div>
+
+    <div class="clause">
+      <div class="clause-num">15. Notificaciones</div>
+      <div class="clause-body">
+        Las comunicaciones entre las partes se harán por escrito a las direcciones postales o electrónicas designadas, siendo válidas las remitidas por correo electrónico con confirmación de recepción. Todo cambio de datos de contacto deberá notificarse a la otra parte.
+      </div>
+    </div>
+
+    <div class="clause">
+      <div class="clause-num">16. Nulidad e integridad</div>
+      <div class="clause-body">
+        La nulidad de una cláusula no afecta a la validez del resto del contrato, que seguirá vigente, sustituyéndose la cláusula nula por otra válida de finalidad equivalente. El contrato y sus anexos constituyen el acuerdo íntegro entre las partes y sustituyen cualquier acuerdo anterior sobre la misma materia.
+      </div>
+    </div>
+
+    <div class="clause">
+      <div class="clause-num">17. Ley y jurisdicción</div>
+      <div class="clause-body">
+        El contrato se rige por la legislación española. Para cualquier controversia, las partes se someten a los Juzgados y Tribunales del domicilio de Platomico, salvo que una norma imperativa imponga otro fuero, en particular si el Cliente tuviera la condición legal de consumidor.
       </div>
     </div>
 
     ${notas ? `
     <div class="clause">
-      <div class="clause-num">Notas adicionales</div>
+      <div class="clause-num">Condiciones especiales / Notas</div>
       <div class="clause-body">${esc(notas)}</div>
     </div>` : ''}
 
