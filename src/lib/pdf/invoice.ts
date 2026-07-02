@@ -250,11 +250,11 @@ export async function generateInvoicePdf(invoice: Invoice): Promise<Buffer> {
     border-collapse: collapse;
     margin-bottom: 24px;
   }
-  table.concept-table thead tr {
+  table.concept-table tbody.table-header-row tr {
     background: #1e3a5f;
     color: #fff;
   }
-  table.concept-table thead th {
+  table.concept-table tbody.table-header-row th {
     font-size: 8px;
     font-weight: 700;
     letter-spacing: 0.8px;
@@ -262,7 +262,7 @@ export async function generateInvoicePdf(invoice: Invoice): Promise<Buffer> {
     padding: 8px 10px;
     text-align: left;
   }
-  table.concept-table thead th.right { text-align: right; }
+  table.concept-table tbody.table-header-row th.right { text-align: right; }
   table.concept-table tbody tr {
     border-bottom: 1px solid #f1f5f9;
   }
@@ -392,9 +392,9 @@ ${invoice.locationName ? `
   ${invoice.locationAddress ? `<div style="font-size:10px;color:#444;margin-top:2px;">${esc(invoice.locationAddress)}</div>` : ''}
 </div>` : ''}
 
-<!-- Line items table -->
+<!-- Line items table — thead uses tbody so it does NOT repeat on page breaks -->
 <table class="concept-table">
-  <thead>
+  <tbody class="table-header-row">
     <tr>
       <th>Descripción</th>
       <th class="right" style="width:65px;">Cantidad</th>
@@ -407,7 +407,7 @@ ${invoice.locationName ? `
       <th class="right" style="width:110px;">Importe</th>
       `}
     </tr>
-  </thead>
+  </tbody>
   <tbody>
     ${hasLineItems
       ? renderLineRows(items, hasAnyDiscount)
@@ -419,33 +419,38 @@ ${invoice.locationName ? `
         </tr>`
     }
   </tbody>
+  <!-- Totals inside the table so break-before:avoid works relative to the last data row -->
+  <tbody style="break-before:avoid;break-inside:avoid;">
+    <tr>
+      <td colspan="${hasAnyDiscount ? 6 : 4}" style="padding:0;border:none;">
+        <div class="totals-box" style="margin-top:12px;">
+          ${hasLineItems ? `
+          <div class="totals-row">
+            <span class="label">Subtotal</span>
+            <span class="amount">${fmt(subtotalBruto)} €</span>
+          </div>` : ''}
+          ${hasAnyDiscount ? `
+          <div class="totals-row discount">
+            <span class="label">Descuento total</span>
+            <span class="amount">−${fmt(totalDiscounts)} €</span>
+          </div>` : ''}
+          <div class="totals-row">
+            <span class="label">Base imponible</span>
+            <span class="amount">${fmt(base)} €</span>
+          </div>
+          <div class="totals-row">
+            <span class="label">IVA (${fmt(invoice.vatRate)}%)</span>
+            <span class="amount">${fmt(vatAmount)} €</span>
+          </div>
+          <div class="totals-row total-final">
+            <span class="label">${totalLabel}</span>
+            <span class="amount" style="font-size:14px;">${fmt(invoice.amountTotal)} €</span>
+          </div>
+        </div>
+      </td>
+    </tr>
+  </tbody>
 </table>
-
-<!-- Totals box -->
-<div class="totals-box">
-  ${hasLineItems ? `
-  <div class="totals-row">
-    <span class="label">Subtotal</span>
-    <span class="amount">${fmt(subtotalBruto)} €</span>
-  </div>` : ''}
-  ${hasAnyDiscount ? `
-  <div class="totals-row discount">
-    <span class="label">Descuento total</span>
-    <span class="amount">−${fmt(totalDiscounts)} €</span>
-  </div>` : ''}
-  <div class="totals-row">
-    <span class="label">Base imponible</span>
-    <span class="amount">${fmt(base)} €</span>
-  </div>
-  <div class="totals-row">
-    <span class="label">IVA (${fmt(invoice.vatRate)}%)</span>
-    <span class="amount">${fmt(vatAmount)} €</span>
-  </div>
-  <div class="totals-row total-final">
-    <span class="label">${totalLabel}</span>
-    <span class="amount" style="font-size:14px;">${fmt(invoice.amountTotal)} €</span>
-  </div>
-</div>
 
 <!-- Bank transfer footer -->
 <div class="footer-bank">
