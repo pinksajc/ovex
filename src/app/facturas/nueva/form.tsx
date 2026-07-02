@@ -955,16 +955,16 @@ function RegularLineRow({
         )}
       </div>
 
-      {/* Row 2: custom description + unit input only for "Línea personalizada" */}
-      {line.serviceId && isCustom && (
-        <div className="grid items-center gap-2" style={{ gridTemplateColumns: '1fr 90px 110px 60px 100px 28px' }}>
-          <input
-            type="text"
-            value={line.description}
-            onChange={(e) => onChange(line.id, { description: e.target.value })}
-            placeholder="Descripción personalizada"
-            className="border border-zinc-200 rounded px-2 py-1 text-xs text-zinc-700 focus:outline-none focus:ring-1 focus:ring-zinc-300 w-full bg-white"
-          />
+      {/* Row 2: description (always visible) + unit input */}
+      <div className="grid items-center gap-2" style={{ gridTemplateColumns: '1fr 90px 110px 60px 100px 28px' }}>
+        <input
+          type="text"
+          value={line.description}
+          onChange={(e) => onChange(line.id, { description: e.target.value })}
+          placeholder="Descripción (aparece en la factura)"
+          className="border border-zinc-200 rounded px-2 py-1 text-xs text-zinc-700 focus:outline-none focus:ring-1 focus:ring-zinc-300 w-full bg-white"
+        />
+        {(isCustom || !line.serviceId) ? (
           <input
             type="text"
             value={line.unit}
@@ -972,11 +972,13 @@ function RegularLineRow({
             placeholder="unidad"
             className="border border-zinc-200 rounded px-2 py-1 text-[10px] text-center text-zinc-400 focus:outline-none focus:ring-1 focus:ring-zinc-300 w-full"
           />
-          {svc?.note && (
-            <div className="text-[10px] text-amber-600 text-right truncate">{svc.note}</div>
-          )}
-        </div>
-      )}
+        ) : (
+          <span className="text-[10px] text-zinc-400 text-center">{line.unit}</span>
+        )}
+        {svc?.note && (
+          <div className="text-[10px] text-amber-600 text-right truncate">{svc.note}</div>
+        )}
+      </div>
 
       {/* Row 3: Período (all regular lines) */}
       <div className="grid items-center gap-2" style={{ gridTemplateColumns: '1fr 90px 110px 60px 100px 28px' }}>
