@@ -4,6 +4,7 @@
 // =========================================
 
 import { PLANS, ADDONS, DELIVERY_PLANS } from '@/lib/pricing/catalog'
+import { SERVICE_MAP } from '@/lib/invoice-catalog'
 import type { CompanyLocation, DealConfiguration, InvoiceLineItem } from '@/types'
 
 function newId(): string {
@@ -28,31 +29,33 @@ export function generateLinesForLocation(
   }
 
   // 1 — Fixed plan fee (Starter = €0, no line generated)
+  const fixedServiceId = `ros_${config.plan}_fixed`
   if (plan.priceMonthly > 0) {
     lines.push({
       id: newId(),
       type: 'line',
-      description: `ROS ${plan.label}`,
+      description: SERVICE_MAP.get(fixedServiceId)?.label ?? `ROS ${plan.label} — Fee fijo`,
       quantity: 1,
       unitPrice: plan.priceMonthly,
       amount: plan.priceMonthly,
-      serviceId: `ros_${config.plan}_fixed`,
+      serviceId: fixedServiceId,
       unit: 'mes',
       ...group,
     })
   }
 
   // 2 — Variable fee (only if deliveryOrdersPerVenue > 0)
+  const variableServiceId = `ros_${config.plan}_variable`
   const deliveryOrders = config.deliveryOrdersPerVenue ?? 0
   if (deliveryOrders > 0 && plan.variableFee > 0) {
     lines.push({
       id: newId(),
       type: 'line',
-      description: `Cuota variable ROS`,
+      description: SERVICE_MAP.get(variableServiceId)?.label ?? `ROS ${plan.label} — Fee variable`,
       quantity: deliveryOrders,
       unitPrice: plan.variableFee,
       amount: deliveryOrders * plan.variableFee,
-      serviceId: `ros_${config.plan}_variable`,
+      serviceId: variableServiceId,
       unit: 'pedidos',
       ...group,
     })
