@@ -41,57 +41,23 @@ function fmtDate(s: string | null): string {
 function renderLineRows(items: InvoiceLineItem[], hasDiscount: boolean): string {
   if (!items || items.length === 0) return ''
 
-  // Total column count — used for colspans
   const totalCols = hasDiscount ? 6 : 4
-
-  // Determine if any item carries locationGroupId — if so, render group headers
   const hasGroups = items.some((i) => i.locationGroupId)
 
-  const rows: string[] = []
-  let lastGroupId: string | undefined = undefined
-
-  for (const item of items) {
-    // Inject location group header when the group changes
-    if (hasGroups) {
-      const groupId = item.locationGroupId ?? ''
-      if (groupId !== lastGroupId) {
-        lastGroupId = groupId
-        if (groupId) {
-          const name = item.locationGroupName ?? groupId
-          const addr = item.locationGroupAddress
-          rows.push(`
-            <tr class="location-group-header">
-              <td colspan="${totalCols}">
-                <span style="font-weight:700;font-size:9px;letter-spacing:0.5px;">${esc(name)}</span>
-                ${addr ? `<span style="font-size:8px;color:#94a3b8;margin-left:8px;">${esc(addr)}</span>` : ''}
-              </td>
-            </tr>`)
-        } else {
-          rows.push(`
-            <tr class="location-group-header">
-              <td colspan="${totalCols}" style="font-size:8px;color:#94a3b8;font-style:italic;">General</td>
-            </tr>`)
-        }
-      }
-    }
-
+  function itemRow(item: InvoiceLineItem): string {
     if (item.type === 'discount') {
-      // Discount rows only appear when hasDiscount is true (6-col layout)
-      rows.push(`
+      return `
         <tr class="discount-row">
           <td colspan="4" style="color:#dc2626;">${esc(item.description || 'Descuento')}</td>
           <td class="right" style="color:#dc2626;">—</td>
           <td class="right" style="color:#dc2626;font-weight:700;">${fmt(item.amount)} €</td>
-        </tr>`)
-      continue
+        </tr>`
     }
-
     const dto = item.lineDiscountPercent ?? 0
     const gross = item.quantity * item.unitPrice
     const net = item.amount
-
     if (hasDiscount) {
-      rows.push(`
+      return `
         <tr>
           <td>
             ${esc(item.description || '—')}
@@ -103,22 +69,63 @@ function renderLineRows(items: InvoiceLineItem[], hasDiscount: boolean): string 
           <td class="right">${dto > 0 ? `${fmt(dto)}%` : '—'}</td>
           <td class="right">${fmt(gross)} €</td>
           <td class="right" style="font-weight:600;">${dto > 0 ? `${fmt(net)} €` : '—'}</td>
-        </tr>`)
-    } else {
-      rows.push(`
-        <tr>
-          <td>
-            ${esc(item.description || '—')}
-            ${item.period ? `<div style="font-size:8px;color:#94a3b8;margin-top:2px;">${esc(item.period)}</div>` : ''}
-          </td>
-          <td class="right">${fmt(item.quantity)}</td>
-          <td class="right">${fmt(item.unitPrice)} €</td>
-          <td class="right" style="font-weight:600;">${fmt(net)} €</td>
-        </tr>`)
+        </tr>`
     }
+    return `
+      <tr>
+        <td>
+          ${esc(item.description || '—')}
+          ${item.period ? `<div style="font-size:8px;color:#94a3b8;margin-top:2px;">${esc(item.period)}</div>` : ''}
+        </td>
+        <td class="right">${fmt(item.quantity)}</td>
+        <td class="right">${fmt(item.unitPrice)} €</td>
+        <td class="right" style="font-weight:600;">${fmt(net)} €</td>
+      </tr>`
   }
 
-  return rows.join('')
+  if (!hasGroups) {
+    // Flat — single tbody, no grouping needed
+    return items.map(itemRow).join('')
+  }
+
+  // Grouped — one <tbody> per location group with break-inside: avoid
+  // This keeps the header row + its data rows on the same page in Chromium.
+  const seen = new Set<string>()
+  const groupIds: Array<string> = []
+  for (const item of items) {
+    const gid = item.locationGroupId ?? '__ungrouped__'
+    if (!seen.has(gid)) { seen.add(gid); groupIds.push(gid) }
+  }
+
+  const tbodies: string[] = []
+  // Close the outer tbody opened in the template, emit per-group tbodies, then reopen
+  tbodies.push('</tbody>')
+
+  for (const gid of groupIds) {
+    const groupItems = items.filter((i) => (i.locationGroupId ?? '__ungrouped__') === gid)
+    const name = groupItems[0]?.locationGroupName ?? (gid !== '__ungrouped__' ? gid : 'General')
+    const addr = groupItems[0]?.locationGroupAddress
+
+    const headerRow = gid !== '__ungrouped__'
+      ? `<tr class="location-group-header">
+          <td colspan="${totalCols}">
+            <span style="font-weight:700;font-size:9px;letter-spacing:0.5px;">${esc(name)}</span>
+            ${addr ? `<span style="font-size:8px;color:#94a3b8;margin-left:8px;">${esc(addr)}</span>` : ''}
+          </td>
+        </tr>`
+      : `<tr class="location-group-header">
+          <td colspan="${totalCols}" style="font-size:8px;color:#94a3b8;font-style:italic;">General</td>
+        </tr>`
+
+    tbodies.push(`<tbody style="break-inside:avoid;">
+      ${headerRow}
+      ${groupItems.map(itemRow).join('')}
+    </tbody>`)
+  }
+
+  // Reopen a dummy tbody so the closing </tbody> in the template is valid
+  tbodies.push('<tbody>')
+  return tbodies.join('')
 }
 
 // ---- Invoice HTML ----
@@ -287,6 +294,8 @@ export async function generateInvoicePdf(invoice: Invoice): Promise<Buffer> {
     border-radius: 8px;
     overflow: hidden;
     margin-bottom: 40px;
+    break-inside: avoid;
+    break-before: avoid;
   }
   .totals-row {
     display: flex;
