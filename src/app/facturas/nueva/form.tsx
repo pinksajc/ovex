@@ -229,6 +229,7 @@ export function NewInvoiceForm({
     } else {
       // Select: add the location and auto-generate lines if config available
       setSelectedLocs((prev) => [...prev, loc])
+      const group = { locationGroupId: loc.id, locationGroupName: loc.name, locationGroupAddress: loc.address ?? undefined }
       if (dealConfig) {
         const generated = generateLinesForLocation(loc, dealConfig).map((item) => ({
           ...item,
@@ -236,10 +237,17 @@ export function NewInvoiceForm({
           unit: item.unit ?? '',
         })) as FormLine[]
         setLines((prev) => {
-          // Remove the placeholder empty line if it's the only ungrouped line
           const hasOnlyPlaceholder =
             prev.length === 1 && !prev[0].description && !prev[0].locationGroupId
           return hasOnlyPlaceholder ? generated : [...prev, ...generated]
+        })
+      } else {
+        // No config — add a blank grouped line so the location group appears in the view
+        const placeholder: FormLine = { ...emptyLine(), ...group }
+        setLines((prev) => {
+          const hasOnlyPlaceholder =
+            prev.length === 1 && !prev[0].description && !prev[0].locationGroupId
+          return hasOnlyPlaceholder ? [placeholder] : [...prev, placeholder]
         })
       }
     }
