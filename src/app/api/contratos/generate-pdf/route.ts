@@ -35,6 +35,18 @@ export async function GET(req: Request) {
       return NextResponse.json({ error: 'Presupuesto not found' }, { status: 404 })
     }
 
+    // Load deal contact data if linked
+    let contactName: string | null = null
+    let contactEmail: string | null = null
+    if (presupuesto.dealId) {
+      const { getDealById } = await import('@/lib/supabase/deals')
+      const deal = await getDealById(presupuesto.dealId).catch(() => null)
+      if (deal) {
+        contactName  = deal.contact.name  || null
+        contactEmail = deal.contact.email || null
+      }
+    }
+
     const { generateContractPdf } = await import('@/lib/pdf/contract')
     const pdfBuffer = await generateContractPdf(presupuesto, {
       duracionMeses: isNaN(duracion) ? 12 : duracion,
@@ -42,6 +54,8 @@ export async function GET(req: Request) {
       formaPago: pago,
       fechaInicio: inicio,
       notas,
+      contactName,
+      contactEmail,
     })
 
     const slug = presupuesto.number.replace(/[^A-Za-z0-9-]/g, '-')

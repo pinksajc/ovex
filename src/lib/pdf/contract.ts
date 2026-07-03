@@ -25,6 +25,8 @@ export interface ContractParams {
   formaPago: string
   fechaInicio: string  // YYYY-MM-DD
   notas?: string | null
+  contactName?: string | null
+  contactEmail?: string | null
 }
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -98,7 +100,7 @@ export async function generateContractPdf(
   params: ContractParams,
 ): Promise<Buffer> {
   const logo = readLogoDataUri()
-  const { duracionMeses, permanenciaMeses, formaPago, fechaInicio, notas } = params
+  const { duracionMeses, permanenciaMeses, formaPago, fechaInicio, notas, contactName, contactEmail } = params
 
   const fechaFin  = addMonths(fechaInicio, duracionMeses)
   const today     = fmtDate(fechaInicio)
@@ -489,7 +491,7 @@ export async function generateContractPdf(
     <div class="party-detail">
       ${presupuesto.clientCif ? `NIF/CIF: ${esc(presupuesto.clientCif)}<br/>` : ''}
       ${presupuesto.clientAddress ? `${esc(presupuesto.clientAddress)}<br/>` : ''}
-      Representada en este acto por D./D.ª <strong>[NOMBRE DEL REPRESENTANTE]</strong>
+      Representada en este acto por D./D.ª <strong>${contactName ? esc(contactName) : '[NOMBRE DEL REPRESENTANTE]'}</strong>
       en calidad de <strong>[CARGO]</strong>
       <br/>(en adelante, el «CLIENTE»)
     </div>
@@ -759,7 +761,7 @@ export async function generateContractPdf(
     <div class="clause-body">
       <p>Cualquier comunicación relativa al presente documento se dirigirá a las siguientes direcciones:</p>
       <p><strong>PROVEEDOR:</strong> hola@platomico.com / C/ Antonio Machado 9, Rozas de Puerto Real, Madrid 28649.</p>
-      <p><strong>CLIENTE:</strong> [DIRECCIÓN DE CORREO ELECTRÓNICO DE CONTACTO] / [DOMICILIO A EFECTOS DE NOTIFICACIONES].</p>
+      <p><strong>CLIENTE:</strong> ${contactEmail ? esc(contactEmail) : '[DIRECCIÓN DE CORREO ELECTRÓNICO DE CONTACTO]'} / ${presupuesto.clientAddress ? esc(presupuesto.clientAddress) : '[DOMICILIO A EFECTOS DE NOTIFICACIONES]'}.</p>
       <p>Cualquier cambio de estos datos deberá comunicarse a la otra parte con una antelación mínima de 15 días.</p>
     </div>
   </div>
@@ -820,7 +822,7 @@ export async function generateContractPdf(
         <div class="sig-line-label">Firma</div>
         <div class="sig-line">&nbsp;</div>
         <div class="sig-line-label">Nombre del representante</div>
-        <div class="sig-line">&nbsp;</div>
+        <div class="sig-line">${contactName ? esc(contactName) : '&nbsp;'}</div>
         <div class="sig-line-label">Cargo</div>
         <div class="sig-line">&nbsp;</div>
         <div class="sig-line-label">DNI del firmante</div>
