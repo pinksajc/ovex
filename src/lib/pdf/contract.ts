@@ -848,7 +848,8 @@ export async function generateContractPdf(
 <!-- ══════════════════════════════════════════════════════════════════
      FIRMAS
 ══════════════════════════════════════════════════════════════════ -->
-<div class="pg">
+<div style="break-after:page;page-break-after:always;height:0;overflow:hidden;"></div>
+<div class="pg" style="min-height:auto;">
   ${WM}
 
   ${lbl('Firmas')}
