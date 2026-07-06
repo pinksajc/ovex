@@ -68,6 +68,7 @@ export const SERVICES: ServiceItem[] = [
   { id: 'lenovo_rental', label: 'Tablet Lenovo M11 — Alquiler', group: 'HARDWARE', unit: 'ud/mes', defaultPrice: 9 },
   { id: 'lenovo_financed', label: 'Tablet Lenovo M11 — Financiado', group: 'HARDWARE', unit: 'ud/mes', defaultPrice: 0, priceEditable: true },
   { id: 'lenovo_sold', label: 'Tablet Lenovo M11 — Vendido', group: 'HARDWARE', unit: 'ud', defaultPrice: 0, priceEditable: true },
+  { id: 'tablet_custom', label: 'Tablet', group: 'HARDWARE', unit: 'ud', defaultPrice: 0, priceEditable: true },
   { id: 'bouncepad', label: 'Bouncepad Kiosk — Vendido', group: 'HARDWARE', unit: 'ud', defaultPrice: 200 },
   { id: 'counter_stand', label: 'Counter Stand — Vendido', group: 'HARDWARE', unit: 'ud', defaultPrice: 120 },
 
