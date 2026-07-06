@@ -5,13 +5,23 @@
 // Estructura:
 //  Pág. 1  — Encabezado, Partes e Identificación del Contrato
 //  Pág. 2  — Exponen + Servicios contratados
-//  Págs. 3+ — Cláusulas 1ª–20ª (flujo automático)
-//  Pág. (N) — Firmas
+//  Págs. 3+ — Cláusulas 1ª–20ª (flujo libre, sin breaks forzados)
+//  Pág. (N) — Firmas  [break-before:page]
 //  Pág. (N+1) — Anexo I (SLA)
 //  Pág. (N+2) — Anexo II (Encargado del Tratamiento)
 //  Pág. (N+3) — Anexo III (Inventario de Equipos)
 //
-// Watermark CONFIDENCIAL en cada página.
+// PAGE BREAK STRATEGY:
+//  - Las págs. 1 y 2 usan break-after:page (tamaño fijo, sin riesgo de overflow).
+//  - Las cláusulas fluyen libremente sin ningún break forzado; Puppeteer hace los
+//    saltos de página automáticamente. NO se usa break-after:page en ellas porque
+//    si el contenido termina justo en el límite de página se generaría un salto
+//    doble (natural + forzado) → página en blanco.
+//  - La sección Firmas usa break-before:page (fuerza nueva página desde donde
+//    queden las cláusulas) + break-after:page (separa del Anexo I).
+//  - Los Anexos usan break-after:page salvo el último.
+//
+// Watermark CONFIDENCIAL via position:fixed en el body (aparece en todas las páginas).
 // =========================================
 
 import fs from 'fs'
@@ -81,7 +91,7 @@ interface HardwareRow {
   tipo: string
   modelo: string
   cantidad: number
-  cuota: number | null   // null = vendido / pago único
+  cuota: number | null
   origen: string
 }
 
@@ -95,7 +105,7 @@ function extractHardwareRows(items: InvoiceLineItem[]): HardwareRow[] {
     const isHardwareCustom  = (item as any).itemCategory === 'hardware'
     if (!isHardwareCatalog && !isHardwareCustom) continue
 
-    const isRental  = item.serviceId?.includes('rental') || item.serviceId?.includes('financed')
+    const isRental = item.serviceId?.includes('rental') || item.serviceId?.includes('financed')
     rows.push({
       n: n++,
       tipo: catalogEntry?.label ?? item.description ?? '—',
@@ -124,20 +134,6 @@ function renderServiceRows(items: InvoiceLineItem[]): string {
     .join('')
 }
 
-// ── Watermark helper ──────────────────────────────────────────────────────────
-
-const WM = `<div class="watermark">CONFIDENCIAL</div>`
-
-// ── Page header helper ────────────────────────────────────────────────────────
-
-function pgHeader(logoHtml: string, label: string): string {
-  return `
-    <div class="pg-header">
-      ${logoHtml}
-      <span class="pg-header-label">${label}</span>
-    </div>`
-}
-
 // ── Main generator ────────────────────────────────────────────────────────────
 
 export async function generateContractPdf(
@@ -147,10 +143,10 @@ export async function generateContractPdf(
   const logo = readLogoDataUri()
   const { duracionMeses, permanenciaMeses, formaPago, fechaInicio, notas, contactName, contactEmail, equipment } = params
 
-  const fechaFin  = addMonths(fechaInicio, duracionMeses)
-  const today     = fmtDate(fechaInicio)
-  const startStr  = fmtDate(fechaInicio)
-  const endStr    = fmtDate(fechaFin)
+  const fechaFin = addMonths(fechaInicio, duracionMeses)
+  const today    = fmtDate(fechaInicio)
+  const startStr = fmtDate(fechaInicio)
+  const endStr   = fmtDate(fechaFin)
 
   const items     = presupuesto.lineItems ?? []
   const vatAmount = presupuesto.amountNet * (presupuesto.vatRate / 100)
@@ -160,7 +156,14 @@ export async function generateContractPdf(
     ? `<img class="logo" src="${logo}" alt="Platomico"/>`
     : `<span style="font-size:14px;font-weight:700;color:#1e3a5f;">Platomico</span>`
 
-  const lbl = (t: string) => pgHeader(logoHtml, `Condiciones Generales del Servicio · ${t}`)
+  const lbl = (t: string) => `
+    <div class="pg-header">
+      ${logoHtml}
+      <span class="pg-header-label">Condiciones Generales del Servicio · ${t}</span>
+    </div>`
+
+  // Inline style shared by all page containers
+  const PAGE = `width:210mm; padding:20mm 20mm 16mm; position:relative; font-family:Helvetica,Arial,sans-serif; font-size:9.5px; color:#1e293b; line-height:1.6;`
 
   const html = `<!DOCTYPE html>
 <html lang="es">
@@ -176,20 +179,7 @@ export async function generateContractPdf(
     line-height: 1.6;
   }
 
-  /* ── Page containers ── */
-  .pg {
-    width: 210mm;
-    min-height: 220mm;
-    padding: 20mm 20mm 16mm;
-    position: relative;
-  }
-  .pg-flow {
-    width: 210mm;
-    padding: 20mm 20mm 16mm;
-    position: relative;
-  }
-
-  /* ── Watermark ── */
+  /* ── Watermark — fixed so it appears on every physical page ── */
   .watermark {
     position: fixed;
     top: 50%;
@@ -504,13 +494,14 @@ export async function generateContractPdf(
 </head>
 <body>
 
-<!-- Single fixed watermark — renders on every physical page without interfering with page-break layout -->
-${WM}
+<!-- Single fixed watermark — Puppeteer repeats it on every physical page -->
+<div class="watermark">CONFIDENCIAL</div>
 
 <!-- ══════════════════════════════════════════════════════════════════
      PÁGINA 1 — ENCABEZADO Y PARTES
+     break-after:page — tamaño fijo, sin riesgo de doble salto
 ══════════════════════════════════════════════════════════════════ -->
-<div class="pg" style="break-after:page;">
+<div style="break-after:page; ${PAGE}">
 
   ${lbl('Encabezado y Partes')}
 
@@ -553,8 +544,9 @@ ${WM}
 
 <!-- ══════════════════════════════════════════════════════════════════
      PÁGINA 2 — EXPONEN + SERVICIOS CONTRATADOS
+     break-after:page — tamaño fijo, sin riesgo de doble salto
 ══════════════════════════════════════════════════════════════════ -->
-<div class="pg" style="break-after:page;">
+<div style="break-after:page; ${PAGE}">
   ${lbl('Exponen y Servicios Contratados')}
 
   <div class="exponen-block">
@@ -569,7 +561,6 @@ ${WM}
 
   <div class="acuerdan" style="margin-bottom:14px;">— ACUERDAN —</div>
 
-  <!-- Servicios contratados -->
   <div class="section-label">Servicios contratados (Oferta ${esc(presupuesto.number)})</div>
 
   <table class="svc-table">
@@ -613,9 +604,11 @@ ${WM}
 
 
 <!-- ══════════════════════════════════════════════════════════════════
-     PÁGINAS 3+ — CLÁUSULAS (flujo automático)
+     CLÁUSULAS 1ª–20ª — FLUJO LIBRE
+     Sin break-after: Puppeteer pagina automáticamente.
+     No se fuerza ningún salto al final para evitar doble salto.
 ══════════════════════════════════════════════════════════════════ -->
-<div class="pg-flow" style="break-after:page;">
+<div style="${PAGE}">
   ${lbl('Cláusulas 1ª–4ª')}
 
   <div class="clause">
@@ -661,11 +654,6 @@ ${WM}
       <p><strong>4.7. Prevalencia.</strong> En caso de contradicción entre la Oferta y el presente documento respecto del precio, la forma de pago o las condiciones de facturación, prevalecerá lo establecido en la Oferta.</p>
     </div>
   </div>
-
-</div>
-
-<div class="pg-flow" style="break-after:page;">
-  ${lbl('Cláusulas 5ª–9ª')}
 
   <div class="clause">
     <div class="clause-num">Cláusula 5ª — Duración y Vigencia</div>
@@ -730,11 +718,6 @@ ${WM}
       <p>El CLIENTE podrá solicitar el cambio de plan mediante la aceptación de una nueva Oferta, que sustituirá a la anterior a efectos de nivel de servicio desde la fecha en ella indicada.</p>
     </div>
   </div>
-
-</div>
-
-<div class="pg-flow" style="break-after:page;">
-  ${lbl('Cláusulas 10ª–16ª')}
 
   <div class="clause">
     <div class="clause-num">Cláusula 10ª — Protección de Datos</div>
@@ -832,8 +815,12 @@ ${WM}
 
 <!-- ══════════════════════════════════════════════════════════════════
      FIRMAS
+     break-before:page — fuerza nueva página desde donde acabaron las cláusulas.
+     break-after:page  — separa limpiamente del Anexo I.
+     Al usar solo break-before (no break-after en las cláusulas) se elimina el
+     riesgo de doble salto que causaba la página en blanco.
 ══════════════════════════════════════════════════════════════════ -->
-<div class="pg" style="min-height:auto;break-after:page;">
+<div style="break-before:page; break-after:page; ${PAGE}">
   ${lbl('Firmas')}
 
   <div class="sig-intro">
@@ -878,7 +865,7 @@ ${WM}
 <!-- ══════════════════════════════════════════════════════════════════
      ANEXO I — SLA
 ══════════════════════════════════════════════════════════════════ -->
-<div class="pg" style="break-after:page;">
+<div style="break-after:page; ${PAGE}">
   ${lbl('Anexo I — Acuerdo de Nivel de Servicio (SLA)')}
 
   <div class="anx-title">Anexo I</div>
@@ -968,7 +955,7 @@ ${WM}
 <!-- ══════════════════════════════════════════════════════════════════
      ANEXO II — ENCARGADO DEL TRATAMIENTO (ART. 28 RGPD)
 ══════════════════════════════════════════════════════════════════ -->
-<div class="pg" style="break-after:page;">
+<div style="break-after:page; ${PAGE}">
   ${lbl('Anexo II — Acuerdo de Encargado del Tratamiento')}
 
   <div class="anx-title">Anexo II</div>
@@ -1002,7 +989,7 @@ ${WM}
 <!-- ══════════════════════════════════════════════════════════════════
      ANEXO III — INVENTARIO DE EQUIPOS
 ══════════════════════════════════════════════════════════════════ -->
-<div class="pg">
+<div style="${PAGE}">
   ${lbl('Anexo III — Inventario de Equipos')}
 
   <div class="anx-title">Anexo III</div>
@@ -1013,7 +1000,6 @@ ${WM}
   </p>
 
   ${(() => {
-    // Use form-supplied equipment data if available, otherwise derive from line items
     type AnyRow = { n: number; tipo: string; marca: string; color: string; serie: string; funcion: string; origen: string; cuotaMensual: string }
     let rows: AnyRow[]
 
