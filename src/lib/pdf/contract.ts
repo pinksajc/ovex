@@ -182,6 +182,8 @@ export async function generateContractPdf(
     min-height: 297mm;
     padding: 20mm 20mm 16mm;
     position: relative;
+    break-before: page;
+    page-break-before: always;
     break-after: page;
     page-break-after: always;
   }
