@@ -160,6 +160,7 @@ export default async function OfertaDetailPage({ params }: { params: Promise<{ i
               clientName={presupuesto.clientName}
               clientCif={presupuesto.clientCif}
               clientAddress={presupuesto.clientAddress}
+              lineItems={presupuesto.lineItems ?? []}
             />
           )}
           {canEdit && (

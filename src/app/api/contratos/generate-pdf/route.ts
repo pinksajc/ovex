@@ -24,6 +24,8 @@ export async function GET(req: Request) {
     const inicio      = searchParams.get('inicio') ?? new Date().toISOString().split('T')[0]
     const notas       = searchParams.get('notas') ?? null
     const inline      = searchParams.get('inline') === '1'
+    const equipmentRaw = searchParams.get('equipment')
+    const equipment = equipmentRaw ? JSON.parse(decodeURIComponent(equipmentRaw)) : undefined
 
     if (!id) {
       return NextResponse.json({ error: 'id is required' }, { status: 400 })
@@ -56,6 +58,7 @@ export async function GET(req: Request) {
       notas,
       contactName,
       contactEmail,
+      equipment,
     })
 
     const slug = presupuesto.number.replace(/[^A-Za-z0-9-]/g, '-')

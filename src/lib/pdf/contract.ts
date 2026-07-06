@@ -28,6 +28,16 @@ export interface ContractParams {
   notas?: string | null
   contactName?: string | null
   contactEmail?: string | null
+  equipment?: Array<{
+    n: number
+    tipo: string
+    marca: string
+    color: string
+    serie: string
+    funcion: string
+    origen: string
+    cuotaMensual: string
+  }>
 }
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -135,7 +145,7 @@ export async function generateContractPdf(
   params: ContractParams,
 ): Promise<Buffer> {
   const logo = readLogoDataUri()
-  const { duracionMeses, permanenciaMeses, formaPago, fechaInicio, notas, contactName, contactEmail } = params
+  const { duracionMeses, permanenciaMeses, formaPago, fechaInicio, notas, contactName, contactEmail, equipment } = params
 
   const fechaFin  = addMonths(fechaInicio, duracionMeses)
   const today     = fmtDate(fechaInicio)
@@ -1020,22 +1030,40 @@ export async function generateContractPdf(
   </p>
 
   ${(() => {
-    const hwRows = extractHardwareRows(items)
-    // Expand rows by quantity (e.g. 3× Counter Stand → 3 rows)
-    const expanded: HardwareRow[] = []
-    let n = 1
-    for (const row of hwRows) {
-      const count = Math.max(1, Math.round(row.cantidad))
-      for (let i = 0; i < count; i++) {
-        expanded.push({ ...row, n: n++ })
+    // Use form-supplied equipment data if available, otherwise derive from line items
+    type AnyRow = { n: number; tipo: string; marca: string; color: string; serie: string; funcion: string; origen: string; cuotaMensual: string }
+    let rows: AnyRow[]
+
+    if (equipment && equipment.length > 0) {
+      rows = equipment
+    } else {
+      const hwRows = extractHardwareRows(items)
+      const expanded: AnyRow[] = []
+      let n = 1
+      for (const row of hwRows) {
+        const count = Math.max(1, Math.round(row.cantidad))
+        for (let i = 0; i < count; i++) {
+          expanded.push({
+            n: n++,
+            tipo: row.tipo,
+            marca: '',
+            color: '',
+            serie: '',
+            funcion: '',
+            origen: row.origen,
+            cuotaMensual: row.cuota !== null ? `${fmt(row.cuota)} €/mes` : '',
+          })
+        }
       }
+      rows = expanded.length > 0 ? expanded : [
+        { n: 1, tipo: '—', marca: '', color: '', serie: '', funcion: '', origen: '—', cuotaMensual: '' },
+        { n: 2, tipo: '—', marca: '', color: '', serie: '', funcion: '', origen: '—', cuotaMensual: '' },
+        { n: 3, tipo: '—', marca: '', color: '', serie: '', funcion: '', origen: '—', cuotaMensual: '' },
+      ]
     }
-    // If no hardware found, show 3 blank placeholder rows
-    const rows = expanded.length > 0 ? expanded : [
-      { n: 1, tipo: '—', modelo: '—', cantidad: 1, cuota: null, origen: '—' },
-      { n: 2, tipo: '—', modelo: '—', cantidad: 1, cuota: null, origen: '—' },
-      { n: 3, tipo: '—', modelo: '—', cantidad: 1, cuota: null, origen: '—' },
-    ]
+
+    const ph = (v: string) => v ? esc(v) : '<span style="color:#94a3b8">[__]</span>'
+
     return `
   <table class="anx-table" style="margin-bottom:20px;">
     <thead>
@@ -1045,7 +1073,7 @@ export async function generateContractPdf(
         <th>Marca / Modelo</th>
         <th>Color</th>
         <th>Nº Serie / ID</th>
-        <th>Función (POS/Kiosko/KDS)</th>
+        <th>Función</th>
         <th>Origen</th>
         <th>Cuota mensual</th>
       </tr>
@@ -1055,12 +1083,12 @@ export async function generateContractPdf(
       <tr>
         <td>${r.n}</td>
         <td>${esc(r.tipo)}</td>
-        <td class="cell-placeholder">[__]</td>
-        <td class="cell-placeholder">[__]</td>
-        <td class="cell-placeholder">[__]</td>
-        <td class="cell-placeholder">[__]</td>
-        <td>${esc(r.origen)}</td>
-        <td>${r.cuota !== null ? `${fmt(r.cuota)} €/mes` : '<span style="color:#94a3b8">Vendido</span>'}</td>
+        <td>${ph(r.marca)}</td>
+        <td>${ph(r.color)}</td>
+        <td>${ph(r.serie)}</td>
+        <td>${ph(r.funcion)}</td>
+        <td>${esc(r.origen) || '<span style="color:#94a3b8">Platomico</span>'}</td>
+        <td>${r.cuotaMensual || '<span style="color:#94a3b8">Vendido</span>'}</td>
       </tr>`).join('')}
     </tbody>
   </table>`
