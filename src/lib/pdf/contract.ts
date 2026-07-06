@@ -195,6 +195,8 @@ export async function generateContractPdf(
     position: relative;
     break-after: auto;
     page-break-after: auto;
+    break-before: page;
+    page-break-before: always;
   }
 
   /* ── Watermark ── */
@@ -456,15 +458,17 @@ export async function generateContractPdf(
     text-align: center;
     margin: 20px 0 28px;
   }
-  .sig-cols { width: 100%; overflow: hidden; margin-top: 12px; }
+  .sig-cols { width: 100%; font-size: 0; margin-top: 12px; }
   .sig-col {
-    float: left;
-    width: 46%;
+    display: inline-block;
+    vertical-align: top;
+    width: 48%;
     border: 1px solid #e2e8f0;
     border-radius: 10px;
     padding: 18px;
     margin-right: 4%;
     box-sizing: border-box;
+    font-size: 10px;
   }
   .sig-col:last-child { margin-right: 0; }
   .sig-col-title {
