@@ -184,19 +184,11 @@ export async function generateContractPdf(
     position: relative;
     break-before: page;
     page-break-before: always;
-    break-after: page;
-    page-break-after: always;
-  }
-  .pg:last-child {
-    break-after: avoid;
-    page-break-after: avoid;
   }
   .pg-flow {
     width: 210mm;
     padding: 20mm 20mm 16mm;
     position: relative;
-    break-after: page;
-    page-break-after: always;
     break-before: page;
     page-break-before: always;
   }
@@ -848,8 +840,7 @@ export async function generateContractPdf(
 <!-- ══════════════════════════════════════════════════════════════════
      FIRMAS
 ══════════════════════════════════════════════════════════════════ -->
-<div style="break-after:page;page-break-after:always;height:0;overflow:hidden;"></div>
-<div class="pg" style="min-height:auto;">
+<div class="pg">
   ${WM}
 
   ${lbl('Firmas')}
