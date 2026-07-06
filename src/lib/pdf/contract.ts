@@ -182,15 +182,13 @@ export async function generateContractPdf(
     min-height: 297mm;
     padding: 20mm 20mm 16mm;
     position: relative;
-    break-before: page;
-    page-break-before: always;
+    break-after: page;
+    page-break-after: always;
   }
   .pg-flow {
     width: 210mm;
     padding: 20mm 20mm 16mm;
     position: relative;
-    break-before: page;
-    page-break-before: always;
   }
 
   /* ── Watermark ── */
@@ -619,7 +617,7 @@ export async function generateContractPdf(
 <!-- ══════════════════════════════════════════════════════════════════
      PÁGINAS 3+ — CLÁUSULAS (flujo automático)
 ══════════════════════════════════════════════════════════════════ -->
-<div class="pg-flow">
+<div class="pg-flow" style="break-after:page;page-break-after:always;">
   ${WM}
 
   ${lbl('Cláusulas 1ª–4ª')}
@@ -670,7 +668,7 @@ export async function generateContractPdf(
 
 </div>
 
-<div class="pg-flow">
+<div class="pg-flow" style="break-after:page;page-break-after:always;">
   ${WM}
 
   ${lbl('Cláusulas 5ª–9ª')}
@@ -738,7 +736,7 @@ export async function generateContractPdf(
 
 </div>
 
-<div class="pg-flow">
+<div class="pg-flow" style="break-after:page;page-break-after:always;">
   ${WM}
 
   ${lbl('Cláusulas 10ª–16ª')}
@@ -840,7 +838,7 @@ export async function generateContractPdf(
 <!-- ══════════════════════════════════════════════════════════════════
      FIRMAS
 ══════════════════════════════════════════════════════════════════ -->
-<div class="pg" style="min-height:auto;">
+<div class="pg" style="min-height:auto;break-after:page;page-break-after:always;">
   ${WM}
 
   ${lbl('Firmas')}
@@ -1015,7 +1013,7 @@ export async function generateContractPdf(
 <!-- ══════════════════════════════════════════════════════════════════
      ANEXO III — INVENTARIO DE EQUIPOS
 ══════════════════════════════════════════════════════════════════ -->
-<div class="pg">
+<div class="pg" style="break-after:auto;page-break-after:auto;">
   ${WM}
 
   ${lbl('Anexo III — Inventario de Equipos')}
