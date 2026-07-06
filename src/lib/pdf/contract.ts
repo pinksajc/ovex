@@ -504,11 +504,13 @@ export async function generateContractPdf(
 </head>
 <body>
 
+<!-- Single fixed watermark — renders on every physical page without interfering with page-break layout -->
+${WM}
+
 <!-- ══════════════════════════════════════════════════════════════════
      PÁGINA 1 — ENCABEZADO Y PARTES
 ══════════════════════════════════════════════════════════════════ -->
 <div class="pg" style="break-after:page;">
-  ${WM}
 
   ${lbl('Encabezado y Partes')}
 
@@ -553,8 +555,6 @@ export async function generateContractPdf(
      PÁGINA 2 — EXPONEN + SERVICIOS CONTRATADOS
 ══════════════════════════════════════════════════════════════════ -->
 <div class="pg" style="break-after:page;">
-  ${WM}
-
   ${lbl('Exponen y Servicios Contratados')}
 
   <div class="exponen-block">
@@ -616,8 +616,6 @@ export async function generateContractPdf(
      PÁGINAS 3+ — CLÁUSULAS (flujo automático)
 ══════════════════════════════════════════════════════════════════ -->
 <div class="pg-flow" style="break-after:page;">
-  ${WM}
-
   ${lbl('Cláusulas 1ª–4ª')}
 
   <div class="clause">
@@ -667,8 +665,6 @@ export async function generateContractPdf(
 </div>
 
 <div class="pg-flow" style="break-after:page;">
-  ${WM}
-
   ${lbl('Cláusulas 5ª–9ª')}
 
   <div class="clause">
@@ -738,8 +734,6 @@ export async function generateContractPdf(
 </div>
 
 <div class="pg-flow" style="break-after:page;">
-  ${WM}
-
   ${lbl('Cláusulas 10ª–16ª')}
 
   <div class="clause">
@@ -840,8 +834,6 @@ export async function generateContractPdf(
      FIRMAS
 ══════════════════════════════════════════════════════════════════ -->
 <div class="pg" style="min-height:auto;break-after:page;">
-  ${WM}
-
   ${lbl('Firmas')}
 
   <div class="sig-intro">
@@ -887,8 +879,6 @@ export async function generateContractPdf(
      ANEXO I — SLA
 ══════════════════════════════════════════════════════════════════ -->
 <div class="pg" style="break-after:page;">
-  ${WM}
-
   ${lbl('Anexo I — Acuerdo de Nivel de Servicio (SLA)')}
 
   <div class="anx-title">Anexo I</div>
@@ -979,8 +969,6 @@ export async function generateContractPdf(
      ANEXO II — ENCARGADO DEL TRATAMIENTO (ART. 28 RGPD)
 ══════════════════════════════════════════════════════════════════ -->
 <div class="pg" style="break-after:page;">
-  ${WM}
-
   ${lbl('Anexo II — Acuerdo de Encargado del Tratamiento')}
 
   <div class="anx-title">Anexo II</div>
@@ -1015,8 +1003,6 @@ export async function generateContractPdf(
      ANEXO III — INVENTARIO DE EQUIPOS
 ══════════════════════════════════════════════════════════════════ -->
 <div class="pg">
-  ${WM}
-
   ${lbl('Anexo III — Inventario de Equipos')}
 
   <div class="anx-title">Anexo III</div>

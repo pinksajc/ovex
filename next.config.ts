@@ -10,8 +10,10 @@ const nextConfig: NextConfig = {
   // supporting assets that it would otherwise skip (they are not JS files
   // so NFT doesn't trace them automatically).
   outputFileTracingIncludes: {
-    // Match the PDF generation API route
     "/api/propuestas/generate-pdf": [
+      "./node_modules/@sparticuz/chromium/bin/**/*",
+    ],
+    "/api/contratos/generate-pdf": [
       "./node_modules/@sparticuz/chromium/bin/**/*",
     ],
   },
