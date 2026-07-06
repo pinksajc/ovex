@@ -411,12 +411,14 @@ export async function generateContractPdf(
     text-align: center;
     margin: 20px 0 28px;
   }
-  .sig-cols { display: flex; gap: 28px; margin-top: 12px; }
+  .sig-cols { display: table; width: 100%; border-spacing: 20px 0; margin-top: 12px; }
   .sig-col {
-    flex: 1;
+    display: table-cell;
+    width: 50%;
     border: 1px solid #e2e8f0;
     border-radius: 10px;
     padding: 18px;
+    vertical-align: top;
   }
   .sig-col-title {
     font-size: 8px;
@@ -518,7 +520,7 @@ export async function generateContractPdf(
     <div class="exponen-title">Exponen</div>
     <p>1.º Que Platomico, S.L. es una empresa especializada en el desarrollo y gestión de soluciones tecnológicas y software para el sector de la restauración.</p>
     <p>2.º Que el CLIENTE es una sociedad mercantil dedicada a la actividad de restauración y que desea contratar los servicios objeto de las presentes Condiciones Generales para la gestión operativa de dicho establecimiento.</p>
-    <p>3.º Que las partes han mantenido conversaciones comerciales previas, en cuyo marco Platomico presentó al CLIENTE la oferta comercial nº <strong>${esc(presupuesto.id)}</strong>, relativa a la implantación del sistema ROS y del hardware asociado (la «Oferta»), oferta que ha sido aceptada por el CLIENTE y cuyo contenido económico se rige por lo dispuesto en la Cláusula 4ª.</p>
+    <p>3.º Que las partes han mantenido conversaciones comerciales previas, en cuyo marco Platomico presentó al CLIENTE la oferta comercial nº <strong>${esc(presupuesto.number)}</strong>, relativa a la implantación del sistema ROS y del hardware asociado (la «Oferta»), oferta que ha sido aceptada por el CLIENTE y cuyo contenido económico se rige por lo dispuesto en la Cláusula 4ª.</p>
     <p>4.º Que, con carácter previo a la firma del presente documento, Platomico ha informado al CLIENTE de las funcionalidades y limitaciones del Servicio, del precio indicado en la Oferta, del período de permanencia mínima establecido en la Cláusula 6ª y de las condiciones de baja anticipada.</p>
     <p>5.º Que Platomico es titular de todos los derechos de propiedad intelectual e industrial sobre el software ROS y demás elementos tecnológicos objeto de las presentes Condiciones Generales, encontrándose facultada para conceder al CLIENTE la licencia de uso regulada en la Cláusula 12ª.</p>
     <p>6.º Que el sistema ROS cumple, o se encuentra en proceso de adaptación para cumplir, con los requisitos del Reglamento de Sistemas Informáticos de Facturación (Real Decreto 1007/2023), incluyendo, en su caso, la modalidad VERI*FACTU.</p>
@@ -527,7 +529,7 @@ export async function generateContractPdf(
   <div class="acuerdan" style="margin-bottom:14px;">— ACUERDAN —</div>
 
   <!-- Servicios contratados -->
-  <div class="section-label">Servicios contratados (Oferta ${esc(presupuesto.id)})</div>
+  <div class="section-label">Servicios contratados (Oferta ${esc(presupuesto.number)})</div>
 
   <table class="svc-table">
     <thead>
@@ -846,7 +848,7 @@ export async function generateContractPdf(
   ${lbl('Anexo I — Acuerdo de Nivel de Servicio (SLA)')}
 
   <div class="anx-title">Anexo I</div>
-  <div class="anx-subtitle">Acuerdo de Nivel de Servicio (SLA) — Contrato ${esc(presupuesto.id)}</div>
+  <div class="anx-subtitle">Acuerdo de Nivel de Servicio (SLA) — Contrato ${esc(presupuesto.number)}</div>
 
   <p style="font-size:9.5px;color:#334155;line-height:1.7;margin-bottom:12px;">
     El presente Anexo desarrolla el nivel de servicio aplicable en función del plan contratado por el CLIENTE, identificado en la Oferta.
@@ -938,7 +940,7 @@ export async function generateContractPdf(
   ${lbl('Anexo II — Acuerdo de Encargado del Tratamiento')}
 
   <div class="anx-title">Anexo II</div>
-  <div class="anx-subtitle">Acuerdo de Encargado del Tratamiento (art. 28 RGPD) — Contrato ${esc(presupuesto.id)}</div>
+  <div class="anx-subtitle">Acuerdo de Encargado del Tratamiento (art. 28 RGPD) — Contrato ${esc(presupuesto.number)}</div>
 
   <table class="anx-table" style="margin-bottom:14px;">
     <tbody>
@@ -974,7 +976,7 @@ export async function generateContractPdf(
   ${lbl('Anexo III — Inventario de Equipos')}
 
   <div class="anx-title">Anexo III</div>
-  <div class="anx-subtitle">Inventario de Equipos — Contrato ${esc(presupuesto.id)} · ${esc(presupuesto.clientName)}</div>
+  <div class="anx-subtitle">Inventario de Equipos — Contrato ${esc(presupuesto.number)} · ${esc(presupuesto.clientName)}</div>
 
   <p style="font-size:9.5px;color:#334155;line-height:1.7;margin-bottom:12px;">
     El presente Anexo identifica de forma individualizada los Equipos entregados al CLIENTE conforme a la Cláusula 3ª. Se actualizará cada vez que se sustituya o incorpore un nuevo Equipo, sin que ello requiera modificar formalmente el presente documento.
