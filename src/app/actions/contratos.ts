@@ -12,6 +12,7 @@ export interface SaveContratoInput {
   formaPago: string
   fechaInicio: string  // YYYY-MM-DD
   notas?: string | null
+  equipment?: unknown | null
 }
 
 export async function saveContratoAction(
@@ -31,6 +32,7 @@ export async function saveContratoAction(
       forma_pago: input.formaPago,
       fecha_inicio: input.fechaInicio,
       notas: input.notas ?? null,
+      equipment: input.equipment ?? null,
     })
 
     revalidatePath(`/ofertas/${input.presupuestoId}`)

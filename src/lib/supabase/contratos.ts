@@ -21,6 +21,7 @@ export interface ContratoRow {
   forma_pago: string
   fecha_inicio: string
   notas: string | null
+  equipment: unknown | null
 }
 
 export interface ContratoInsert {
@@ -31,6 +32,7 @@ export interface ContratoInsert {
   forma_pago: string
   fecha_inicio: string  // YYYY-MM-DD
   notas?: string | null
+  equipment?: unknown | null
 }
 
 export async function createContrato(data: ContratoInsert): Promise<ContratoRow> {
@@ -44,6 +46,7 @@ export async function createContrato(data: ContratoInsert): Promise<ContratoRow>
       forma_pago: data.forma_pago,
       fecha_inicio: data.fecha_inicio,
       notas: data.notas ?? null,
+      equipment: data.equipment ?? null,
     })
     .select()
     .single()

@@ -15,6 +15,7 @@ interface Props {
   clientCif: string | null
   clientAddress: string | null
   lineItems?: InvoiceLineItem[]
+  savedEquipment?: EquipmentRow[] | null
 }
 
 interface EquipmentRow {
@@ -61,6 +62,7 @@ export function GenerarContratoButton({
   clientCif,
   clientAddress,
   lineItems = [],
+  savedEquipment,
 }: Props) {
   const [isOpen, setIsOpen]          = useState(false)
   const [isPending, startTransition] = useTransition()
@@ -73,7 +75,9 @@ export function GenerarContratoButton({
   const [pago,        setPago]        = useState('Transferencia bancaria')
   const [inicio,      setInicio]      = useState(today)
   const [notas,       setNotas]       = useState('')
-  const [equipment,   setEquipment]   = useState<EquipmentRow[]>(() => buildEquipmentRows(lineItems))
+  const [equipment,   setEquipment]   = useState<EquipmentRow[]>(() =>
+    savedEquipment && savedEquipment.length > 0 ? savedEquipment : buildEquipmentRows(lineItems)
+  )
 
   function updateEquipment(n: number, field: keyof EquipmentRow, value: string) {
     setEquipment(prev => prev.map(r => r.n === n ? { ...r, [field]: value } : r))
@@ -115,6 +119,7 @@ export function GenerarContratoButton({
         formaPago: pago,
         fechaInicio: inicio,
         notas: notas.trim() || null,
+        equipment: equipment.length > 0 ? equipment : null,
       })
 
       if (!res.ok) { setError(res.error); return }

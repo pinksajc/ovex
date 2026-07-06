@@ -4,6 +4,7 @@ import { getPresupuesto, getPresupuestosByDeal } from '@/lib/supabase/presupuest
 import { getInvoicesByDeal } from '@/lib/supabase/invoices'
 import { getDealById } from '@/lib/supabase/deals'
 import { listLocationsByDeal } from '@/lib/supabase/company-locations'
+import { getContratosByPresupuesto } from '@/lib/supabase/contratos'
 import { getCurrentUser } from '@/lib/auth'
 import { OfertaActions } from './actions'
 import { RequiresSignatureToggle } from './requires-signature-toggle'
@@ -65,8 +66,6 @@ export default async function OfertaDetailPage({ params }: { params: Promise<{ i
     getPresupuesto(id).catch(() => null),
     getCurrentUser(),
   ])
-  if (!presupuesto) notFound()
-
   const vatAmount = presupuesto.amountNet * (presupuesto.vatRate / 100)
   const canEdit = presupuesto.status === 'draft' || presupuesto.status === 'sent'
 
@@ -85,6 +84,11 @@ export default async function OfertaDetailPage({ params }: { params: Promise<{ i
     : [[], [], null, []]
 
   const locationCount = dealLocations.length
+
+  const lastContrato = presupuesto.status === 'accepted'
+    ? await getContratosByPresupuesto(presupuesto.id).then(r => r[0] ?? null).catch(() => null)
+    : null
+  const savedEquipment = (lastContrato?.equipment ?? null) as any[] | null
 
   const pdfDownloadUrl = `/api/presupuestos/generate-pdf?id=${presupuesto.id}`
 
@@ -161,6 +165,7 @@ export default async function OfertaDetailPage({ params }: { params: Promise<{ i
               clientCif={presupuesto.clientCif}
               clientAddress={presupuesto.clientAddress}
               lineItems={presupuesto.lineItems ?? []}
+              savedEquipment={savedEquipment}
             />
           )}
           {canEdit && (
