@@ -67,12 +67,14 @@ export async function renderHtmlToPdf(html: string): Promise<Buffer> {
 
   console.log('[renderHtmlToPdf] executablePath:', executablePath)
 
+  // When using a local Chrome binary (CHROME_EXECUTABLE_PATH set), skip the
+  // Lambda-specific args from @sparticuz/chromium — they crash on macOS.
+  const launchArgs = process.env.CHROME_EXECUTABLE_PATH
+    ? ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage']
+    : [...chromium.args, '--disable-dev-shm-usage', '--no-zygote']
+
   const browser = await puppeteer.launch({
-    args: [
-      ...chromium.args,
-      '--disable-dev-shm-usage', // avoids /dev/shm exhaustion in Lambda
-      '--no-zygote',             // required in some Lambda environments
-    ],
+    args: launchArgs,
     defaultViewport: { width: 1240, height: 1754 },
     executablePath,
     headless: true,
