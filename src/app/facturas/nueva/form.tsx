@@ -980,6 +980,29 @@ function RegularLineRow({
         )}
       </div>
 
+      {/* Row 2b: Hardware/Software toggle — only for custom lines without catalog serviceId */}
+      {(!line.serviceId || isCustom) && (
+        <div className="flex items-center gap-1.5">
+          <span className="text-[10px] text-zinc-400">Tipo:</span>
+          {(['software', 'hardware'] as const).map((cat) => (
+            <button
+              key={cat}
+              type="button"
+              onClick={() => onChange(line.id, { itemCategory: cat })}
+              className={`px-2 py-0.5 rounded text-[10px] font-medium border transition-colors ${
+                (line.itemCategory ?? 'software') === cat
+                  ? cat === 'hardware'
+                    ? 'bg-amber-50 border-amber-300 text-amber-700'
+                    : 'bg-blue-50 border-blue-300 text-blue-700'
+                  : 'bg-white border-zinc-200 text-zinc-400 hover:border-zinc-300'
+              }`}
+            >
+              {cat === 'hardware' ? '⬡ Hardware' : '◻ Software'}
+            </button>
+          ))}
+        </div>
+      )}
+
       {/* Row 3: Período (all regular lines) */}
       <div className="grid items-center gap-2" style={{ gridTemplateColumns: '1fr 90px 110px 60px 100px 28px' }}>
         <input

@@ -17,6 +17,7 @@
 import fs from 'fs'
 import path from 'path'
 import type { Presupuesto, InvoiceLineItem } from '@/types'
+import { SERVICE_MAP } from '@/lib/invoice-catalog'
 import { renderHtmlToPdf } from './generate'
 
 export interface ContractParams {
@@ -61,6 +62,40 @@ function addMonths(dateStr: string, months: number): string {
   const d = new Date(dateStr)
   d.setMonth(d.getMonth() + months)
   return d.toISOString().split('T')[0]
+}
+
+// ── Hardware items extractor ──────────────────────────────────────────────────
+
+interface HardwareRow {
+  n: number
+  tipo: string
+  modelo: string
+  cantidad: number
+  cuota: number | null   // null = vendido / pago único
+  origen: string
+}
+
+function extractHardwareRows(items: InvoiceLineItem[]): HardwareRow[] {
+  const rows: HardwareRow[] = []
+  let n = 1
+  for (const item of items) {
+    if (item.type !== 'line') continue
+    const catalogEntry = item.serviceId ? SERVICE_MAP.get(item.serviceId) : undefined
+    const isHardwareCatalog = catalogEntry?.group === 'HARDWARE'
+    const isHardwareCustom  = (item as any).itemCategory === 'hardware'
+    if (!isHardwareCatalog && !isHardwareCustom) continue
+
+    const isRental  = item.serviceId?.includes('rental') || item.serviceId?.includes('financed')
+    rows.push({
+      n: n++,
+      tipo: catalogEntry?.label ?? item.description ?? '—',
+      modelo: '—',
+      cantidad: item.quantity,
+      cuota: isRental ? item.unitPrice : null,
+      origen: 'Platomico',
+    })
+  }
+  return rows
 }
 
 // ── Services table rows ───────────────────────────────────────────────────────
@@ -982,11 +1017,29 @@ export async function generateContractPdf(
     El presente Anexo identifica de forma individualizada los Equipos entregados al CLIENTE conforme a la Cláusula 3ª. Se actualizará cada vez que se sustituya o incorpore un nuevo Equipo, sin que ello requiera modificar formalmente el presente documento.
   </p>
 
+  ${(() => {
+    const hwRows = extractHardwareRows(items)
+    // Expand rows by quantity (e.g. 3× Counter Stand → 3 rows)
+    const expanded: HardwareRow[] = []
+    let n = 1
+    for (const row of hwRows) {
+      const count = Math.max(1, Math.round(row.cantidad))
+      for (let i = 0; i < count; i++) {
+        expanded.push({ ...row, n: n++ })
+      }
+    }
+    // If no hardware found, show 3 blank placeholder rows
+    const rows = expanded.length > 0 ? expanded : [
+      { n: 1, tipo: '—', modelo: '—', cantidad: 1, cuota: null, origen: '—' },
+      { n: 2, tipo: '—', modelo: '—', cantidad: 1, cuota: null, origen: '—' },
+      { n: 3, tipo: '—', modelo: '—', cantidad: 1, cuota: null, origen: '—' },
+    ]
+    return `
   <table class="anx-table" style="margin-bottom:20px;">
     <thead>
       <tr>
         <th style="width:28px;">Nº</th>
-        <th>Tipo</th>
+        <th>Tipo / Descripción</th>
         <th>Marca / Modelo</th>
         <th>Color</th>
         <th>Nº Serie / ID</th>
@@ -996,13 +1049,20 @@ export async function generateContractPdf(
       </tr>
     </thead>
     <tbody>
-      <tr><td>1</td><td>Tablet</td><td class="cell-placeholder">[__]</td><td class="cell-placeholder">[__]</td><td class="cell-placeholder">[__]</td><td class="cell-placeholder">[__]</td><td class="cell-placeholder">[Platomico/Cliente]</td><td class="cell-placeholder">[__] €</td></tr>
-      <tr><td>2</td><td>Tablet</td><td class="cell-placeholder">[__]</td><td class="cell-placeholder">[__]</td><td class="cell-placeholder">[__]</td><td class="cell-placeholder">[__]</td><td class="cell-placeholder">[Platomico/Cliente]</td><td class="cell-placeholder">[__] €</td></tr>
-      <tr><td>3</td><td>Tablet</td><td class="cell-placeholder">[__]</td><td class="cell-placeholder">[__]</td><td class="cell-placeholder">[__]</td><td class="cell-placeholder">[__]</td><td class="cell-placeholder">[Platomico/Cliente]</td><td class="cell-placeholder">[__] €</td></tr>
-      <tr><td>4</td><td>Counter Stand</td><td class="cell-placeholder">[__]</td><td>—</td><td class="cell-placeholder">[__]</td><td>—</td><td class="cell-placeholder">[Platomico/Cliente]</td><td>—</td></tr>
-      <tr><td>5</td><td>Bouncepad Kiosk</td><td class="cell-placeholder">[__]</td><td>—</td><td class="cell-placeholder">[__]</td><td>—</td><td class="cell-placeholder">[Platomico/Cliente]</td><td>—</td></tr>
+      ${rows.map(r => `
+      <tr>
+        <td>${r.n}</td>
+        <td>${esc(r.tipo)}</td>
+        <td class="cell-placeholder">[__]</td>
+        <td class="cell-placeholder">[__]</td>
+        <td class="cell-placeholder">[__]</td>
+        <td class="cell-placeholder">[__]</td>
+        <td>${esc(r.origen)}</td>
+        <td>${r.cuota !== null ? `${fmt(r.cuota)} €/mes` : '<span style="color:#94a3b8">Vendido</span>'}</td>
+      </tr>`).join('')}
     </tbody>
-  </table>
+  </table>`
+  })()}
 
   <p style="font-size:9px;font-weight:700;color:#1e3a5f;margin-bottom:8px;text-transform:uppercase;letter-spacing:0.6px;">Historial de modificaciones</p>
 

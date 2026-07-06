@@ -275,6 +275,8 @@ export interface InvoiceLineItem {
   lineDiscountPercent?: number
   /** Optional name/label for the per-line discount (e.g. "CORE PARTNER DISCOUNT") */
   discountName?: string
+  /** 'hardware' for physical equipment, 'software' for services. Used in Anexo III. */
+  itemCategory?: 'hardware' | 'software'
   /** Location group — groups this line under a location header in PDF and form */
   locationGroupId?: string
   locationGroupName?: string
