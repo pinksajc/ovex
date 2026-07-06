@@ -446,15 +446,17 @@ export async function generateContractPdf(
     text-align: center;
     margin: 20px 0 28px;
   }
-  .sig-cols { display: table; width: 100%; border-spacing: 20px 0; margin-top: 12px; }
+  .sig-cols { width: 100%; overflow: hidden; margin-top: 12px; }
   .sig-col {
-    display: table-cell;
-    width: 50%;
+    float: left;
+    width: 46%;
     border: 1px solid #e2e8f0;
     border-radius: 10px;
     padding: 18px;
-    vertical-align: top;
+    margin-right: 4%;
+    box-sizing: border-box;
   }
+  .sig-col:last-child { margin-right: 0; }
   .sig-col-title {
     font-size: 8px;
     font-weight: 700;
