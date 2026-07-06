@@ -75,12 +75,22 @@ export function GenerarContratoButton({
   const [pago,        setPago]        = useState('Transferencia bancaria')
   const [inicio,      setInicio]      = useState(today)
   const [notas,       setNotas]       = useState('')
-  const [equipment,   setEquipment]   = useState<EquipmentRow[]>(() =>
-    savedEquipment && savedEquipment.length > 0 ? savedEquipment : buildEquipmentRows(lineItems)
-  )
+  const lsKey = `equipment-draft-${presupuestoId}`
+  const [equipment, setEquipment] = useState<EquipmentRow[]>(() => {
+    try {
+      const draft = typeof window !== 'undefined' ? localStorage.getItem(lsKey) : null
+      if (draft) return JSON.parse(draft)
+    } catch {}
+    if (savedEquipment && savedEquipment.length > 0) return savedEquipment
+    return buildEquipmentRows(lineItems)
+  })
 
   function updateEquipment(n: number, field: keyof EquipmentRow, value: string) {
-    setEquipment(prev => prev.map(r => r.n === n ? { ...r, [field]: value } : r))
+    setEquipment(prev => {
+      const next = prev.map(r => r.n === n ? { ...r, [field]: value } : r)
+      try { localStorage.setItem(lsKey, JSON.stringify(next)) } catch {}
+      return next
+    })
   }
 
   function buildDownloadUrl() {
