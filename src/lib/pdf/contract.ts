@@ -528,7 +528,7 @@ export async function generateContractPdf(
       ${presupuesto.clientCif ? `NIF/CIF: ${esc(presupuesto.clientCif)}<br/>` : ''}
       ${presupuesto.clientAddress ? `${esc(presupuesto.clientAddress)}<br/>` : ''}
       Representada en este acto por D./D.ª <strong>${contactName ? esc(contactName) : '[NOMBRE DEL REPRESENTANTE]'}</strong>
-      en calidad de <strong>[CARGO]</strong>
+      en calidad de <strong>Administrador</strong>
       <br/>(en adelante, el «CLIENTE»)
     </div>
   </div>
