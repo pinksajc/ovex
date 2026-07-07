@@ -66,6 +66,7 @@ export default async function OfertaDetailPage({ params }: { params: Promise<{ i
     getPresupuesto(id).catch(() => null),
     getCurrentUser(),
   ])
+  if (!presupuesto) notFound()
   const vatAmount = presupuesto.amountNet * (presupuesto.vatRate / 100)
   const canEdit = presupuesto.status === 'draft' || presupuesto.status === 'sent'
 
