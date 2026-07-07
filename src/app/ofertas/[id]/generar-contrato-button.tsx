@@ -366,7 +366,7 @@ export function GenerarContratoButton({
                                 className="w-full text-xs border border-zinc-200 rounded-lg px-2.5 py-1.5 bg-white focus:outline-none focus:ring-1 focus:ring-blue-400/50 focus:border-blue-300"
                               >
                                 <option value="Vendido">Vendido</option>
-                                <option value="Comodato">Comodato (se devuelve)</option>
+                                <option value="Comodato">Comodato</option>
                                 <option value="__custom">Cuota mensual (€)</option>
                               </select>
                               {row.cuotaMensual !== 'Vendido' && row.cuotaMensual !== 'Comodato' && (
