@@ -148,6 +148,23 @@ export function GenerarContratoButton({
     })
   }
 
+  function addEquipmentRow() {
+    setEquipment(prev => {
+      const n = prev.length > 0 ? Math.max(...prev.map(r => r.n)) + 1 : 1
+      const next = [...prev, { n, tipo: '', marca: '', color: '', serie: '', funcion: '', origen: 'Platomico' as const, cuotaMensual: '' }]
+      try { localStorage.setItem(lsKey, JSON.stringify(next)) } catch {}
+      return next
+    })
+  }
+
+  function removeEquipmentRow(n: number) {
+    setEquipment(prev => {
+      const next = prev.filter(r => r.n !== n).map((r, i) => ({ ...r, n: i + 1 }))
+      try { localStorage.setItem(lsKey, JSON.stringify(next)) } catch {}
+      return next
+    })
+  }
+
   const FUNCIONES = ['POS', 'Kiosko', 'KDS', 'Otro']
 
   return (
@@ -242,18 +259,39 @@ export function GenerarContratoButton({
                 </div>
 
                 {/* Inventario de equipos */}
-                {equipment.length > 0 && (
-                  <div>
-                    <p className="text-[10px] font-semibold text-zinc-400 uppercase tracking-widest mb-3">
-                      Inventario de equipos <span className="font-normal normal-case tracking-normal">(Anexo III)</span>
-                    </p>
+                <div>
+                    <div className="flex items-center justify-between mb-3">
+                      <p className="text-[10px] font-semibold text-zinc-400 uppercase tracking-widest">
+                        Inventario de equipos <span className="font-normal normal-case tracking-normal">(Anexo III)</span>
+                      </p>
+                      <button
+                        type="button"
+                        onClick={addEquipmentRow}
+                        className="inline-flex items-center gap-1 text-[11px] font-medium text-blue-600 hover:text-blue-800 transition-colors"
+                      >
+                        <svg className="w-3 h-3" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="2"><path d="M6 1v10M1 6h10" strokeLinecap="round"/></svg>
+                        Añadir equipo
+                      </button>
+                    </div>
+                    {equipment.length === 0 && (
+                      <p className="text-xs text-zinc-400 text-center py-4 border border-dashed border-zinc-200 rounded-xl">Sin equipos — pulsa «Añadir equipo» para registrar dispositivos</p>
+                    )}
                     <div className="space-y-3">
                       {equipment.map(row => (
                         <div key={row.n} className="border border-zinc-100 rounded-xl px-4 py-3 bg-zinc-50/50">
                           <div className="flex items-center gap-2 mb-3">
                             <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-zinc-200 text-zinc-600 text-[10px] font-bold">{row.n}</span>
-                            <span className="text-xs font-semibold text-zinc-800">{row.tipo}</span>
-                            {row.cuotaMensual && <span className="ml-auto text-[10px] text-zinc-400">{row.cuotaMensual} €/mes</span>}
+                            <input
+                              type="text"
+                              value={row.tipo}
+                              onChange={e => updateEquipment(row.n, 'tipo', e.target.value)}
+                              placeholder="Tipo / Descripción"
+                              className="flex-1 text-xs font-semibold border-0 bg-transparent focus:outline-none text-zinc-800 placeholder:text-zinc-400"
+                            />
+                            {row.cuotaMensual && <span className="text-[10px] text-zinc-400">{row.cuotaMensual} €/mes</span>}
+                            <button type="button" onClick={() => removeEquipmentRow(row.n)} className="text-zinc-300 hover:text-red-400 transition-colors ml-1">
+                              <svg className="w-3.5 h-3.5" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="2"><path d="M2 2l10 10M12 2L2 12" strokeLinecap="round"/></svg>
+                            </button>
                           </div>
                           <div className="grid grid-cols-2 gap-2.5">
                             <div>
@@ -320,8 +358,7 @@ export function GenerarContratoButton({
                         </div>
                       ))}
                     </div>
-                  </div>
-                )}
+                </div>
 
                 {/* Error / success */}
                 {error   && <p className="text-xs text-red-600 bg-red-50 border border-red-100 rounded-lg px-3 py-2">{error}</p>}
