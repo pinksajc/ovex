@@ -37,7 +37,7 @@ export async function GET(req: Request) {
       return NextResponse.json({ error: 'Presupuesto not found' }, { status: 404 })
     }
 
-    // Load deal contact data if linked
+    // Load deal data — overrides presupuesto's client fields with latest deal info
     let contactName: string | null = null
     let contactEmail: string | null = null
     if (presupuesto.dealId) {
@@ -46,6 +46,10 @@ export async function GET(req: Request) {
       if (deal) {
         contactName  = deal.contact.name  || null
         contactEmail = deal.contact.email || null
+        // Override presupuesto client fields with latest deal company data
+        if (deal.company.name)    presupuesto.clientName    = deal.company.name
+        if (deal.company.cif)     presupuesto.clientCif     = deal.company.cif
+        if (deal.company.address) presupuesto.clientAddress = deal.company.address
       }
     }
 
