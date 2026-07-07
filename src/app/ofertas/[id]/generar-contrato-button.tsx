@@ -335,7 +335,7 @@ export function GenerarContratoButton({
                                 {FUNCIONES.map(f => <option key={f}>{f}</option>)}
                               </select>
                             </div>
-                            <div className="col-span-2">
+                            <div>
                               <label className="block text-[10px] text-zinc-500 mb-1">Origen</label>
                               <div className="flex gap-2">
                                 {(['Platomico', 'Cliente'] as const).map(o => (
@@ -353,6 +353,31 @@ export function GenerarContratoButton({
                                   </button>
                                 ))}
                               </div>
+                            </div>
+                            <div>
+                              <label className="block text-[10px] text-zinc-500 mb-1">Modalidad</label>
+                              <select
+                                value={row.cuotaMensual.startsWith('__') ? row.cuotaMensual : (row.cuotaMensual === 'Vendido' || row.cuotaMensual === '' ? row.cuotaMensual || 'Vendido' : '__custom')}
+                                onChange={e => {
+                                  const v = e.target.value
+                                  if (v === 'Vendido' || v === 'Comodato') updateEquipment(row.n, 'cuotaMensual', v)
+                                  else updateEquipment(row.n, 'cuotaMensual', '')
+                                }}
+                                className="w-full text-xs border border-zinc-200 rounded-lg px-2.5 py-1.5 bg-white focus:outline-none focus:ring-1 focus:ring-blue-400/50 focus:border-blue-300"
+                              >
+                                <option value="Vendido">Vendido</option>
+                                <option value="Comodato">Comodato (se devuelve)</option>
+                                <option value="__custom">Cuota mensual (€)</option>
+                              </select>
+                              {row.cuotaMensual !== 'Vendido' && row.cuotaMensual !== 'Comodato' && (
+                                <input
+                                  type="text"
+                                  value={row.cuotaMensual}
+                                  onChange={e => updateEquipment(row.n, 'cuotaMensual', e.target.value)}
+                                  placeholder="ej: 29.00 €/mes"
+                                  className="w-full mt-1.5 text-xs border border-zinc-200 rounded-lg px-2.5 py-1.5 bg-white focus:outline-none focus:ring-1 focus:ring-blue-400/50 focus:border-blue-300"
+                                />
+                              )}
                             </div>
                           </div>
                         </div>

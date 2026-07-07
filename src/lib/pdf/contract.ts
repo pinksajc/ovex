@@ -1057,7 +1057,7 @@ export async function generateContractPdf(
         <td>${ph(r.serie)}</td>
         <td>${ph(r.funcion)}</td>
         <td>${esc(r.origen) || '<span style="color:#94a3b8">Platomico</span>'}</td>
-        <td>${r.cuotaMensual || '<span style="color:#94a3b8">Vendido</span>'}</td>
+        <td>${r.cuotaMensual === 'Comodato' ? '<span style="color:#0369a1">Comodato</span>' : r.cuotaMensual === 'Vendido' || !r.cuotaMensual ? '<span style="color:#94a3b8">Vendido</span>' : esc(r.cuotaMensual)}</td>
       </tr>`).join('')}
     </tbody>
   </table>`
