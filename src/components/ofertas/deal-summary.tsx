@@ -55,10 +55,13 @@ export function DealSummary({ lineItems, dealType, locationCount = 0 }: Props) {
   const serviceLines = lineItems.filter(
     (l) => l.type === 'line' && !IGNORE_IDS.has(l.serviceId ?? ''),
   )
+  const otherLines = toRows(lineItems.filter(
+    (l) => l.type === 'line' && IGNORE_IDS.has(l.serviceId ?? ''),
+  ))
   const fixedLines    = toRows(serviceLines.filter((l) => !VARIABLE_IDS.has(l.serviceId ?? '')))
   const variableLines = toRows(serviceLines.filter((l) =>  VARIABLE_IDS.has(l.serviceId ?? '')))
 
-  if (fixedLines.length === 0 && variableLines.length === 0) return null
+  if (fixedLines.length === 0 && variableLines.length === 0 && otherLines.length === 0) return null
 
   const totalFixed   = fixedLines.reduce((s, l) => s + l.amount, 0)
   const feePerOrder  = variableLines.reduce((s, l) => s + l.unitPrice, 0)
@@ -150,6 +153,25 @@ export function DealSummary({ lineItems, dealType, locationCount = 0 }: Props) {
           </div>
         )}
       </div>
+
+      {/* ── Other / one-off lines ──────────────────────────────────────── */}
+      {otherLines.length > 0 && (
+        <div className="mt-4 pt-4 border-t border-zinc-100">
+          <p className="text-[10px] font-semibold text-zinc-400 uppercase tracking-widest mb-2.5">
+            Otros
+          </p>
+          <div className="space-y-1.5">
+            {otherLines.map((l) => (
+              <div key={l.id} className="flex items-baseline justify-between gap-2">
+                <span className="text-xs text-zinc-700 truncate">{l.description}</span>
+                <span className="text-xs font-mono text-zinc-900 shrink-0 tabular-nums">
+                  {formatEur(l.amount)}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* ── Summary totals (Mixto only) ────────────────────────────────── */}
       {isMixed && (
