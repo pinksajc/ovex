@@ -42,7 +42,11 @@ export async function GET(req: Request) {
     let contactEmail: string | null = null
     if (presupuesto.dealId) {
       const { getDealById } = await import('@/lib/supabase/deals')
-      const deal = await getDealById(presupuesto.dealId).catch(() => null)
+      const { getContactOverridesForDeals } = await import('@/lib/supabase/contact-overrides')
+      const [deal, overridesMap] = await Promise.all([
+        getDealById(presupuesto.dealId).catch(() => null),
+        getContactOverridesForDeals([presupuesto.dealId]).catch(() => new Map()),
+      ])
       if (deal) {
         contactName  = deal.contact.name  || null
         contactEmail = deal.contact.email || null
@@ -50,6 +54,13 @@ export async function GET(req: Request) {
         if (deal.company.name)    presupuesto.clientName    = deal.company.name
         if (deal.company.cif)     presupuesto.clientCif     = deal.company.cif
         if (deal.company.address) presupuesto.clientAddress = deal.company.address
+      }
+      // contact_overrides table takes precedence over deal row (user edits saved there)
+      const override = overridesMap.get(presupuesto.dealId)
+      if (override) {
+        const overrideName = `${override.firstName} ${override.lastName}`.trim()
+        if (overrideName) contactName = overrideName
+        if (override.email) contactEmail = override.email
       }
     }
 
