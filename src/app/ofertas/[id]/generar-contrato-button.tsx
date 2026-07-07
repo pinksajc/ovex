@@ -357,7 +357,7 @@ export function GenerarContratoButton({
                             <div>
                               <label className="block text-[10px] text-zinc-500 mb-1">Modalidad</label>
                               <select
-                                value={row.cuotaMensual.startsWith('__') ? row.cuotaMensual : (row.cuotaMensual === 'Vendido' || row.cuotaMensual === '' ? row.cuotaMensual || 'Vendido' : '__custom')}
+                                value={row.cuotaMensual === 'Comodato' ? 'Comodato' : (row.cuotaMensual === 'Vendido' || row.cuotaMensual === '') ? 'Vendido' : '__custom'}
                                 onChange={e => {
                                   const v = e.target.value
                                   if (v === 'Vendido' || v === 'Comodato') updateEquipment(row.n, 'cuotaMensual', v)
