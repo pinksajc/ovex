@@ -70,7 +70,11 @@ export const SERVICES: ServiceItem[] = [
   { id: 'lenovo_sold', label: 'Tablet Lenovo M11 — Vendido', group: 'HARDWARE', unit: 'ud', defaultPrice: 0, priceEditable: true },
   { id: 'tablet_custom', label: 'Tablet', group: 'HARDWARE', unit: 'ud', defaultPrice: 0, priceEditable: true },
   { id: 'bouncepad', label: 'Bouncepad Kiosk — Vendido', group: 'HARDWARE', unit: 'ud', defaultPrice: 200 },
+  { id: 'bouncepad_comodato', label: 'Bouncepad Kiosk — Comodato', group: 'HARDWARE', unit: 'ud/mes', defaultPrice: 0, priceEditable: true },
   { id: 'counter_stand', label: 'Counter Stand — Vendido', group: 'HARDWARE', unit: 'ud', defaultPrice: 120 },
+  { id: 'counter_stand_comodato', label: 'Counter Stand — Comodato', group: 'HARDWARE', unit: 'ud/mes', defaultPrice: 0, priceEditable: true },
+  { id: 'xiaomi_redmi_pad_comodato', label: 'Tablet Xiaomi REDMI Pad — Comodato', group: 'HARDWARE', unit: 'ud/mes', defaultPrice: 0, priceEditable: true },
+  { id: 'xiaomi_redmi_pad_sold', label: 'Tablet Xiaomi REDMI Pad — Vendido', group: 'HARDWARE', unit: 'ud', defaultPrice: 0, priceEditable: true },
 
   // ---- WHISPR ----
   { id: 'whispr_starter',       label: 'Whispr Starter',              group: 'WHISPR', unit: 'mes', defaultPrice: 49 },
