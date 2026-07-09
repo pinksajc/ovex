@@ -31,6 +31,12 @@ function fmt(n: number): string {
   return new Intl.NumberFormat('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n)
 }
 
+function fmtQty(n: number): string {
+  return Number.isInteger(n)
+    ? String(n)
+    : new Intl.NumberFormat('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n)
+}
+
 function fmtDate(s: string | null): string {
   if (!s) return '—'
   return new Date(s).toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' })
@@ -62,7 +68,7 @@ function renderLineRows(items: InvoiceLineItem[]): string {
           ${item.period ? `<div style="font-size:8px;color:#94a3b8;margin-top:2px;">${esc(item.period)}</div>` : ''}
           ${dto > 0 && item.discountName ? `<div style="font-size:8px;color:#10b981;margin-top:2px;font-weight:600;">${esc(item.discountName)}</div>` : ''}
         </td>
-        <td class="right">${fmt(item.quantity)}</td>
+        <td class="right">${fmtQty(item.quantity)}</td>
         <td class="right">${fmt(item.unitPrice)} €</td>
         <td class="right" style="font-weight:600;">
           ${dto > 0 ? `<span style="text-decoration:line-through;color:#94a3b8;font-weight:400;font-size:8.5px;">${fmt(originalAmount)} €</span><br/>` : ''}
