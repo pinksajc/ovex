@@ -253,13 +253,18 @@ export default async function DealPage({
           <div className="divide-y divide-zinc-50">
             {presupuestos.map((p) => (
               <div key={p.id} className="flex items-center justify-between py-2.5">
-                <div className="flex items-center gap-3">
-                  <Link href={`/ofertas/${p.id}`} className="text-xs font-mono font-semibold text-zinc-800 hover:text-blue-700 transition-colors">
+                <div className="flex items-center gap-3 min-w-0">
+                  <Link href={`/ofertas/${p.id}`} className="text-xs font-mono font-semibold text-zinc-800 hover:text-blue-700 transition-colors shrink-0">
                     {p.number}
                   </Link>
-                  <span className={`text-[10px] font-semibold uppercase tracking-wide px-2 py-0.5 rounded-full ${PRESUPUESTO_STATUS_COLORS[p.status]}`}>
+                  <span className={`text-[10px] font-semibold uppercase tracking-wide px-2 py-0.5 rounded-full shrink-0 ${PRESUPUESTO_STATUS_COLORS[p.status]}`}>
                     {PRESUPUESTO_STATUS_LABELS[p.status]}
                   </span>
+                  {p.concept && (
+                    <span className="text-[10px] text-zinc-500 truncate" title={p.concept}>
+                      {p.concept}
+                    </span>
+                  )}
                   {/* Contract indicator — only shown for accepted offers */}
                   {p.status === 'accepted' && (
                     <span
