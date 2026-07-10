@@ -23,7 +23,7 @@ export async function createPresupuestoAction(input: CreatePresupuestoInput): Pr
 
     revalidatePath('/ofertas')
     revalidatePath('/deals')
-    revalidateTag('attio-deals')
+    revalidateTag('attio-deals', 'max')
     redirect(`/ofertas/${presupuesto.id}`)
   } catch (err) {
     // redirect() throws internally — rethrow it
@@ -42,7 +42,7 @@ export async function updatePresupuestoAction(
     revalidatePath('/ofertas')
     revalidatePath(`/ofertas/${id}`)
     revalidatePath('/deals')
-    revalidateTag('attio-deals')
+    revalidateTag('attio-deals', 'max')
     redirect(`/ofertas/${id}`)
   } catch (err) {
     if (isRedirectError(err)) throw err
@@ -61,7 +61,7 @@ export async function updatePresupuestoStatusAction(
     revalidatePath('/ofertas')
     revalidatePath(`/ofertas/${id}`)
     revalidatePath('/deals')
-    revalidateTag('attio-deals')
+    revalidateTag('attio-deals', 'max')
     return { ok: true }
   } catch (err) {
     return { ok: false, error: (err as { message?: string })?.message ?? 'Error desconocido' }
@@ -95,7 +95,7 @@ export async function createVersionAction(
     revalidatePath('/ofertas')
     revalidatePath(`/ofertas/${presupuestoId}`)
     revalidatePath('/deals')
-    revalidateTag('attio-deals')
+    revalidateTag('attio-deals', 'max')
     return { ok: true, id: newPq.id }
   } catch (err) {
     return { ok: false, error: (err as { message?: string })?.message ?? 'Error desconocido' }
@@ -110,7 +110,7 @@ export async function deletePresupuestoAction(
     await deletePresupuesto(id)
     revalidatePath('/ofertas')
     revalidatePath('/deals')
-    revalidateTag('attio-deals')
+    revalidateTag('attio-deals', 'max')
     return { ok: true }
   } catch (err) {
     return { ok: false, error: (err as { message?: string })?.message ?? 'Error desconocido' }
@@ -150,7 +150,7 @@ export async function acceptContratoAction(
     revalidatePath('/ofertas')
     revalidatePath(`/ofertas/${id}`)
     revalidatePath('/deals')
-    revalidateTag('attio-deals')
+    revalidateTag('attio-deals', 'max')
     return { ok: true }
   } catch (err) {
     return { ok: false, error: (err as { message?: string })?.message ?? 'Error desconocido' }
