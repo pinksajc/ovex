@@ -174,7 +174,7 @@ export async function GET() {
     <div class="kpi">
       <div class="kpi-label">MRR Actual</div>
       <div class="kpi-value blue">${fmt(totalMrr)}</div>
-      <div class="kpi-sub">${closedRows.filter(r => r.mrr > 0).length} clientes con factura</div>
+      <div class="kpi-sub">${closedRows.filter(r => r.mrrSource === 'invoice').length} facturando · ${closedRows.filter(r => r.mrrSource === 'offer').length} estimados</div>
     </div>
     <div class="kpi">
       <div class="kpi-label">Total facturado</div>
