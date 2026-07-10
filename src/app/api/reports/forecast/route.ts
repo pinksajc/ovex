@@ -20,12 +20,15 @@ export async function GET() {
   const { getDeals } = await import('@/lib/deals')
   const { getInvoices } = await import('@/lib/supabase/invoices')
   const { getPresupuestos } = await import('@/lib/supabase/presupuestos')
+  const { getLocationCountsByDeal } = await import('@/lib/supabase/company-locations')
 
   const [deals, invoices, presupuestos] = await Promise.all([
     getDeals(user),
     getInvoices(),
     getPresupuestos(),
   ])
+
+  const locationCountMap = await getLocationCountsByDeal(deals.map((d) => d.id)).catch(() => new Map<string, number>())
 
   const now = new Date()
   const todayStr = now.toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' })
@@ -76,6 +79,7 @@ export async function GET() {
       mrr,
       mrrSource,
       missingVariable,
+      locales: locationCountMap.get(d.id) ?? 0,
       lastInvoice: inv?.number ?? '—',
       contractStart: offer?.contractStartDate ?? null,
       offerNumber: offer?.number ?? '—',
@@ -84,6 +88,7 @@ export async function GET() {
 
   const totalMrr = closedRows.reduce((s, r) => s + r.mrr, 0)
   const proj3m = totalMrr * 3
+  const localesHoy = closedRows.reduce((s, r) => s + r.locales, 0)
 
   // ── Pipeline 75%+ ─────────────────────────────────────────────────────────
   const pipelineDeals = deals.filter((d) =>
@@ -109,11 +114,13 @@ export async function GET() {
       offerTotal: bestOffer?.amountTotal ?? 0,
       concept: bestOffer?.concept ?? '—',
       missingVariable: bestOffer?.hasVariable ?? false,
+      locales: locationCountMap.get(d.id) ?? 0,
     }
   }).sort((a, b) => b.probability - a.probability || b.offerMrr - a.offerMrr)
 
   const pipelinePotentialMrr = pipelineRows.reduce((s, r) => s + r.offerMrr, 0)
   const weightedMrr = pipelineRows.reduce((s, r) => s + r.offerMrr * (r.probability / 100), 0)
+  const localesPipeline = pipelineRows.reduce((s, r) => s + r.locales, 0)
 
   // ── Total invoiced ─────────────────────────────────────────────────────────
   const totalInvoiced = invoices
@@ -199,6 +206,21 @@ export async function GET() {
       <div class="kpi-value blue">${fmt(proj3m + weightedMrr * 3)}</div>
       <div class="kpi-sub">actuales + pipeline ponderado por prob.</div>
     </div>
+    <div class="kpi">
+      <div class="kpi-label">Locales hoy</div>
+      <div class="kpi-value">${localesHoy}</div>
+      <div class="kpi-sub">clientes activos</div>
+    </div>
+    <div class="kpi">
+      <div class="kpi-label">Locales potenciales</div>
+      <div class="kpi-value amber">+${localesPipeline}</div>
+      <div class="kpi-sub">en pipeline ≥75% / negociación</div>
+    </div>
+    <div class="kpi">
+      <div class="kpi-label">Locales en 3 meses</div>
+      <div class="kpi-value">${localesHoy} → ${localesHoy + localesPipeline}</div>
+      <div class="kpi-sub">si se cierra el pipeline</div>
+    </div>
   </div>
 </div>
 
@@ -213,6 +235,7 @@ export async function GET() {
         <th>Cliente</th>
         <th>Comercial</th>
         <th>Inicio contrato</th>
+        <th style="text-align:center">Locales</th>
         <th>Última factura</th>
         <th style="text-align:right">MRR</th>
         <th style="text-align:right">Proyección 3m</th>
@@ -227,6 +250,7 @@ export async function GET() {
         </td>
         <td class="muted">${r.owner}</td>
         <td class="mono muted">${fmtDate(r.contractStart)}</td>
+        <td class="mono" style="text-align:center">${r.locales || '—'}</td>
         <td class="mono muted">${r.lastInvoice}</td>
         <td class="mono bold" style="text-align:right">
           ${r.mrrSource === 'none'
@@ -237,7 +261,9 @@ export async function GET() {
         <td class="mono" style="text-align:right">${r.mrr > 0 ? fmt(r.mrr * 3) : '—'}</td>
       </tr>`).join('')}
       <tr class="total-row">
-        <td colspan="4">TOTAL</td>
+        <td colspan="3">TOTAL</td>
+        <td class="mono" style="text-align:center">${localesHoy}</td>
+        <td></td>
         <td class="mono" style="text-align:right">${fmt(totalMrr)}</td>
         <td class="mono" style="text-align:right">${fmt(proj3m)}</td>
       </tr>
@@ -258,13 +284,14 @@ export async function GET() {
         <th>Prob.</th>
         <th>Comercial</th>
         <th>Servicio</th>
+        <th style="text-align:center">Locales</th>
         <th style="text-align:right">MRR oferta</th>
         <th style="text-align:right">MRR ponderado</th>
       </tr>
     </thead>
     <tbody>
       ${pipelineRows.length === 0
-        ? `<tr><td colspan="7" class="muted" style="text-align:center;padding:24px">No hay deals en negociación o con probabilidad ≥75%</td></tr>`
+        ? `<tr><td colspan="8" class="muted" style="text-align:center;padding:24px">No hay deals en negociación o con probabilidad ≥75%</td></tr>`
         : pipelineRows.map(r => {
           const tagClass = r.stage === 'Negociación' ? 'tag-purple' : r.stage === 'Propuesta enviada' ? 'tag-blue' : 'tag-amber'
           return `
@@ -277,6 +304,7 @@ export async function GET() {
             <td class="mono bold">${r.probability}%</td>
             <td class="muted">${r.owner}</td>
             <td class="muted">${r.concept}</td>
+            <td class="mono" style="text-align:center">${r.locales || '—'}</td>
             <td class="mono" style="text-align:right">
               ${r.offerMrr > 0 ? fmt(r.offerMrr) : '<span class="muted">Sin oferta</span>'}
               ${r.missingVariable ? '<div style="font-size:10px;color:#dc2626;font-weight:600;margin-top:2px">⚠ Falta variable ROS</div>' : ''}
@@ -288,6 +316,7 @@ export async function GET() {
       ${pipelineRows.length > 0 ? `
       <tr class="total-row">
         <td colspan="5">TOTAL PIPELINE</td>
+        <td class="mono" style="text-align:center">${localesPipeline}</td>
         <td class="mono" style="text-align:right">${fmt(pipelinePotentialMrr)}</td>
         <td class="mono" style="text-align:right">${fmt(weightedMrr)}</td>
       </tr>` : ''}
