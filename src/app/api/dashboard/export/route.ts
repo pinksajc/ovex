@@ -106,7 +106,7 @@ export async function GET() {
         .reduce((s, l) => s + ((l as {amount?: number}).amount ?? 0), 0) * vatMult
       const hasVariable = p.lineItems.some((l) =>
         l.type === 'line' &&
-        ['ros_starter_variable','ros_growth_variable','ros_pro_variable','ren','addon_delivery_adic_start','addon_delivery_adic_go','addon_delivery_adic_pro','datafono'].includes((l as {serviceId?: string}).serviceId ?? '') &&
+        ['ros_starter_variable','ros_growth_variable','ros_pro_variable','ren'].includes((l as {serviceId?: string}).serviceId ?? '') &&
         ((l as {quantity?: number}).quantity ?? 0) === 0
       )
 

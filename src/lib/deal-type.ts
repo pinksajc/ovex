@@ -23,6 +23,29 @@ export const VARIABLE_IDS = new Set([
 ])
 
 /**
+ * Subset of VARIABLE_IDS that represent optional overage fees (only charged
+ * when a delivery volume threshold is exceeded). These are NOT shown as
+ * "+ variable" in the pipeline — they are conditional, not structural.
+ */
+export const OVERAGE_IDS = new Set([
+  'addon_delivery_adic_start',
+  'addon_delivery_adic_go',
+  'addon_delivery_adic_pro',
+  'datafono',
+])
+
+/**
+ * True variable IDs: per-order fees that are a core structural part of pricing.
+ * Only these trigger the "+ variable" indicator in the pipeline.
+ */
+export const CORE_VARIABLE_IDS = new Set([
+  'ros_starter_variable',
+  'ros_growth_variable',
+  'ros_pro_variable',
+  'ren',
+])
+
+/**
  * Service IDs that should be excluded from classification
  * (one-off travel costs, fully custom lines with no inherent nature).
  */

@@ -286,7 +286,7 @@ async function getDealsFromSupabase(ownerId?: string): Promise<Deal[]> {
   const { listDeals } = await import('./supabase/deals')
   const { getBatchActiveConfigsForDeals } = await import('./supabase/configs')
   const { getSupabaseClient } = await import('./supabase/client')
-  const { VARIABLE_IDS } = await import('./deal-type')
+  const { VARIABLE_IDS, CORE_VARIABLE_IDS } = await import('./deal-type')
 
   const baseDeals = await listDeals(ownerId)
   if (baseDeals.length === 0) return []
@@ -353,7 +353,7 @@ async function getDealsFromSupabase(ownerId?: string): Promise<Deal[]> {
         typeof row.line_items === 'string' ? JSON.parse(row.line_items) : (row.line_items as typeof lines ?? [])
       const serviceLines = lines.filter((l) => l.type === 'line')
       const hasVariable = serviceLines.some(
-        (l) => VARIABLE_IDS.has(l.serviceId ?? '') && ((l.quantity ?? 0) === 0 || (l.amount ?? 0) === 0)
+        (l) => CORE_VARIABLE_IDS.has(l.serviceId ?? '') && ((l.quantity ?? 0) === 0 || (l.amount ?? 0) === 0)
       )
       const vatMultiplier = 1 + (row.vat_rate ?? 21) / 100
       const fixedMonthly = serviceLines
