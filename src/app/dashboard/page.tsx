@@ -1,11 +1,11 @@
 import { getCurrentUser } from '@/lib/auth'
-import { getDeals, getActiveConfig } from '@/lib/deals'
+import { getDeals } from '@/lib/deals'
 import { getInvoices } from '@/lib/supabase/invoices'
 import { getPresupuestos, getPendingBillingPresupuestos } from '@/lib/supabase/presupuestos'
+import { getLocationCountsByDeal } from '@/lib/supabase/company-locations'
 import { formatCurrency } from '@/lib/format'
 import { BillingChart } from './billing-chart'
 import Link from 'next/link'
-import type { Deal } from '@/types'
 
 // Dashboard aggregates data that doesn't change in real time — revalidate every
 // 60 s for a balance of freshness vs. server load.
@@ -51,14 +51,19 @@ export default async function DashboardPage() {
     getPendingBillingPresupuestos(),
   ])
 
+  const dealIds = deals.map((d) => d.id)
+  const locationCountMap = await getLocationCountsByDeal(dealIds).catch(() => new Map<string, number>())
+  const totalLocations = Array.from(locationCountMap.values()).reduce((s, n) => s + n, 0)
+
+  // helper: sum fixedMonthly across all offer chains for a deal
+  function dealMrr(d: (typeof deals)[0]): number {
+    return (d.latestOffers ?? []).reduce((s, o) => s + o.fixedMonthly, 0)
+  }
+
   // ── Section 1: KPIs ────────────────────────────────────────────────────────
-  const pipelineDeals = deals.filter(
-    (d) => d.stage !== 'closed_lost' && d.stage !== 'rejected',
-  )
-  const mrr = pipelineDeals.reduce(
-    (s, d) => s + (getActiveConfig(d)?.economics.totalMonthlyRevenue ?? 0),
-    0,
-  )
+  // MRR = accepted deals only (closed_won with accepted offers preferred, else sent)
+  const closedWonDeals = deals.filter((d) => d.stage === 'closed_won')
+  const mrr = closedWonDeals.reduce((s, d) => s + dealMrr(d), 0)
   const arr = mrr * 12
 
   const now       = new Date()
@@ -96,10 +101,7 @@ export default async function DashboardPage() {
       stage,
       label: STAGE_LABELS[stage],
       count: stageDeals.length,
-      mrr: stageDeals.reduce(
-        (s, d) => s + (getActiveConfig(d)?.economics.totalMonthlyRevenue ?? 0),
-        0,
-      ),
+      mrr: stageDeals.reduce((s, d) => s + dealMrr(d), 0),
       color: STAGE_COLORS[stage],
     }
   })
@@ -112,9 +114,8 @@ export default async function DashboardPage() {
   const convBase   = pqSent.length + pqRejected.length
   const convRate   = convBase > 0 ? (pqAccepted.length / convBase) * 100 : 0
 
-  const closedWon   = deals.filter((d) => d.stage === 'closed_won')
-  const mrrMedioWon = closedWon.length > 0
-    ? closedWon.reduce((s, d) => s + (getActiveConfig(d)?.economics.totalMonthlyRevenue ?? 0), 0) / closedWon.length
+  const mrrMedioWon = closedWonDeals.length > 0
+    ? closedWonDeals.reduce((s, d) => s + dealMrr(d), 0) / closedWonDeals.length
     : 0
 
   // ── Section 4: Owners leaderboard ─────────────────────────────────────────
@@ -124,7 +125,7 @@ export default async function DashboardPage() {
     const name = deal.owner || 'Sin asignar'
     const rec  = ownerMap.get(key) ?? { name, count: 0, mrr: 0 }
     rec.count += 1
-    rec.mrr   += getActiveConfig(deal)?.economics.totalMonthlyRevenue ?? 0
+    rec.mrr   += dealMrr(deal)
     ownerMap.set(key, rec)
   }
   const owners = Array.from(ownerMap.values()).sort((a, b) => b.mrr - a.mrr)
@@ -134,17 +135,26 @@ export default async function DashboardPage() {
     <div className="min-h-full bg-[#f5f5f7] p-8 space-y-5">
 
       {/* Header */}
-      <div className="mb-2">
-        <h1 className="text-2xl font-bold text-zinc-900 tracking-tight">Dashboard</h1>
-        <p className="text-sm text-zinc-400 mt-0.5">
-          {now.toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
-        </p>
+      <div className="mb-2 flex items-start justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-zinc-900 tracking-tight">Dashboard</h1>
+          <p className="text-sm text-zinc-400 mt-0.5">
+            {now.toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
+          </p>
+        </div>
+        <a
+          href="/api/dashboard/export"
+          className="text-xs font-semibold border border-zinc-200 text-zinc-600 hover:text-zinc-900 hover:border-zinc-400 px-3 py-1.5 rounded-lg transition-colors"
+        >
+          Descargar informe →
+        </a>
       </div>
 
       {/* ── Section 1: KPI strip ── */}
-      <div className="grid grid-cols-5 gap-4">
-        <KpiCard label="MRR" value={formatCurrency(mrr)} color="#0071e3" />
+      <div className="grid grid-cols-6 gap-4">
+        <KpiCard label="MRR" value={formatCurrency(mrr)} color="#0071e3" sub="clientes activos" />
         <KpiCard label="ARR" value={formatCurrency(arr)} color="#0071e3" />
+        <KpiCard label="Localizaciones" value={String(totalLocations)} color="#8e8e93" sub={`en ${closedWonDeals.length} clientes`} />
         <KpiCard label="Facturado este mes" value={formatCurrency(facturacionMes)} color="#8e8e93" />
         <KpiCard label="Cobrado este mes" value={formatCurrency(cobradoMes)} color="#34c759" />
         <KpiCard label="Pendiente de cobro" value={formatCurrency(pendiente)} color={pendiente > 0 ? '#ff9f0a' : '#8e8e93'} />
@@ -367,10 +377,12 @@ function KpiCard({
   label,
   value,
   color = '#18181b',
+  sub,
 }: {
   label: string
   value: string
   color?: string
+  sub?: string
 }) {
   return (
     <div className="bg-white rounded-2xl shadow-sm p-5">
@@ -380,6 +392,7 @@ function KpiCard({
       <p className="text-2xl font-bold tracking-tight" style={{ color }}>
         {value}
       </p>
+      {sub && <p className="text-[10px] text-zinc-400 mt-1">{sub}</p>}
     </div>
   )
 }

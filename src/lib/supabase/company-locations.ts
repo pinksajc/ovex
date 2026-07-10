@@ -77,3 +77,17 @@ export async function deleteLocation(id: string): Promise<void> {
   const { error } = await table().delete().eq('id', id)
   if (error) throw new Error(`deleteLocation: ${error.message}`)
 }
+
+/** Returns a Map<dealId, locationCount> for a batch of deal IDs. */
+export async function getLocationCountsByDeal(dealIds: string[]): Promise<Map<string, number>> {
+  if (dealIds.length === 0) return new Map()
+  const { data, error } = await table()
+    .select('deal_id')
+    .in('deal_id', dealIds) as { data: { deal_id: string }[] | null; error: unknown }
+  if (error) return new Map()
+  const map = new Map<string, number>()
+  for (const row of data ?? []) {
+    map.set(row.deal_id, (map.get(row.deal_id) ?? 0) + 1)
+  }
+  return map
+}
