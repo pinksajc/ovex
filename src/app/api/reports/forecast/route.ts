@@ -136,45 +136,47 @@ export async function GET() {
 <title>Informe Forecast — Platomico</title>
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
-  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; font-size: 13px; color: #18181b; background: #fff; padding: 48px; }
-  h1 { font-size: 26px; font-weight: 700; letter-spacing: -0.5px; }
-  .meta { color: #71717a; font-size: 12px; margin-top: 4px; }
-  .section { margin-top: 40px; }
-  .section-title { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 1.5px; color: #a1a1aa; margin-bottom: 16px; }
-  .kpi-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 32px; }
-  .kpi { background: #f4f4f5; border-radius: 12px; padding: 16px 20px; }
-  .kpi-label { font-size: 10px; text-transform: uppercase; letter-spacing: 1px; color: #71717a; margin-bottom: 6px; }
-  .kpi-value { font-size: 22px; font-weight: 700; letter-spacing: -0.5px; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; font-size: 11px; line-height: 1.4; color: #27272a; background: #fff; padding: 40px 44px; }
+  h1 { font-size: 19px; font-weight: 650; letter-spacing: -0.3px; }
+  .meta { color: #a1a1aa; font-size: 10px; margin-top: 3px; }
+  .section { margin-top: 28px; }
+  .section-title { font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 1.2px; color: #a1a1aa; margin-bottom: 12px; }
+  .kpi-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 10px; }
+  .kpi { background: #fafafa; border: 1px solid #f0f0f0; border-radius: 9px; padding: 11px 13px; }
+  .kpi-label { font-size: 8.5px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.7px; color: #a1a1aa; margin-bottom: 5px; }
+  .kpi-value { font-size: 16px; font-weight: 650; letter-spacing: -0.3px; }
   .kpi-value.blue { color: #0071e3; }
   .kpi-value.green { color: #16a34a; }
   .kpi-value.amber { color: #d97706; }
-  .kpi-sub { font-size: 10px; color: #a1a1aa; margin-top: 3px; }
+  .kpi-sub { font-size: 8.5px; color: #a1a1aa; margin-top: 2px; line-height: 1.3; }
   table { width: 100%; border-collapse: collapse; }
-  th { font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.8px; color: #a1a1aa; padding: 8px 12px; text-align: left; border-bottom: 1px solid #e4e4e7; }
-  td { padding: 10px 12px; border-bottom: 1px solid #f4f4f5; vertical-align: middle; }
+  th { font-size: 8px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.6px; color: #a1a1aa; padding: 6px 10px; text-align: left; border-bottom: 1px solid #e4e4e7; }
+  td { padding: 7px 10px; border-bottom: 1px solid #f4f4f5; vertical-align: middle; font-size: 10.5px; }
+  tr { page-break-inside: avoid; }
   tr:last-child td { border-bottom: none; }
-  .mono { font-family: 'SF Mono', 'Fira Code', monospace; }
+  .mono { font-family: 'SF Mono', 'Fira Code', monospace; font-size: 10px; }
   .bold { font-weight: 600; }
   .muted { color: #a1a1aa; }
-  .tag { display: inline-block; font-size: 10px; font-weight: 600; padding: 2px 8px; border-radius: 999px; }
+  .tag { display: inline-block; font-size: 8.5px; font-weight: 600; padding: 1.5px 7px; border-radius: 999px; }
   .tag-green { background: #dcfce7; color: #15803d; }
   .tag-blue { background: #dbeafe; color: #1d4ed8; }
   .tag-amber { background: #fef3c7; color: #92400e; }
   .tag-purple { background: #ede9fe; color: #6d28d9; }
-  .total-row td { font-weight: 700; background: #f4f4f5; border-top: 2px solid #e4e4e7; }
-  .divider { border: none; border-top: 1px solid #e4e4e7; margin: 32px 0; }
-  .note { font-size: 11px; color: #71717a; margin-top: 12px; }
+  .total-row td { font-weight: 700; background: #fafafa; border-top: 1.5px solid #e4e4e7; font-size: 10.5px; }
+  .divider { border: none; border-top: 1px solid #e4e4e7; margin: 24px 0; }
+  .note { font-size: 9px; color: #a1a1aa; margin-top: 10px; }
   .download-btn {
-    position: fixed; top: 24px; right: 24px; z-index: 100;
+    position: fixed; top: 20px; right: 20px; z-index: 100;
     background: #18181b; color: #fff; border: none; cursor: pointer;
-    font-size: 13px; font-weight: 600; padding: 10px 18px; border-radius: 10px;
+    font-size: 12px; font-weight: 600; padding: 9px 16px; border-radius: 9px;
     box-shadow: 0 2px 8px rgba(0,0,0,0.15); transition: background 0.15s;
   }
   .download-btn:hover { background: #3f3f46; }
   @media print {
-    body { padding: 24px; }
+    body { padding: 28px 32px; }
     .page-break { page-break-before: always; }
     .download-btn { display: none; }
+    thead { display: table-header-group; }
   }
 </style>
 </head>
@@ -188,7 +190,7 @@ export async function GET() {
     <p class="meta">Generado el ${todayStr} · Platomico CRM</p>
   </div>
   <div style="text-align:right;">
-    <p style="font-size:11px;color:#a1a1aa;">Generado por</p>
+    <p style="font-size:9px;color:#a1a1aa;">Generado por</p>
     <p style="font-weight:600;">${user.name ?? user.email}</p>
   </div>
 </div>
@@ -256,7 +258,7 @@ export async function GET() {
       <tr>
         <td>
           <div class="bold">${r.company}</div>
-          ${r.company !== r.legalName ? `<div class="muted" style="font-size:11px">${r.legalName}</div>` : ''}
+          ${r.company !== r.legalName ? `<div class="muted" style="font-size:9px">${r.legalName}</div>` : ''}
         </td>
         <td class="muted">${r.owner}</td>
         <td class="mono muted">${fmtDate(r.contractStart)}</td>
@@ -265,8 +267,8 @@ export async function GET() {
         <td class="mono bold" style="text-align:right">
           ${r.mrrSource === 'none'
             ? '<span class="muted">Sin datos</span>'
-            : fmt(r.mrr) + (r.mrrSource === 'offer' ? ' <span style="font-size:10px;color:#d97706;font-weight:600">est.</span>' : '')}
-          ${r.missingVariable ? '<div style="font-size:10px;color:#dc2626;font-weight:600;margin-top:2px">⚠ Falta variable ROS</div>' : ''}
+            : fmt(r.mrr) + (r.mrrSource === 'offer' ? ' <span style="font-size:8.5px;color:#d97706;font-weight:600">est.</span>' : '')}
+          ${r.missingVariable ? '<div style="font-size:8.5px;color:#dc2626;font-weight:600;margin-top:1px">⚠ Falta variable ROS</div>' : ''}
         </td>
         <td class="mono" style="text-align:right">${r.mrr > 0 ? fmt(r.mrr * 3) : '—'}</td>
       </tr>`).join('')}
@@ -308,7 +310,7 @@ export async function GET() {
           <tr>
             <td>
               <div class="bold">${r.company}</div>
-              ${r.company !== r.legalName ? `<div class="muted" style="font-size:11px">${r.legalName}</div>` : ''}
+              ${r.company !== r.legalName ? `<div class="muted" style="font-size:9px">${r.legalName}</div>` : ''}
             </td>
             <td><span class="tag ${tagClass}">${r.stage}</span></td>
             <td class="mono bold">${r.probability}%</td>
@@ -317,7 +319,7 @@ export async function GET() {
             <td class="mono" style="text-align:center">${r.locales || '—'}</td>
             <td class="mono" style="text-align:right">
               ${r.offerMrr > 0 ? fmt(r.offerMrr) : '<span class="muted">Sin oferta</span>'}
-              ${r.missingVariable ? '<div style="font-size:10px;color:#dc2626;font-weight:600;margin-top:2px">⚠ Falta variable ROS</div>' : ''}
+              ${r.missingVariable ? '<div style="font-size:8.5px;color:#dc2626;font-weight:600;margin-top:1px">⚠ Falta variable ROS</div>' : ''}
             </td>
             <td class="mono bold" style="text-align:right">${r.offerMrr > 0 ? fmt(r.offerMrr * r.probability / 100) : '—'}</td>
           </tr>`
