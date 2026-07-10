@@ -362,9 +362,12 @@ async function getDealsFromSupabase(ownerId?: string): Promise<Deal[]> {
       const concept = row.concept?.trim() || conceptFromLines(lines)
       offers.push({ amountTotal: row.amount_total, fixedMonthly, hasVariable, status: row.status, concept })
     }
+    // If any chain is accepted, hide sent/draft-only chains (old preliminary quotes)
+    const hasAnyAccepted = offers.some((o) => o.status === 'accepted')
+    const filtered = hasAnyAccepted ? offers.filter((o) => o.status === 'accepted') : offers
     // Sort: accepted first, then by amount desc
-    offers.sort((a, b) => (STATUS_PRIORITY[a.status] ?? 99) - (STATUS_PRIORITY[b.status] ?? 99) || b.fixedMonthly - a.fixedMonthly)
-    latestOffersMap.set(dealId, offers)
+    filtered.sort((a, b) => (STATUS_PRIORITY[a.status] ?? 99) - (STATUS_PRIORITY[b.status] ?? 99) || b.fixedMonthly - a.fixedMonthly)
+    latestOffersMap.set(dealId, filtered)
   }
 
   return baseDeals.map((deal) => {
