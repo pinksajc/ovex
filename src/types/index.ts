@@ -181,6 +181,16 @@ export interface Deal {
 
   notes?: string
 
+  /** Latest accepted or sent presupuesto for this deal, populated server-side. */
+  latestOffer?: {
+    amountTotal: number
+    /** Sum of fixed (non-variable) line items */
+    fixedMonthly: number
+    /** true when at least one variable (per-order) line exists */
+    hasVariable: boolean
+    status: string
+  }
+
   createdAt: string
   updatedAt: string
 }

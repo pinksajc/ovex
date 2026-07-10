@@ -14,7 +14,6 @@ import {
   type DragStartEvent,
 } from '@dnd-kit/core'
 import { CSS } from '@dnd-kit/utilities'
-import { getActiveConfig } from '@/lib/deals'
 import { formatCurrency } from '@/lib/format'
 import { updateStageAction } from '@/app/actions/deals'
 import type { Deal, DealStage } from '@/types'
@@ -71,8 +70,7 @@ function matchesQuery(deal: Deal, q: string): boolean {
 // ── Draggable card ────────────────────────────────────────────────────────────
 
 function DealCard({ deal, isDragging = false }: { deal: Deal; isDragging?: boolean }) {
-  const cfg = getActiveConfig(deal)
-  const mrr = cfg?.economics.totalMonthlyRevenue ?? 0
+  const offer = deal.latestOffer
 
   return (
     <div
@@ -87,10 +85,21 @@ function DealCard({ deal, isDragging = false }: { deal: Deal; isDragging?: boole
       {deal.company.city && !deal.company.brandName && (
         <p className="text-xs text-zinc-400 mt-0.5">{deal.company.city}</p>
       )}
-      {mrr > 0 && (
-        <p className="text-xs font-mono font-semibold text-zinc-700 mt-2">
-          {formatCurrency(mrr)}/mes
-        </p>
+      {offer && (
+        <div className="mt-2 flex items-baseline gap-1.5 flex-wrap">
+          {offer.fixedMonthly > 0 ? (
+            <p className="text-xs font-mono font-semibold text-zinc-700">
+              {formatCurrency(offer.fixedMonthly)}/mes
+            </p>
+          ) : offer.amountTotal > 0 ? (
+            <p className="text-xs font-mono font-semibold text-zinc-700">
+              {formatCurrency(offer.amountTotal)} total
+            </p>
+          ) : null}
+          {offer.hasVariable && (
+            <span className="text-[10px] text-amber-600 font-medium">+ variable</span>
+          )}
+        </div>
       )}
       <div className="flex items-center justify-between mt-2">
         <span className="text-[10px] text-zinc-400">{deal.owner.split(' ')[0]}</span>
@@ -154,7 +163,7 @@ function DroppableColumn({
   const colors = STAGE_COLORS[stage]
 
   const stageMRR = deals.reduce(
-    (sum, d) => sum + (getActiveConfig(d)?.economics.totalMonthlyRevenue ?? 0),
+    (sum, d) => sum + (d.latestOffer?.fixedMonthly ?? 0),
     0
   )
 
