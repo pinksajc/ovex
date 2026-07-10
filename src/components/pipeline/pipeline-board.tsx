@@ -70,7 +70,7 @@ function matchesQuery(deal: Deal, q: string): boolean {
 // ── Draggable card ────────────────────────────────────────────────────────────
 
 function DealCard({ deal, isDragging = false }: { deal: Deal; isDragging?: boolean }) {
-  const offer = deal.latestOffer
+  const offers = deal.latestOffers ?? []
 
   return (
     <div
@@ -85,20 +85,27 @@ function DealCard({ deal, isDragging = false }: { deal: Deal; isDragging?: boole
       {deal.company.city && !deal.company.brandName && (
         <p className="text-xs text-zinc-400 mt-0.5">{deal.company.city}</p>
       )}
-      {offer && (
-        <div className="mt-2 flex items-baseline gap-1.5 flex-wrap">
-          {offer.fixedMonthly > 0 ? (
-            <p className="text-xs font-mono font-semibold text-zinc-700">
-              {formatCurrency(offer.fixedMonthly)}/mes
-            </p>
-          ) : offer.amountTotal > 0 ? (
-            <p className="text-xs font-mono font-semibold text-zinc-700">
-              {formatCurrency(offer.amountTotal)} total
-            </p>
-          ) : null}
-          {offer.hasVariable && (
-            <span className="text-[10px] text-amber-600 font-medium">+ variable</span>
-          )}
+      {offers.length > 0 && (
+        <div className="mt-2 space-y-1">
+          {offers.map((offer, i) => (
+            <div key={i} className="flex items-baseline gap-1.5 flex-wrap">
+              {offer.concept && (
+                <span className="text-[10px] text-zinc-400 font-medium">{offer.concept}</span>
+              )}
+              {offer.fixedMonthly > 0 ? (
+                <span className="text-xs font-mono font-semibold text-zinc-700">
+                  {formatCurrency(offer.fixedMonthly)}/mes
+                </span>
+              ) : offer.amountTotal > 0 ? (
+                <span className="text-xs font-mono font-semibold text-zinc-700">
+                  {formatCurrency(offer.amountTotal)} total
+                </span>
+              ) : null}
+              {offer.hasVariable && (
+                <span className="text-[10px] text-amber-600 font-medium">+ variable</span>
+              )}
+            </div>
+          ))}
         </div>
       )}
       <div className="flex items-center justify-between mt-2">
@@ -163,7 +170,7 @@ function DroppableColumn({
   const colors = STAGE_COLORS[stage]
 
   const stageMRR = deals.reduce(
-    (sum, d) => sum + (d.latestOffer?.fixedMonthly ?? 0),
+    (sum, d) => sum + (d.latestOffers ?? []).reduce((s, o) => s + o.fixedMonthly, 0),
     0
   )
 

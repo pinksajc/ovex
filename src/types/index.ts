@@ -181,15 +181,14 @@ export interface Deal {
 
   notes?: string
 
-  /** Latest accepted or sent presupuesto for this deal, populated server-side. */
-  latestOffer?: {
+  /** Latest accepted or sent presupuesto per independent chain, populated server-side. */
+  latestOffers?: Array<{
     amountTotal: number
-    /** Sum of fixed (non-variable) line items */
     fixedMonthly: number
-    /** true when at least one variable (per-order) line exists */
     hasVariable: boolean
     status: string
-  }
+    concept?: string
+  }>
 
   createdAt: string
   updatedAt: string

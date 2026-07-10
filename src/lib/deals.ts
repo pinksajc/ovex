@@ -296,15 +296,15 @@ async function getDealsFromSupabase(ownerId?: string): Promise<Deal[]> {
 
   type ProfileRow = { id: string; full_name: string | null }
   type OfferRow = {
-    id: string; deal_id: string; amount_total: number; vat_rate: number
-    status: string; line_items: string | unknown[]
+    id: string; deal_id: string; parent_id: string | null; amount_total: number; vat_rate: number
+    status: string; line_items: string | unknown[]; concept: string | null
   }
 
   const [activeConfigMap, profilesData, offersData] = await Promise.all([
     getBatchActiveConfigsForDeals(dealIds).catch(() => new Map<string, DealConfiguration>()),
     db.from('profiles').select('id, full_name') as unknown as Promise<{ data: ProfileRow[] | null; error: unknown }>,
     (db.from('presupuestos')
-      .select('id, deal_id, amount_total, vat_rate, status, line_items')
+      .select('id, deal_id, parent_id, amount_total, vat_rate, status, line_items, concept')
       .in('deal_id', dealIds)
       .in('status', ['accepted', 'sent'])
       .order('created_at', { ascending: false }) as unknown as Promise<{ data: OfferRow[] | null; error: unknown }>),
@@ -314,15 +314,42 @@ async function getDealsFromSupabase(ownerId?: string): Promise<Deal[]> {
     ((profilesData as { data: ProfileRow[] | null }).data ?? []).map((p) => [p.id, p.full_name ?? 'Sin asignar'])
   )
 
-  // Pick best offer per deal: accepted > sent, then most-recent (already sorted desc)
+  const SERVICE_GROUP_LABEL: Record<string, string> = {
+    ros: 'ROS', ren: 'REN', whispr: 'Whispr', addon: 'Delivery', datafono: 'Datáfono',
+  }
+  function conceptFromLines(lines: Array<{ serviceId?: string; description?: string; type?: string }>): string {
+    const groups = new Set<string>()
+    for (const l of lines.filter((l) => l.type === 'line')) {
+      for (const [prefix, label] of Object.entries(SERVICE_GROUP_LABEL)) {
+        if ((l.serviceId ?? '').startsWith(prefix)) { groups.add(label); break }
+      }
+    }
+    return groups.size > 0 ? Array.from(groups).join(' · ') : ''
+  }
+
+  // Group offers by version chain (root id). Per chain, keep the best: accepted > sent > most-recent
   const STATUS_PRIORITY: Record<string, number> = { accepted: 0, sent: 1 }
-  const latestOfferMap = new Map<string, Deal['latestOffer']>()
-  for (const row of ((offersData as { data: OfferRow[] | null }).data ?? [])) {
-    const existing = latestOfferMap.get(row.deal_id)
-    const rowPriority = STATUS_PRIORITY[row.status] ?? 99
-    const existingPriority = existing ? (STATUS_PRIORITY[existing.status] ?? 99) : 99
-    if (!existing || rowPriority < existingPriority) {
-      const lines: Array<{ serviceId?: string; amount?: number; unitPrice?: number; quantity?: number; type?: string }> =
+  // Map: deal_id → Map<chainRootId, best OfferRow>
+  const chainMap = new Map<string, Map<string, OfferRow>>()
+  const allRows = (offersData as { data: OfferRow[] | null }).data ?? []
+  // Build a set of ids that appear as parent_ids so we can identify roots
+  const parentIds = new Set(allRows.map((r) => r.parent_id).filter(Boolean))
+  for (const row of allRows) {
+    const chainRoot = row.parent_id ?? row.id
+    const dealChains = chainMap.get(row.deal_id) ?? new Map<string, OfferRow>()
+    const existing = dealChains.get(chainRoot)
+    const rowPri = STATUS_PRIORITY[row.status] ?? 99
+    const exPri = existing ? (STATUS_PRIORITY[existing.status] ?? 99) : 99
+    if (!existing || rowPri < exPri) dealChains.set(chainRoot, row)
+    chainMap.set(row.deal_id, dealChains)
+  }
+  void parentIds // suppress unused warning
+
+  const latestOffersMap = new Map<string, NonNullable<Deal['latestOffers']>>()
+  for (const [dealId, chains] of chainMap.entries()) {
+    const offers: NonNullable<Deal['latestOffers']> = []
+    for (const row of chains.values()) {
+      const lines: Array<{ serviceId?: string; description?: string; amount?: number; type?: string }> =
         typeof row.line_items === 'string' ? JSON.parse(row.line_items) : (row.line_items as typeof lines ?? [])
       const serviceLines = lines.filter((l) => l.type === 'line')
       const hasVariable = serviceLines.some((l) => VARIABLE_IDS.has(l.serviceId ?? ''))
@@ -330,13 +357,12 @@ async function getDealsFromSupabase(ownerId?: string): Promise<Deal[]> {
       const fixedMonthly = serviceLines
         .filter((l) => !VARIABLE_IDS.has(l.serviceId ?? ''))
         .reduce((s, l) => s + (l.amount ?? 0), 0) * vatMultiplier
-      latestOfferMap.set(row.deal_id, {
-        amountTotal: row.amount_total,
-        fixedMonthly,
-        hasVariable,
-        status: row.status,
-      })
+      const concept = row.concept?.trim() || conceptFromLines(lines)
+      offers.push({ amountTotal: row.amount_total, fixedMonthly, hasVariable, status: row.status, concept })
     }
+    // Sort: accepted first, then by amount desc
+    offers.sort((a, b) => (STATUS_PRIORITY[a.status] ?? 99) - (STATUS_PRIORITY[b.status] ?? 99) || b.fixedMonthly - a.fixedMonthly)
+    latestOffersMap.set(dealId, offers)
   }
 
   return baseDeals.map((deal) => {
@@ -347,7 +373,7 @@ async function getDealsFromSupabase(ownerId?: string): Promise<Deal[]> {
       owner: ownerName,
       configurations: activeConfig ? [activeConfig] : [],
       activeConfigId: activeConfig?.id,
-      latestOffer: latestOfferMap.get(deal.id),
+      latestOffers: latestOffersMap.get(deal.id),
     }
   })
 }

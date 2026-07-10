@@ -73,11 +73,30 @@ function parseLineItems(raw: unknown): InvoiceLineItem[] {
   return []
 }
 
+// Maps serviceId prefix/group to a short display label for concept derivation
+const SERVICE_GROUP_LABEL: Record<string, string> = {
+  ros: 'ROS', ren: 'REN', whispr: 'Whispr', addon: 'Delivery', datafono: 'Datáfono',
+}
+
+function deriveConceptFromLines(lines: Array<{ serviceId?: string; description?: string; type?: string; amount?: number }>): string {
+  const serviceLines = lines.filter((l) => l.type === 'line' && l.description?.trim())
+  if (serviceLines.length === 0) return ''
+  if (serviceLines.length === 1) return serviceLines[0].description!.trim()
+  // Detect primary groups from serviceIds (by prefix, ignoring hardware/travel/custom)
+  const groups = new Set<string>()
+  for (const l of serviceLines) {
+    const sid = l.serviceId ?? ''
+    for (const [prefix, label] of Object.entries(SERVICE_GROUP_LABEL)) {
+      if (sid.startsWith(prefix)) { groups.add(label); break }
+    }
+  }
+  if (groups.size === 0) return 'Varios conceptos'
+  return Array.from(groups).join(' · ')
+}
+
 function rowToPresupuesto(row: PresupuestoRow): Presupuesto {
   const lineItems = parseLineItems(row.line_items)
-  const filledLines = lineItems.filter((l) => l.type === 'line' && l.description?.trim())
-  const derivedConcept = row.concept?.trim()
-    || (filledLines.length === 1 ? filledLines[0].description.trim() : filledLines.length > 1 ? 'Varios conceptos' : '')
+  const derivedConcept = row.concept?.trim() || deriveConceptFromLines(lineItems)
   return {
     id: row.id,
     number: row.number,
