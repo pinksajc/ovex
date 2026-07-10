@@ -57,11 +57,18 @@ export async function GET() {
   const closedRows = closedDeals.map((d) => {
     const inv = latestInvByDeal.get(d.id)
     const offer = acceptedOfferByDeal.get(d.id)
+    // Use latest invoice amount if available; otherwise fall back to accepted offer fixedMonthly
+    const offerMrr = (d.latestOffers ?? [])
+      .filter((o) => o.status === 'accepted')
+      .reduce((s, o) => s + o.fixedMonthly, 0)
+    const mrr = inv?.amount ?? offerMrr
+    const mrrSource: 'invoice' | 'offer' | 'none' = inv ? 'invoice' : offerMrr > 0 ? 'offer' : 'none'
     return {
       company: d.company.brandName || d.company.name,
       legalName: d.company.name,
       owner: d.owner,
-      mrr: inv?.amount ?? 0,
+      mrr,
+      mrrSource,
       lastInvoice: inv?.number ?? '—',
       contractStart: offer?.contractStartDate ?? null,
       offerNumber: offer?.number ?? '—',
@@ -213,7 +220,11 @@ export async function GET() {
         <td class="muted">${r.owner}</td>
         <td class="mono muted">${fmtDate(r.contractStart)}</td>
         <td class="mono muted">${r.lastInvoice}</td>
-        <td class="mono bold" style="text-align:right">${r.mrr > 0 ? fmt(r.mrr) : '<span class="muted">Sin factura</span>'}</td>
+        <td class="mono bold" style="text-align:right">
+          ${r.mrrSource === 'none'
+            ? '<span class="muted">Sin datos</span>'
+            : fmt(r.mrr) + (r.mrrSource === 'offer' ? ' <span style="font-size:10px;color:#d97706;font-weight:600">est.</span>' : '')}
+        </td>
         <td class="mono" style="text-align:right">${r.mrr > 0 ? fmt(r.mrr * 3) : '—'}</td>
       </tr>`).join('')}
       <tr class="total-row">
