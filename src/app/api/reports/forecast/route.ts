@@ -68,12 +68,14 @@ export async function GET() {
       .reduce((s, o) => s + offerMonthly(o), 0)
     const mrr = inv?.amount ?? offerMrr
     const mrrSource: 'invoice' | 'offer' | 'none' = inv ? 'invoice' : offerMrr > 0 ? 'offer' : 'none'
+    const missingVariable = (d.latestOffers ?? []).some((o) => o.status === 'accepted' && o.hasVariable)
     return {
       company: d.company.brandName || d.company.name,
       legalName: d.company.name,
       owner: d.owner,
       mrr,
       mrrSource,
+      missingVariable,
       lastInvoice: inv?.number ?? '—',
       contractStart: offer?.contractStartDate ?? null,
       offerNumber: offer?.number ?? '—',
@@ -106,6 +108,7 @@ export async function GET() {
       offerMrr: bestOffer ? offerMonthly(bestOffer) : 0,
       offerTotal: bestOffer?.amountTotal ?? 0,
       concept: bestOffer?.concept ?? '—',
+      missingVariable: bestOffer?.hasVariable ?? false,
     }
   }).sort((a, b) => b.probability - a.probability || b.offerMrr - a.offerMrr)
 
@@ -229,6 +232,7 @@ export async function GET() {
           ${r.mrrSource === 'none'
             ? '<span class="muted">Sin datos</span>'
             : fmt(r.mrr) + (r.mrrSource === 'offer' ? ' <span style="font-size:10px;color:#d97706;font-weight:600">est.</span>' : '')}
+          ${r.missingVariable ? '<div style="font-size:10px;color:#dc2626;font-weight:600;margin-top:2px">⚠ Falta variable ROS</div>' : ''}
         </td>
         <td class="mono" style="text-align:right">${r.mrr > 0 ? fmt(r.mrr * 3) : '—'}</td>
       </tr>`).join('')}
@@ -273,7 +277,10 @@ export async function GET() {
             <td class="mono bold">${r.probability}%</td>
             <td class="muted">${r.owner}</td>
             <td class="muted">${r.concept}</td>
-            <td class="mono" style="text-align:right">${r.offerMrr > 0 ? fmt(r.offerMrr) : '<span class="muted">Sin oferta</span>'}</td>
+            <td class="mono" style="text-align:right">
+              ${r.offerMrr > 0 ? fmt(r.offerMrr) : '<span class="muted">Sin oferta</span>'}
+              ${r.missingVariable ? '<div style="font-size:10px;color:#dc2626;font-weight:600;margin-top:2px">⚠ Falta variable ROS</div>' : ''}
+            </td>
             <td class="mono bold" style="text-align:right">${r.offerMrr > 0 ? fmt(r.offerMrr * r.probability / 100) : '—'}</td>
           </tr>`
         }).join('')
