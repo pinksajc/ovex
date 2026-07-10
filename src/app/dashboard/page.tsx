@@ -162,12 +162,21 @@ export default async function DashboardPage() {
             {now.toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
           </p>
         </div>
-        <a
-          href="/api/dashboard/export"
-          className="text-xs font-semibold border border-zinc-200 text-zinc-600 hover:text-zinc-900 hover:border-zinc-400 px-3 py-1.5 rounded-lg transition-colors"
-        >
-          Descargar informe →
-        </a>
+        <div className="flex items-center gap-2">
+          <a
+            href="/api/reports/forecast"
+            target="_blank"
+            className="text-xs font-semibold bg-zinc-900 text-white hover:bg-zinc-700 px-3 py-1.5 rounded-lg transition-colors"
+          >
+            Forecast 3 meses →
+          </a>
+          <a
+            href="/api/dashboard/export"
+            className="text-xs font-semibold border border-zinc-200 text-zinc-600 hover:text-zinc-900 hover:border-zinc-400 px-3 py-1.5 rounded-lg transition-colors"
+          >
+            Descargar CSV →
+          </a>
+        </div>
       </div>
 
       {/* ── Section 1: KPI strip ── */}

@@ -164,13 +164,23 @@ export async function GET() {
   .total-row td { font-weight: 700; background: #f4f4f5; border-top: 2px solid #e4e4e7; }
   .divider { border: none; border-top: 1px solid #e4e4e7; margin: 32px 0; }
   .note { font-size: 11px; color: #71717a; margin-top: 12px; }
+  .download-btn {
+    position: fixed; top: 24px; right: 24px; z-index: 100;
+    background: #18181b; color: #fff; border: none; cursor: pointer;
+    font-size: 13px; font-weight: 600; padding: 10px 18px; border-radius: 10px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.15); transition: background 0.15s;
+  }
+  .download-btn:hover { background: #3f3f46; }
   @media print {
     body { padding: 24px; }
     .page-break { page-break-before: always; }
+    .download-btn { display: none; }
   }
 </style>
 </head>
 <body>
+
+<button class="download-btn" onclick="window.print()">⬇ Descargar PDF</button>
 
 <div style="display:flex; align-items:flex-start; justify-content:space-between;">
   <div>
