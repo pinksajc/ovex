@@ -51,20 +51,36 @@ export default async function DashboardPage() {
     getPendingBillingPresupuestos(),
   ])
 
-  const dealIds = deals.map((d) => d.id)
-  const locationCountMap = await getLocationCountsByDeal(dealIds).catch(() => new Map<string, number>())
-  const totalLocations = Array.from(locationCountMap.values()).reduce((s, n) => s + n, 0)
+  // Only load locations for closed_won deals (active clients)
+  const closedWonDeals = deals.filter((d) => d.stage === 'closed_won')
+  const closedWonIds = closedWonDeals.map((d) => d.id)
+  const locationCountMap = await getLocationCountsByDeal(closedWonIds).catch(() => new Map<string, number>())
 
-  // helper: sum fixedMonthly across all offer chains for a deal
+  // helper: sum fixedMonthly across accepted offer chains only
   function dealMrr(d: (typeof deals)[0]): number {
-    return (d.latestOffers ?? []).reduce((s, o) => s + o.fixedMonthly, 0)
+    return (d.latestOffers ?? [])
+      .filter((o) => o.status === 'accepted')
+      .reduce((s, o) => s + o.fixedMonthly, 0)
   }
 
   // ── Section 1: KPIs ────────────────────────────────────────────────────────
-  // MRR = accepted deals only (closed_won with accepted offers preferred, else sent)
-  const closedWonDeals = deals.filter((d) => d.stage === 'closed_won')
+  // MRR = accepted offers from closed_won deals only
   const mrr = closedWonDeals.reduce((s, d) => s + dealMrr(d), 0)
   const arr = mrr * 12
+
+  // Localizaciones split by service type (ROS vs REN)
+  // A deal can contribute to both if it has offers of each type
+  let locRos = 0, locRen = 0, locOther = 0
+  for (const deal of closedWonDeals) {
+    const locs = locationCountMap.get(deal.id) ?? 0
+    if (locs === 0) continue
+    const concepts = (deal.latestOffers ?? []).map((o) => o.concept ?? '')
+    const hasRos = concepts.some((c) => c.toLowerCase().includes('ros'))
+    const hasRen = concepts.some((c) => c.toLowerCase().includes('ren'))
+    if (hasRos) locRos += locs
+    if (hasRen) locRen += locs
+    if (!hasRos && !hasRen) locOther += locs
+  }
 
   const now       = new Date()
   const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString()
@@ -151,10 +167,34 @@ export default async function DashboardPage() {
       </div>
 
       {/* ── Section 1: KPI strip ── */}
-      <div className="grid grid-cols-6 gap-4">
-        <KpiCard label="MRR" value={formatCurrency(mrr)} color="#0071e3" sub="clientes activos" />
+      <div className="grid grid-cols-3 gap-4">
+        <KpiCard label="MRR" value={formatCurrency(mrr)} color="#0071e3" sub={`${closedWonDeals.length} clientes · solo aceptadas`} />
         <KpiCard label="ARR" value={formatCurrency(arr)} color="#0071e3" />
-        <KpiCard label="Localizaciones" value={String(totalLocations)} color="#8e8e93" sub={`en ${closedWonDeals.length} clientes`} />
+        <div className="bg-white rounded-2xl shadow-sm p-5">
+          <p className="text-xs font-semibold uppercase tracking-widest text-zinc-400 mb-3 leading-tight">Localizaciones activas</p>
+          <div className="flex items-end gap-5">
+            <div>
+              <p className="text-2xl font-bold tracking-tight text-zinc-900">{locRos}</p>
+              <p className="text-[10px] text-zinc-400 mt-0.5">ROS</p>
+            </div>
+            <div className="w-px h-8 bg-zinc-100 self-center" />
+            <div>
+              <p className="text-2xl font-bold tracking-tight text-zinc-900">{locRen}</p>
+              <p className="text-[10px] text-zinc-400 mt-0.5">REN</p>
+            </div>
+            {locOther > 0 && (
+              <>
+                <div className="w-px h-8 bg-zinc-100 self-center" />
+                <div>
+                  <p className="text-2xl font-bold tracking-tight text-zinc-900">{locOther}</p>
+                  <p className="text-[10px] text-zinc-400 mt-0.5">Otros</p>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      </div>
+      <div className="grid grid-cols-3 gap-4">
         <KpiCard label="Facturado este mes" value={formatCurrency(facturacionMes)} color="#8e8e93" />
         <KpiCard label="Cobrado este mes" value={formatCurrency(cobradoMes)} color="#34c759" />
         <KpiCard label="Pendiente de cobro" value={formatCurrency(pendiente)} color={pendiente > 0 ? '#ff9f0a' : '#8e8e93'} />
