@@ -56,16 +56,47 @@ export default async function DashboardPage() {
   const closedWonIds = closedWonDeals.map((d) => d.id)
   const locationCountMap = await getLocationCountsByDeal(closedWonIds).catch(() => new Map<string, number>())
 
-  // helper: sum fixedMonthly across accepted offer chains only
+  // helper: sum fixedMonthly across accepted offer chains only (for pipeline bars / leaderboard)
   function dealMrr(d: (typeof deals)[0]): number {
     return (d.latestOffers ?? [])
       .filter((o) => o.status === 'accepted')
       .reduce((s, o) => s + o.fixedMonthly, 0)
   }
 
+  const now        = new Date()
+  const todayStr   = now.toISOString().slice(0, 10)
+
   // ── Section 1: KPIs ────────────────────────────────────────────────────────
-  // MRR = accepted offers from closed_won deals only
-  const mrr = closedWonDeals.reduce((s, d) => s + dealMrr(d), 0)
+  // Real MRR = accepted presupuestos with a contractStartDate that has already started,
+  // deduped by version chain (one per chain — accepted wins over sent).
+  // This avoids counting closed_won deals that have no active contract yet.
+  const activePresupuestos = (() => {
+    // Group accepted presupuestos that have started by version chain, keep one per chain
+    const chainMap = new Map<string, (typeof presupuestos)[0]>()
+    for (const p of presupuestos) {
+      if (p.status !== 'accepted') continue
+      if (!p.contractStartDate || p.contractStartDate > todayStr) continue
+      const root = p.parentId ?? p.id
+      const existing = chainMap.get(root)
+      // prefer most-recent by contractStartDate (shouldn't conflict, but be safe)
+      if (!existing || p.contractStartDate > existing.contractStartDate!) {
+        chainMap.set(root, p)
+      }
+    }
+    return Array.from(chainMap.values())
+  })()
+
+  const { VARIABLE_IDS: VAR_IDS } = await import('@/lib/deal-type')
+  const mrr = activePresupuestos.reduce((sum, p) => {
+    const vatMult = 1 + (p.vatRate ?? 21) / 100
+    const fixed = p.lineItems
+      .filter((l) => l.type === 'line' && !VAR_IDS.has(l.serviceId ?? ''))
+      .reduce((s, l) => s + (l.amount ?? 0), 0)
+    const calcVar = p.lineItems
+      .filter((l) => l.type === 'line' && VAR_IDS.has(l.serviceId ?? '') && (l.quantity ?? 0) > 0)
+      .reduce((s, l) => s + (l.amount ?? 0), 0)
+    return sum + (fixed + calcVar) * vatMult
+  }, 0)
   const arr = mrr * 12
 
   // Localizaciones split by service type (ROS vs REN)
@@ -82,7 +113,6 @@ export default async function DashboardPage() {
     if (!hasRos && !hasRen) locOther += locs
   }
 
-  const now       = new Date()
   const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString()
   const thisMonth  = invoices.filter((i) => i.createdAt >= monthStart)
 
