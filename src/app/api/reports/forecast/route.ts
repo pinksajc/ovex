@@ -54,13 +54,18 @@ export async function GET() {
     }
   }
 
+  // Monthly value of an offer: fixed cuota if present, else the total
+  // (covers offers whose recurring revenue is a calculated per-order variable).
+  const offerMonthly = (o: { fixedMonthly: number; amountTotal: number }) =>
+    o.fixedMonthly > 0 ? o.fixedMonthly : o.amountTotal
+
   const closedRows = closedDeals.map((d) => {
     const inv = latestInvByDeal.get(d.id)
     const offer = acceptedOfferByDeal.get(d.id)
-    // Use latest invoice amount if available; otherwise fall back to accepted offer fixedMonthly
+    // Use latest invoice amount if available; otherwise fall back to accepted offer monthly value
     const offerMrr = (d.latestOffers ?? [])
       .filter((o) => o.status === 'accepted')
-      .reduce((s, o) => s + o.fixedMonthly, 0)
+      .reduce((s, o) => s + offerMonthly(o), 0)
     const mrr = inv?.amount ?? offerMrr
     const mrrSource: 'invoice' | 'offer' | 'none' = inv ? 'invoice' : offerMrr > 0 ? 'offer' : 'none'
     return {
@@ -91,14 +96,14 @@ export async function GET() {
 
   // Best offer per pipeline deal
   const pipelineRows = pipelineDeals.map((d) => {
-    const bestOffer = (d.latestOffers ?? []).sort((a, b) => b.fixedMonthly - a.fixedMonthly)[0]
+    const bestOffer = (d.latestOffers ?? []).sort((a, b) => offerMonthly(b) - offerMonthly(a))[0]
     return {
       company: d.company.brandName || d.company.name,
       legalName: d.company.name,
       stage: STAGE_LABELS[d.stage] ?? d.stage,
       probability: d.closeProbability,
       owner: d.owner,
-      offerMrr: bestOffer?.fixedMonthly ?? 0,
+      offerMrr: bestOffer ? offerMonthly(bestOffer) : 0,
       offerTotal: bestOffer?.amountTotal ?? 0,
       concept: bestOffer?.concept ?? '—',
     }
