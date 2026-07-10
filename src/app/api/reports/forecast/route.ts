@@ -170,23 +170,6 @@ export async function GET() {
       <div class="kpi-sub">${closedRows.filter(r => r.mrr > 0).length} clientes con factura</div>
     </div>
     <div class="kpi">
-      <div class="kpi-label">Proyección 3 meses</div>
-      <div class="kpi-value blue">${fmt(proj3m)}</div>
-      <div class="kpi-sub">MRR × 3 (clientes actuales)</div>
-    </div>
-    <div class="kpi">
-      <div class="kpi-label">Pipeline potencial</div>
-      <div class="kpi-value amber">${fmt(pipelinePotentialMrr)}</div>
-      <div class="kpi-sub">${pipelineRows.length} deals ≥75% / negociación</div>
-    </div>
-    <div class="kpi">
-      <div class="kpi-label">MRR ponderado pipeline</div>
-      <div class="kpi-value green">${fmt(weightedMrr)}</div>
-      <div class="kpi-sub">suma MRR × probabilidad</div>
-    </div>
-  </div>
-  <div class="kpi-grid">
-    <div class="kpi">
       <div class="kpi-label">Total facturado</div>
       <div class="kpi-value">${fmt(totalInvoiced)}</div>
       <div class="kpi-sub">emitidas + pagadas (histórico)</div>
@@ -197,14 +180,9 @@ export async function GET() {
       <div class="kpi-sub">facturas pagadas</div>
     </div>
     <div class="kpi">
-      <div class="kpi-label">Forecast conservador 3m</div>
-      <div class="kpi-value">${fmt(proj3m + weightedMrr * 3)}</div>
-      <div class="kpi-sub">actuales + pipeline ponderado</div>
-    </div>
-    <div class="kpi">
-      <div class="kpi-label">Forecast optimista 3m</div>
-      <div class="kpi-value">${fmt(proj3m + pipelinePotentialMrr * 3)}</div>
-      <div class="kpi-sub">actuales + todo el pipeline</div>
+      <div class="kpi-label">Forecast 3 meses</div>
+      <div class="kpi-value blue">${fmt(proj3m + weightedMrr * 3)}</div>
+      <div class="kpi-sub">actuales + pipeline ponderado por prob.</div>
     </div>
   </div>
 </div>
