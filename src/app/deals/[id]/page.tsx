@@ -1,9 +1,8 @@
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
-import { getDeal, getActiveConfig } from '@/lib/deals'
+import { getDeal } from '@/lib/deals'
 import { getCurrentUser } from '@/lib/auth'
 import { formatCurrency } from '@/lib/format'
-import { calculateMonthlyTotals } from '@/lib/pricing/totals'
 import { ContactEditor } from '@/components/contact-editor'
 import { CompanyEditor } from '@/components/company-editor'
 import { OwnerSelector } from '@/components/owner-selector'
@@ -19,7 +18,7 @@ import { CloseProbabilitySelector } from '@/components/deals/close-probability-s
 import { DealCommentsPanel } from '@/components/deals/deal-comments-panel'
 import { getCommentsByDeal } from '@/lib/supabase/deal-comments'
 import { getGmailToken } from '@/lib/supabase/gmail-tokens'
-import type { DealStage, PresupuestoStatus, InvoiceStatus, DeliveryPlanId, AddonId } from '@/types'
+import type { DealStage, PresupuestoStatus, InvoiceStatus } from '@/types'
 
 const PRESUPUESTO_STATUS_LABELS: Record<PresupuestoStatus, string> = {
   draft: 'Borrador',
@@ -93,58 +92,6 @@ export default async function DealPage({
 
   if (!deal) notFound()
 
-  const cfg = getActiveConfig(deal)
-
-  // MRR via canonical calculateMonthlyTotals (same function used by simulator):
-  //   planFee    = Math.ceil(planFeeMonthly)   ← fixes raw-float vs ceil discrepancy
-  //   addonFee   = addonFeeMonthly + KDS/Kiosk venue adj
-  //   deliveryFee= DELIVERY_PLANS[plan].priceMonthly × locations  ← catalog, not stale JSONB float
-  //   hardware   = fresh per-item ceil (Math.ceil(unitPrice/months)×qty) overrides snapshot
-  const cfgEco = cfg
-    ? (cfg.economics as typeof cfg.economics & {
-        deliveryFixedFee?: number
-        deliveryPlanKey?: string
-        deliveryPlan?: string
-        kdsVenues?: number
-        kioskVenues?: number
-      })
-    : null
-  // Compute hardware monthly fresh from line items (ceil per unit × qty)
-  const cfgHardwareMonthly = cfg
-    ? cfg.hardware
-        .filter(item => item.mode === 'financed' && Number(item.financeMonths ?? 0) > 0)
-        .reduce(
-          (sum, item) =>
-            sum + Math.ceil(Number(item.unitPrice) / Number(item.financeMonths)) * Number(item.quantity),
-          0,
-        )
-    : 0
-  const cfgTotals = cfg && cfgEco
-    ? calculateMonthlyTotals({
-        economics: cfgEco,
-        locations: cfg.locations,
-        activeAddons: cfg.activeAddons as AddonId[],
-        // Read plan from catalog — do NOT pass deliveryFixedFeePerLoc (avoids stale JSONB float)
-        deliveryPlan: (cfgEco.deliveryPlanKey ?? cfgEco.deliveryPlan ?? 'start') as DeliveryPlanId,
-        kdsVenues: cfgEco.kdsVenues,
-        kioskVenues: cfgEco.kioskVenues,
-      })
-    : null
-  // REN monthly fee (variable, excluded from engine; computed from config fields)
-  const cfgRenEnabled = (cfg?.renEnabled === true) && ((cfg?.renVenues ?? 0) > 0)
-  const cfgRenFeePerOrder = cfg?.renFeePerOrder ?? 0.10
-  const cfgDeliveryPerVenue = cfg?.deliveryOrdersPerVenue ?? 0
-  const cfgRenVenues = cfg?.renVenues ?? 0
-  const cfgRenMonthly = cfgRenEnabled ? cfgRenFeePerOrder * cfgDeliveryPerVenue * cfgRenVenues : 0
-  // Override hardwareMonthly with fresh computation; add REN monthly fee
-  const cfgMrr = cfgTotals
-    ? cfgTotals.planFee + cfgTotals.addonFee + cfgTotals.datafonoFee + cfgTotals.deliveryFee + cfgHardwareMonthly + cfgRenMonthly
-    : 0
-  const cfgArr = cfgMrr * 12
-  const cfgPaybackMonths =
-    cfg && cfg.economics.hardwareNetInvestment > 0 && cfgMrr > 0
-      ? Math.ceil(cfg.economics.hardwareNetInvestment / cfgMrr)
-      : null
 
   return (
     <div className="p-8 max-w-5xl mx-auto">
@@ -180,7 +127,7 @@ export default async function DealPage({
           </div>
         </div>
         <div className="flex items-center gap-2">
-          {cfg && (
+          {deal.configurations.length > 0 && (
             <Link
               href={`/deals/${deal.id}/propuesta`}
               className="inline-flex items-center gap-2 text-sm font-medium px-4 py-2 rounded-lg border border-zinc-200 text-zinc-600 hover:border-zinc-400 hover:text-zinc-900 transition-colors"
@@ -297,11 +244,10 @@ export default async function DealPage({
         <DealTimeline presupuestos={presupuestos} facturas={facturas} approvalEvents={approvalEvents} />
       )}
 
-      {/* Historial de facturación — always show when there's a config or invoices */}
-      {(facturas.length > 0 || cfg) && (
+      {/* Historial de facturación */}
+      {facturas.length > 0 && (
         <ClientHistoryCard
           facturas={facturas}
-          mrr={cfgMrr > 0 ? cfgMrr : undefined}
         />
       )}
 
@@ -344,64 +290,18 @@ export default async function DealPage({
         )}
       </div>
 
-      {/* Configuración activa */}
-      {cfg && (
-        <div className="bg-white border border-zinc-200 rounded-xl p-5">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-xs font-medium text-zinc-500 uppercase tracking-wide">
-              Configuración activa · v{cfg.version}
-              {cfg.label && ` · ${cfg.label}`}
-            </h3>
-            <Link
-              href={`/deals/${deal.id}/configurador`}
-              className="text-xs text-zinc-400 hover:text-zinc-900 font-medium transition-colors"
-            >
-              Editar →
-            </Link>
-          </div>
-
-          <div className="grid grid-cols-4 gap-4">
-            <Metric
-              label="MRR"
-              value={formatCurrency(cfgMrr)}
-              highlight
-            />
-            <Metric label="ARR" value={formatCurrency(cfgArr)} />
-            <Metric label="Plan" value={cfg.plan.charAt(0).toUpperCase() + cfg.plan.slice(1)} />
-            <Metric label="Locales" value={String(cfg.locations)} />
-            <Metric
-              label="€/local/mes"
-              value={formatCurrency(cfg.locations > 0 ? cfgMrr / cfg.locations : 0)}
-            />
-            <Metric
-              label="Vol. total/mes"
-              value={`${cfg.economics.totalMonthlyVolume.toLocaleString('es-ES')} pedidos`}
-            />
-            <Metric
-              label="GMV/mes"
-              value={formatCurrency(cfg.economics.totalMonthlyGMV)}
-            />
-            <Metric
-              label="Margen est."
-              value={`${cfg.economics.grossMarginPercent.toFixed(0)}% ⚠️`}
-              muted
-            />
-            {cfgPaybackMonths !== null && (
-              <Metric
-                label="Payback"
-                value={`${cfgPaybackMonths} meses`}
-                muted
-              />
-            )}
-          </div>
-
-          {cfg.economics.hasReviewManualItems && (
-            <p className="mt-4 text-xs text-amber-600 bg-amber-50 border border-amber-100 rounded-lg px-3 py-2">
-              ⚠️ Esta configuración tiene items marcados como{' '}
-              <strong>review_manual</strong>. Revisar hardware y margen con datos
-              internos antes de enviar propuesta.
-            </p>
-          )}
+      {/* Simulador link — keep access to simulator but don't show config economics */}
+      {deal.configurations.length > 0 && (
+        <div className="bg-white border border-zinc-200 rounded-xl p-4 flex items-center justify-between">
+          <p className="text-xs text-zinc-500">
+            Configuración activa disponible en el simulador
+          </p>
+          <Link
+            href={`/deals/${deal.id}/configurador`}
+            className="text-xs text-zinc-400 hover:text-zinc-900 font-medium transition-colors"
+          >
+            Abrir simulador →
+          </Link>
         </div>
       )}
 

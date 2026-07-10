@@ -65,6 +65,15 @@ export async function markSentForSignatureAction(
       const cfg = getActiveConfig(deal)
       if (!cfg) throw new Error(`No hay configuración activa para el deal ${dealId}`)
       if (cfg.id !== configId) throw new Error(`La configuración activa (${cfg.id}) no coincide con la solicitada (${configId})`)
+      // Load latest offer for economic summary (avoids using simulator estimates)
+      const { getPresupuestosByDeal } = await import('@/lib/supabase/presupuestos')
+      const presupuestos = await getPresupuestosByDeal(dealId).catch(() => [])
+      const latestOffer = presupuestos
+        .filter((p) => p.status === 'accepted' || p.status === 'sent')
+        .sort((a, b) => {
+          const pri: Record<string, number> = { accepted: 0, sent: 1 }
+          return (pri[a.status] ?? 9) - (pri[b.status] ?? 9)
+        })[0]
 
       const saved = await getProposal(dealId, configId)
 
@@ -92,12 +101,13 @@ export async function markSentForSignatureAction(
           .map((h) => `${h.quantity} ${HARDWARE[h.hardwareId].label}`)
           .join(', ') || null
 
+        const offerAmount = latestOffer ? formatCurrency(latestOffer.amountTotal) : null
         sections = {
           executiveSummary: [
             `Platomico propone a ${deal.company.name} una solución completa de gestión de pedidos en hostelería basada en el plan ${plan.label}.`,
             `Con ${cfg.locations} local${cfg.locations > 1 ? 'es' : ''} y un volumen estimado de ${formatNumber(cfg.dailyOrdersPerLocation)} pedidos mensuales por local, la plataforma digitaliza y optimiza toda la operación.`,
-            `El impacto económico estimado es de ${formatCurrency(eco.totalMonthlyRevenue)}/mes (${formatCurrency(eco.annualRevenue)}/año).`,
-          ].join(' '),
+            offerAmount ? `El importe de la oferta es de ${offerAmount}.` : null,
+          ].filter(Boolean).join(' '),
           solution: [
             `La solución incluye el plan ${plan.label} con acceso completo a la plataforma Platomico.`,
             addonsText ? `Módulos adicionales contratados: ${addonsText}.` : null,
@@ -105,11 +115,8 @@ export async function markSentForSignatureAction(
             'La implementación contempla formación completa del equipo y soporte técnico dedicado durante el arranque.',
           ].filter(Boolean).join(' '),
           economicsSummary: [
-            `Ingresos recurrentes estimados: ${formatCurrency(eco.totalMonthlyRevenue)}/mes · ${formatCurrency(eco.annualRevenue)}/año.`,
-            eco.hardwareCostTotal > 0
-              ? `Inversión en hardware: ${formatCurrency(eco.hardwareCostTotal)}${eco.paybackMonths !== null ? `. Payback estimado: ${eco.paybackMonths} meses.` : '.'}`
-              : 'Sin inversión en hardware adicional.',
-            `Margen bruto estimado: ${eco.grossMarginPercent.toFixed(0)}% (${formatCurrency(eco.grossMarginMonthly)}/mes).`,
+            offerAmount ? `Importe oferta: ${offerAmount}.` : 'Importe pendiente de confirmar.',
+            hwText ? `Hardware incluido: ${hwText}.` : 'Sin hardware adicional.',
           ].join(' '),
           nextSteps: [
             '1. Revisión y aprobación de la propuesta.',

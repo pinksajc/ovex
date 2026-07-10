@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { getDeals, getActiveConfig } from '@/lib/deals'
+import { getDeals } from '@/lib/deals'
 import { formatCurrency } from '@/lib/format'
 import { DealsTable } from '@/components/deals/deals-table'
 import { getCurrentUser, getWorkspaceMembers } from '@/lib/auth'
@@ -36,8 +36,8 @@ export default async function DealsPage({
     ? allDeals.filter((d) => d.ownerId === null || d.ownerId === user.id)
     : allDeals
 
-  const totalMRR = deals.reduce((sum, d) => sum + (getActiveConfig(d)?.economics.totalMonthlyRevenue ?? 0), 0)
-  const totalARR = deals.reduce((sum, d) => sum + (getActiveConfig(d)?.economics.annualRevenue ?? 0), 0)
+  const totalMRR = deals.reduce((sum, d) => sum + (d.latestOffers ?? []).reduce((s, o) => s + o.fixedMonthly, 0), 0)
+  const totalARR = totalMRR * 12
   const configured = deals.filter((d) => d.commercialStatus !== 'no_config').length
   const closeReady = deals.filter((d) => d.commercialStatus === 'proposal_created').length
 

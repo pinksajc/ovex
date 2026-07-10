@@ -3,7 +3,6 @@
 import { useState, useTransition, useCallback } from 'react'
 import { useRouter, usePathname } from 'next/navigation'
 import Link from 'next/link'
-import { getActiveConfig } from '@/lib/deals'
 import { formatCurrency } from '@/lib/format'
 import { assignDealOwnerAction } from '@/app/actions/assign-owner'
 import { bulkDeleteDealsAction } from '@/app/actions/deals'
@@ -466,11 +465,9 @@ function DealRow({
   isSelected?: boolean
   onToggle?: (id: string) => void
 }) {
-  const cfg = getActiveConfig(deal)
-  const mrr = cfg?.economics.totalMonthlyRevenue ?? 0
-  const arr = cfg?.economics.annualRevenue ?? 0
-  const payback = cfg?.economics.paybackMonths ?? null
-  const versionLabel = cfg ? `v${cfg.version}${cfg.label ? ` · ${cfg.label}` : ''}` : null
+  const mrr = (deal.latestOffers ?? []).reduce((s, o) => s + o.fixedMonthly, 0)
+  const arr = mrr * 12
+  const hasOffer = (deal.latestOffers ?? []).length > 0
   const hot = ['signed', 'negotiating', 'viewed', 'proposal_sent', 'proposal_created'].includes(deal.commercialStatus)
   const stale = !!deal.lastActivityAt && isStale(deal.lastActivityAt) && !hot
 
@@ -552,15 +549,12 @@ function DealRow({
       <td className="px-3 py-3">
         <div className="flex flex-col gap-1 items-start">
           <StatusBadge status={deal.commercialStatus} dealId={deal.id} />
-          {versionLabel && (
-            <span className="text-[10px] font-mono text-zinc-400 leading-none">{versionLabel}</span>
-          )}
         </div>
       </td>
 
       {/* MRR */}
       <td className="px-3 py-3 text-right">
-        {cfg ? (
+        {hasOffer ? (
           <span className="font-mono font-semibold text-sm text-zinc-900 tabular-nums">{formatCurrency(mrr)}</span>
         ) : (
           <span className="text-xs text-zinc-300">—</span>
@@ -569,24 +563,16 @@ function DealRow({
 
       {/* ARR */}
       <td className="px-3 py-3 text-right hidden lg:table-cell">
-        {cfg ? (
+        {hasOffer ? (
           <span className="font-mono text-sm text-zinc-500 tabular-nums">{formatCurrency(arr)}</span>
         ) : (
           <span className="text-xs text-zinc-300">—</span>
         )}
       </td>
 
-      {/* Payback */}
+      {/* Payback — removed (simulator data) */}
       <td className="px-3 py-3 text-right hidden lg:table-cell">
-        {cfg ? (
-          payback !== null ? (
-            <span className={`font-mono text-sm font-medium tabular-nums ${paybackColor(payback)}`}>{payback}m</span>
-          ) : (
-            <span className="text-xs text-zinc-400">—</span>
-          )
-        ) : (
-          <span className="text-xs text-zinc-300">—</span>
-        )}
+        <span className="text-xs text-zinc-300">—</span>
       </td>
 
       {/* Owner */}
