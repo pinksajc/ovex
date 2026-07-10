@@ -51,10 +51,14 @@ export default async function DashboardPage() {
     getPendingBillingPresupuestos(),
   ])
 
-  // Only load locations for closed_won deals (active clients)
   const closedWonDeals = deals.filter((d) => d.stage === 'closed_won')
-  const closedWonIds = closedWonDeals.map((d) => d.id)
-  const locationCountMap = await getLocationCountsByDeal(closedWonIds).catch(() => new Map<string, number>())
+  const pipelineDeals  = deals.filter((d) => d.stage !== 'closed_won' && d.stage !== 'closed_lost' && d.stage !== 'rejected')
+
+  const allActiveIds = deals.map((d) => d.id)
+  const locationCountMap = await getLocationCountsByDeal(allActiveIds).catch(() => new Map<string, number>())
+
+  const locActuales = closedWonDeals.reduce((s, d) => s + (locationCountMap.get(d.id) ?? 0), 0)
+  const locPosibles = pipelineDeals.reduce((s, d) => s + (locationCountMap.get(d.id) ?? 0), 0)
 
   // helper: sum fixedMonthly across accepted offer chains only (for pipeline bars / leaderboard)
   function dealMrr(d: (typeof deals)[0]): number {
@@ -82,39 +86,6 @@ export default async function DashboardPage() {
   const mrr = Array.from(latestInvoiceByDeal.values()).reduce((s, e) => s + e.amount, 0)
   const arr = mrr * 12
 
-  // Localizaciones split by ROS / REN — use ALL presupuestos per deal
-  // (not just accepted) so deals without an accepted offer still classify correctly
-  const pByDeal = new Map<string, (typeof presupuestos)>()
-  for (const p of presupuestos) {
-    if (!p.dealId) continue
-    const arr2 = pByDeal.get(p.dealId) ?? []
-    arr2.push(p)
-    pByDeal.set(p.dealId, arr2)
-  }
-
-  function dealServiceType(dealId: string): { ros: boolean; ren: boolean } {
-    const ps = pByDeal.get(dealId) ?? []
-    let ros = false, ren = false
-    for (const p of ps) {
-      for (const l of p.lineItems) {
-        if (l.type !== 'line') continue
-        const id = l.serviceId ?? ''
-        if (id.startsWith('ros')) ros = true
-        if (id === 'ren') ren = true
-      }
-    }
-    return { ros, ren }
-  }
-
-  let locRos = 0, locRen = 0, locOther = 0
-  for (const deal of closedWonDeals) {
-    const locs = locationCountMap.get(deal.id) ?? 0
-    if (locs === 0) continue
-    const { ros, ren } = dealServiceType(deal.id)
-    if (ros) locRos += locs
-    if (ren) locRen += locs
-    if (!ros && !ren) locOther += locs
-  }
 
   const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString()
   const thisMonth  = invoices.filter((i) => i.createdAt >= monthStart)
@@ -204,26 +175,17 @@ export default async function DashboardPage() {
         <KpiCard label="MRR" value={formatCurrency(mrr)} color="#0071e3" sub={`última factura × ${latestInvoiceByDeal.size} clientes`} />
         <KpiCard label="ARR" value={formatCurrency(arr)} color="#0071e3" />
         <div className="bg-white rounded-2xl shadow-sm p-5">
-          <p className="text-xs font-semibold uppercase tracking-widest text-zinc-400 mb-3 leading-tight">Localizaciones activas</p>
+          <p className="text-xs font-semibold uppercase tracking-widest text-zinc-400 mb-3 leading-tight">Localizaciones</p>
           <div className="flex items-end gap-5">
             <div>
-              <p className="text-2xl font-bold tracking-tight text-zinc-900">{locRos}</p>
-              <p className="text-[10px] text-zinc-400 mt-0.5">ROS</p>
+              <p className="text-2xl font-bold tracking-tight text-zinc-900">{locActuales}</p>
+              <p className="text-[10px] text-zinc-400 mt-0.5">Actuales</p>
             </div>
             <div className="w-px h-8 bg-zinc-100 self-center" />
             <div>
-              <p className="text-2xl font-bold tracking-tight text-zinc-900">{locRen}</p>
-              <p className="text-[10px] text-zinc-400 mt-0.5">REN</p>
+              <p className="text-2xl font-bold tracking-tight text-zinc-900">{locPosibles}</p>
+              <p className="text-[10px] text-zinc-400 mt-0.5">Posibles</p>
             </div>
-            {locOther > 0 && (
-              <>
-                <div className="w-px h-8 bg-zinc-100 self-center" />
-                <div>
-                  <p className="text-2xl font-bold tracking-tight text-zinc-900">{locOther}</p>
-                  <p className="text-[10px] text-zinc-400 mt-0.5">Otros</p>
-                </div>
-              </>
-            )}
           </div>
         </div>
       </div>
