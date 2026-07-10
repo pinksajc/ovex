@@ -296,7 +296,7 @@ async function getDealsFromSupabase(ownerId?: string): Promise<Deal[]> {
 
   type ProfileRow = { id: string; full_name: string | null }
   type OfferRow = {
-    id: string; deal_id: string; amount_total: number
+    id: string; deal_id: string; amount_total: number; vat_rate: number
     status: string; line_items: string | unknown[]
   }
 
@@ -304,7 +304,7 @@ async function getDealsFromSupabase(ownerId?: string): Promise<Deal[]> {
     getBatchActiveConfigsForDeals(dealIds).catch(() => new Map<string, DealConfiguration>()),
     db.from('profiles').select('id, full_name') as unknown as Promise<{ data: ProfileRow[] | null; error: unknown }>,
     (db.from('presupuestos')
-      .select('id, deal_id, amount_total, status, line_items')
+      .select('id, deal_id, amount_total, vat_rate, status, line_items')
       .in('deal_id', dealIds)
       .in('status', ['accepted', 'sent'])
       .order('created_at', { ascending: false }) as unknown as Promise<{ data: OfferRow[] | null; error: unknown }>),
@@ -326,9 +326,10 @@ async function getDealsFromSupabase(ownerId?: string): Promise<Deal[]> {
         typeof row.line_items === 'string' ? JSON.parse(row.line_items) : (row.line_items as typeof lines ?? [])
       const serviceLines = lines.filter((l) => l.type === 'line')
       const hasVariable = serviceLines.some((l) => VARIABLE_IDS.has(l.serviceId ?? ''))
+      const vatMultiplier = 1 + (row.vat_rate ?? 21) / 100
       const fixedMonthly = serviceLines
         .filter((l) => !VARIABLE_IDS.has(l.serviceId ?? ''))
-        .reduce((s, l) => s + (l.amount ?? 0), 0)
+        .reduce((s, l) => s + (l.amount ?? 0), 0) * vatMultiplier
       latestOfferMap.set(row.deal_id, {
         amountTotal: row.amount_total,
         fixedMonthly,
