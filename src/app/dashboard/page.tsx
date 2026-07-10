@@ -64,53 +64,44 @@ export default async function DashboardPage() {
   }
 
   const now        = new Date()
-  const todayStr   = now.toISOString().slice(0, 10)
 
   // ── Section 1: KPIs ────────────────────────────────────────────────────────
-  // Real MRR = accepted presupuestos with a contractStartDate that has already started,
-  // deduped by version chain (one per chain — accepted wins over sent).
-  // This avoids counting closed_won deals that have no active contract yet.
-  const activePresupuestos = (() => {
-    // Group accepted presupuestos that have started by version chain, keep one per chain
-    const chainMap = new Map<string, (typeof presupuestos)[0]>()
-    for (const p of presupuestos) {
-      if (p.status !== 'accepted') continue
-      if (!p.contractStartDate || p.contractStartDate > todayStr) continue
-      const root = p.parentId ?? p.id
-      const existing = chainMap.get(root)
-      // prefer most-recent by contractStartDate (shouldn't conflict, but be safe)
-      if (!existing || p.contractStartDate > existing.contractStartDate!) {
-        chainMap.set(root, p)
-      }
-    }
-    return Array.from(chainMap.values())
-  })()
-
-  const { VARIABLE_IDS: VAR_IDS } = await import('@/lib/deal-type')
-  const mrr = activePresupuestos.reduce((sum, p) => {
-    const vatMult = 1 + (p.vatRate ?? 21) / 100
-    const fixed = p.lineItems
-      .filter((l) => l.type === 'line' && !VAR_IDS.has(l.serviceId ?? ''))
-      .reduce((s, l) => s + (l.amount ?? 0), 0)
-    const calcVar = p.lineItems
-      .filter((l) => l.type === 'line' && VAR_IDS.has(l.serviceId ?? '') && (l.quantity ?? 0) > 0)
-      .reduce((s, l) => s + (l.amount ?? 0), 0)
-    return sum + (fixed + calcVar) * vatMult
-  }, 0)
+  // MRR = accepted offers from closed_won deals (same basis as pipeline bar)
+  const mrr = closedWonDeals.reduce((s, d) => s + dealMrr(d), 0)
   const arr = mrr * 12
 
-  // Localizaciones split by service type (ROS vs REN)
-  // A deal can contribute to both if it has offers of each type
+  // Localizaciones split by ROS / REN — use ALL presupuestos per deal
+  // (not just accepted) so deals without an accepted offer still classify correctly
+  const pByDeal = new Map<string, (typeof presupuestos)>()
+  for (const p of presupuestos) {
+    if (!p.dealId) continue
+    const arr2 = pByDeal.get(p.dealId) ?? []
+    arr2.push(p)
+    pByDeal.set(p.dealId, arr2)
+  }
+
+  function dealServiceType(dealId: string): { ros: boolean; ren: boolean } {
+    const ps = pByDeal.get(dealId) ?? []
+    let ros = false, ren = false
+    for (const p of ps) {
+      for (const l of p.lineItems) {
+        if (l.type !== 'line') continue
+        const id = l.serviceId ?? ''
+        if (id.startsWith('ros')) ros = true
+        if (id === 'ren') ren = true
+      }
+    }
+    return { ros, ren }
+  }
+
   let locRos = 0, locRen = 0, locOther = 0
   for (const deal of closedWonDeals) {
     const locs = locationCountMap.get(deal.id) ?? 0
     if (locs === 0) continue
-    const concepts = (deal.latestOffers ?? []).map((o) => o.concept ?? '')
-    const hasRos = concepts.some((c) => c.toLowerCase().includes('ros'))
-    const hasRen = concepts.some((c) => c.toLowerCase().includes('ren'))
-    if (hasRos) locRos += locs
-    if (hasRen) locRen += locs
-    if (!hasRos && !hasRen) locOther += locs
+    const { ros, ren } = dealServiceType(deal.id)
+    if (ros) locRos += locs
+    if (ren) locRen += locs
+    if (!ros && !ren) locOther += locs
   }
 
   const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString()
