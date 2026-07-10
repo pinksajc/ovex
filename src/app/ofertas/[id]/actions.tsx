@@ -8,13 +8,17 @@ import type { PresupuestoStatus } from '@/types'
 const TRANSITIONS: Record<PresupuestoStatus, { label: string; next: PresupuestoStatus; color: string }[]> = {
   draft: [
     { label: 'Marcar como Enviado', next: 'sent', color: 'border-blue-200 text-blue-700 hover:bg-blue-50' },
+    { label: 'Descartar oferta', next: 'expired', color: 'border-zinc-200 text-zinc-500 hover:bg-zinc-50' },
   ],
   sent: [
     { label: 'Marcar como Aceptado', next: 'accepted', color: 'border-emerald-200 text-emerald-700 hover:bg-emerald-50' },
     { label: 'Marcar como Rechazado', next: 'rejected', color: 'border-red-200 text-red-700 hover:bg-red-50' },
+    { label: 'Descartar oferta', next: 'expired', color: 'border-zinc-200 text-zinc-500 hover:bg-zinc-50' },
   ],
   accepted: [],
-  rejected: [],
+  rejected: [
+    { label: 'Descartar oferta', next: 'expired', color: 'border-zinc-200 text-zinc-500 hover:bg-zinc-50' },
+  ],
   expired: [
     { label: 'Marcar como Enviado', next: 'sent', color: 'border-blue-200 text-blue-700 hover:bg-blue-50' },
   ],
