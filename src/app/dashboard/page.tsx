@@ -66,8 +66,20 @@ export default async function DashboardPage() {
   const now        = new Date()
 
   // ── Section 1: KPIs ────────────────────────────────────────────────────────
-  // MRR = accepted offers from closed_won deals (same basis as pipeline bar)
-  const mrr = closedWonDeals.reduce((s, d) => s + dealMrr(d), 0)
+  // MRR = most recent issued/paid invoice per closed_won deal, summed up
+  const closedWonDealIds = new Set(closedWonDeals.map((d) => d.id))
+  type InvEntry = { amount: number; date: string }
+  const latestInvoiceByDeal = new Map<string, InvEntry>()
+  for (const inv of invoices) {
+    if (!inv.dealId || !closedWonDealIds.has(inv.dealId)) continue
+    if (inv.status !== 'issued' && inv.status !== 'paid') continue
+    const date = inv.issuedAt ?? inv.createdAt
+    const existing = latestInvoiceByDeal.get(inv.dealId)
+    if (!existing || date > existing.date) {
+      latestInvoiceByDeal.set(inv.dealId, { amount: inv.amountTotal, date })
+    }
+  }
+  const mrr = Array.from(latestInvoiceByDeal.values()).reduce((s, e) => s + e.amount, 0)
   const arr = mrr * 12
 
   // Localizaciones split by ROS / REN — use ALL presupuestos per deal
@@ -189,7 +201,7 @@ export default async function DashboardPage() {
 
       {/* ── Section 1: KPI strip ── */}
       <div className="grid grid-cols-3 gap-4">
-        <KpiCard label="MRR" value={formatCurrency(mrr)} color="#0071e3" sub={`${closedWonDeals.length} clientes · solo aceptadas`} />
+        <KpiCard label="MRR" value={formatCurrency(mrr)} color="#0071e3" sub={`última factura × ${latestInvoiceByDeal.size} clientes`} />
         <KpiCard label="ARR" value={formatCurrency(arr)} color="#0071e3" />
         <div className="bg-white rounded-2xl shadow-sm p-5">
           <p className="text-xs font-semibold uppercase tracking-widest text-zinc-400 mb-3 leading-tight">Localizaciones activas</p>
