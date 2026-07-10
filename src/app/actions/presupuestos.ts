@@ -1,7 +1,7 @@
 'use server'
 
 import { redirect } from 'next/navigation'
-import { revalidatePath } from 'next/cache'
+import { revalidatePath, revalidateTag } from 'next/cache'
 import { isRedirectError } from 'next/dist/client/components/redirect-error'
 import { requireAuth } from '@/lib/auth'
 import { createPresupuesto, updatePresupuesto, updatePresupuestoStatus, updatePresupuestoSignatureRequired, getPresupuesto, createPresupuestoVersion, deletePresupuesto } from '@/lib/supabase/presupuestos'
@@ -23,6 +23,7 @@ export async function createPresupuestoAction(input: CreatePresupuestoInput): Pr
 
     revalidatePath('/ofertas')
     revalidatePath('/deals')
+    revalidateTag('attio-deals')
     redirect(`/ofertas/${presupuesto.id}`)
   } catch (err) {
     // redirect() throws internally — rethrow it
@@ -41,6 +42,7 @@ export async function updatePresupuestoAction(
     revalidatePath('/ofertas')
     revalidatePath(`/ofertas/${id}`)
     revalidatePath('/deals')
+    revalidateTag('attio-deals')
     redirect(`/ofertas/${id}`)
   } catch (err) {
     if (isRedirectError(err)) throw err
@@ -59,6 +61,7 @@ export async function updatePresupuestoStatusAction(
     revalidatePath('/ofertas')
     revalidatePath(`/ofertas/${id}`)
     revalidatePath('/deals')
+    revalidateTag('attio-deals')
     return { ok: true }
   } catch (err) {
     return { ok: false, error: (err as { message?: string })?.message ?? 'Error desconocido' }
@@ -92,6 +95,7 @@ export async function createVersionAction(
     revalidatePath('/ofertas')
     revalidatePath(`/ofertas/${presupuestoId}`)
     revalidatePath('/deals')
+    revalidateTag('attio-deals')
     return { ok: true, id: newPq.id }
   } catch (err) {
     return { ok: false, error: (err as { message?: string })?.message ?? 'Error desconocido' }
@@ -106,6 +110,7 @@ export async function deletePresupuestoAction(
     await deletePresupuesto(id)
     revalidatePath('/ofertas')
     revalidatePath('/deals')
+    revalidateTag('attio-deals')
     return { ok: true }
   } catch (err) {
     return { ok: false, error: (err as { message?: string })?.message ?? 'Error desconocido' }
@@ -145,6 +150,7 @@ export async function acceptContratoAction(
     revalidatePath('/ofertas')
     revalidatePath(`/ofertas/${id}`)
     revalidatePath('/deals')
+    revalidateTag('attio-deals')
     return { ok: true }
   } catch (err) {
     return { ok: false, error: (err as { message?: string })?.message ?? 'Error desconocido' }
