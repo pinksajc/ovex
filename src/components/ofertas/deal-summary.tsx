@@ -58,14 +58,17 @@ export function DealSummary({ lineItems, dealType, locationCount = 0 }: Props) {
   const otherLines = toRows(lineItems.filter(
     (l) => l.type === 'line' && IGNORE_IDS.has(l.serviceId ?? ''),
   ))
-  const fixedLines    = toRows(serviceLines.filter((l) => !VARIABLE_IDS.has(l.serviceId ?? '')))
-  const variableLines = toRows(serviceLines.filter((l) =>  VARIABLE_IDS.has(l.serviceId ?? '')))
+  const fixedLines       = toRows(serviceLines.filter((l) => !VARIABLE_IDS.has(l.serviceId ?? '')))
+  const allVarLines      = toRows(serviceLines.filter((l) =>  VARIABLE_IDS.has(l.serviceId ?? '')))
+  // Variable lines with a quantity entered are already calculated → treat as fixed monetary
+  const calculatedVarLines = allVarLines.filter((l) => l.quantity > 0 && l.amount > 0)
+  const trueVarLines       = allVarLines.filter((l) => l.quantity === 0 || l.amount === 0)
 
-  if (fixedLines.length === 0 && variableLines.length === 0 && otherLines.length === 0) return null
+  if (fixedLines.length === 0 && allVarLines.length === 0 && otherLines.length === 0) return null
 
   const totalFixed   = fixedLines.reduce((s, l) => s + l.amount, 0)
-  const feePerOrder  = variableLines.reduce((s, l) => s + l.unitPrice, 0)
-  const totalVarEst  = variableLines.reduce((s, l) => s + l.amount, 0)
+  const feePerOrder  = trueVarLines.reduce((s, l) => s + l.unitPrice, 0)
+  const totalVarEst  = calculatedVarLines.reduce((s, l) => s + l.amount, 0)
 
   const isMixed    = dealType === 'mixed'
   const showLocales = locationCount > 0
@@ -127,7 +130,7 @@ export function DealSummary({ lineItems, dealType, locationCount = 0 }: Props) {
         )}
 
         {/* ── Variable block ──────────────────────────────────────────── */}
-        {variableLines.length > 0 && (
+        {allVarLines.length > 0 && (
           <div>
             {isMixed && (
               <p className="text-[10px] font-semibold text-zinc-400 uppercase tracking-widest mb-2.5">
@@ -135,7 +138,17 @@ export function DealSummary({ lineItems, dealType, locationCount = 0 }: Props) {
               </p>
             )}
             <div className="space-y-1.5">
-              {variableLines.map((l) => (
+              {/* Calculated variable lines — show as monetary amount */}
+              {calculatedVarLines.map((l) => (
+                <div key={l.id} className="flex items-baseline justify-between gap-2">
+                  <span className="text-xs text-zinc-700 truncate">{l.description}</span>
+                  <span className="text-xs font-mono text-zinc-900 shrink-0 tabular-nums">
+                    {formatEur(l.amount)}<span className="text-zinc-400">/mes</span>
+                  </span>
+                </div>
+              ))}
+              {/* True variable lines — show per-order rate */}
+              {trueVarLines.map((l) => (
                 <div key={l.id} className="flex items-baseline justify-between gap-2">
                   <span className="text-xs text-zinc-700 truncate">{l.description}</span>
                   <span className="text-xs font-mono text-zinc-900 shrink-0 tabular-nums">
@@ -143,12 +156,14 @@ export function DealSummary({ lineItems, dealType, locationCount = 0 }: Props) {
                   </span>
                 </div>
               ))}
-              <div className="flex items-baseline justify-between gap-2 pt-2 border-t border-zinc-100">
-                <span className="text-xs font-semibold text-zinc-700">Fee variable</span>
-                <span className="text-xs font-mono font-semibold text-zinc-900 tabular-nums">
-                  {formatEurPedido(feePerOrder)}<span className="text-zinc-500 font-normal">/pedido</span>
-                </span>
-              </div>
+              {trueVarLines.length > 1 && (
+                <div className="flex items-baseline justify-between gap-2 pt-2 border-t border-zinc-100">
+                  <span className="text-xs font-semibold text-zinc-700">Fee variable</span>
+                  <span className="text-xs font-mono font-semibold text-zinc-900 tabular-nums">
+                    {formatEurPedido(feePerOrder)}<span className="text-zinc-500 font-normal">/pedido</span>
+                  </span>
+                </div>
+              )}
             </div>
           </div>
         )}
@@ -179,23 +194,14 @@ export function DealSummary({ lineItems, dealType, locationCount = 0 }: Props) {
           <div className="flex items-baseline justify-between gap-2">
             <span className="text-xs text-zinc-500">Cuota fija mensual</span>
             <span className="text-xs font-mono text-zinc-800 tabular-nums">
-              {formatEur(totalFixed)}<span className="text-zinc-400">/mes</span>
+              {formatEur(totalFixed + totalVarEst)}<span className="text-zinc-400">/mes</span>
             </span>
           </div>
-          <div className="flex items-baseline justify-between gap-2">
-            <span className="text-xs text-zinc-500">Fee variable</span>
-            <span className="text-xs font-mono text-zinc-800 tabular-nums">
-              {formatEurPedido(feePerOrder)}<span className="text-zinc-400">/pedido</span>
-            </span>
-          </div>
-          {totalVarEst > 0 && (
-            <div className="flex items-baseline justify-between gap-2 pt-2 border-t border-zinc-100">
-              <span className="text-xs font-semibold text-zinc-700">
-                Total estimado mensual
-                <span className="ml-1 text-[10px] font-normal text-zinc-400">(según volumen oferta)</span>
-              </span>
-              <span className="text-sm font-mono font-semibold text-zinc-900 tabular-nums">
-                {formatEur(totalFixed + totalVarEst)}<span className="text-zinc-500 font-normal text-xs">/mes</span>
+          {trueVarLines.length > 0 && (
+            <div className="flex items-baseline justify-between gap-2">
+              <span className="text-xs text-zinc-500">Fee variable</span>
+              <span className="text-xs font-mono text-zinc-800 tabular-nums">
+                {formatEurPedido(feePerOrder)}<span className="text-zinc-400">/pedido</span>
               </span>
             </div>
           )}
