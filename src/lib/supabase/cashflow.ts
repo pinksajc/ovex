@@ -17,11 +17,12 @@ interface CashflowRow {
   state: string | null
   balance: number | string | null
   source_file: string | null
+  loan_id: string | null
   created_at: string
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function table(db: ReturnType<typeof getSupabaseClient>) {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   return (db as unknown as { from(t: string): any }).from('cashflow_transactions')
 }
 
@@ -37,6 +38,7 @@ function rowToTx(row: CashflowRow): CashflowTransaction {
     state: row.state,
     balance: row.balance != null ? Number(row.balance) : null,
     sourceFile: row.source_file,
+    loanId: row.loan_id ?? null,
     createdAt: row.created_at,
   }
 }
@@ -47,11 +49,23 @@ export async function getCashflowTransactions(): Promise<CashflowTransaction[]> 
   const db = getSupabaseClient()
   // Cap at 2000 rows — date filtering happens in-memory so we need the full history,
   // but a hard cap prevents unbounded fetches if the table grows very large
-  const { data, error } = await table(db)
-    .select('id, date, description, amount, type, category, currency, state, balance, source_file, created_at')
+  const WITH_LOAN = 'id, date, description, amount, type, category, currency, state, balance, source_file, loan_id, created_at'
+  const WITHOUT_LOAN = 'id, date, description, amount, type, category, currency, state, balance, source_file, created_at'
+
+  let { data, error } = await table(db)
+    .select(WITH_LOAN)
     .order('date', { ascending: false })
     .order('created_at', { ascending: false })
     .limit(2000)
+
+  // Graceful fallback if the loan_id column hasn't been migrated yet
+  if (error && /loan_id/.test(error.message ?? '')) {
+    ;({ data, error } = await table(db)
+      .select(WITHOUT_LOAN)
+      .order('date', { ascending: false })
+      .order('created_at', { ascending: false })
+      .limit(2000))
+  }
 
   if (error) throw new Error(`getCashflowTransactions: ${error.message}`)
 
@@ -266,8 +280,8 @@ export async function updateCashflowCategoryByDescription(
 
 // ── Category rules ─────────────────────────────────────────────────────────────
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function rulesTable(db: ReturnType<typeof getSupabaseClient>) {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   return (db as unknown as { from(t: string): any }).from('cashflow_category_rules')
 }
 

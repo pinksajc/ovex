@@ -2,15 +2,17 @@
 
 import { useRouter, usePathname } from 'next/navigation'
 
+type Tab = 'transactions' | 'planning' | 'loans'
+
 interface CashflowTabsProps {
-  activeTab: 'transactions' | 'planning'
+  activeTab: Tab
 }
 
 export function CashflowTabs({ activeTab }: CashflowTabsProps) {
   const router   = useRouter()
   const pathname = usePathname()
 
-  function switchTab(tab: 'transactions' | 'planning') {
+  function switchTab(tab: Tab) {
     const params = new URLSearchParams(window.location.search)
     if (tab === 'transactions') params.delete('tab')
     else params.set('tab', tab)
@@ -26,6 +28,10 @@ export function CashflowTabs({ activeTab }: CashflowTabsProps) {
       <span className="text-zinc-200 text-xs select-none">|</span>
       <TabBtn active={activeTab === 'planning'} onClick={() => switchTab('planning')}>
         Planificación
+      </TabBtn>
+      <span className="text-zinc-200 text-xs select-none">|</span>
+      <TabBtn active={activeTab === 'loans'} onClick={() => switchTab('loans')}>
+        Préstamos
       </TabBtn>
     </div>
   )

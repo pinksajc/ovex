@@ -460,7 +460,27 @@ export interface CashflowTransaction {
   state: string | null
   balance: number | null
   sourceFile: string | null
+  loanId: string | null  // links a Préstamos movement to a named loan
   createdAt: string
+}
+
+/** Direction of a loan relative to Platomico. */
+export type LoanDirection = 'lent' | 'borrowed'
+
+export interface CashflowLoan {
+  id: string
+  name: string
+  counterparty: string
+  direction: LoanDirection  // 'lent' = they owe us · 'borrowed' = we owe them
+  notes: string | null
+  createdAt: string
+}
+
+export interface InsertCashflowLoan {
+  name: string
+  counterparty: string
+  direction: LoanDirection
+  notes?: string | null
 }
 
 export interface InsertCashflowTransaction {

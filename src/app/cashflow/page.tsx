@@ -11,6 +11,8 @@ import { DateRangeFilter } from '@/components/cashflow/date-range-filter'
 import { AddTransactionButton } from '@/components/cashflow/add-transaction-button'
 import { CashflowTabs } from '@/components/cashflow/cashflow-tabs'
 import { PlanningView } from '@/components/cashflow/planning-view'
+import { LoansView } from '@/components/cashflow/loans-view'
+import { getCashflowLoans } from '@/lib/supabase/cashflow-loans'
 import { TransactionsTable } from '@/components/cashflow/transactions-table'
 import {
   IncomeExpenseChart,
@@ -32,7 +34,7 @@ export default async function CashflowPage({
   const now = new Date()
   const { from: fromParam, to: toParam, tab: tabParam } = await searchParams
 
-  const activeTab = tabParam === 'planning' ? 'planning' : 'transactions'
+  const activeTab = tabParam === 'planning' ? 'planning' : tabParam === 'loans' ? 'loans' : 'transactions'
 
   // ── Always fetch transactions (needed in both tabs for recurring detection) ──
   let allTransactions = await getCashflowTransactions()
@@ -54,6 +56,12 @@ export default async function CashflowPage({
   // ── Planning tab: additional fetches ─────────────────────────────────────────
   const presupuestos = activeTab === 'planning' ? await getCashflowPresupuesto() : []
   const currentBalance = allTransactions.find((t) => t.balance != null)?.balance ?? 0
+
+  // ── Loans tab: fetch loans + all Préstamos-category movements ────────────────
+  const loans = activeTab === 'loans' ? await getCashflowLoans().catch(() => []) : []
+  const loanTransactions = activeTab === 'loans'
+    ? allTransactions.filter((t) => t.category === 'Préstamos')
+    : []
 
   // ── Transactions tab: date filtering + KPIs ───────────────────────────────────
   // Default range = full span of available data (allTransactions sorted desc)
@@ -159,7 +167,9 @@ export default async function CashflowPage({
       </div>
 
       {/* ── Tab content ────────────────────────────────────────────────────── */}
-      {activeTab === 'planning' ? (
+      {activeTab === 'loans' ? (
+        <LoansView loans={loans} loanTransactions={loanTransactions} />
+      ) : activeTab === 'planning' ? (
         <PlanningView
           currentBalance={currentBalance}
           presupuestos={presupuestos}
