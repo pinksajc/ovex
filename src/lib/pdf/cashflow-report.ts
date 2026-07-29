@@ -340,7 +340,11 @@ function buildPage1(
       ${kpiCard('Ingresos',             fmt(totalIncome),          '#22c55e', '+')}
       ${kpiCard('Gastos',               fmt(totalExpense),         '#ef4444')}
       ${kpiCard('Fact. por cobrar',     fmt(facturasPendientes),   NAVY)}
-      ${kpiCard('Préstamos pendientes', fmt(Math.max(0, loanPending)), loanPending > 0 ? '#f97316' : NAVY)}
+      ${kpiCard(
+        loanPending > 0 ? 'Préstamos por pagar' : loanPending < 0 ? 'Préstamos por cobrar' : 'Préstamos',
+        fmt(Math.abs(loanPending)),
+        loanPending > 0 ? '#f97316' : loanPending < 0 ? '#0071e3' : NAVY,
+      )}
       ${kpiCard('Capital externo',      fmt(totalExternalCapital), NAVY, totalExternalCapital > 0 ? '+' : '')}
     </div>
 
@@ -442,27 +446,38 @@ function buildPage2(
           <tr style="background:#f8fafc;">
             <th style="padding:5px 6px;font-size:7.5px;font-weight:700;color:#64748b;text-align:left;">Contraparte</th>
             <th style="padding:5px 6px;font-size:7.5px;font-weight:700;color:#22c55e;text-align:right;">Recibido</th>
-            <th style="padding:5px 6px;font-size:7.5px;font-weight:700;color:#ef4444;text-align:right;">Pagado de vuelta</th>
-            <th style="padding:5px 6px;font-size:7.5px;font-weight:700;color:#64748b;text-align:right;">Deuda neta</th>
+            <th style="padding:5px 6px;font-size:7.5px;font-weight:700;color:#ef4444;text-align:right;">Enviado</th>
+            <th style="padding:5px 6px;font-size:7.5px;font-weight:700;color:#64748b;text-align:right;">Balance</th>
           </tr>
         </thead>
         <tbody>
-          ${cpEntries.map(({ name, recibido, dado, neto }) => {
-            const netoColor = neto > 0 ? '#f97316' : neto < 0 ? '#22c55e' : '#64748b'
+          ${cpEntries.map(({ name, recibido, dado }) => {
+            // porCobrar > 0 → nos deben; < 0 → les debemos; 0 → saldado
+            const porCobrar = dado - recibido
+            const balColor = porCobrar > 0 ? '#0071e3' : porCobrar < 0 ? '#f97316' : '#64748b'
+            const balLabel = porCobrar > 0 ? 'Nos deben' : porCobrar < 0 ? 'Les debemos' : 'Saldado'
+            const balText  = porCobrar === 0 ? 'Saldado' : `${fmt(Math.abs(porCobrar))} · ${balLabel}`
             return `
           <tr>
             <td style="padding:5px 6px;border-bottom:1px solid #f1f5f9;font-size:8.5px;color:#334155;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${esc(name)}</td>
             <td style="padding:5px 6px;border-bottom:1px solid #f1f5f9;text-align:right;font-family:'Courier New',monospace;font-size:8.5px;color:#22c55e;white-space:nowrap;">${recibido > 0 ? '+' + fmt(recibido) : '—'}</td>
             <td style="padding:5px 6px;border-bottom:1px solid #f1f5f9;text-align:right;font-family:'Courier New',monospace;font-size:8.5px;color:#ef4444;white-space:nowrap;">${dado > 0 ? '−' + fmt(dado) : '—'}</td>
-            <td style="padding:5px 6px;border-bottom:1px solid #f1f5f9;text-align:right;font-family:'Courier New',monospace;font-size:8.5px;font-weight:700;color:${netoColor};white-space:nowrap;">${fmt(neto)}</td>
+            <td style="padding:5px 6px;border-bottom:1px solid #f1f5f9;text-align:right;font-family:'Courier New',monospace;font-size:8.5px;font-weight:700;color:${balColor};white-space:nowrap;">${balText}</td>
           </tr>`
           }).join('')}
+          ${(() => {
+            const totalPorCobrar = loanOut - loanIn
+            const balColor = totalPorCobrar > 0 ? '#0071e3' : totalPorCobrar < 0 ? '#f97316' : '#64748b'
+            const balLabel = totalPorCobrar > 0 ? 'Nos deben' : totalPorCobrar < 0 ? 'Les debemos' : 'Saldado'
+            const balText  = totalPorCobrar === 0 ? 'Saldado' : `${fmt(Math.abs(totalPorCobrar))} · ${balLabel}`
+            return `
           <tr style="background:#f0f4f8;">
             <td style="padding:6px 6px;font-size:8.5px;font-weight:700;color:#334155;">Total</td>
             <td style="padding:6px 6px;text-align:right;font-family:'Courier New',monospace;font-size:8.5px;font-weight:700;color:#22c55e;white-space:nowrap;">+${fmt(loanIn)}</td>
             <td style="padding:6px 6px;text-align:right;font-family:'Courier New',monospace;font-size:8.5px;font-weight:700;color:#ef4444;white-space:nowrap;">−${fmt(loanOut)}</td>
-            <td style="padding:6px 6px;text-align:right;font-family:'Courier New',monospace;font-size:8.5px;font-weight:700;color:${loanPending > 0 ? '#f97316' : '#22c55e'};white-space:nowrap;">${fmt(loanPending)}</td>
-          </tr>
+            <td style="padding:6px 6px;text-align:right;font-family:'Courier New',monospace;font-size:8.5px;font-weight:700;color:${balColor};white-space:nowrap;">${balText}</td>
+          </tr>`
+          })()}
         </tbody>
       </table>
     </div>` : ''

@@ -232,33 +232,47 @@ function CfLoansTableKpi({
           <tr className="border-b border-zinc-100">
             <th className="text-left pb-1.5 text-[10px] font-semibold text-zinc-400 pr-3">Contraparte</th>
             <th className="text-right pb-1.5 text-[10px] font-semibold text-emerald-600 pr-2">Recibido</th>
-            <th className="text-right pb-1.5 text-[10px] font-semibold text-red-500 pr-2">Pagado de vuelta</th>
-            <th className="text-right pb-1.5 text-[10px] font-semibold text-zinc-500">Deuda neta</th>
+            <th className="text-right pb-1.5 text-[10px] font-semibold text-red-500 pr-2">Enviado</th>
+            <th className="text-right pb-1.5 text-[10px] font-semibold text-zinc-500">Balance</th>
           </tr>
         </thead>
         <tbody>
-          {counterparties.map((cp) => (
-            <tr key={cp.name} className="border-b border-zinc-50">
-              <td className="py-1 pr-3 text-zinc-700 font-medium whitespace-nowrap">{cp.name}</td>
-              <td className="py-1 pr-2 text-right font-mono text-emerald-600 whitespace-nowrap">
-                {cp.recibido > 0 ? `+${formatCurrency(cp.recibido)}` : '—'}
-              </td>
-              <td className="py-1 pr-2 text-right font-mono text-red-500 whitespace-nowrap">
-                {cp.dado > 0 ? `−${formatCurrency(cp.dado)}` : '—'}
-              </td>
-              <td className="py-1 text-right whitespace-nowrap">
-                {cp.neto <= 0 ? (
-                  <span className="inline-block px-1.5 py-0.5 rounded text-[9px] font-bold bg-emerald-50 text-emerald-600 border border-emerald-200">
-                    Saldado
-                  </span>
-                ) : (
-                  <span className="font-mono font-bold" style={{ color: '#ff9f0a' }}>
-                    {formatCurrency(cp.neto)}
-                  </span>
-                )}
-              </td>
-            </tr>
-          ))}
+          {counterparties.map((cp) => {
+            // porCobrar > 0 → ellos nos deben; < 0 → nosotros les debemos; 0 → saldado
+            const porCobrar = cp.dado - cp.recibido
+            return (
+              <tr key={cp.name} className="border-b border-zinc-50">
+                <td className="py-1 pr-3 text-zinc-700 font-medium whitespace-nowrap">{cp.name}</td>
+                <td className="py-1 pr-2 text-right font-mono text-emerald-600 whitespace-nowrap">
+                  {cp.recibido > 0 ? `+${formatCurrency(cp.recibido)}` : '—'}
+                </td>
+                <td className="py-1 pr-2 text-right font-mono text-red-500 whitespace-nowrap">
+                  {cp.dado > 0 ? `−${formatCurrency(cp.dado)}` : '—'}
+                </td>
+                <td className="py-1 text-right whitespace-nowrap">
+                  {porCobrar === 0 ? (
+                    <span className="inline-block px-1.5 py-0.5 rounded text-[9px] font-bold bg-emerald-50 text-emerald-600 border border-emerald-200">
+                      Saldado
+                    </span>
+                  ) : porCobrar > 0 ? (
+                    <span className="inline-flex flex-col items-end leading-tight">
+                      <span className="font-mono font-bold" style={{ color: '#0071e3' }}>
+                        {formatCurrency(porCobrar)}
+                      </span>
+                      <span className="text-[8px] font-semibold uppercase tracking-wide text-blue-400">Nos deben</span>
+                    </span>
+                  ) : (
+                    <span className="inline-flex flex-col items-end leading-tight">
+                      <span className="font-mono font-bold" style={{ color: '#ff9f0a' }}>
+                        {formatCurrency(Math.abs(porCobrar))}
+                      </span>
+                      <span className="text-[8px] font-semibold uppercase tracking-wide text-amber-400">Les debemos</span>
+                    </span>
+                  )}
+                </td>
+              </tr>
+            )
+          })}
         </tbody>
         <tfoot>
           <tr className="bg-zinc-50 rounded">
@@ -269,11 +283,22 @@ function CfLoansTableKpi({
             <td className="pt-2 pr-2 text-right font-mono font-bold text-red-500 whitespace-nowrap text-[11px]">
               −{formatCurrency(totalDado)}
             </td>
-            <td
-              className="pt-2 text-right font-mono font-bold whitespace-nowrap text-[11px]"
-              style={{ color: totalNeto > 0 ? '#ff9f0a' : totalNeto < 0 ? '#34c759' : '#71717a' }}
-            >
-              {formatCurrency(Math.abs(totalNeto))}
+            <td className="pt-2 text-right whitespace-nowrap">
+              {(() => {
+                const totalPorCobrar = -totalNeto
+                if (totalPorCobrar === 0) return <span className="font-mono font-bold text-zinc-500 text-[11px]">0 €</span>
+                const isReceivable = totalPorCobrar > 0
+                return (
+                  <span className="inline-flex flex-col items-end leading-tight">
+                    <span className="font-mono font-bold text-[11px]" style={{ color: isReceivable ? '#0071e3' : '#ff9f0a' }}>
+                      {formatCurrency(Math.abs(totalPorCobrar))}
+                    </span>
+                    <span className={`text-[8px] font-semibold uppercase tracking-wide ${isReceivable ? 'text-blue-400' : 'text-amber-400'}`}>
+                      {isReceivable ? 'Nos deben' : 'Les debemos'}
+                    </span>
+                  </span>
+                )
+              })()}
             </td>
           </tr>
         </tfoot>
