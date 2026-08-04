@@ -1,34 +1,34 @@
-// =========================================
-// CONTRACT PDF GENERATOR — Condiciones Generales del Servicio
-// server-only
+// =====================================================================
+//  CONTRATO MACRO DE PRESTACIÓN DE SERVICIOS — Master Services Agreement
+//  Documento consolidado y bilingüe (ES/EN) aprobado por Legal (v1.4).
+//  Ref. PLT-SAAS-MACRO-001.
 //
-// Estructura:
-//  Pág. 1  — Encabezado, Partes e Identificación del Contrato
-//  Pág. 2  — Exponen + Servicios contratados
-//  Págs. 3+ — Cláusulas 1ª–20ª (flujo libre, sin breaks forzados)
-//  Pág. (N) — Firmas  [break-before:page]
-//  Pág. (N+1) — Anexo I (SLA)
-//  Pág. (N+2) — Anexo II (Encargado del Tratamiento)
-//  Pág. (N+3) — Anexo III (Inventario de Equipos)
+//  Estructura del PDF:
+//   1. Portada · leyenda de servicios · partes (Reunidos)
+//   2. Cuerpo común · cláusulas 1ª–23ª (bilingüe)
+//   3. Cláusulas específicas por servicio (condicionales, según la Oferta)
+//   4. Módulo REN · corresponsabilidad art. 26 (condicional)
+//   5. Anexo I  · Oferta comercial (autorrellenada) + firmas
+//   6. Anexo II · SLA
+//   7. Anexo III· DPA (art. 28) + tratamiento por módulo + subencargados
+//   8. Anexo IV · Inventario de equipos
+//   9. Anexo V  · NDA + firmas
 //
-// PAGE BREAK STRATEGY:
-//  - Las págs. 1 y 2 usan break-after:page (tamaño fijo, sin riesgo de overflow).
-//  - Las cláusulas fluyen libremente sin ningún break forzado; Puppeteer hace los
-//    saltos de página automáticamente. NO se usa break-after:page en ellas porque
-//    si el contenido termina justo en el límite de página se generaría un salto
-//    doble (natural + forzado) → página en blanco.
-//  - La sección Firmas usa break-before:page (fuerza nueva página desde donde
-//    queden las cláusulas) + break-after:page (separa del Anexo I).
-//  - Los Anexos usan break-after:page salvo el último.
+//  Del lado de Platomico las firmas aparecen como «✓ Firmado» (César Augusto
+//  Castro Sáder, Administrador Único) — no requiere firma manuscrita.
 //
-// Watermark CONFIDENCIAL via position:fixed en el body (aparece en todas las páginas).
-// =========================================
+//  Las cláusulas por servicio aparecen/desaparecen según los servicios
+//  contratados, detectados desde las líneas de la Oferta y ajustables desde
+//  el botón «Generar contrato».
+// =====================================================================
 
 import fs from 'fs'
 import path from 'path'
 import type { Presupuesto, InvoiceLineItem } from '@/types'
-import { SERVICE_MAP } from '@/lib/invoice-catalog'
-import { renderHtmlToPdf } from './generate'
+import { detectServices, type ServiceKey } from './contract-services'
+
+export { detectServices }
+export type { ServiceKey }
 
 export interface ContractParams {
   duracionMeses: number
@@ -38,6 +38,8 @@ export interface ContractParams {
   notas?: string | null
   contactName?: string | null
   contactEmail?: string | null
+  /** Explicit override of which service blocks to render. Omitted → auto-detect. */
+  services?: Partial<Record<ServiceKey, boolean>>
   equipment?: Array<{
     n: number
     tipo: string
@@ -49,6 +51,24 @@ export interface ContractParams {
     cuotaMensual: string
   }>
 }
+
+const SERVICE_COLOR: Record<ServiceKey, string> = {
+  ros:       '#1e3a5f',
+  posKiosk:  '#0891b2',
+  whispr:    '#d97706',
+  analitica: '#16a34a',
+  equipos:   '#475569',
+  ren:       '#7c3aed',
+}
+
+const SERVICE_LEGEND: Array<{ key: ServiceKey; label: string }> = [
+  { key: 'ros',       label: 'ROS' },
+  { key: 'posKiosk',  label: 'POS / Kiosk' },
+  { key: 'ren',       label: 'REN (art. 26)' },
+  { key: 'whispr',    label: 'Whispr' },
+  { key: 'analitica', label: 'Analítica / IA' },
+  { key: 'equipos',   label: 'Equipos' },
+]
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -74,67 +94,269 @@ function fmt(n: number): string {
   return new Intl.NumberFormat('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n)
 }
 
+function fmtQty(n: number): string {
+  return Number.isInteger(n) ? String(n) : new Intl.NumberFormat('es-ES', { maximumFractionDigits: 2 }).format(n)
+}
+
 function fmtDate(s: string): string {
   return new Date(s).toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' })
 }
 
-function addMonths(dateStr: string, months: number): string {
-  const d = new Date(dateStr)
-  d.setMonth(d.getMonth() + months)
-  return d.toISOString().split('T')[0]
+// ── Offer table rows (Anexo I) ───────────────────────────────────────────────
+
+function isRecurring(unit: string | undefined): boolean {
+  const u = (unit ?? '').toLowerCase()
+  return u.includes('mes') || u.includes('pedido')
 }
 
-// ── Hardware items extractor ──────────────────────────────────────────────────
-
-interface HardwareRow {
-  n: number
-  tipo: string
-  modelo: string
-  cantidad: number
-  cuota: number | null
-  origen: string
-}
-
-function extractHardwareRows(items: InvoiceLineItem[]): HardwareRow[] {
-  const rows: HardwareRow[] = []
-  let n = 1
-  for (const item of items) {
-    if (item.type !== 'line') continue
-    const catalogEntry = item.serviceId ? SERVICE_MAP.get(item.serviceId) : undefined
-    const isHardwareCatalog = catalogEntry?.group === 'HARDWARE'
-    const isHardwareCustom  = (item as any).itemCategory === 'hardware'
-    if (!isHardwareCatalog && !isHardwareCustom) continue
-
-    const isRental = item.serviceId?.includes('rental') || item.serviceId?.includes('financed')
-    rows.push({
-      n: n++,
-      tipo: catalogEntry?.label ?? item.description ?? '—',
-      modelo: '—',
-      cantidad: item.quantity,
-      cuota: isRental ? item.unitPrice : null,
-      origen: 'Platomico',
-    })
+function renderOfferRows(items: InvoiceLineItem[]): string {
+  const lines = items.filter((i) => i.type === 'line')
+  if (lines.length === 0) {
+    return `<tr><td colspan="5" style="text-align:center;color:#94a3b8;font-style:italic;padding:10px;">Sin conceptos — ver Oferta ${''}</td></tr>`
   }
-  return rows
+  return lines.map((l) => {
+    const period = isRecurring(l.unit) ? 'Mensual' : 'Único'
+    return `<tr>
+      <td>${esc(l.description)}</td>
+      <td class="right mono">${fmtQty(l.quantity)}</td>
+      <td class="right mono">${fmt(l.unitPrice)} €</td>
+      <td class="right mono fw6">${fmt(l.amount)} €</td>
+      <td>${period}</td>
+    </tr>`
+  }).join('')
 }
 
-// ── Services table rows ───────────────────────────────────────────────────────
+// ── Bilingual clause data ────────────────────────────────────────────────────
 
-function renderServiceRows(items: InvoiceLineItem[]): string {
-  if (!items || items.length === 0) return ''
-  return items
-    .filter((i) => i.type === 'line')
-    .map((item) => `
-      <tr>
-        <td>${esc(item.description || '—')}${item.period ? `<div class="item-period">${esc(item.period)}</div>` : ''}</td>
-        <td class="right mono">${fmt(item.quantity)}</td>
-        <td class="right mono">${fmt(item.unitPrice)} €</td>
-        <td class="right mono fw6">${fmt(item.amount)} €</td>
-      </tr>`)
-    .join('')
+interface Clause { n: string; tEs: string; tEn: string; bEs: string; bEn: string }
+
+const COMMON_CLAUSES: Clause[] = [
+  { n: '1ª', tEs: 'Objeto', tEn: 'Subject matter',
+    bEs: 'El Proveedor pone a disposición del Cliente el acceso a los Servicios comercializados bajo la marca "Platomico", contratados conforme a la Oferta (Anexo I). Este contrato macro regula todos los Servicios; a cada Cliente se le aplican únicamente los módulos que haya contratado.',
+    bEn: 'The Provider makes available to the Client access to the Services marketed under the "Platomico" brand, contracted under the Offer (Annex I). This master agreement governs all Services; each Client is bound only by the modules it has contracted.' },
+  { n: '2ª', tEs: 'Forma de prestación y onboarding', tEn: 'Provision and onboarding',
+    bEs: 'El Proveedor prestará los Servicios en la modalidad del plan contratado y realizará una sesión de onboarding que deje al Cliente en condiciones de operar.',
+    bEn: 'The Provider shall deliver the Services under the contracted plan and carry out an onboarding session enabling the Client to operate.' },
+  { n: '3ª', tEs: 'Condiciones económicas y Desarrollos a Medida', tEn: 'Commercial terms and Custom Developments',
+    bEs: 'El precio es el fijado en la Oferta, que prevalece en materia económica. Los Desarrollos a Medida se cotizan aparte, con aceptación previa, pago 50%/50% y procedimiento de aceptación, subsanación y garantía de 30 días.',
+    bEn: 'The price is set out in the Offer, which prevails on financial matters. Custom Developments are quoted separately, with prior acceptance, 50%/50% payment and an acceptance, remediation and 30-day warranty procedure.' },
+  { n: '4ª', tEs: 'Precio y forma de pago', tEn: 'Price and payment',
+    bEs: 'La forma de pago será la indicada en la Oferta. La devolución de un recibo por causa imputable al Cliente conllevará los gastos bancarios y, previo requerimiento no atendido en 5 días, facultará a suspender el acceso al Servicio hasta la regularización.',
+    bEn: 'Payment shall be as stated in the Offer. A returned receipt attributable to the Client shall entail bank charges and, after a request not met within 5 days, shall entitle the Provider to suspend access until regularisation.' },
+  { n: '5ª', tEs: 'Facturación e impago', tEn: 'Invoicing and non-payment',
+    bEs: 'Platomico facturará mensualmente a mes vencido, con pago a 30 días; el impago devenga el interés de demora de la Ley 3/2004 y los costes de cobro. Además, faculta a Platomico, previo requerimiento no atendido en 5 días, a suspender el acceso del Cliente al Servicio hasta la regularización; los datos se conservan y la reactivación queda condicionada a estar al corriente de pago.',
+    bEn: 'Platomico shall invoice monthly in arrears, payable within 30 days; late payment accrues default interest under Law 3/2004 and recovery costs. It also entitles Platomico, after a request not met within 5 days, to suspend the Client’s access until regularisation; data is retained and reactivation is conditional on being up to date with payment.' },
+  { n: '6ª', tEs: 'Revisión de precios (IPC)', tEn: 'Price review (CPI)',
+    bEs: 'Las cuotas recurrentes podrán actualizarse en cada renovación anual conforme al IPC del INE.',
+    bEn: 'Recurring fees may be updated at each annual renewal in line with the INE CPI.' },
+  { n: '7ª', tEs: 'Obligaciones del Proveedor', tEn: 'Provider obligations',
+    bEs: 'Prestar el Servicio con diligencia profesional, dar soporte (Anexo II), mantener el software actualizado, cumplir su rol en protección de datos (Anexo III) y guardar confidencialidad.',
+    bEn: 'To deliver the Service with professional diligence, provide support (Annex II), keep the software updated, comply with its data-protection role (Annex III) and maintain confidentiality.' },
+  { n: '8ª', tEs: 'Obligaciones del Cliente', tEn: 'Client obligations',
+    bEs: 'Abonar el precio, facilitar información veraz, usar el software conforme a la licencia, custodiar los equipos y colaborar en protección de datos, incluida la determinación de la base jurídica y la información a los interesados cuando el Cliente sea Responsable.',
+    bEn: 'To pay the price, provide accurate information, use the software under the licence, safeguard the equipment and cooperate on data protection, including determining the legal basis and informing data subjects where the Client is the Controller.' },
+  { n: '9ª', tEs: 'Soporte técnico', tEn: 'Technical support',
+    bEs: 'El soporte y los niveles de servicio son los del plan contratado (Anexo II). Starter y Growth: best effort; Pro: garantizado.',
+    bEn: 'Support and service levels are those of the contracted plan (Annex II). Starter and Growth: best-effort; Pro: guaranteed.' },
+  { n: '10ª', tEs: 'Reversibilidad y portabilidad', tEn: 'Reversibility and portability',
+    bEs: 'El Cliente podrá exportar su información en formato estándar durante la vigencia y hasta 30 días tras la finalización; la primera exportación es gratuita.',
+    bEn: 'The Client may export its data in a standard format during the term and up to 30 days after termination; the first export is free.' },
+  { n: '11ª', tEs: 'Protección de datos y DPO', tEn: 'Data protection and DPO',
+    bEs: 'Según el módulo, Platomico actúa como Encargado (art. 28, Anexo III) o, en REN, como Corresponsable (art. 26). El contacto en materia de protección de datos es privacy@platomico.com. Platomico ha designado a D. Antonio Casanova como Delegado de Protección de Datos (DPD); su comunicación a la AEPD se encuentra en tramitación (documento PLT-DPO-002).',
+    bEn: 'Depending on the module, Platomico acts as Processor (Art. 28, Annex III) or, in REN, as Joint Controller (Art. 26). The data-protection contact is privacy@platomico.com. Platomico has appointed Mr. Antonio Casanova as Data Protection Officer (DPO); its notification to the AEPD is in progress (document PLT-DPO-002).' },
+  { n: '12ª', tEs: 'Confidencialidad', tEn: 'Confidentiality',
+    bEs: 'Cada parte mantendrá la confidencialidad de la información de la otra a la que efectivamente acceda, durante la vigencia y los 2 años siguientes. El Cliente accede únicamente a los datos societarios y de contacto de Platomico y al propio Contrato; no accede al código fuente, algoritmos ni know-how, cuya protección se rige por la Cláusula 13ª. La información personal se rige por el Anexo III (DPA).',
+    bEn: 'Each party shall keep confidential the other’s information it actually accesses, during the term and for 2 years thereafter. The Client only accesses Platomico’s corporate and contact data and the Agreement itself; it does not access the source code, algorithms or know-how, whose protection is governed by Clause 13. Personal information is governed by Annex III (DPA).' },
+  { n: '13ª', tEs: 'Propiedad intelectual y licencia', tEn: 'IP and licence',
+    bEs: 'El software es titularidad exclusiva de Platomico; licencia de uso no exclusiva, intransferible y limitada a la vigencia y a los terminales contratados.',
+    bEn: 'The software is Platomico’s exclusive property; a non-exclusive, non-transferable licence limited to the term and contracted terminals.' },
+  { n: '14ª', tEs: 'Uso de marca e imagen del Cliente', tEn: 'Use of Client brand and image',
+    bEs: 'El Cliente autoriza, de forma no exclusiva y gratuita, el uso de su marca e imágenes de locales/equipos como referencia comercial; no ampara imágenes de personas identificables.',
+    bEn: 'The Client authorises, non-exclusively and free of charge, use of its brand and images of premises/equipment as a commercial reference; it does not cover images of identifiable individuals.' },
+  { n: '15ª', tEs: 'Limitación de responsabilidad', tEn: 'Limitation of liability',
+    bEs: 'La responsabilidad del Proveedor se limita, salvo dolo o culpa grave, al importe satisfecho en los 12 meses anteriores; no responde de daños indirectos ni lucro cesante. La limitación opera entre las partes y no afecta a las responsabilidades frente a interesados o autoridades en materia de protección de datos.',
+    bEn: 'The Provider’s liability is capped, save for wilful misconduct or gross negligence, at the amount paid in the preceding 12 months; no liability for indirect damages or loss of profit. The cap operates between the parties and does not affect liabilities towards data subjects or authorities under data-protection law.' },
+  { n: '16ª', tEs: 'Fuerza mayor', tEn: 'Force majeure',
+    bEs: 'Ninguna parte responde del incumplimiento por fuerza mayor (art. 1105 CC).',
+    bEn: 'Neither party is liable for breach due to force majeure (Art. 1105 CC).' },
+  { n: '17ª', tEs: 'Duración', tEn: 'Term',
+    bEs: '__DURACION__ meses desde la firma, con renovación automática anual salvo preaviso fehaciente de 30 días.',
+    bEn: '__DURACION__ months from signature, with automatic annual renewal unless 30 days’ reliable notice.' },
+  { n: '18ª', tEs: 'Permanencia', tEn: 'Minimum term',
+    bEs: 'Permanencia mínima de __PERMANENCIA__ meses. En baja anticipada el Cliente elige: (a) devolver los equipos de Platomico en 10 días; o (b) abonar las mensualidades restantes como cláusula penal (art. 1152 CC). A falta de elección, aplica (b). Sin penalización si hay incumplimiento grave del Proveedor no subsanado en 15 días (art. 1124 CC).',
+    bEn: '__PERMANENCIA__-month minimum term. On early termination the Client chooses: (a) return Platomico’s equipment within 10 days; or (b) pay the remaining monthly fees as a penalty clause (Art. 1152 CC). Absent a choice, (b) applies. No penalty if the Provider materially breaches and fails to cure within 15 days (Art. 1124 CC).' },
+  { n: '19ª', tEs: 'Cesión y subcontratación', tEn: 'Assignment and subcontracting',
+    bEs: 'Ninguna parte cederá el contrato sin consentimiento previo por escrito, salvo operaciones societarias con notificación. El Proveedor podrá subcontratar servicios auxiliares, permaneciendo responsable.',
+    bEn: 'Neither party shall assign the agreement without prior written consent, save for corporate transactions with notice. The Provider may subcontract ancillary services while remaining liable.' },
+  { n: '20ª', tEs: 'Modificación y nulidad parcial', tEn: 'Amendment and severability',
+    bEs: 'Toda modificación del presente Contrato deberá realizarse por escrito y ser firmada por los representantes debidamente apoderados de ambas partes; las comunicaciones por correo ordinario o la mera tolerancia no constituyen modificación tácita de lo pactado. La nulidad, anulabilidad o ineficacia de una cláusula no afectará a la validez del resto del Contrato, que continuará vigente e interpretándose conforme a la voluntad original de las partes.',
+    bEn: 'Any amendment to this Agreement must be made in writing and signed by the duly authorised representatives of both parties; ordinary email or mere tolerance shall not constitute a tacit amendment. The nullity, voidability or ineffectiveness of a clause shall not affect the validity of the remainder of the Agreement, which shall remain in force and be construed in line with the parties’ original intent.' },
+  { n: '21ª', tEs: 'Notificaciones', tEn: 'Notices',
+    bEs: 'Proveedor: Platomico, S.L., C/ Antonio Machado 9, Rozas de Puerto Real, 28649 Madrid — contacto general admin@platomico.com; protección de datos privacy@platomico.com. Cliente: __CLIENTE__.',
+    bEn: 'Provider: Platomico, S.L., C/ Antonio Machado 9, Rozas de Puerto Real, 28649 Madrid — general admin@platomico.com; data protection privacy@platomico.com. Client: __CLIENTE__.' },
+  { n: '22ª', tEs: 'Idioma', tEn: 'Language',
+    bEs: 'Versión bilingüe español/inglés; en caso de discrepancia prevalece la versión en inglés.',
+    bEn: 'Bilingual Spanish/English version; in case of discrepancy the English version prevails.' },
+  { n: '23ª', tEs: 'Ley aplicable y jurisdicción', tEn: 'Governing law and jurisdiction',
+    bEs: 'Ley española; previa negociación amistosa de 15 días, las partes se someten a los Juzgados y Tribunales de Madrid.',
+    bEn: 'Spanish law; after a 15-day good-faith negotiation, the parties submit to the Courts of Madrid.' },
+]
+
+const SERVICE_CLAUSES: Record<ServiceKey, Clause[]> = {
+  ros: [
+    { n: 'R1', tEs: 'Servicio ROS', tEn: 'ROS service',
+      bEs: 'El módulo ROS comprende la gestión de pedidos y operaciones del establecimiento. El sistema de facturación cumple, dentro de los plazos legales, el RD 1007/2023 y, en su caso, la modalidad VERI*FACTU. Rol RGPD: Encargado (Anexo III).',
+      bEn: 'The ROS module covers order and operations management. The invoicing system complies, within legal deadlines, with RD 1007/2023 and, where applicable, VERI*FACTU. GDPR role: Processor (Annex III).' },
+  ],
+  posKiosk: [
+    { n: 'P1', tEs: 'POS / Kiosk', tEn: 'POS / Kiosk',
+      bEs: 'Punto de venta y kiosco de autoservicio. Las pasarelas de pago (Stripe/Revolut) las contrata el Cliente y son responsables independientes: Platomico no trata datos de pago. Stripe opera en la UE. Si el establecimiento configura la captura de datos que puedan ser categoría especial (p. ej. alergias), el Cliente es responsable de la base del art. 9 y Platomico los trata con minimización. Rol RGPD: Encargado.',
+      bEn: 'Point of sale and self-service kiosk. Payment gateways (Stripe/Revolut) are contracted by the Client and are independent controllers: Platomico processes no payment data. Stripe operates in the EU. If the establishment configures capture of data that may be special category (e.g. allergies), the Client is responsible for the Art. 9 basis and Platomico processes it under minimisation. GDPR role: Processor.' },
+  ],
+  whispr: [
+    { n: 'W1', tEs: 'Servicio Whispr — Ley 2/2023', tEn: 'Whispr service — Law 2/2023',
+      bEs: 'Whispr se presta "tal cual". Dado que el Cliente cumple plazos perentorios de la Ley 2/2023, Platomico se compromete a una disponibilidad mensual del 99,5% y a alertar de incidencias que los comprometan. Las categorías especiales que consten en una comunicación se suprimen de inmediato (art. 30.5 Ley 2/2023). Infraestructura en la UE (Supabase, Resend —Irlanda—, Railway). El canal está cifrado y garantiza el anonimato mediante un código de acceso, un identificador de caso y una clave de seguimiento; ni siquiera Platomico conoce la identidad del denunciante que reporta de forma anónima. Retención: 3 meses + 30 días. Brecha: 24h. Rol RGPD: Encargado.',
+      bEn: 'Whispr is provided "as is". As the Client meets peremptory deadlines under Law 2/2023, Platomico commits to 99.5% monthly availability and alerts of incidents jeopardising them. Special categories appearing in a report are deleted immediately (Art. 30.5). EU infrastructure (Supabase, Resend —Ireland—, Railway). The channel is encrypted and guarantees anonymity via an access code, a case ID and a tracking key; not even Platomico knows the identity of a whistleblower reporting anonymously. Retention: 3 months + 30 days. Breach: 24h. GDPR role: Processor.' },
+    { n: 'W2', tEs: 'Responsabilidad reforzada Whispr', tEn: 'Enhanced Whispr liability',
+      bEs: 'La limitación general (Cl. 15ª) no se aplica al incumplimiento de las medidas de seguridad o confidencialidad de Whispr.',
+      bEn: 'The general cap (Cl. 15) does not apply to breach of Whispr’s security or confidentiality measures.' },
+  ],
+  analitica: [
+    { n: 'A1', tEs: 'Analítica de negocio / IA', tEn: 'Business analytics / AI',
+      bEs: 'La Analítica almacena datos de negocio del Cliente y genera gráficos e índices con IA (Anthropic) para responder a sus consultas, previo filtrado de datos personales. Platomico no entrena modelos, no perfila ni toma decisiones automatizadas (art. 22) ni reutiliza los datos. Subencargados: Anthropic (EE.UU., SCCs) y OpenAI (sin PII). La transferencia a Anthropic se evalúa en la TIA (PLT-TIA-ANT-001). Rol RGPD: Encargado.',
+      bEn: 'Analytics stores the Client’s business data and produces charts/indices with AI (Anthropic) to answer queries, after filtering personal data. Platomico does not train models, profile or take automated decisions (Art. 22), nor reuse the data. Sub-processors: Anthropic (US, SCCs) and OpenAI (no PII). GDPR role: Processor.' },
+  ],
+  equipos: [
+    { n: 'E1', tEs: 'Equipos en comodato', tEn: 'Equipment on loan',
+      bEs: 'Los equipos aportados por Platomico se ceden en uso (comodato, arts. 1740 y ss. CC) vinculado a la vigencia, con cuota de mantenimiento y devolución (Anexo IV).',
+      bEn: 'Equipment provided by Platomico is loaned (commodatum, Arts. 1740 et seq. CC) tied to the term, with a maintenance fee and return (Annex IV).' },
+  ],
+  ren: [
+    { n: 'N1', tEs: 'REN — plataforma de intermediación', tEn: 'REN — intermediation platform',
+      bEs: 'Plataforma operativa de intermediación entre flotas de reparto (terceros) y restaurantes. Platomico trata datos de la flota/repartidores (identificativos, contacto, ubicación), del restaurante y sus consumidores (contacto, dirección de entrega) y del pedido (fechas, distancias, tiempos, comanda, foto de recogida/entrega, ID de Glovo/Uber/JustEat).',
+      bEn: 'Live intermediation platform between delivery fleets (third parties) and restaurants. Platomico processes fleet/rider data (identification, contact, location), restaurant and end-customer data (contact, delivery address) and order data (dates, distances, times, order details, pickup/delivery photo, Glovo/Uber/JustEat ID).' },
+    { n: 'N2', tEs: 'REN — corresponsabilidad (art. 26)', tEn: 'REN — joint controllership (Art. 26)',
+      bEs: 'Platomico y el Cliente determinan conjuntamente las finalidades y medios esenciales del módulo REN y actúan como CORRESPONSABLES (art. 26 RGPD). Este bloque regula dicha corresponsabilidad y sustituye, para REN, al régimen de encargo del Anexo III.',
+      bEn: 'Platomico and the Client jointly determine the purposes and essential means of the REN module and act as JOINT CONTROLLERS (Art. 26 GDPR). This block governs that joint controllership and replaces, for REN, the processor regime of Annex III.' },
+    { n: 'N3', tEs: 'REN — reparto de responsabilidades', tEn: 'REN — allocation of responsibilities',
+      bEs: 'Platomico gestiona la plataforma, la seguridad, la integración con Sinqro y las plataformas (Glovo/Uber/JustEat, responsables independientes) y la conservación técnica. El Cliente determina el uso operativo y la relación con sus consumidores. Cada parte garantiza una base jurídica válida.',
+      bEn: 'Platomico manages the platform, security, integration with Sinqro and platforms (Glovo/Uber/JustEat, independent controllers) and technical retention. The Client determines operational use and the relationship with its customers. Each party ensures a valid legal basis.' },
+    { n: 'N4', tEs: 'REN — punto de contacto y derechos', tEn: 'REN — contact point and rights',
+      bEs: 'Platomico es el punto de contacto para los interesados (art. 26.1). Los interesados podrán ejercer sus derechos frente a cualquiera de las partes (art. 26.3); la parte que reciba una solicitud la atenderá y la trasladará a la otra en 5 días hábiles.',
+      bEn: 'Platomico is the contact point for data subjects (Art. 26.1). Data subjects may exercise their rights against either party (Art. 26.3); the party receiving a request handles it and forwards it within 5 business days.' },
+    { n: 'N5', tEs: 'REN — información y responsabilidad', tEn: 'REN — information and liability',
+      bEs: 'Las partes pondrán a disposición de los interesados los aspectos esenciales del acuerdo (art. 26.2). Frente a los interesados, ambas responden solidariamente (art. 82 RGPD); en la relación interna, cada parte responde de su propio incumplimiento.',
+      bEn: 'The parties make available to data subjects the essence of the arrangement (Art. 26.2). Towards data subjects, both are jointly and severally liable (Art. 82 GDPR); internally, each is liable for its own breach.' },
+    { n: 'N6', tEs: 'REN — conservación y transferencias', tEn: 'REN — retention and transfers',
+      bEs: 'Ubicación del rider: se trata únicamente mientras el pedido está en curso y solo si el rider ha dado su consentimiento y activado el GPS; no se conserva tras la entrega. Foto de recogida/entrega: 90 días. Datos del pedido con relevancia fiscal se conservan durante la relación contractual y 6 años bloqueados; las métricas de reparto (distancias, tiempos, identificadores) se conservan 2 años.',
+      bEn: 'Rider location: processed only while the order is in progress and only if the rider has consented and activated GPS; not retained after delivery. Pickup/delivery photo: 90 days. Order data with tax relevance is retained during the contractual relationship and for 6 years (blocked); delivery metrics (distances, times, identifiers) are retained for 2 years.' },
+    { n: 'N7', tEs: 'REN — evaluación de impacto (EIPD)', tEn: 'REN — impact assessment (DPIA)',
+      bEs: 'Platomico ha realizado la evaluación de impacto relativa a la protección de datos de REN (art. 35 RGPD; documento PLT-EIPD-REN-001), dada la geolocalización de repartidores a gran escala. Sus medidas se aplican a este tratamiento y ambas partes colaborarán en su actualización antes de ampliaciones significativas del tratamiento.',
+      bEn: 'Platomico has carried out the data protection impact assessment for REN (Art. 35 GDPR; document PLT-EIPD-REN-001), given the large-scale rider geolocation. Its measures apply to this processing and both parties shall cooperate in updating it before any significant expansion of the processing.' },
+  ],
 }
 
-// ── Main generator ────────────────────────────────────────────────────────────
+const DPA_CLAUSES: Clause[] = [
+  { n: '1', tEs: 'Objeto y naturaleza', tEn: 'Subject and nature',
+    bEs: 'El Encargado trata por cuenta del Responsable los datos necesarios para el Servicio, solo conforme a sus instrucciones documentadas. Se exceptúa REN (corresponsabilidad, art. 26; regulada en el cuerpo del Contrato).',
+    bEn: 'The Processor processes on behalf of the Controller the data necessary for the Service, solely under documented instructions. REN is excluded (joint controllership, Art. 26; governed in the body of the Agreement).' },
+  { n: '2', tEs: 'Duración', tEn: 'Duration',
+    bEs: 'Vigente mientras dure el Contrato; subsisten supresión, devolución y confidencialidad.',
+    bEn: 'In force for the term of the Agreement; deletion, return and confidentiality survive.' },
+  { n: '3', tEs: 'Instrucciones documentadas', tEn: 'Documented instructions',
+    bEs: 'Trata los datos solo según instrucciones del Responsable e informa si una instrucción infringe la normativa.',
+    bEn: 'Processes only under the Controller’s instructions and informs if an instruction infringes the law.' },
+  { n: '4', tEs: 'Confidencialidad del personal', tEn: 'Staff confidentiality',
+    bEs: 'El personal autorizado está sujeto a deber de confidencialidad.',
+    bEn: 'Authorised staff are bound by confidentiality.' },
+  { n: '5', tEs: 'Seguridad (art. 32)', tEn: 'Security (Art. 32)',
+    bEs: 'Cifrado en tránsito y reposo; control de accesos por roles; MFA/PKI; backups en la UE; alojamiento EEE; Whispr con AES-256-GCM y aislamiento por tenant.',
+    bEn: 'Encryption in transit and at rest; role-based access; MFA/PKI; EU backups; EEA hosting; Whispr with AES-256-GCM and per-tenant isolation.' },
+  { n: '6', tEs: 'Subencargados', tEn: 'Sub-processors',
+    bEs: 'Autorización general (Anexo B); notificación de cambios con 15 días y derecho de oposición; mismas obligaciones al subencargado.',
+    bEn: 'General authorisation (Annex B); 15-day change notice and right to object; same obligations imposed on sub-processors.' },
+  { n: '7', tEs: 'Transferencias internacionales', tEn: 'International transfers',
+    bEs: 'Fuera del EEE: decisión de adecuación, SCCs u otro instrumento del Cap. V; se acredita al Responsable.',
+    bEn: 'Outside the EEA: adequacy decision, SCCs or another Chapter V instrument; evidenced to the Controller.' },
+  { n: '8', tEs: 'Asistencia al Responsable', tEn: 'Assistance',
+    bEs: 'Asiste en derechos de los interesados y en los arts. 32-36.',
+    bEn: 'Assists with data-subject rights and Arts. 32-36.' },
+  { n: '9', tEs: 'Notificación de brechas', tEn: 'Breach notification',
+    bEs: 'Sin dilación indebida y máx. 48h (24h en Whispr) desde el conocimiento (art. 33).',
+    bEn: 'Without undue delay and within 48h (24h for Whispr) of awareness (Art. 33).' },
+  { n: '10', tEs: 'Supresión o devolución', tEn: 'Deletion or return',
+    bEs: 'A elección del Responsable en 30 días; salvo conservación legalmente exigible (bloqueo).',
+    bEn: 'At the Controller’s choice within 30 days; save legally required retention (blocking).' },
+  { n: '11', tEs: 'Auditoría', tEn: 'Audit',
+    bEs: 'Información para demostrar el cumplimiento y auditorías con antelación razonable.',
+    bEn: 'Information to demonstrate compliance and audits with reasonable notice.' },
+  { n: '12', tEs: 'Responsabilidad y ley aplicable', tEn: 'Liability and law',
+    bEs: 'Art. 28 RGPD y LOPDGDD; la limitación de la Cl. 15ª opera solo entre partes, no frente a interesados ni autoridades.',
+    bEn: 'Art. 28 GDPR and LOPDGDD; the Cl. 15 cap operates only between parties, not vis-à-vis data subjects or authorities.' },
+]
+
+const NDA_CLAUSES: Clause[] = [
+  { n: '1ª', tEs: 'Objeto', tEn: 'Purpose',
+    bEs: 'Regula, con carácter recíproco, la confidencialidad de la información intercambiada con motivo de la relación.',
+    bEn: 'Governs, reciprocally, the confidentiality of information exchanged in connection with the relationship.' },
+  { n: '2ª', tEs: 'Información confidencial', tEn: 'Confidential information',
+    bEs: 'Toda información técnica, comercial, financiera, operativa o personal revelada por una parte a la otra, y la derivada de ella.',
+    bEn: 'All technical, commercial, financial, operational or personal information disclosed by one party to the other, and derived information.' },
+  { n: '3ª', tEs: 'Exclusiones', tEn: 'Exclusions',
+    bEs: 'No es confidencial la información pública sin incumplimiento, ya conocida lícitamente, recibida de tercero sin deber de secreto, o de revelación legalmente obligada (con aviso).',
+    bEn: 'Not confidential: public without breach, already lawfully known, received from a third party without duty of secrecy, or legally required to be disclosed (with notice).' },
+  { n: '4ª', tEs: 'Obligaciones', tEn: 'Obligations',
+    bEs: 'Uso exclusivo para la finalidad, protección diligente, acceso limitado a personas necesarias, sin comunicación a terceros sin autorización escrita.',
+    bEn: 'Use solely for the purpose, diligent protection, access limited to necessary persons, no disclosure without written authorisation.' },
+  { n: '5ª', tEs: 'Duración', tEn: 'Term',
+    bEs: 'Subsiste durante la relación y los 2 años siguientes.',
+    bEn: 'Survives during the relationship and for 2 years thereafter.' },
+  { n: '6ª', tEs: 'Datos personales', tEn: 'Personal data',
+    bEs: 'Si incluye datos personales, prevalece el Anexo III (DPA) y la normativa de protección de datos.',
+    bEn: 'If it includes personal data, Annex III (DPA) and data-protection law prevail.' },
+  { n: '7ª', tEs: 'Ley y jurisdicción', tEn: 'Law and jurisdiction',
+    bEs: 'Ley española; Juzgados y Tribunales de Madrid; prevalece el inglés en discrepancia.',
+    bEn: 'Spanish law; Courts of Madrid; English prevails in case of discrepancy.' },
+]
+
+// Per-module DPA processing table (Anexo A) — only contracted modules shown
+const DPA_MODULE_ROWS: Array<{ key: ServiceKey; mod: string; es: string; en: string }> = [
+  { key: 'ros', mod: 'ROS', es: 'Consumidores y personal del Cliente; identificativos, pedido/transacción, laborales básicos. Relación + 6 años; logs 2 años. Encargado.', en: 'End customers and Client staff; identification, order/transaction, basic employment. Relationship + 6 years; logs 2 years. Processor.' },
+  { key: 'posKiosk', mod: 'POS / Kiosk', es: 'Consumidores; datos de transacción (no de pago). Pasarelas = responsables independientes. Encargado.', en: 'Customers; transaction data (not payment). Gateways = independent controllers. Processor.' },
+  { key: 'whispr', mod: 'Whispr', es: 'Informantes y personas mencionadas; identificativos/profesionales; categorías especiales → supresión inmediata (art. 30.5 Ley 2/2023). 3 meses + 30 días. Brecha 24h. Encargado.', en: 'Whistleblowers and named persons; identification/professional; special categories → immediate deletion (Art. 30.5). 3 months + 30 days. Breach 24h. Processor.' },
+  { key: 'analitica', mod: 'Analítica / IA', es: 'Datos de negocio; Anthropic (EE.UU., SCCs), OpenAI (sin PII); sin entrenamiento ni art. 22. Encargado.', en: 'Business data; Anthropic (US, SCCs), OpenAI (no PII); no training or Art. 22. Processor.' },
+]
+
+const SUBPROCESSORS: Array<[string, string, string, string]> = [
+  ['AWS', 'Infraestructura', 'España/Irlanda', 'EEE'],
+  ['MongoDB Atlas', 'Base de datos', 'Irlanda', 'EEE'],
+  ['Vercel', 'Hosting', 'Irlanda', 'EEE'],
+  ['Sinqro', 'Agregador delivery', 'España', 'EEE — solicitar DPA art. 28'],
+  ['Supabase', 'Postgres Whispr', 'Irlanda', 'EEE — firmar DPA'],
+  ['Resend', 'Email transaccional', 'Irlanda, UE', 'EEE — sin transferencia'],
+  ['Railway', 'Caché Whispr', 'UE', 'EEE — firmar DPA'],
+  ['Anthropic', 'Analítica IA', 'EE.UU.', 'SCCs · TIA hecha (PLT-TIA-ANT-001)'],
+  ['OpenAI', 'Embeddings', 'EE.UU.', 'SCCs · sin PII'],
+  ['PostHog', 'Analítica web', 'Irlanda / UE', 'EEE — activar DPA en panel'],
+  ['Expo', 'Notificaciones push (REN)', 'EE.UU.', 'SCCs — solicitar DPA Enterprise'],
+  ['Haddock', 'Integración / agregador', 'UE', 'EEE — solicitar DPA art. 28'],
+]
+
+// ── Clause renderer ────────────────────────────────────────────────────────
+
+function renderClause(c: Clause, color?: string): string {
+  const border = color ? `border-left:3px solid ${color};padding-left:10px;` : ''
+  return `
+  <div class="clause" style="${border}">
+    <div class="clause-num"${color ? ` style="color:${color}"` : ''}>${c.n}. ${esc(c.tEs)}</div>
+    <div class="clause-body">
+      <p>${esc(c.bEs)}</p>
+      <p class="en">${esc(c.bEn)}</p>
+    </div>
+  </div>`
+}
+
+// ── Main generator ───────────────────────────────────────────────────────────
 
 export async function generateContractPdf(
   presupuesto: Presupuesto,
@@ -143,14 +365,23 @@ export async function generateContractPdf(
   const logo = readLogoDataUri()
   const { duracionMeses, permanenciaMeses, formaPago, fechaInicio, notas, contactName, contactEmail, equipment } = params
 
-  const fechaFin = addMonths(fechaInicio, duracionMeses)
-  const today    = fmtDate(fechaInicio)
-  const startStr = fmtDate(fechaInicio)
-  const endStr   = fmtDate(fechaFin)
+  const today   = fmtDate(fechaInicio)
+  const items   = presupuesto.lineItems ?? []
+  const services = detectServices(items, params.services)
 
-  const items     = presupuesto.lineItems ?? []
-  const vatAmount = presupuesto.amountNet * (presupuesto.vatRate / 100)
-  const hasItems  = items.filter((i) => i.type === 'line').length > 0
+  const clienteLine = [
+    esc(presupuesto.clientName),
+    presupuesto.clientCif ? `NIF/CIF ${esc(presupuesto.clientCif)}` : '',
+    presupuesto.clientAddress ? esc(presupuesto.clientAddress) : '',
+    contactEmail ? esc(contactEmail) : '',
+  ].filter(Boolean).join(' · ')
+
+  // Substitute editable tokens into the common clauses
+  const commonRendered = COMMON_CLAUSES.map((c) => ({
+    ...c,
+    bEs: c.bEs.replace(/__DURACION__/g, String(duracionMeses)).replace(/__PERMANENCIA__/g, String(permanenciaMeses)).replace(/__CLIENTE__/g, clienteLine),
+    bEn: c.bEn.replace(/__DURACION__/g, String(duracionMeses)).replace(/__PERMANENCIA__/g, String(permanenciaMeses)).replace(/__CLIENTE__/g, clienteLine),
+  }))
 
   const logoHtml = logo
     ? `<img class="logo" src="${logo}" alt="Platomico"/>`
@@ -159,11 +390,34 @@ export async function generateContractPdf(
   const lbl = (t: string) => `
     <div class="pg-header">
       ${logoHtml}
-      <span class="pg-header-label">Condiciones Generales del Servicio · ${t}</span>
+      <span class="pg-header-label">Contrato Macro · ${esc(t)}</span>
     </div>`
 
-  // Inline style shared by all page containers
-  const PAGE = `width:210mm; padding:20mm 20mm 16mm; position:relative; font-family:Helvetica,Arial,sans-serif; font-size:9.5px; color:#1e293b; line-height:1.6;`
+  const PAGE = `width:210mm; padding:18mm 18mm 14mm; position:relative; font-family:Helvetica,Arial,sans-serif; font-size:9px; color:#1e293b; line-height:1.55;`
+
+  // Active service clause blocks (in canonical order)
+  const activeServiceOrder: ServiceKey[] = ['ros', 'posKiosk', 'whispr', 'analitica', 'equipos']
+  const serviceBlocks = activeServiceOrder
+    .filter((k) => services[k])
+    .map((k) => SERVICE_CLAUSES[k].map((c) => renderClause(c, SERVICE_COLOR[k])).join(''))
+    .join('')
+
+  const renBlock = services.ren
+    ? SERVICE_CLAUSES.ren.map((c) => renderClause(c, SERVICE_COLOR.ren)).join('')
+    : ''
+
+  const activeLegend = SERVICE_LEGEND.filter((l) => services[l.key])
+
+  const equipmentRows = (equipment ?? []).length > 0
+    ? (equipment ?? []).map((e) => `<tr>
+        <td class="mono">${e.n}</td>
+        <td>${esc(e.funcion || e.tipo)}</td>
+        <td>${esc(e.marca) || '<span class="cell-placeholder">—</span>'}</td>
+        <td>${esc(e.serie) || '<span class="cell-placeholder">—</span>'}</td>
+        <td>${esc(e.origen)}</td>
+        <td>${esc(e.cuotaMensual) || '<span class="cell-placeholder">—</span>'}</td>
+      </tr>`).join('')
+    : `<tr><td colspan="6" style="text-align:center;color:#94a3b8;font-style:italic;padding:8px;">Sin equipos registrados</td></tr>`
 
   const html = `<!DOCTYPE html>
 <html lang="es">
@@ -171,923 +425,275 @@ export async function generateContractPdf(
 <meta charset="UTF-8"/>
 <style>
   * { margin:0; padding:0; box-sizing:border-box; }
-  body {
-    font-family: Helvetica, Arial, sans-serif;
-    font-size: 9.5px;
-    color: #1e293b;
-    background: #fff;
-    line-height: 1.6;
-  }
-
-  /* ── Watermark — fixed so it appears on every physical page ── */
-  .watermark {
-    position: fixed;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%) rotate(-45deg);
-    font-size: 65px;
-    font-weight: 900;
-    color: rgba(0,0,0,0.04);
-    letter-spacing: 18px;
-    text-transform: uppercase;
-    pointer-events: none;
-    user-select: none;
-    white-space: nowrap;
-    z-index: 9999;
-  }
-
-  /* ── Logo header ── */
-  .logo { height: 20px; object-fit: contain; }
-  .pg-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding-bottom: 12px;
-    border-bottom: 2px solid #1e3a5f;
-    margin-bottom: 18px;
-  }
-  .pg-header-label {
-    font-size: 8px;
-    font-weight: 700;
-    letter-spacing: 1.5px;
-    text-transform: uppercase;
-    color: #94a3b8;
-  }
-
-  /* ── Title ── */
-  .contract-title {
-    text-align: center;
-    font-size: 14px;
-    font-weight: 700;
-    color: #1e3a5f;
-    letter-spacing: 0.5px;
-    text-transform: uppercase;
-    margin: 20px 0 4px;
-  }
-  .contract-subtitle {
-    text-align: center;
-    font-size: 9px;
-    color: #64748b;
-    margin-bottom: 22px;
-  }
-
-  /* ── Section label ── */
-  .section-label {
-    font-size: 8px;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 1.2px;
-    color: #94a3b8;
-    margin-bottom: 10px;
-    padding-bottom: 5px;
-    border-bottom: 1px solid #f1f5f9;
-  }
-
-  /* ── Party blocks ── */
-  .party-block {
-    background: #f8fafc;
-    border-left: 3px solid #1e3a5f;
-    border-radius: 0 6px 6px 0;
-    padding: 11px 14px;
-    margin-bottom: 12px;
-  }
-  .party-role {
-    font-size: 8px;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 1px;
-    color: #94a3b8;
-    margin-bottom: 4px;
-  }
-  .party-name { font-size: 11px; font-weight: 700; color: #1e3a5f; margin-bottom: 3px; }
-  .party-detail { font-size: 9px; color: #475569; line-height: 1.7; }
-
-  /* ── Exponen ── */
-  .exponen-block {
-    background: #f0f4f8;
-    border-radius: 6px;
-    padding: 12px 14px;
-    font-size: 9px;
-    color: #334155;
-    line-height: 1.7;
-    margin-top: 14px;
-  }
-  .exponen-block p { margin-bottom: 6px; }
-  .exponen-block p:last-child { margin-bottom: 0; }
-  .exponen-title {
-    font-size: 9px;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.8px;
-    color: #1e3a5f;
-    margin-bottom: 10px;
-  }
-  .acuerdan {
-    margin-top: 12px;
-    font-size: 10px;
-    font-weight: 700;
-    color: #1e3a5f;
-    text-align: center;
-    letter-spacing: 0.5px;
-  }
-
-  /* ── Services table ── */
-  table.svc-table {
-    width: 100%;
-    border-collapse: collapse;
-    margin: 10px 0 14px;
-    font-size: 9.5px;
-  }
-  table.svc-table thead tr { background: #1e3a5f; color: #fff; }
-  table.svc-table thead th {
-    font-size: 8px;
-    font-weight: 700;
-    letter-spacing: 0.8px;
-    text-transform: uppercase;
-    padding: 7px 9px;
-    text-align: left;
-  }
-  table.svc-table thead th.right { text-align: right; }
-  table.svc-table tbody tr { border-bottom: 1px solid #f1f5f9; }
-  table.svc-table tbody td { padding: 7px 9px; color: #334155; }
-  table.svc-table tbody td.right { text-align: right; }
-  .item-period { font-size: 8px; color: #94a3b8; margin-top: 2px; }
-  .mono { font-family: 'Courier New', monospace; }
-  .right { text-align: right; }
-  .fw6 { font-weight: 600; }
-
-  /* ── Totals ── */
-  .totals-box {
-    margin-left: auto;
-    width: 260px;
-    border: 1px solid #e2e8f0;
-    border-radius: 8px;
-    overflow: hidden;
-    margin-bottom: 8px;
-  }
-  .totals-row {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 6px 12px;
-    font-size: 9.5px;
-    border-bottom: 1px solid #f1f5f9;
-  }
-  .totals-row:last-child { border-bottom: none; }
-  .totals-row.grand {
-    background: #1e3a5f;
-    color: #fff;
-    font-weight: 700;
-    padding: 10px 12px;
-  }
-  .totals-row .lbl { color: #64748b; }
-  .totals-row.grand .lbl { color: #cbd5e1; font-size: 8.5px; font-weight: 400; text-transform: uppercase; letter-spacing: 0.6px; }
-  .totals-row .amt { font-family: 'Courier New', monospace; font-weight: 600; }
-  .totals-row.grand .amt { font-size: 12px; }
-
-  /* ── Clauses ── */
-  .clause {
-    margin-bottom: 14px;
-    break-inside: avoid;
-  }
-  .clause-num {
-    font-size: 9px;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.8px;
-    color: #1e3a5f;
-    margin-bottom: 4px;
-  }
-  .clause-body {
-    font-size: 9.5px;
-    color: #334155;
-    line-height: 1.7;
-  }
-  .clause-body p { margin-bottom: 6px; }
-  .clause-body p:last-child { margin-bottom: 0; }
-  .sub-clause {
-    margin-top: 6px;
-    padding-left: 14px;
-    border-left: 2px solid #e2e8f0;
-  }
-  .sub-clause-title { font-weight: 700; color: #1e3a5f; margin-bottom: 2px; }
-  .highlight-box {
-    display: inline-flex;
-    align-items: center;
-    gap: 8px;
-    background: #eff6ff;
-    border: 1px solid #bfdbfe;
-    border-radius: 6px;
-    padding: 5px 10px;
-    margin: 6px 0 4px;
-    font-size: 9px;
-    font-weight: 700;
-    color: #1e3a5f;
-  }
-  .notas-box {
-    background: #fefce8;
-    border: 1px solid #fde68a;
-    border-radius: 6px;
-    padding: 10px 14px;
-    margin-top: 10px;
-    font-size: 9.5px;
-    color: #78350f;
-    line-height: 1.7;
-  }
-  .notas-title { font-weight: 700; margin-bottom: 4px; font-size: 8.5px; text-transform: uppercase; letter-spacing: 0.8px; }
-
-  /* ── Annex tables ── */
-  table.anx-table {
-    width: 100%;
-    border-collapse: collapse;
-    font-size: 9px;
-    margin: 10px 0;
-  }
-  table.anx-table th {
-    background: #1e3a5f;
-    color: #fff;
-    padding: 6px 8px;
-    font-size: 8px;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.6px;
-    text-align: left;
-  }
-  table.anx-table td {
-    padding: 6px 8px;
-    border-bottom: 1px solid #f1f5f9;
-    color: #334155;
-  }
-  table.anx-table tr:last-child td { border-bottom: none; }
-  .anx-title {
-    font-size: 12px;
-    font-weight: 700;
-    color: #1e3a5f;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-    margin-bottom: 4px;
-  }
-  .anx-subtitle { font-size: 9px; color: #64748b; margin-bottom: 14px; }
-  .cell-placeholder { color: #94a3b8; font-style: italic; }
-
-  /* ── Signatures ── */
-  .sig-intro {
-    font-size: 9.5px;
-    color: #475569;
-    line-height: 1.8;
-    text-align: center;
-    margin: 20px 0 28px;
-  }
-  .sig-cols { width: 100%; font-size: 0; margin-top: 12px; }
-  .sig-col {
-    display: inline-block;
-    vertical-align: top;
-    width: 48%;
-    border: 1px solid #e2e8f0;
-    border-radius: 10px;
-    padding: 18px;
-    margin-right: 4%;
-    box-sizing: border-box;
-    font-size: 10px;
-  }
-  .sig-col:last-child { margin-right: 0; }
-  .sig-col-title {
-    font-size: 8px;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 1px;
-    color: #94a3b8;
-    margin-bottom: 12px;
-    padding-bottom: 7px;
-    border-bottom: 1px solid #f1f5f9;
-  }
-  .sig-name { font-size: 10px; font-weight: 700; color: #1e3a5f; margin-bottom: 3px; }
-  .sig-role { font-size: 9px; color: #64748b; margin-bottom: 2px; }
-  .sig-nif  { font-size: 9px; color: #94a3b8; margin-bottom: 10px; }
-  .sig-presigned {
-    display: inline-flex;
-    align-items: center;
-    gap: 5px;
-    background: #ecfdf5;
-    border: 1px solid #a7f3d0;
-    border-radius: 20px;
-    padding: 3px 10px;
-    font-size: 9px;
-    font-weight: 700;
-    color: #059669;
-  }
-  .sig-line {
-    font-size: 9px;
-    color: #475569;
-    margin-bottom: 20px;
-    padding-bottom: 4px;
-    border-bottom: 1px solid #cbd5e1;
-  }
-  .sig-line-label {
-    font-size: 8px;
-    color: #94a3b8;
-    margin-bottom: 5px;
-    text-transform: uppercase;
-    letter-spacing: 0.8px;
-  }
+  body { font-family: Helvetica, Arial, sans-serif; font-size: 9px; color: #1e293b; background:#fff; line-height:1.55; }
+  .watermark { position: fixed; top:50%; left:50%; transform: translate(-50%,-50%) rotate(-45deg); font-size:64px; font-weight:900; color:rgba(0,0,0,0.035); letter-spacing:16px; text-transform:uppercase; pointer-events:none; user-select:none; white-space:nowrap; z-index:9999; }
+  .logo { height:20px; object-fit:contain; }
+  .pg-header { display:flex; align-items:center; justify-content:space-between; padding-bottom:10px; border-bottom:2px solid #1e3a5f; margin-bottom:16px; }
+  .pg-header-label { font-size:8px; font-weight:700; letter-spacing:1.4px; text-transform:uppercase; color:#94a3b8; }
+  .contract-title { text-align:center; font-size:15px; font-weight:700; color:#1e3a5f; letter-spacing:0.5px; text-transform:uppercase; margin:14px 0 3px; }
+  .contract-subtitle { text-align:center; font-size:9px; color:#64748b; margin-bottom:4px; }
+  .contract-en-sub { text-align:center; font-size:8.5px; color:#94a3b8; font-style:italic; margin-bottom:16px; }
+  .section-label { font-size:8px; font-weight:700; text-transform:uppercase; letter-spacing:1.1px; color:#94a3b8; margin:16px 0 9px; padding-bottom:5px; border-bottom:1px solid #f1f5f9; }
+  .note-box { background:#f0f4f8; border-radius:6px; padding:10px 13px; font-size:8.5px; color:#475569; line-height:1.6; margin-bottom:14px; }
+  .legend { display:flex; flex-wrap:wrap; gap:6px; margin:10px 0 4px; }
+  .legend-item { display:inline-flex; align-items:center; gap:5px; font-size:8px; font-weight:600; color:#334155; border:1px solid #e2e8f0; border-radius:20px; padding:2px 9px; }
+  .legend-dot { width:8px; height:8px; border-radius:50%; }
+  .party-block { background:#f8fafc; border-left:3px solid #1e3a5f; border-radius:0 6px 6px 0; padding:10px 13px; margin-bottom:10px; }
+  .party-role { font-size:8px; font-weight:700; text-transform:uppercase; letter-spacing:1px; color:#94a3b8; margin-bottom:4px; }
+  .party-name { font-size:11px; font-weight:700; color:#1e3a5f; margin-bottom:3px; }
+  .party-detail { font-size:9px; color:#475569; line-height:1.65; }
+  .clause { margin-bottom:11px; break-inside:avoid; }
+  .clause-num { font-size:9px; font-weight:700; text-transform:uppercase; letter-spacing:0.6px; color:#1e3a5f; margin-bottom:3px; }
+  .clause-body { font-size:9px; color:#334155; line-height:1.6; }
+  .clause-body p { margin-bottom:4px; }
+  .clause-body p:last-child { margin-bottom:0; }
+  .clause-body p.en { color:#94a3b8; font-style:italic; font-size:8.3px; line-height:1.5; }
+  .anx-title { font-size:13px; font-weight:700; color:#1e3a5f; text-transform:uppercase; letter-spacing:0.5px; margin-bottom:3px; }
+  .anx-subtitle { font-size:9px; color:#64748b; margin-bottom:14px; }
+  .anx-en { font-style:italic; color:#94a3b8; }
+  table.tbl { width:100%; border-collapse:collapse; font-size:8.5px; margin:8px 0 14px; }
+  table.tbl th { background:#1e3a5f; color:#fff; padding:6px 8px; font-size:8px; font-weight:700; text-transform:uppercase; letter-spacing:0.5px; text-align:left; }
+  table.tbl th.right { text-align:right; }
+  table.tbl td { padding:6px 8px; border-bottom:1px solid #f1f5f9; color:#334155; vertical-align:top; }
+  table.tbl td.right { text-align:right; }
+  table.tbl tr:last-child td { border-bottom:none; }
+  .mono { font-family:'Courier New', monospace; }
+  .right { text-align:right; }
+  .fw6 { font-weight:600; }
+  .cell-placeholder { color:#94a3b8; font-style:italic; }
+  .notas-box { background:#fefce8; border:1px solid #fde68a; border-radius:6px; padding:9px 13px; margin:12px 0; font-size:9px; color:#78350f; line-height:1.6; }
+  .notas-title { font-weight:700; margin-bottom:3px; font-size:8px; text-transform:uppercase; letter-spacing:0.7px; }
+  /* Signatures */
+  .sig-intro { font-size:9px; color:#475569; line-height:1.7; text-align:center; margin:16px 0 20px; }
+  .sig-cols { width:100%; font-size:0; }
+  .sig-col { display:inline-block; vertical-align:top; width:48%; border:1px solid #e2e8f0; border-radius:10px; padding:16px; margin-right:4%; box-sizing:border-box; font-size:9px; }
+  .sig-col:last-child { margin-right:0; }
+  .sig-col-title { font-size:8px; font-weight:700; text-transform:uppercase; letter-spacing:1px; color:#94a3b8; margin-bottom:11px; padding-bottom:6px; border-bottom:1px solid #f1f5f9; }
+  .sig-name { font-size:10px; font-weight:700; color:#1e3a5f; margin-bottom:3px; }
+  .sig-role { font-size:9px; color:#64748b; margin-bottom:2px; }
+  .sig-nif  { font-size:9px; color:#94a3b8; margin-bottom:10px; }
+  .sig-presigned { display:inline-flex; align-items:center; gap:5px; background:#ecfdf5; border:1px solid #a7f3d0; border-radius:20px; padding:3px 12px; font-size:10px; font-weight:700; color:#059669; }
+  .sig-line-label { font-size:8px; color:#94a3b8; margin-bottom:5px; text-transform:uppercase; letter-spacing:0.7px; }
+  .sig-line { font-size:9px; color:#475569; margin-bottom:16px; padding-bottom:4px; border-bottom:1px solid #cbd5e1; min-height:14px; }
 </style>
 </head>
 <body>
 
-<!-- Single fixed watermark — Puppeteer repeats it on every physical page -->
 <div class="watermark">CONFIDENCIAL</div>
 
-<!-- ══════════════════════════════════════════════════════════════════
-     PÁGINA 1 — ENCABEZADO Y PARTES
-     break-after:page — tamaño fijo, sin riesgo de doble salto
-══════════════════════════════════════════════════════════════════ -->
+<!-- ═══ PÁGINA 1 · PORTADA + PARTES ═══ -->
 <div style="break-after:page; ${PAGE}">
+  ${lbl('Portada y Partes')}
 
-  ${lbl('Encabezado y Partes')}
+  <div class="contract-title">Contrato Macro de Prestación de Servicios</div>
+  <div class="contract-subtitle">Master Services Agreement — documento consolidado (contrato + anexos) · Ref. PLT-SAAS-MACRO-001 · v1.4</div>
+  <div class="contract-en-sub">En Madrid, a ${today} · Oferta vinculada nº ${esc(presupuesto.number)}</div>
 
-  <div class="contract-title">Condiciones Generales del Servicio</div>
-  <div class="contract-subtitle">En Madrid, a ${today}</div>
+  <div class="note-box">
+    Documento único. A cada Cliente se le aplican solo los módulos contratados en su Oferta (Anexo I). Las cláusulas específicas de cada servicio van resaltadas por color.<br/>
+    <span class="anx-en">Single document. Each Client is bound only by the modules contracted in its Offer (Annex I). Service-specific clauses are colour-highlighted.</span>
+  </div>
 
-  <div class="section-label">Reunidos</div>
+  <div class="section-label">Servicios contratados · Contracted services</div>
+  <div class="legend">
+    ${activeLegend.length > 0
+      ? activeLegend.map((l) => `<span class="legend-item"><span class="legend-dot" style="background:${SERVICE_COLOR[l.key]}"></span>${esc(l.label)}</span>`).join('')
+      : '<span class="cell-placeholder">Ningún módulo detectado en la Oferta</span>'}
+  </div>
+
+  <div class="section-label">Reunidos · Between</div>
 
   <div class="party-block">
-    <div class="party-role">De una parte — Proveedor</div>
+    <div class="party-role">De una parte — Proveedor / Provider</div>
     <div class="party-name">Platomico, S.L.</div>
     <div class="party-detail">
-      NIF: B22741094 &nbsp;·&nbsp; Inscrita en el Registro Mercantil de Madrid<br/>
-      C/ Antonio Machado 9, Rozas de Puerto Real, Madrid 28649<br/>
-      Representada por <strong>César Augusto Castro Sáder</strong>, Administrador Único
-      <br/>(en adelante, el «PROVEEDOR» o «Platomico»)
+      CIF B-22741094 · C/ Antonio Machado 9, Rozas de Puerto Real, 28649 Madrid<br/>
+      Representada por <strong>D. César Augusto Castro Sáder</strong>, Administrador Único<br/>
+      Contacto: admin@platomico.com · Protección de datos: privacy@platomico.com<br/>
+      (en adelante, el «PROVEEDOR» o «Platomico»)
     </div>
   </div>
 
   <div class="party-block">
-    <div class="party-role">De otra parte — Cliente</div>
+    <div class="party-role">De otra parte — Cliente / Client</div>
     <div class="party-name">${esc(presupuesto.clientName)}</div>
     <div class="party-detail">
       ${presupuesto.clientCif ? `NIF/CIF: ${esc(presupuesto.clientCif)}<br/>` : ''}
       ${presupuesto.clientAddress ? `${esc(presupuesto.clientAddress)}<br/>` : ''}
-      Representada en este acto por D./D.ª <strong>${contactName ? esc(contactName) : '[NOMBRE DEL REPRESENTANTE]'}</strong>
-      en calidad de <strong>Administrador</strong>
-      <br/>(en adelante, el «CLIENTE»)
+      ${contactName ? `Representada por <strong>${esc(contactName)}</strong>, Administrador<br/>` : ''}
+      ${contactEmail ? `Contacto: ${esc(contactEmail)}<br/>` : ''}
+      (en adelante, el «CLIENTE»)
     </div>
   </div>
-
-  <p style="font-size:9.5px;color:#475569;line-height:1.7;margin-top:10px;">
-    Ambas partes se reconocen mutuamente capacidad legal suficiente para obligarse mediante el
-    presente Contrato y, al efecto, <strong>EXPONEN</strong> lo siguiente, pasando a continuación a
-    <strong>ACUERDAN</strong> las cláusulas que se desarrollan en las páginas siguientes.
-  </p>
-
 </div>
 
-
-<!-- ══════════════════════════════════════════════════════════════════
-     PÁGINA 2 — EXPONEN + SERVICIOS CONTRATADOS
-     break-after:page — tamaño fijo, sin riesgo de doble salto
-══════════════════════════════════════════════════════════════════ -->
+<!-- ═══ CUERPO COMÚN ═══ -->
 <div style="break-after:page; ${PAGE}">
-  ${lbl('Exponen y Servicios Contratados')}
+  ${lbl('Cuerpo común · Common body')}
+  <div class="anx-title">Cuerpo común · Common body</div>
+  <div class="anx-subtitle">Cláusulas 1ª–23ª aplicables a todos los Servicios</div>
+  ${commonRendered.map((c) => renderClause(c)).join('')}
+</div>
 
-  <div class="exponen-block">
-    <div class="exponen-title">Exponen</div>
-    <p>1.º Que Platomico, S.L. es una empresa especializada en el desarrollo y gestión de soluciones tecnológicas y software para el sector de la restauración.</p>
-    <p>2.º Que el CLIENTE es una sociedad mercantil dedicada a la actividad de restauración y que desea contratar los servicios objeto de las presentes Condiciones Generales para la gestión operativa de dicho establecimiento.</p>
-    <p>3.º Que las partes han mantenido conversaciones comerciales previas, en cuyo marco Platomico presentó al CLIENTE la oferta comercial nº <strong>${esc(presupuesto.number)}</strong>, relativa a la implantación del sistema ROS y del hardware asociado (la «Oferta»), oferta que ha sido aceptada por el CLIENTE y cuyo contenido económico se rige por lo dispuesto en la Cláusula 4ª.</p>
-    <p>4.º Que, con carácter previo a la firma del presente documento, Platomico ha informado al CLIENTE de las funcionalidades y limitaciones del Servicio, del precio indicado en la Oferta, del período de permanencia mínima establecido en la Cláusula 6ª y de las condiciones de baja anticipada.</p>
-    <p>5.º Que Platomico es titular de todos los derechos de propiedad intelectual e industrial sobre el software ROS y demás elementos tecnológicos objeto de las presentes Condiciones Generales, encontrándose facultada para conceder al CLIENTE la licencia de uso regulada en la Cláusula 12ª.</p>
-    <p>6.º Que el sistema ROS cumple, o se encuentra en proceso de adaptación para cumplir, con los requisitos del Reglamento de Sistemas Informáticos de Facturación (Real Decreto 1007/2023), incluyendo, en su caso, la modalidad VERI*FACTU.</p>
-  </div>
+<!-- ═══ CLÁUSULAS POR SERVICIO ═══ -->
+${serviceBlocks || renBlock ? `
+<div style="break-after:page; ${PAGE}">
+  ${lbl('Cláusulas específicas por servicio')}
+  <div class="anx-title">Cláusulas específicas por servicio</div>
+  <div class="anx-subtitle">Service-specific clauses — solo los módulos contratados</div>
+  ${serviceBlocks}
+  ${renBlock ? `<div class="section-label" style="color:${SERVICE_COLOR.ren};border-color:${SERVICE_COLOR.ren}20;">Módulo REN · Corresponsabilidad (art. 26)</div>${renBlock}` : ''}
+</div>` : ''}
 
-  <div class="acuerdan" style="margin-bottom:14px;">— ACUERDAN —</div>
+<!-- ═══ ANEXO I · OFERTA + FIRMAS ═══ -->
+<div style="break-after:page; ${PAGE}">
+  ${lbl('Anexo I · Oferta comercial')}
+  <div class="anx-title">Anexo I · Oferta comercial</div>
+  <div class="anx-subtitle">Commercial Offer · nº ${esc(presupuesto.number)} — PLT-OFC-001</div>
 
-  <div class="section-label">Servicios contratados (Oferta ${esc(presupuesto.number)})</div>
-
-  <table class="svc-table">
-    <thead>
-      <tr>
-        <th>Descripción del servicio</th>
-        <th class="right" style="width:55px;">Cantidad</th>
-        <th class="right" style="width:90px;">Precio unit.</th>
-        <th class="right" style="width:90px;">Importe</th>
-      </tr>
-    </thead>
-    <tbody>
-      ${hasItems
-        ? renderServiceRows(items)
-        : `<tr>
-            <td>${esc(presupuesto.concept || 'Servicios según oferta')}</td>
-            <td class="right mono">1</td>
-            <td class="right mono">${fmt(presupuesto.amountNet)} €</td>
-            <td class="right mono fw6">${fmt(presupuesto.amountNet)} €</td>
-          </tr>`
-      }
-    </tbody>
+  <table class="tbl">
+    <thead><tr>
+      <th>Concepto</th><th class="right">Cant.</th><th class="right">P. unit.</th><th class="right">P. total</th><th>Period.</th>
+    </tr></thead>
+    <tbody>${renderOfferRows(items)}</tbody>
   </table>
+  <p style="font-size:8px;color:#94a3b8;margin-bottom:10px;">Importes sin IVA. / Amounts excl. VAT.</p>
 
-  <div class="totals-box">
-    <div class="totals-row">
-      <span class="lbl">Base imponible</span>
-      <span class="amt mono">${fmt(presupuesto.amountNet)} €</span>
-    </div>
-    <div class="totals-row">
-      <span class="lbl">IVA (${fmt(presupuesto.vatRate)}%)</span>
-      <span class="amt mono">${fmt(vatAmount)} €</span>
-    </div>
-    <div class="totals-row grand">
-      <span class="lbl">Total mensual</span>
-      <span class="amt">${fmt(presupuesto.amountTotal)} €</span>
-    </div>
-  </div>
+  <div class="clause"><div class="clause-num">Prevalencia · Prevalence</div><div class="clause-body">
+    <p>En caso de contradicción sobre precio, forma de pago o condiciones de facturación, prevalece esta Oferta sobre el Contrato. Para el resto de extremos se aplica el Contrato y sus Anexos. Forma de pago: <strong>${esc(formaPago)}</strong>.</p>
+    <p class="en">In case of conflict over price, payment method or invoicing conditions, this Offer prevails over the Agreement. For all other matters, the Agreement and its Annexes apply.</p>
+  </div></div>
 
-</div>
+  ${notas && notas.trim() ? `<div class="notas-box"><div class="notas-title">Notas / Notes</div>${esc(notas)}</div>` : ''}
 
-
-<!-- ══════════════════════════════════════════════════════════════════
-     CLÁUSULAS 1ª–20ª — FLUJO LIBRE
-     Sin break-after: Puppeteer pagina automáticamente.
-     No se fuerza ningún salto al final para evitar doble salto.
-══════════════════════════════════════════════════════════════════ -->
-<div style="${PAGE}">
-  ${lbl('Cláusulas 1ª–4ª')}
-
-  <div class="clause">
-    <div class="clause-num">Cláusula 1ª — Objeto y Ámbito de Aplicación</div>
-    <div class="clause-body">
-      <p>Con la firma del presente documento, el PROVEEDOR pone a disposición del CLIENTE el acceso a los servicios de los que es propietario bajo la marca comercial «PLATOMICO» (en adelante, los «Servicios»), contratados por el CLIENTE de conformidad con la Oferta comercial aceptada por éste (la «Oferta»).</p>
-      <p>Las presentes Condiciones Generales regulan con carácter estable la relación entre el PROVEEDOR y el CLIENTE, y resultarán de aplicación a la Oferta identificada en el Expositivo y a cualquier otra Oferta, ampliación o renovación que el CLIENTE acepte durante la vigencia de la relación contractual, salvo que la Oferta correspondiente disponga expresamente otra cosa para algún extremo concreto.</p>
-    </div>
-  </div>
-
-  <div class="clause">
-    <div class="clause-num">Cláusula 2ª — Forma de Prestación del Servicio</div>
-    <div class="clause-body">
-      <p><strong>2.1.</strong> El PROVEEDOR pondrá a disposición del CLIENTE el software ROS, en la versión del plan contratado, junto con el hardware acordado en la Oferta.</p>
-      <p><strong>2.2.</strong> El CLIENTE podrá utilizar el software durante toda la vigencia del Contrato y conforme a los términos de la licencia de uso regulada en la Cláusula 12ª, para las necesidades ordinarias de su actividad de restauración.</p>
-      <p><strong>2.3.</strong> El PROVEEDOR realizará una sesión de onboarding en la que instalará y configurará el software adaptándolo al negocio del CLIENTE, incluyendo la carga del menú, precios, imágenes, categorías y demás elementos necesarios, de modo que el CLIENTE quede en condiciones de operar por sí mismo tanto el software de punto de venta como el resto de terminales que, en su caso, hubiera contratado.</p>
-    </div>
-  </div>
-
-  <div class="clause">
-    <div class="clause-num">Cláusula 3ª — Equipos: Titularidad, Origen y Devolución</div>
-    <div class="clause-body">
-      <p>A los efectos del presente documento, se entiende por «Equipos», «Terminales» o «Dispositivos» aquellos terminales físicos necesarios para el uso del Servicio, a título enunciativo y no limitativo: el Counter Stand, Bouncepad y los dispositivos tipo tablet (Android o iOS) en los que se ejecute el software ROS, ya sea en modalidad de punto de venta (POS), de kiosco de autoservicio o de pantalla de cocina (KDS), según el paquete contratado por el CLIENTE.</p>
-      <div class="sub-clause">
-        <p><span class="sub-clause-title">a) Identificación individualizada.</span> Cada tablet entregada al CLIENTE quedará identificada de forma individual en el Anexo III (Inventario de Equipos), que indicará, como mínimo, su tipología, marca y modelo, color, número de serie o identificador único, y la función asignada (POS, Kiosko o KDS). Cualquier sustitución se documentará mediante la actualización de dicho Anexo, sin que ello requiera la modificación formal del presente documento conforme a la Cláusula 16ª.</p>
-        <p><span class="sub-clause-title">b) Origen de los Equipos.</span> Los Equipos podrán ser (i) aportados por el CLIENTE, quien los habrá adquirido por su cuenta y quedarán excluidos de las condiciones de la Oferta; o (ii) aportados por el PROVEEDOR, en cuyo caso se regirán por lo dispuesto en el apartado c). El origen de cada Equipo se hará constar en el Anexo III.</p>
-        <p><span class="sub-clause-title">c) Equipos aportados por el PROVEEDOR — cesión de uso.</span> Los Equipos aportados por el PROVEEDOR se ceden en uso al CLIENTE (comodato) vinculado a la vigencia del presente documento. Por cada tablet aportada por el PROVEEDOR, el CLIENTE abonará una cuota mensual conforme a lo indicado en la Oferta (IVA no incluido), adicional a la cuota del Servicio, en concepto de mantenimiento, actualizaciones y sustitución del dispositivo en caso de avería no imputable al CLIENTE.</p>
-        <p><span class="sub-clause-title">d) Equipos aportados por el CLIENTE.</span> El PROVEEDOR prestará únicamente soporte sobre el software instalado, sin asumir responsabilidad sobre el hardware, su mantenimiento o sustitución. El PROVEEDOR podrá condicionar la instalación del software al cumplimiento de unos requisitos técnicos mínimos.</p>
-        <p><span class="sub-clause-title">e) Devolución.</span> El CLIENTE deberá devolver al PROVEEDOR los Equipos aportados por este último en el plazo de 10 días naturales desde la finalización o resolución del presente documento por cualquier causa, en condiciones normales de uso conforme al desgaste propio de su utilización ordinaria. El CLIENTE responderá del valor de reposición de cada Equipo en caso de pérdida, sustracción o deterioro que exceda del desgaste ordinario.</p>
-      </div>
-    </div>
-  </div>
-
-  <div class="clause">
-    <div class="clause-num">Cláusula 4ª — Precio, Facturación y Forma de Pago</div>
-    <div class="clause-body">
-      <p><strong>4.1. Precio.</strong> El precio de los Servicios y, en su caso, de los Equipos es el que se determina en la Oferta aceptada por el CLIENTE, que queda incorporada al presente documento como parte integrante del mismo. La Oferta detallará los conceptos contratados, las cantidades, el precio unitario y total de cada uno, el IVA aplicable y la periodicidad de facturación correspondiente (única o recurrente).</p>
-      <p><strong>4.2. Forma de pago.</strong> La forma de pago será <strong>${esc(formaPago)}</strong>${formaPago.toLowerCase().includes('domiciliación') || formaPago.toLowerCase().includes('transferencia') ? `, al IBAN <strong>ES69 1583 0001 1993 4722 6761</strong> (Platomico, S.L.)` : ''}. En caso de domiciliación bancaria, el CLIENTE suscribirá el correspondiente mandato SEPA. La devolución de un recibo o el rechazo de un cargo por causa imputable al CLIENTE conllevará la repercusión de los gastos bancarios ocasionados y facultará al PROVEEDOR, previo requerimiento no atendido en el plazo de 5 días, a suspender la prestación del Servicio hasta la regularización del pago.</p>
-      <p><strong>4.3. Cuotas de pago único.</strong> Cuando la Oferta incluya servicios de alta, formación, onboarding u otros conceptos análogos de puesta en marcha del Servicio —con exclusión de los Desarrollos a Medida—, dichos Servicios se facturarán conforme a lo establecido en la sección «Set-up fee» de la Oferta y, en ausencia de determinación expresa en ésta, se facturarán en su totalidad de forma anticipada a la firma del presente documento.</p>
-      <p><strong>4.4. Desarrollos a Medida.</strong> Cuando el CLIENTE solicite un desarrollo, integración o personalización específica no incluida en el plan estándar («Desarrollo a Medida»), el PROVEEDOR remitirá una Oferta de Desarrollo a Medida con el alcance, el plazo y el coste total, que deberá ser aceptada expresamente por el CLIENTE antes del inicio de los trabajos. El coste se abona en dos plazos: 50% por adelantado y 50% a la finalización y puesta en marcha. El CLIENTE dispondrá de 10 días naturales para comunicar disconformidades; transcurrido dicho plazo, el Desarrollo se entenderá aceptado. La propiedad intelectual del Desarrollo corresponderá al PROVEEDOR salvo pacto expreso en contrario.</p>
-      <p><strong>4.5. Actualización del precio.</strong> El precio de las cuotas recurrentes podrá actualizarse en cada renovación anual aplicando la variación interanual del IPC publicado por el INE, o el porcentaje acordado expresamente con 30 días de antelación. En ausencia de acuerdo, el precio vigente se mantiene sin modificación hasta la siguiente renovación.</p>
-      <p><strong>4.6. Facturación y morosidad.</strong> El PROVEEDOR emitirá factura mensualmente a mes vencido. El plazo de pago será de 30 días desde la fecha de emisión. El impago devengará automáticamente el interés de demora previsto en el art. 7 de la Ley 3/2004, de 29 de diciembre, así como la indemnización por costes de cobro prevista en su art. 8.</p>
-      <p><strong>4.7. Prevalencia.</strong> En caso de contradicción entre la Oferta y el presente documento respecto del precio, la forma de pago o las condiciones de facturación, prevalecerá lo establecido en la Oferta.</p>
-    </div>
-  </div>
-
-  <div class="clause">
-    <div class="clause-num">Cláusula 5ª — Duración y Vigencia</div>
-    <div class="clause-body">
-      <p>El presente documento tendrá una duración de <strong>${duracionMeses} meses</strong>, con fecha de inicio el <strong>${startStr}</strong> y fecha de vencimiento el <strong>${endStr}</strong>. Transcurrido dicho período, se renovará automáticamente por períodos anuales sucesivos, salvo que cualquiera de las partes lo notifique a la otra de forma fehaciente (burofax, conducto notarial o correo electrónico con acuse de recibo) con una antelación mínima de 30 días naturales a la fecha de vencimiento en curso.</p>
-      <div class="highlight-box">Inicio: ${startStr} &nbsp;·&nbsp; Vencimiento: ${endStr} &nbsp;·&nbsp; Duración: ${duracionMeses} meses</div>
-    </div>
-  </div>
-
-  <div class="clause">
-    <div class="clause-num">Cláusula 6ª — Período de Permanencia</div>
-    <div class="clause-body">
-      ${permanenciaMeses > 0
-        ? `<p>El CLIENTE se compromete a mantener activos los Servicios contratados durante un período mínimo de permanencia de <strong>${permanenciaMeses} meses</strong> desde la fecha de inicio. En caso de baja anticipada durante dicho período, el CLIENTE podrá optar entre las siguientes alternativas, a su elección:</p>
-          <p><strong>(a) Devolución de equipos.</strong> Devolver al PROVEEDOR la totalidad de los Equipos aportados por este último conforme a la Cláusula 3ª, en condiciones normales de uso, dentro de los 10 días naturales siguientes a la fecha efectiva de baja; o bien</p>
-          <p><strong>(b) Compensación económica.</strong> Abonar al PROVEEDOR las mensualidades de cuota de servicio correspondientes a los meses que resten desde la fecha efectiva de baja hasta la finalización del período de permanencia pactado, en concepto de cláusula penal conforme al artículo 1152 del Código Civil.</p>
-          <p>El CLIENTE comunicará al PROVEEDOR la opción elegida en el mismo escrito de notificación de baja anticipada. A falta de comunicación expresa, se entenderá optada la alternativa (b).</p>`
-        : `<p>Las partes no han pactado período mínimo de permanencia. Solo cuando Platomico suministre hardware o instalación de forma subvencionada o con descuento podrá pactarse un compromiso de permanencia, que quedará cuantificado en la Oferta correspondiente.</p>`
-      }
-      <p>Lo anterior no será de aplicación cuando la resolución anticipada traiga causa de un incumplimiento grave de las obligaciones del PROVEEDOR —incluido el incumplimiento reiterado de los niveles de servicio del Anexo I— no subsanado en el plazo de 15 días desde su requerimiento fehaciente, conforme al artículo 1124 del Código Civil; en tal caso el CLIENTE podrá resolver el Contrato sin penalización.</p>
-    </div>
-  </div>
-
-  <div class="clause">
-    <div class="clause-num">Cláusula 7ª — Obligaciones del Proveedor</div>
-    <div class="clause-body">
-      <p>Sin perjuicio de las demás obligaciones asumidas en el presente documento, el PROVEEDOR se obliga a:</p>
-      <p>(a) Prestar el Servicio con la diligencia profesional exigible a un ordenado empresario del sector tecnológico (art. 1104 CC), poniendo a disposición del CLIENTE el software ROS y, en su caso, los Equipos acordados en la Oferta, en los términos, plazos y condiciones pactados.</p>
-      <p>(b) Realizar la sesión de onboarding, instalando y configurando el software conforme a las necesidades del negocio del CLIENTE.</p>
-      <p>(c) Prestar el soporte técnico y cumplir los tiempos de respuesta y resolución establecidos en el Anexo I (SLA), así como mantener operativos los canales de reporte de incidencias.</p>
-      <p>(d) Mantener el software actualizado, corrigiendo los errores de funcionamiento que le sean notificados y aplicando las actualizaciones de seguridad razonablemente necesarias.</p>
-      <p>(e) Cumplir con la normativa aplicable a los sistemas informáticos de facturación (Ley 11/2021 y Real Decreto 1007/2023, incluida la modalidad VERI*FACTU), manteniendo dicho cumplimiento durante toda la vigencia del Contrato.</p>
-      <p>(f) Actuar como Encargado del Tratamiento de los datos personales del CLIENTE conforme al RGPD y la LOPDGDD, en los términos del Anexo II.</p>
-      <p>(g) Guardar la confidencialidad prevista en la Cláusula 11ª respecto de la información del CLIENTE a la que tenga acceso con ocasión de la prestación del Servicio.</p>
-      <p>(h) Emitir puntualmente las facturas correspondientes conforme a lo pactado en la Cláusula 4ª.</p>
-      <p>(i) Informar al CLIENTE de cualquier incidencia relevante que afecte de forma significativa a la disponibilidad o seguridad del Servicio.</p>
-    </div>
-  </div>
-
-  <div class="clause">
-    <div class="clause-num">Cláusula 8ª — Obligaciones del Cliente</div>
-    <div class="clause-body">
-      <p>Sin perjuicio de las demás obligaciones asumidas en el presente documento, el CLIENTE se obliga a:</p>
-      <p>(a) Abonar puntualmente el precio del Servicio en los términos, plazos y forma de pago pactados en la Cláusula 4ª.</p>
-      <p>(b) Facilitar al PROVEEDOR, de forma veraz y en tiempo razonable, la información y colaboración necesarias para la correcta prestación del Servicio.</p>
-      <p>(c) Destinar el software y los Equipos exclusivamente al desarrollo de su propia actividad empresarial y a los fines previstos en el presente documento, absteniéndose de cederlos o sublicenciarlos.</p>
-      <p>(d) Abstenerse de realizar labores de ingeniería inversa, descompilación, copia o modificación no autorizada del software.</p>
-      <p>(e) Custodiar adecuadamente los Equipos entregados y responder de su pérdida, sustracción o deterioro no atribuible al desgaste ordinario, en los términos de la Cláusula 3ª.</p>
-      <p>(f) Designar una persona de contacto operativo para la coordinación del onboarding, la gestión de incidencias y las comunicaciones ordinarias con el PROVEEDOR.</p>
-      <p>(g) Ser responsable frente a terceros y frente a la Administración del contenido que introduzca en el sistema (precios, productos, datos fiscales), así como del cumplimiento de la normativa aplicable a su propia actividad.</p>
-      <p>(h) Notificar sin demora injustificada al PROVEEDOR cualquier incidencia de seguridad, uso indebido o acceso no autorizado del que tenga conocimiento.</p>
-      <p>(i) Mantener actualizados sus datos de contacto, facturación y pago, comunicando cualquier variación conforme a la Cláusula 18ª.</p>
-    </div>
-  </div>
-
-  <div class="clause">
-    <div class="clause-num">Cláusula 9ª — Soporte Técnico y Nivel de Servicio</div>
-    <div class="clause-body">
-      <p>El soporte técnico y el nivel de servicio aplicables al CLIENTE serán los correspondientes al plan contratado (Starter, Growth o Pro), según se identifique en la Oferta, y se prestarán conforme a las condiciones descritas en el Anexo I (Acuerdo de Nivel de Servicio).</p>
-      <p>El PROVEEDOR podrá actualizar la denominación, contenido o alcance de los planes ofrecidos con carácter general a sus clientes, sin que ello suponga una reducción de las condiciones ya contratadas por el CLIENTE.</p>
-      <p>En los planes Starter y Growth los tiempos de respuesta tienen carácter orientativo y de mejor esfuerzo («best effort»). En el plan Pro, dichos tiempos constituyen un Acuerdo de Nivel de Servicio garantizado, cuyo incumplimiento reiterado dará lugar a las consecuencias previstas en la Cláusula 6ª.</p>
-      <p>El CLIENTE podrá solicitar el cambio de plan mediante la aceptación de una nueva Oferta, que sustituirá a la anterior a efectos de nivel de servicio desde la fecha en ella indicada.</p>
-    </div>
-  </div>
-
-  <div class="clause">
-    <div class="clause-num">Cláusula 10ª — Protección de Datos</div>
-    <div class="clause-body">
-      <p><strong>10.1.</strong> En cumplimiento del RGPD y de la LOPDGDD, las partes se informan mutuamente de que los datos personales de sus firmantes, así como de las personas que trabajen para cada una de ellas, serán tratados con la única finalidad de gestionar y ejecutar la relación contractual. Los datos no serán cedidos a terceros, salvo a aquellos que resulten imprescindibles para la propia ejecución del Contrato o para el cumplimiento de obligaciones legales.</p>
-      <p><strong>10.2.</strong> En la medida en que la prestación del Servicio suponga el acceso del PROVEEDOR a datos de carácter personal responsabilidad del CLIENTE, el PROVEEDOR tendrá la consideración de Encargado del Tratamiento conforme al artículo 28 RGPD, suscribiéndose a tal efecto el Acuerdo de Encargado del Tratamiento que se adjunta como Anexo II.</p>
-      <p><strong>10.3.</strong> El CLIENTE es responsable de la veracidad y exactitud de los datos que introduzca en el sistema, sin que el PROVEEDOR asuma responsabilidad alguna por los errores u omisiones en que aquel pudiera incurrir.</p>
-    </div>
-  </div>
-
-  <div class="clause">
-    <div class="clause-num">Cláusula 11ª — Confidencialidad</div>
-    <div class="clause-body">
-      <p>Cada parte se obliga a mantener la más estricta confidencialidad respecto de la información técnica, comercial o de cualquier otra naturaleza a la que tenga acceso con ocasión del presente documento, y a no revelarla a terceros ni utilizarla para fines distintos de los aquí previstos, tanto durante su vigencia como durante los 2 años siguientes a su finalización, salvo obligación legal o requerimiento de autoridad competente.</p>
-    </div>
-  </div>
-
-  <div class="clause">
-    <div class="clause-num">Cláusula 12ª — Propiedad Intelectual y Licencia de Software</div>
-    <div class="clause-body">
-      <p>El software ROS y demás desarrollos tecnológicos empleados en la prestación del Servicio son titularidad exclusiva de Platomico o de sus licenciantes. El presente documento no transmite al CLIENTE derecho de propiedad intelectual o industrial alguno, sino una licencia de uso no exclusiva, intransferible y limitada a la duración del Contrato y al número de terminales contratados.</p>
-      <p>Finalizado el Contrato por cualquier causa, el CLIENTE cesará de inmediato en el uso del software, sin perjuicio de su derecho a solicitar la exportación de sus datos conforme a la Cláusula 10ª.</p>
-    </div>
-  </div>
-
-  <div class="clause">
-    <div class="clause-num">Cláusula 13ª — Limitación de Responsabilidad</div>
-    <div class="clause-body">
-      <p>La responsabilidad total del PROVEEDOR frente al CLIENTE por cualquier daño derivado del presente documento quedará limitada, salvo dolo o negligencia grave conforme al artículo 1102 del Código Civil, al importe efectivamente satisfecho por el CLIENTE durante los 12 meses anteriores al hecho causante. En ningún caso el PROVEEDOR responderá de daños indirectos, lucro cesante o pérdida de datos u oportunidades de negocio.</p>
-    </div>
-  </div>
-
-  <div class="clause">
-    <div class="clause-num">Cláusula 14ª — Fuerza Mayor</div>
-    <div class="clause-body">
-      <p>Ninguna de las partes será responsable del incumplimiento de sus obligaciones cuando este derive de un supuesto de fuerza mayor o caso fortuito conforme al artículo 1105 del Código Civil, incluyendo, entre otros, fallos de terceros proveedores de infraestructura, cortes de suministro eléctrico o de telecomunicaciones, catástrofes naturales o decisiones de autoridades públicas ajenas a la voluntad de las partes.</p>
-    </div>
-  </div>
-
-  <div class="clause">
-    <div class="clause-num">Cláusula 15ª — Cesión y Subcontratación</div>
-    <div class="clause-body">
-      <p>Ninguna de las partes podrá ceder el presente documento ni los derechos y obligaciones derivados del mismo sin el consentimiento previo y por escrito de la otra, salvo en caso de fusión, escisión o transmisión global de su negocio, supuesto en el que bastará notificación previa fehaciente.</p>
-      <p>El PROVEEDOR podrá subcontratar la prestación de servicios auxiliares (alojamiento, soporte de primer nivel, etc.), permaneciendo en todo caso responsable frente al CLIENTE del cumplimiento del Contrato.</p>
-    </div>
-  </div>
-
-  <div class="clause">
-    <div class="clause-num">Cláusula 16ª — Modificación del Contrato</div>
-    <div class="clause-body">
-      <p>Cualquier modificación del presente documento deberá constar por escrito y ser firmada por los representantes debidamente apoderados de ambas partes, sin que las comunicaciones por correo electrónico ordinario o la mera tolerancia de una de las partes puedan entenderse como modificación tácita de lo pactado, conforme al principio de forma del artículo 1258 del Código Civil. Lo anterior se entiende sin perjuicio de la actualización del Anexo III conforme a la Cláusula 3ª.a) y de la suscripción de nuevas Ofertas conforme a la Cláusula 1ª.</p>
-    </div>
-  </div>
-
-  <div class="clause">
-    <div class="clause-num">Cláusula 17ª — Nulidad Parcial</div>
-    <div class="clause-body">
-      <p>Si cualquiera de las cláusulas del presente documento fuera declarada nula, anulable o ineficaz, dicha nulidad no afectará a la validez del resto del Contrato, que continuará vigente e interpretándose en el sentido más próximo a la voluntad original de las partes.</p>
-    </div>
-  </div>
-
-  <div class="clause">
-    <div class="clause-num">Cláusula 18ª — Notificaciones</div>
-    <div class="clause-body">
-      <p>Cualquier comunicación relativa al presente documento se dirigirá a las siguientes direcciones:</p>
-      <p><strong>PROVEEDOR:</strong> hola@platomico.com / C/ Antonio Machado 9, Rozas de Puerto Real, Madrid 28649.</p>
-      <p><strong>CLIENTE:</strong> ${contactEmail ? esc(contactEmail) : '[DIRECCIÓN DE CORREO ELECTRÓNICO DE CONTACTO]'} / ${presupuesto.clientAddress ? esc(presupuesto.clientAddress) : '[DOMICILIO A EFECTOS DE NOTIFICACIONES]'}.</p>
-      <p>Cualquier cambio de estos datos deberá comunicarse a la otra parte con una antelación mínima de 15 días.</p>
-    </div>
-  </div>
-
-  <div class="clause">
-    <div class="clause-num">Cláusula 19ª — Cesión de Imagen</div>
-    <div class="clause-body">
-      <p>El CLIENTE autoriza al PROVEEDOR a dar publicidad a la relación de CLIENTE y PROVEEDOR formalizada en el presente documento en los medios y canales utilizados por el PROVEEDOR; en especial, el CLIENTE autoriza expresamente al PROVEEDOR al uso de su marca, logo, nombre comercial e imagen corporativa para tal fin publicitario en sus presentaciones y ofertas comerciales y en su página web.</p>
-    </div>
-  </div>
-
-  <div class="clause">
-    <div class="clause-num">Cláusula 20ª — Resolución Amistosa, Ley Aplicable y Jurisdicción</div>
-    <div class="clause-body">
-      <p>Con carácter previo al ejercicio de acciones judiciales, las partes procurarán resolver de buena fe cualquier controversia derivada del presente documento mediante negociación directa entre sus representantes, durante un plazo de 15 días desde su notificación fehaciente.</p>
-      <p>El presente documento se regirá e interpretará de acuerdo con la legislación española. Para la resolución de cualquier controversia que no se resuelva conforme al párrafo anterior, ambas partes se someten expresamente a los Juzgados y Tribunales de Madrid, con renuncia a cualquier otro fuero que pudiera corresponderles.</p>
-    </div>
-  </div>
-
-  ${notas ? `
-  <div class="notas-box">
-    <div class="notas-title">Condiciones especiales / Notas</div>
-    ${esc(notas)}
-  </div>` : ''}
-
-</div>
-
-
-<!-- ══════════════════════════════════════════════════════════════════
-     FIRMAS
-     break-before:page — fuerza nueva página desde donde acabaron las cláusulas.
-     break-after:page  — separa limpiamente del Anexo I.
-     Al usar solo break-before (no break-after en las cláusulas) se elimina el
-     riesgo de doble salto que causaba la página en blanco.
-══════════════════════════════════════════════════════════════════ -->
-<div style="break-before:page; break-after:page; ${PAGE}">
-  ${lbl('Firmas')}
-
+  <div class="section-label">Firmas · Signatures</div>
   <div class="sig-intro">
-    Y en prueba de conformidad con todo lo expuesto, las partes firman el presente documento
-    en Madrid, a ${today}.
+    Y en prueba de conformidad, las partes suscriben el presente documento en Madrid, a ${today}.<br/>
+    <span class="anx-en">In witness whereof, the parties sign this document in Madrid, on ${today}.</span>
   </div>
-
   <div class="sig-cols">
-
     <div class="sig-col">
-      <div class="sig-col-title">Por Platomico, S.L.</div>
+      <div class="sig-col-title">Por el Proveedor · Platomico, S.L.</div>
       <div class="sig-name">César Augusto Castro Sáder</div>
       <div class="sig-role">Administrador Único</div>
-      <div class="sig-nif">NIF sociedad: B22741094</div>
+      <div class="sig-nif">CIF B-22741094</div>
       <div class="sig-presigned">✓ Firmado</div>
     </div>
-
     <div class="sig-col">
-      <div class="sig-col-title">Por ${esc(presupuesto.clientName)}</div>
+      <div class="sig-col-title">Por el Cliente · ${esc(presupuesto.clientName)}</div>
       <div class="sig-name">${esc(presupuesto.clientName)}</div>
-      ${presupuesto.clientCif     ? `<div class="sig-role">NIF/CIF: ${esc(presupuesto.clientCif)}</div>` : ''}
-      ${presupuesto.clientAddress ? `<div class="sig-nif">${esc(presupuesto.clientAddress)}</div>`      : ''}
-      <div style="margin-top:16px;">
-        <div class="sig-line-label">Firma</div>
-        <div class="sig-line">&nbsp;</div>
-        <div class="sig-line-label">Nombre del representante</div>
+      ${presupuesto.clientCif ? `<div class="sig-role">NIF/CIF: ${esc(presupuesto.clientCif)}</div>` : ''}
+      <div style="margin-top:14px;">
+        <div class="sig-line-label">Representante</div>
         <div class="sig-line">${contactName ? esc(contactName) : '&nbsp;'}</div>
-        <div class="sig-line-label">Cargo</div>
+        <div class="sig-line-label">Cargo · DNI</div>
         <div class="sig-line">&nbsp;</div>
-        <div class="sig-line-label">DNI del firmante</div>
-        <div class="sig-line">&nbsp;</div>
-        <div class="sig-line-label">Fecha</div>
+        <div class="sig-line-label">Firma · Fecha</div>
         <div class="sig-line">&nbsp;</div>
       </div>
     </div>
-
   </div>
-
 </div>
 
-
-<!-- ══════════════════════════════════════════════════════════════════
-     ANEXO I — SLA
-══════════════════════════════════════════════════════════════════ -->
+<!-- ═══ ANEXO II · SLA ═══ -->
 <div style="break-after:page; ${PAGE}">
-  ${lbl('Anexo I — Acuerdo de Nivel de Servicio (SLA)')}
+  ${lbl('Anexo II · SLA')}
+  <div class="anx-title">Anexo II · Acuerdo de Nivel de Servicio (SLA)</div>
+  <div class="anx-subtitle">Service Level Agreement — PLT-SLA-001</div>
+  <p style="font-size:8.5px;color:#475569;line-height:1.6;margin-bottom:6px;">Horas hábiles: L–V 9:00–18:00 (hora peninsular), excluidos festivos. Tiempo de respuesta: hasta la primera respuesta sustantiva. Tiempo de resolución: hasta el restablecimiento o workaround.</p>
+  <p style="font-size:8px;color:#94a3b8;font-style:italic;line-height:1.5;margin-bottom:12px;">Business hours: Mon–Fri 9:00–18:00 (mainland Spain), excluding holidays. Response: to first substantive response. Resolution: to restoration or workaround.</p>
 
-  <div class="anx-title">Anexo I</div>
-  <div class="anx-subtitle">Acuerdo de Nivel de Servicio (SLA) — Contrato ${esc(presupuesto.number)}</div>
-
-  <p style="font-size:9.5px;color:#334155;line-height:1.7;margin-bottom:12px;">
-    El presente Anexo desarrolla el nivel de servicio aplicable en función del plan contratado por el CLIENTE, identificado en la Oferta.
-  </p>
-
-  <table class="anx-table" style="margin-bottom:16px;">
-    <thead>
-      <tr>
-        <th>Plan</th>
-        <th>Hardware con soporte incluido</th>
-        <th>Canales de soporte</th>
-        <th>Horario («horas hábiles»)</th>
-      </tr>
-    </thead>
+  <table class="tbl">
+    <thead><tr><th>Severidad</th><th>Descripción</th><th>Respuesta</th><th>Resolución</th></tr></thead>
     <tbody>
-      <tr>
-        <td><strong>Starter</strong></td>
-        <td>Register (POS)</td>
-        <td>Centro de ayuda + correo electrónico</td>
-        <td>L–V, 9:00–18:00</td>
-      </tr>
-      <tr>
-        <td><strong>Growth</strong></td>
-        <td>Register (POS) o Kiosk (a elección del CLIENTE)</td>
-        <td>Centro de ayuda + correo electrónico</td>
-        <td>L–V, 9:00–23:00</td>
-      </tr>
-      <tr>
-        <td><strong>Pro</strong></td>
-        <td>Register (POS) o Kiosk (a elección del CLIENTE)</td>
-        <td>Teléfono + WhatsApp, con Customer Success Manager dedicado</td>
-        <td>24 horas, todos los días</td>
-      </tr>
+      <tr><td><strong>Crítica</strong></td><td>Servicio caído o funcionalidad esencial no disponible</td><td>4 h hábiles</td><td>8 h hábiles</td></tr>
+      <tr><td><strong>Alta</strong></td><td>Funcionalidad relevante degradada</td><td>8 h hábiles</td><td>24 h hábiles</td></tr>
+      <tr><td><strong>Media</strong></td><td>Incidencia con workaround</td><td>24 h hábiles</td><td>72 h hábiles</td></tr>
+      <tr><td><strong>Baja</strong></td><td>Consultas o mejoras</td><td>48 h hábiles</td><td>A planificar</td></tr>
     </tbody>
   </table>
 
-  <p style="font-size:9px;color:#64748b;margin-bottom:10px;">En los planes Starter y Growth las «horas hábiles» se computan conforme al horario de la tabla anterior. En el plan Pro, al disponer de cobertura continua, los tiempos se computan en horas naturales.</p>
-
-  <table class="anx-table">
-    <thead>
-      <tr>
-        <th>Severidad</th>
-        <th>Descripción</th>
-        <th>Tiempo de respuesta</th>
-        <th>Tiempo de resolución objetivo</th>
-      </tr>
-    </thead>
+  <table class="tbl">
+    <thead><tr><th>Plan</th><th>Hardware</th><th>Canales</th><th>Horario</th></tr></thead>
     <tbody>
-      <tr>
-        <td><strong>Crítica</strong></td>
-        <td>Servicio caído o funcionalidad esencial no disponible</td>
-        <td>4 horas hábiles</td>
-        <td>8 horas hábiles</td>
-      </tr>
-      <tr>
-        <td><strong>Alta</strong></td>
-        <td>Funcionalidad relevante degradada, con impacto operativo significativo</td>
-        <td>8 horas hábiles</td>
-        <td>24 horas hábiles</td>
-      </tr>
-      <tr>
-        <td><strong>Media</strong></td>
-        <td>Incidencia con solución alternativa (workaround) disponible</td>
-        <td>24 horas hábiles</td>
-        <td>72 horas hábiles</td>
-      </tr>
-      <tr>
-        <td><strong>Baja</strong></td>
-        <td>Consultas, dudas de uso o solicitudes de mejora</td>
-        <td>48 horas hábiles</td>
-        <td>A planificar de mutuo acuerdo</td>
-      </tr>
+      <tr><td><strong>Starter</strong></td><td>Register (POS)</td><td>Centro de ayuda + email</td><td>L–V 9:00–18:00</td></tr>
+      <tr><td><strong>Growth</strong></td><td>Register o Kiosk</td><td>Centro de ayuda + email</td><td>L–V 9:00–23:00</td></tr>
+      <tr><td><strong>Pro</strong></td><td>Register o Kiosk</td><td>Teléfono + WhatsApp + CSM</td><td>24/7</td></tr>
     </tbody>
   </table>
-
-  <p style="font-size:9px;color:#64748b;margin-top:10px;">
-    En los planes Starter y Growth, los tiempos anteriores son orientativos («best effort»); en el plan Pro constituyen un compromiso garantizado conforme a la Cláusula 9ª.
-  </p>
-
+  <p style="font-size:8px;color:#64748b;line-height:1.5;">Starter/Growth: tiempos best effort. Pro: nivel garantizado (su incumplimiento reiterado habilita la excepción de la Cl. 18ª). Exclusiones: fuerza mayor, fallos de terceros, uso indebido, mantenimiento notificado y equipos del Cliente.</p>
 </div>
 
-
-<!-- ══════════════════════════════════════════════════════════════════
-     ANEXO II — ENCARGADO DEL TRATAMIENTO (ART. 28 RGPD)
-══════════════════════════════════════════════════════════════════ -->
+<!-- ═══ ANEXO III · DPA ═══ -->
 <div style="break-after:page; ${PAGE}">
-  ${lbl('Anexo II — Acuerdo de Encargado del Tratamiento')}
+  ${lbl('Anexo III · DPA (art. 28)')}
+  <div class="anx-title">Anexo III · Acuerdo de Encargado del Tratamiento (DPA)</div>
+  <div class="anx-subtitle">Data Processing Agreement — Art. 28 GDPR — PLT-DPA-C-001</div>
+  ${DPA_CLAUSES.map((c) => renderClause(c)).join('')}
 
-  <div class="anx-title">Anexo II</div>
-  <div class="anx-subtitle">Acuerdo de Encargado del Tratamiento (art. 28 RGPD) — Contrato ${esc(presupuesto.number)}</div>
-
-  <table class="anx-table" style="margin-bottom:14px;">
+  <div class="section-label">Anexo A · Tratamiento por módulo · Processing per module</div>
+  <table class="tbl">
+    <thead><tr><th>Módulo</th><th>Tratamiento</th></tr></thead>
     <tbody>
-      <tr><td style="width:160px;font-weight:700;color:#1e3a5f;">Objeto</td><td>Prestación del Servicio ROS y gestión de los Equipos asociados descritos en el presente documento.</td></tr>
-      <tr><td style="font-weight:700;color:#1e3a5f;">Duración</td><td>Coincidente con la duración del Contrato principal y sus renovaciones.</td></tr>
-      <tr><td style="font-weight:700;color:#1e3a5f;">Naturaleza y finalidad</td><td>Gestión de pedidos y operaciones del establecimiento del CLIENTE a través del Servicio contratado.</td></tr>
-      <tr><td style="font-weight:700;color:#1e3a5f;">Tipo de datos</td><td>Datos identificativos y de contacto de clientes finales; datos de transacciones y pedidos.</td></tr>
-      <tr><td style="font-weight:700;color:#1e3a5f;">Categorías de interesados</td><td>Clientes finales del establecimiento del CLIENTE; personal del CLIENTE.</td></tr>
+      ${DPA_MODULE_ROWS.filter((r) => services[r.key]).map((r) => `<tr><td><strong>${esc(r.mod)}</strong></td><td>${esc(r.es)}<br/><span class="anx-en">${esc(r.en)}</span></td></tr>`).join('') || '<tr><td colspan="2" class="cell-placeholder" style="text-align:center;">Sin módulos de encargo (ver REN en el cuerpo del Contrato)</td></tr>'}
     </tbody>
   </table>
 
-  <p style="font-size:9px;font-weight:700;color:#1e3a5f;margin-bottom:8px;text-transform:uppercase;letter-spacing:0.6px;">Obligaciones del Proveedor como Encargado del Tratamiento:</p>
+  <div class="section-label">Anexo B · Subencargados y transferencias · Sub-processors</div>
+  <table class="tbl">
+    <thead><tr><th>Subencargado</th><th>Uso</th><th>Región</th><th>Mecanismo</th></tr></thead>
+    <tbody>
+      ${SUBPROCESSORS.map(([n, u, r, m]) => `<tr><td><strong>${esc(n)}</strong></td><td>${esc(u)}</td><td>${esc(r)}</td><td>${esc(m)}</td></tr>`).join('')}
+    </tbody>
+  </table>
+  <p style="font-size:8px;color:#64748b;line-height:1.5;">EEE = Espacio Económico Europeo. Las pasarelas de pago las contrata el Cliente (responsables independientes). Glovo/Uber/JustEat (REN) son responsables independientes. Ver PLT-VEN-001.</p>
+</div>
 
-  <div style="font-size:9.5px;color:#334155;line-height:1.7;">
-    <p style="margin-bottom:5px;">(a) Tratar los datos personales únicamente conforme a las instrucciones documentadas del CLIENTE, sin aplicarlos ni utilizarlos para fines distintos del objeto del Contrato, ni comunicarlos a terceros, salvo autorización expresa del CLIENTE.</p>
-    <p style="margin-bottom:5px;">(b) Garantizar que las personas autorizadas para tratar los datos se comprometan a respetar la confidencialidad.</p>
-    <p style="margin-bottom:5px;">(c) Adoptar las medidas técnicas y organizativas necesarias para garantizar la seguridad de los datos, atendiendo al estado de la tecnología, la naturaleza de los datos tratados y los riesgos a los que están expuestos, conforme al artículo 32 RGPD.</p>
-    <p style="margin-bottom:5px;">(d) No subcontratar a otro encargado del tratamiento sin la autorización previa, específica o general, por escrito, del CLIENTE, en los términos de la Cláusula 15ª. <em>Subencargados actualmente autorizados: proveedores de infraestructura cloud (alojamiento y almacenamiento).</em></p>
-    <p style="margin-bottom:5px;">(e) Asistir al CLIENTE, mediante las medidas técnicas y organizativas apropiadas y en la medida de lo posible, en la atención de solicitudes de ejercicio de derechos de los interesados y en el cumplimiento de sus obligaciones conforme a los artículos 32 a 36 RGPD.</p>
-    <p style="margin-bottom:5px;">(f) A elección del CLIENTE, suprimir o devolver todos los datos personales una vez finalizada la prestación del Servicio, y suprimir las copias existentes, en el plazo de 30 días, salvo que resulte necesaria su conservación en virtud del Derecho de la Unión o de un Estado miembro.</p>
-    <p style="margin-bottom:0;">(g) Poner a disposición del CLIENTE la información necesaria para demostrar el cumplimiento de estas obligaciones y permitir auditorías realizadas por el CLIENTE o un auditor autorizado.</p>
+<!-- ═══ ANEXO IV · INVENTARIO ═══ -->
+<div style="break-after:page; ${PAGE}">
+  ${lbl('Anexo IV · Inventario de equipos')}
+  <div class="anx-title">Anexo IV · Inventario de Equipos</div>
+  <div class="anx-subtitle">Equipment Inventory — PLT-INV-001</div>
+  <p style="font-size:8.5px;color:#475569;line-height:1.6;margin-bottom:10px;">Los equipos aportados por Platomico se ceden en comodato (arts. 1740 y ss. CC), vinculado a la vigencia; el Cliente los custodia con diligencia y los devuelve en 10 días desde la finalización, respondiendo del valor de reposición por pérdida o deterioro que exceda el desgaste ordinario. Los aportados por el Cliente permanecen de su propiedad.</p>
+  <table class="tbl">
+    <thead><tr><th>Nº</th><th>Tipología</th><th>Marca/modelo</th><th>Nº serie</th><th>Origen</th><th>Modalidad</th></tr></thead>
+    <tbody>${equipmentRows}</tbody>
+  </table>
+</div>
+
+<!-- ═══ ANEXO V · NDA + FIRMAS ═══ -->
+<div style="break-before:page; ${PAGE}">
+  ${lbl('Anexo V · NDA')}
+  <div class="anx-title">Anexo V · Acuerdo de Confidencialidad (NDA)</div>
+  <div class="anx-subtitle">Non-Disclosure Agreement — PLT-NDA-001</div>
+  ${NDA_CLAUSES.map((c) => renderClause(c)).join('')}
+
+  <div class="section-label">Firmas · Signatures</div>
+  <div class="sig-cols">
+    <div class="sig-col">
+      <div class="sig-col-title">Por el Proveedor · Platomico, S.L.</div>
+      <div class="sig-name">César Augusto Castro Sáder</div>
+      <div class="sig-role">Administrador Único · CIF B-22741094</div>
+      <div class="sig-presigned">✓ Firmado</div>
+    </div>
+    <div class="sig-col">
+      <div class="sig-col-title">Por el Cliente · ${esc(presupuesto.clientName)}</div>
+      <div class="sig-name">${esc(presupuesto.clientName)}</div>
+      ${presupuesto.clientCif ? `<div class="sig-role">NIF/CIF: ${esc(presupuesto.clientCif)}</div>` : ''}
+      <div style="margin-top:14px;">
+        <div class="sig-line-label">Representante · DNI</div>
+        <div class="sig-line">${contactName ? esc(contactName) : '&nbsp;'}</div>
+        <div class="sig-line-label">Firma · Fecha</div>
+        <div class="sig-line">&nbsp;</div>
+      </div>
+    </div>
   </div>
-
-</div>
-
-
-<!-- ══════════════════════════════════════════════════════════════════
-     ANEXO III — INVENTARIO DE EQUIPOS
-══════════════════════════════════════════════════════════════════ -->
-<div style="${PAGE}">
-  ${lbl('Anexo III — Inventario de Equipos')}
-
-  <div class="anx-title">Anexo III</div>
-  <div class="anx-subtitle">Inventario de Equipos — Contrato ${esc(presupuesto.number)} · ${esc(presupuesto.clientName)}</div>
-
-  <p style="font-size:9.5px;color:#334155;line-height:1.7;margin-bottom:12px;">
-    El presente Anexo identifica de forma individualizada los Equipos entregados al CLIENTE conforme a la Cláusula 3ª. Se actualizará cada vez que se sustituya o incorpore un nuevo Equipo, sin que ello requiera modificar formalmente el presente documento.
-  </p>
-
-  ${(() => {
-    type AnyRow = { n: number; tipo: string; marca: string; color: string; serie: string; funcion: string; origen: string; cuotaMensual: string }
-    let rows: AnyRow[]
-
-    if (equipment && equipment.length > 0) {
-      rows = equipment
-    } else {
-      const hwRows = extractHardwareRows(items)
-      const expanded: AnyRow[] = []
-      let n = 1
-      for (const row of hwRows) {
-        const count = Math.max(1, Math.round(row.cantidad))
-        for (let i = 0; i < count; i++) {
-          expanded.push({
-            n: n++,
-            tipo: row.tipo,
-            marca: '',
-            color: '',
-            serie: '',
-            funcion: '',
-            origen: row.origen,
-            cuotaMensual: row.cuota !== null ? `${fmt(row.cuota)} €/mes` : '',
-          })
-        }
-      }
-      rows = expanded.length > 0 ? expanded : [
-        { n: 1, tipo: '—', marca: '', color: '', serie: '', funcion: '', origen: '—', cuotaMensual: '' },
-        { n: 2, tipo: '—', marca: '', color: '', serie: '', funcion: '', origen: '—', cuotaMensual: '' },
-        { n: 3, tipo: '—', marca: '', color: '', serie: '', funcion: '', origen: '—', cuotaMensual: '' },
-      ]
-    }
-
-    const ph = (v: string) => v ? esc(v) : '<span style="color:#94a3b8">[__]</span>'
-
-    return `
-  <table class="anx-table" style="margin-bottom:20px;">
-    <thead>
-      <tr>
-        <th style="width:28px;">Nº</th>
-        <th>Tipo / Descripción</th>
-        <th>Marca / Modelo</th>
-        <th>Color</th>
-        <th>Nº Serie / ID</th>
-        <th>Función</th>
-        <th>Origen</th>
-        <th>Cuota mensual</th>
-      </tr>
-    </thead>
-    <tbody>
-      ${rows.map(r => `
-      <tr>
-        <td>${r.n}</td>
-        <td>${esc(r.tipo)}</td>
-        <td>${ph(r.marca)}</td>
-        <td>${ph(r.color)}</td>
-        <td>${ph(r.serie)}</td>
-        <td>${ph(r.funcion)}</td>
-        <td>${esc(r.origen) || '<span style="color:#94a3b8">Platomico</span>'}</td>
-        <td>${r.cuotaMensual === 'Comodato' ? '<span style="color:#0369a1">Comodato</span>' : r.cuotaMensual === 'Vendido' || !r.cuotaMensual ? '<span style="color:#94a3b8">Vendido</span>' : esc(r.cuotaMensual)}</td>
-      </tr>`).join('')}
-    </tbody>
-  </table>`
-  })()}
-
-  <p style="font-size:9px;font-weight:700;color:#1e3a5f;margin-bottom:8px;text-transform:uppercase;letter-spacing:0.6px;">Historial de modificaciones</p>
-
-  <table class="anx-table">
-    <thead>
-      <tr>
-        <th>Fecha</th>
-        <th>Equipo afectado (Nº)</th>
-        <th>Motivo (avería / sustitución / alta / baja)</th>
-        <th>Observaciones</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr><td class="cell-placeholder">[__/__/____]</td><td class="cell-placeholder">[__]</td><td class="cell-placeholder">[__]</td><td class="cell-placeholder">[__]</td></tr>
-      <tr><td class="cell-placeholder">[__/__/____]</td><td class="cell-placeholder">[__]</td><td class="cell-placeholder">[__]</td><td class="cell-placeholder">[__]</td></tr>
-    </tbody>
-  </table>
-
-  <p style="font-size:8.5px;color:#94a3b8;margin-top:12px;line-height:1.6;">
-    Cada actualización de este Anexo deberá comunicarse a la otra parte por escrito (correo electrónico a las direcciones designadas en la Cláusula 18ª) y conservarse junto con el presente documento.
-  </p>
-
 </div>
 
 </body>
 </html>`
 
+  // Render to PDF via the shared puppeteer helper (applies A4 + footer)
+  const { renderHtmlToPdf } = await import('./generate')
   return renderHtmlToPdf(html)
 }

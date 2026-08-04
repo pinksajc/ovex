@@ -26,6 +26,15 @@ export async function GET(req: Request) {
     const inline      = searchParams.get('inline') === '1'
     const equipmentRaw = searchParams.get('equipment')
     const equipment = equipmentRaw ? JSON.parse(decodeURIComponent(equipmentRaw)) : undefined
+    // Optional explicit service-block override: ?services=ros,whispr,ren
+    const servicesRaw = searchParams.get('services')
+    const services = servicesRaw !== null
+      ? (() => {
+          const on = new Set(servicesRaw.split(',').map((s) => s.trim()).filter(Boolean))
+          const keys = ['ros', 'posKiosk', 'whispr', 'analitica', 'equipos', 'ren'] as const
+          return Object.fromEntries(keys.map((k) => [k, on.has(k)])) as Record<(typeof keys)[number], boolean>
+        })()
+      : undefined
 
     if (!id) {
       return NextResponse.json({ error: 'id is required' }, { status: 400 })
@@ -74,6 +83,7 @@ export async function GET(req: Request) {
       contactName,
       contactEmail,
       equipment,
+      services,
     })
 
     const slug = presupuesto.number.replace(/[^A-Za-z0-9-]/g, '-')

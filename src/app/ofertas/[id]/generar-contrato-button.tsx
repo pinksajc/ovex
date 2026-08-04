@@ -7,6 +7,16 @@ import { useState, useTransition } from 'react'
 import { saveContratoAction } from '@/app/actions/contratos'
 import type { InvoiceLineItem } from '@/types'
 import { SERVICE_MAP } from '@/lib/invoice-catalog'
+import { detectServices, type ServiceKey } from '@/lib/pdf/contract-services'
+
+const SERVICE_LABELS: Array<{ key: ServiceKey; label: string; color: string }> = [
+  { key: 'ros',       label: 'ROS',            color: '#1e3a5f' },
+  { key: 'posKiosk',  label: 'POS / Kiosk',    color: '#0891b2' },
+  { key: 'ren',       label: 'REN (art. 26)',  color: '#7c3aed' },
+  { key: 'whispr',    label: 'Whispr',         color: '#d97706' },
+  { key: 'analitica', label: 'Analítica / IA', color: '#16a34a' },
+  { key: 'equipos',   label: 'Equipos',        color: '#475569' },
+]
 
 interface Props {
   presupuestoId: string
@@ -35,7 +45,7 @@ function buildEquipmentRows(items: InvoiceLineItem[]): EquipmentRow[] {
   for (const item of items) {
     if (item.type !== 'line') continue
     const entry = item.serviceId ? SERVICE_MAP.get(item.serviceId) : undefined
-    const isHw = entry?.group === 'HARDWARE' || (item as any).itemCategory === 'hardware'
+    const isHw = entry?.group === 'HARDWARE' || (item as { itemCategory?: string }).itemCategory === 'hardware'
     if (!isHw) continue
     const isRental = item.serviceId?.includes('rental') || item.serviceId?.includes('financed')
     const count = Math.max(1, Math.round(item.quantity))
@@ -75,6 +85,11 @@ export function GenerarContratoButton({
   const [pago,        setPago]        = useState('Transferencia bancaria')
   const [inicio,      setInicio]      = useState(today)
   const [notas,       setNotas]       = useState('')
+  const [services, setServices] = useState<Record<ServiceKey, boolean>>(() => detectServices(lineItems))
+
+  function toggleService(key: ServiceKey) {
+    setServices((prev) => ({ ...prev, [key]: !prev[key] }))
+  }
   const lsKey = `equipment-draft-${presupuestoId}`
   const [equipment, setEquipment] = useState<EquipmentRow[]>(() => {
     try {
@@ -103,6 +118,8 @@ export function GenerarContratoButton({
     })
     if (notas.trim()) params.set('notas', notas.trim())
     if (equipment.length > 0) params.set('equipment', JSON.stringify(equipment))
+    const activeServices = (Object.keys(services) as ServiceKey[]).filter((k) => services[k])
+    params.set('services', activeServices.join(','))
     return `/api/contratos/generate-pdf?${params.toString()}`
   }
 
@@ -255,6 +272,45 @@ export function GenerarContratoButton({
                   <div className="mt-4">
                     <label className="block text-xs font-medium text-zinc-700 mb-1.5">Notas adicionales <span className="font-normal text-zinc-400">(opcional)</span></label>
                     <textarea value={notas} onChange={e => setNotas(e.target.value)} rows={2} placeholder="Condiciones especiales, SLA personalizado…" className="w-full text-xs border border-zinc-200 rounded-lg px-3 py-2 text-zinc-800 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 resize-none" />
+                  </div>
+                </div>
+
+                {/* Servicios / cláusulas por servicio */}
+                <div>
+                  <p className="text-[10px] font-semibold text-zinc-400 uppercase tracking-widest mb-1">
+                    Cláusulas por servicio
+                  </p>
+                  <p className="text-[11px] text-zinc-400 mb-3">
+                    Detectadas desde la oferta. Marca/desmarca qué bloques aparecen en el contrato.
+                  </p>
+                  <div className="grid grid-cols-3 gap-2">
+                    {SERVICE_LABELS.map(({ key, label, color }) => (
+                      <button
+                        key={key}
+                        type="button"
+                        onClick={() => toggleService(key)}
+                        className={`flex items-center gap-2 text-xs px-3 py-2 rounded-lg border transition-colors ${
+                          services[key]
+                            ? 'border-zinc-300 bg-white text-zinc-800'
+                            : 'border-zinc-100 bg-zinc-50 text-zinc-400'
+                        }`}
+                      >
+                        <span
+                          className="w-3.5 h-3.5 rounded-sm border flex items-center justify-center shrink-0"
+                          style={{
+                            borderColor: services[key] ? color : '#d4d4d8',
+                            background: services[key] ? color : 'transparent',
+                          }}
+                        >
+                          {services[key] && (
+                            <svg className="w-2.5 h-2.5 text-white" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="2.5">
+                              <path d="M2.5 6.5l2.5 2.5 4.5-5" strokeLinecap="round" strokeLinejoin="round" />
+                            </svg>
+                          )}
+                        </span>
+                        <span className="font-medium truncate">{label}</span>
+                      </button>
+                    ))}
                   </div>
                 </div>
 
