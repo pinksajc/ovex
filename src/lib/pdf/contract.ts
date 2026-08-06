@@ -417,7 +417,7 @@ export async function generateContractPdf(
         <td>${esc(e.serie) || '<span class="cell-placeholder">—</span>'}</td>
         <td>${esc(e.origen)}</td>
         <td>${esc(e.cuotaMensual) || '<span class="cell-placeholder">—</span>'}</td>
-        <td class="right mono">${esc(e.valorReposicion) || '<span class="cell-placeholder">[COMPLETAR]</span>'}</td>
+        <td class="right mono">${esc(e.valorReposicion) || '<span class="cell-placeholder">—</span>'}</td>
       </tr>`).join('')
     : `<tr><td colspan="7" style="text-align:center;color:#94a3b8;font-style:italic;padding:8px;">Sin equipos registrados</td></tr>`
 
@@ -628,22 +628,25 @@ export async function generateContractPdf(
   <div class="anx-subtitle">Data Processing Agreement — Art. 28 GDPR — PLT-DPA-C-001</div>
   ${DPA_CLAUSES.map((c) => renderClause(c)).join('')}
 
-  <div class="section-label">Anexo A · Tratamiento por módulo · Processing per module</div>
-  <table class="tbl">
-    <thead><tr><th>Módulo</th><th>Tratamiento</th></tr></thead>
-    <tbody>
-      ${DPA_MODULE_ROWS.filter((r) => services[r.key]).map((r) => `<tr><td><strong>${esc(r.mod)}</strong></td><td>${esc(r.es)}<br/><span class="anx-en">${esc(r.en)}</span></td></tr>`).join('') || '<tr><td colspan="2" class="cell-placeholder" style="text-align:center;">Sin módulos de encargo (ver REN en el cuerpo del Contrato)</td></tr>'}
-    </tbody>
-  </table>
+  <div style="break-before:page;">
+    ${lbl('Anexo III · DPA (tratamiento y subencargados)')}
+    <div class="section-label" style="break-after:avoid;">Anexo A · Tratamiento por módulo · Processing per module</div>
+    <table class="tbl" style="break-inside:avoid;">
+      <thead><tr><th>Módulo</th><th>Tratamiento</th></tr></thead>
+      <tbody>
+        ${DPA_MODULE_ROWS.filter((r) => services[r.key]).map((r) => `<tr><td><strong>${esc(r.mod)}</strong></td><td>${esc(r.es)}<br/><span class="anx-en">${esc(r.en)}</span></td></tr>`).join('') || '<tr><td colspan="2" class="cell-placeholder" style="text-align:center;">Sin módulos de encargo (ver REN en el cuerpo del Contrato)</td></tr>'}
+      </tbody>
+    </table>
 
-  <div class="section-label">Anexo B · Subencargados y transferencias · Sub-processors</div>
-  <table class="tbl">
-    <thead><tr><th>Subencargado</th><th>Uso</th><th>Región</th><th>Mecanismo</th></tr></thead>
-    <tbody>
-      ${SUBPROCESSORS.map(([n, u, r, m]) => `<tr><td><strong>${esc(n)}</strong></td><td>${esc(u)}</td><td>${esc(r)}</td><td>${esc(m)}</td></tr>`).join('')}
-    </tbody>
-  </table>
-  <p style="font-size:8px;color:#64748b;line-height:1.5;">EEE = Espacio Económico Europeo. Las pasarelas de pago las contrata el Cliente (responsables independientes). Glovo/Uber/JustEat (REN) son responsables independientes. Ver PLT-VEN-001.</p>
+    <div class="section-label" style="break-after:avoid;">Anexo B · Subencargados y transferencias · Sub-processors</div>
+    <table class="tbl" style="break-inside:avoid;">
+      <thead><tr><th>Subencargado</th><th>Uso</th><th>Región</th><th>Mecanismo</th></tr></thead>
+      <tbody>
+        ${SUBPROCESSORS.map(([n, u, r, m]) => `<tr><td><strong>${esc(n)}</strong></td><td>${esc(u)}</td><td>${esc(r)}</td><td>${esc(m)}</td></tr>`).join('')}
+      </tbody>
+    </table>
+    <p style="font-size:8px;color:#64748b;line-height:1.5;">EEE = Espacio Económico Europeo. Las pasarelas de pago las contrata el Cliente (responsables independientes). Glovo/Uber/JustEat (REN) son responsables independientes. Ver PLT-VEN-001.</p>
+  </div>
 </div>
 
 <!-- ═══ ANEXO IV · INVENTARIO ═══ -->
@@ -654,7 +657,7 @@ export async function generateContractPdf(
   <p style="font-size:8.5px;color:#475569;line-height:1.6;margin-bottom:10px;">Los equipos aportados por Platomico se ceden en comodato (arts. 1740 y ss. CC), vinculado a la vigencia; el Cliente los custodia con diligencia y los devuelve en 10 días desde la finalización, respondiendo del valor de reposición por pérdida o deterioro que exceda el desgaste ordinario. Los aportados por el Cliente permanecen de su propiedad.</p>
 
   <div class="clause" style="border-left:3px solid ${SERVICE_COLOR.equipos};padding-left:10px;">
-    <div class="clause-num" style="color:${SERVICE_COLOR.equipos}">E2. Responsabilidad y custodia del equipo en comodato <span style="color:#b45309;font-weight:700;">· [PROPUESTA — pendiente de validación]</span></div>
+    <div class="clause-num" style="color:${SERVICE_COLOR.equipos}">E2. Responsabilidad y custodia del equipo en comodato</div>
     <div class="clause-body">
       <p>Desde la entrega y hasta su devolución efectiva, el Cliente es el único custodio y responsable de los equipos cedidos en comodato (POS, Kiosk, KDS y periféricos) y asume el riesgo de su pérdida, sustracción, destrucción o deterioro que exceda el desgaste ordinario derivado del uso pactado. A tal efecto, los equipos se entregan tasados por el valor de reposición indicado en el inventario de este Anexo IV, por lo que, conforme al artículo 1745 del Código Civil, el Cliente responde de su pérdida o deterioro aunque sobrevengan por caso fortuito o fuerza mayor, así como en los supuestos del artículo 1744 CC (destino a un uso distinto del pactado o retención más allá del plazo de devolución). Esta asignación de riesgo constituye pacto expreso a los efectos del artículo 1745 CC y prevalece, respecto de los equipos, sobre la exención general de fuerza mayor de la Cláusula 16ª. El Cliente mantendrá los equipos asegurados por su valor de reposición durante toda la vigencia y acreditará dicho aseguramiento a requerimiento del Proveedor. El Cliente no responderá cuando la pérdida o el daño deriven de un defecto propio del equipo o sean directamente imputables al Proveedor. En caso de pérdida, daño no reparable o falta de devolución en plazo, el Cliente abonará el valor de reposición vigente del equipo afectado. La cuota de mantenimiento retribuye exclusivamente el servicio de mantenimiento y no la cesión de uso, que permanece gratuita a título de comodato; la asignación de riesgo y el deber de aseguramiento se aplican cualquiera que sea la calificación jurídica de la cesión.</p>
       <p class="en">From delivery until effective return, the Client is the sole custodian of and responsible for the equipment loaned under commodatum (POS, Kiosk, KDS and peripherals) and bears the risk of its loss, theft, destruction or damage beyond ordinary wear from the agreed use. To this end, the equipment is delivered appraised at the replacement value stated in the inventory of this Annex IV, so that, under Article 1745 of the Spanish Civil Code, the Client is liable for its loss or damage even where arising from an act of God or force majeure, as well as in the cases of Article 1744 CC (use other than agreed or retention beyond the return period). This risk allocation is an express agreement for the purposes of Article 1745 CC and prevails, as regards the equipment, over the general force-majeure exemption in Clause 16. The Client shall keep the equipment insured for its replacement value throughout the term and shall evidence such insurance upon the Provider request. The Client shall not be liable where the loss or damage results from an inherent defect of the equipment or is directly attributable to the Provider. In the event of loss, irreparable damage or failure to return on time, the Client shall pay the then-current replacement value of the affected equipment. The maintenance fee remunerates solely the maintenance service and not the transfer of use, which remains gratuitous by way of commodatum; the risk allocation and the insurance duty apply regardless of the legal characterisation of the transfer.</p>
