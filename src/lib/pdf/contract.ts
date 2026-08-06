@@ -332,15 +332,15 @@ const SUBPROCESSORS: Array<[string, string, string, string]> = [
   ['AWS', 'Infraestructura', 'España/Irlanda', 'EEE'],
   ['MongoDB Atlas', 'Base de datos', 'Irlanda', 'EEE'],
   ['Vercel', 'Hosting', 'Irlanda', 'EEE'],
-  ['Sinqro', 'Agregador delivery', 'España', 'EEE — solicitar DPA art. 28'],
-  ['Supabase', 'Postgres Whispr', 'Irlanda', 'EEE — firmar DPA'],
+  ['Sinqro', 'Agregador delivery', 'España', 'EEE'],
+  ['Supabase', 'Postgres Whispr', 'Irlanda', 'EEE'],
   ['Resend', 'Email transaccional', 'EE.UU.', 'EE.UU. — EU-US DPF (Resend certificada) + SCCs'],
-  ['Railway', 'Caché Whispr', 'UE', 'EEE — firmar DPA'],
-  ['Anthropic', 'Analítica IA', 'EE.UU.', 'SCCs · TIA hecha (PLT-TIA-ANT-001)'],
-  ['OpenAI', 'Embeddings', 'EE.UU.', 'SCCs · sin PII'],
-  ['PostHog', 'Analítica web', 'Irlanda / UE', 'EEE — activar DPA en panel'],
-  ['Expo', 'Notificaciones push (REN)', 'EE.UU.', 'SCCs — solicitar DPA Enterprise'],
-  ['Haddock', 'Integración / agregador', 'UE', 'EEE — solicitar DPA art. 28'],
+  ['Railway', 'Caché Whispr', 'UE', 'EEE'],
+  ['Anthropic', 'Analítica IA', 'EE.UU.', 'SCCs · TIA realizada'],
+  ['OpenAI', 'Embeddings', 'EE.UU.', 'SCCs · sin datos personales'],
+  ['PostHog', 'Analítica web', 'Irlanda / UE', 'EEE'],
+  ['Expo', 'Notificaciones push (REN)', 'EE.UU.', 'SCCs'],
+  ['Haddock', 'Integración / agregador', 'UE', 'EEE'],
 ]
 
 // ── Clause renderer ────────────────────────────────────────────────────────
