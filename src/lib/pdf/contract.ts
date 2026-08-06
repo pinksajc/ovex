@@ -49,6 +49,7 @@ export interface ContractParams {
     funcion: string
     origen: string
     cuotaMensual: string
+    valorReposicion?: string
   }>
 }
 
@@ -215,8 +216,8 @@ const SERVICE_CLAUSES: Record<ServiceKey, Clause[]> = {
   ],
   whispr: [
     { n: 'W1', tEs: 'Servicio Whispr — Ley 2/2023', tEn: 'Whispr service — Law 2/2023',
-      bEs: 'Whispr se presta "tal cual". Dado que el Cliente cumple plazos perentorios de la Ley 2/2023, Platomico se compromete a una disponibilidad mensual del 99,5% y a alertar de incidencias que los comprometan. Las categorías especiales que consten en una comunicación se suprimen de inmediato (art. 30.5 Ley 2/2023). Infraestructura en la UE (Supabase, Resend —Irlanda—, Railway). El canal está cifrado y garantiza el anonimato mediante un código de acceso, un identificador de caso y una clave de seguimiento; ni siquiera Platomico conoce la identidad del denunciante que reporta de forma anónima. Retención: 3 meses + 30 días. Brecha: 24h. Rol RGPD: Encargado.',
-      bEn: 'Whispr is provided "as is". As the Client meets peremptory deadlines under Law 2/2023, Platomico commits to 99.5% monthly availability and alerts of incidents jeopardising them. Special categories appearing in a report are deleted immediately (Art. 30.5). EU infrastructure (Supabase, Resend —Ireland—, Railway). The channel is encrypted and guarantees anonymity via an access code, a case ID and a tracking key; not even Platomico knows the identity of a whistleblower reporting anonymously. Retention: 3 months + 30 days. Breach: 24h. GDPR role: Processor.' },
+      bEs: 'Whispr se presta "tal cual". Dado que el Cliente cumple plazos perentorios de la Ley 2/2023, Platomico se compromete a una disponibilidad mensual del 99,5% y a alertar de incidencias que los comprometan. Las categorías especiales que consten en una comunicación se suprimen de inmediato (art. 30.5 Ley 2/2023). Infraestructura en la UE (Supabase, Resend —EE.UU. (Plus Five Five, Inc.), con garantías del EU-US Data Privacy Framework y SCCs—, Railway). El canal está cifrado y garantiza el anonimato mediante un código de acceso, un identificador de caso y una clave de seguimiento; ni siquiera Platomico conoce la identidad del denunciante que reporta de forma anónima. Retención: 3 meses + 30 días. Brecha: 24h. Rol RGPD: Encargado.',
+      bEn: 'Whispr is provided "as is". As the Client meets peremptory deadlines under Law 2/2023, Platomico commits to 99.5% monthly availability and alerts of incidents jeopardising them. Special categories appearing in a report are deleted immediately (Art. 30.5). EU infrastructure (Supabase, Resend —USA (Plus Five Five, Inc.), under the EU-US Data Privacy Framework and SCCs—, Railway). The channel is encrypted and guarantees anonymity via an access code, a case ID and a tracking key; not even Platomico knows the identity of a whistleblower reporting anonymously. Retention: 3 months + 30 days. Breach: 24h. GDPR role: Processor.' },
     { n: 'W2', tEs: 'Responsabilidad reforzada Whispr', tEn: 'Enhanced Whispr liability',
       bEs: 'La limitación general (Cl. 15ª) no se aplica al incumplimiento de las medidas de seguridad o confidencialidad de Whispr.',
       bEn: 'The general cap (Cl. 15) does not apply to breach of Whispr’s security or confidentiality measures.' },
@@ -333,7 +334,7 @@ const SUBPROCESSORS: Array<[string, string, string, string]> = [
   ['Vercel', 'Hosting', 'Irlanda', 'EEE'],
   ['Sinqro', 'Agregador delivery', 'España', 'EEE — solicitar DPA art. 28'],
   ['Supabase', 'Postgres Whispr', 'Irlanda', 'EEE — firmar DPA'],
-  ['Resend', 'Email transaccional', 'Irlanda, UE', 'EEE — sin transferencia'],
+  ['Resend', 'Email transaccional', 'EE.UU.', 'EE.UU. — EU-US DPF (Resend certificada) + SCCs'],
   ['Railway', 'Caché Whispr', 'UE', 'EEE — firmar DPA'],
   ['Anthropic', 'Analítica IA', 'EE.UU.', 'SCCs · TIA hecha (PLT-TIA-ANT-001)'],
   ['OpenAI', 'Embeddings', 'EE.UU.', 'SCCs · sin PII'],
@@ -416,8 +417,9 @@ export async function generateContractPdf(
         <td>${esc(e.serie) || '<span class="cell-placeholder">—</span>'}</td>
         <td>${esc(e.origen)}</td>
         <td>${esc(e.cuotaMensual) || '<span class="cell-placeholder">—</span>'}</td>
+        <td class="right mono">${esc(e.valorReposicion) || '<span class="cell-placeholder">[COMPLETAR]</span>'}</td>
       </tr>`).join('')
-    : `<tr><td colspan="6" style="text-align:center;color:#94a3b8;font-style:italic;padding:8px;">Sin equipos registrados</td></tr>`
+    : `<tr><td colspan="7" style="text-align:center;color:#94a3b8;font-style:italic;padding:8px;">Sin equipos registrados</td></tr>`
 
   const html = `<!DOCTYPE html>
 <html lang="es">
@@ -481,12 +483,12 @@ export async function generateContractPdf(
 
 <div class="watermark">CONFIDENCIAL</div>
 
-<!-- ═══ PÁGINA 1 · PORTADA + PARTES ═══ -->
-<div style="break-after:page; ${PAGE}">
-  ${lbl('Portada y Partes')}
+<!-- ═══ CONTRATO MACRO · portada + cuerpo + servicios (flujo continuo) ═══ -->
+<div style="${PAGE}">
+  ${lbl('Contrato y cláusulas')}
 
   <div class="contract-title">Contrato Macro de Prestación de Servicios</div>
-  <div class="contract-subtitle">Master Services Agreement — documento consolidado (contrato + anexos) · Ref. PLT-SAAS-MACRO-001 · v1.4</div>
+  <div class="contract-subtitle">Master Services Agreement — documento consolidado (contrato + anexos) · Ref. PLT-SAAS-MACRO-001 · v1.7</div>
   <div class="contract-en-sub">En Madrid, a ${today} · Oferta vinculada nº ${esc(presupuesto.number)}</div>
 
   <div class="note-box">
@@ -525,28 +527,23 @@ export async function generateContractPdf(
       (en adelante, el «CLIENTE»)
     </div>
   </div>
-</div>
 
-<!-- ═══ CUERPO COMÚN ═══ -->
-<div style="break-after:page; ${PAGE}">
-  ${lbl('Cuerpo común · Common body')}
-  <div class="anx-title">Cuerpo común · Common body</div>
+  <!-- Cuerpo común (mismo flujo) -->
+  <div class="anx-title" style="margin-top:24px;">Cuerpo común · Common body</div>
   <div class="anx-subtitle">Cláusulas 1ª–23ª aplicables a todos los Servicios</div>
   ${commonRendered.map((c) => renderClause(c)).join('')}
-</div>
 
-<!-- ═══ CLÁUSULAS POR SERVICIO ═══ -->
-${serviceBlocks || renBlock ? `
-<div style="break-after:page; ${PAGE}">
-  ${lbl('Cláusulas específicas por servicio')}
-  <div class="anx-title">Cláusulas específicas por servicio</div>
+  <!-- Cláusulas específicas por servicio (mismo flujo) -->
+  ${serviceBlocks || renBlock ? `
+  <div class="anx-title" style="margin-top:24px;">Cláusulas específicas por servicio</div>
   <div class="anx-subtitle">Service-specific clauses — solo los módulos contratados</div>
   ${serviceBlocks}
-  ${renBlock ? `<div class="section-label" style="color:${SERVICE_COLOR.ren};border-color:${SERVICE_COLOR.ren}20;">Módulo REN · Corresponsabilidad (art. 26)</div>${renBlock}` : ''}
-</div>` : ''}
+  ${renBlock ? `<div class="section-label" style="color:${SERVICE_COLOR.ren};">Módulo REN · Corresponsabilidad (art. 26)</div>${renBlock}` : ''}
+  ` : ''}
+</div>
 
 <!-- ═══ ANEXO I · OFERTA + FIRMAS ═══ -->
-<div style="break-after:page; ${PAGE}">
+<div style="break-before:page; ${PAGE}">
   ${lbl('Anexo I · Oferta comercial')}
   <div class="anx-title">Anexo I · Oferta comercial</div>
   <div class="anx-subtitle">Commercial Offer · nº ${esc(presupuesto.number)} — PLT-OFC-001</div>
@@ -596,7 +593,7 @@ ${serviceBlocks || renBlock ? `
 </div>
 
 <!-- ═══ ANEXO II · SLA ═══ -->
-<div style="break-after:page; ${PAGE}">
+<div style="break-before:page; ${PAGE}">
   ${lbl('Anexo II · SLA')}
   <div class="anx-title">Anexo II · Acuerdo de Nivel de Servicio (SLA)</div>
   <div class="anx-subtitle">Service Level Agreement — PLT-SLA-001</div>
@@ -625,7 +622,7 @@ ${serviceBlocks || renBlock ? `
 </div>
 
 <!-- ═══ ANEXO III · DPA ═══ -->
-<div style="break-after:page; ${PAGE}">
+<div style="break-before:page; ${PAGE}">
   ${lbl('Anexo III · DPA (art. 28)')}
   <div class="anx-title">Anexo III · Acuerdo de Encargado del Tratamiento (DPA)</div>
   <div class="anx-subtitle">Data Processing Agreement — Art. 28 GDPR — PLT-DPA-C-001</div>
@@ -650,13 +647,22 @@ ${serviceBlocks || renBlock ? `
 </div>
 
 <!-- ═══ ANEXO IV · INVENTARIO ═══ -->
-<div style="break-after:page; ${PAGE}">
+<div style="break-before:page; ${PAGE}">
   ${lbl('Anexo IV · Inventario de equipos')}
   <div class="anx-title">Anexo IV · Inventario de Equipos</div>
   <div class="anx-subtitle">Equipment Inventory — PLT-INV-001</div>
   <p style="font-size:8.5px;color:#475569;line-height:1.6;margin-bottom:10px;">Los equipos aportados por Platomico se ceden en comodato (arts. 1740 y ss. CC), vinculado a la vigencia; el Cliente los custodia con diligencia y los devuelve en 10 días desde la finalización, respondiendo del valor de reposición por pérdida o deterioro que exceda el desgaste ordinario. Los aportados por el Cliente permanecen de su propiedad.</p>
+
+  <div class="clause" style="border-left:3px solid ${SERVICE_COLOR.equipos};padding-left:10px;">
+    <div class="clause-num" style="color:${SERVICE_COLOR.equipos}">E2. Responsabilidad y custodia del equipo en comodato <span style="color:#b45309;font-weight:700;">· [PROPUESTA — pendiente de validación]</span></div>
+    <div class="clause-body">
+      <p>Desde la entrega y hasta su devolución efectiva, el Cliente es el único custodio y responsable de los equipos cedidos en comodato (POS, Kiosk, KDS y periféricos) y asume el riesgo de su pérdida, sustracción, destrucción o deterioro que exceda el desgaste ordinario derivado del uso pactado. A tal efecto, los equipos se entregan tasados por el valor de reposición indicado en el inventario de este Anexo IV, por lo que, conforme al artículo 1745 del Código Civil, el Cliente responde de su pérdida o deterioro aunque sobrevengan por caso fortuito o fuerza mayor, así como en los supuestos del artículo 1744 CC (destino a un uso distinto del pactado o retención más allá del plazo de devolución). Esta asignación de riesgo constituye pacto expreso a los efectos del artículo 1745 CC y prevalece, respecto de los equipos, sobre la exención general de fuerza mayor de la Cláusula 16ª. El Cliente mantendrá los equipos asegurados por su valor de reposición durante toda la vigencia y acreditará dicho aseguramiento a requerimiento del Proveedor. El Cliente no responderá cuando la pérdida o el daño deriven de un defecto propio del equipo o sean directamente imputables al Proveedor. En caso de pérdida, daño no reparable o falta de devolución en plazo, el Cliente abonará el valor de reposición vigente del equipo afectado. La cuota de mantenimiento retribuye exclusivamente el servicio de mantenimiento y no la cesión de uso, que permanece gratuita a título de comodato; la asignación de riesgo y el deber de aseguramiento se aplican cualquiera que sea la calificación jurídica de la cesión.</p>
+      <p class="en">From delivery until effective return, the Client is the sole custodian of and responsible for the equipment loaned under commodatum (POS, Kiosk, KDS and peripherals) and bears the risk of its loss, theft, destruction or damage beyond ordinary wear from the agreed use. To this end, the equipment is delivered appraised at the replacement value stated in the inventory of this Annex IV, so that, under Article 1745 of the Spanish Civil Code, the Client is liable for its loss or damage even where arising from an act of God or force majeure, as well as in the cases of Article 1744 CC (use other than agreed or retention beyond the return period). This risk allocation is an express agreement for the purposes of Article 1745 CC and prevails, as regards the equipment, over the general force-majeure exemption in Clause 16. The Client shall keep the equipment insured for its replacement value throughout the term and shall evidence such insurance upon the Provider request. The Client shall not be liable where the loss or damage results from an inherent defect of the equipment or is directly attributable to the Provider. In the event of loss, irreparable damage or failure to return on time, the Client shall pay the then-current replacement value of the affected equipment. The maintenance fee remunerates solely the maintenance service and not the transfer of use, which remains gratuitous by way of commodatum; the risk allocation and the insurance duty apply regardless of the legal characterisation of the transfer.</p>
+    </div>
+  </div>
+
   <table class="tbl">
-    <thead><tr><th>Nº</th><th>Tipología</th><th>Marca/modelo</th><th>Nº serie</th><th>Origen</th><th>Modalidad</th></tr></thead>
+    <thead><tr><th>Nº</th><th>Tipología</th><th>Marca/modelo</th><th>Nº serie</th><th>Origen</th><th>Modalidad</th><th class="right">Valor reposición (€)</th></tr></thead>
     <tbody>${equipmentRows}</tbody>
   </table>
 </div>

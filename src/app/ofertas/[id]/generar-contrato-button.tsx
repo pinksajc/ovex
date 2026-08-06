@@ -37,6 +37,7 @@ interface EquipmentRow {
   funcion: string
   origen: 'Platomico' | 'Cliente'
   cuotaMensual: string
+  valorReposicion?: string
 }
 
 function buildEquipmentRows(items: InvoiceLineItem[]): EquipmentRow[] {
@@ -434,6 +435,16 @@ export function GenerarContratoButton({
                                   className="w-full mt-1.5 text-xs border border-zinc-200 rounded-lg px-2.5 py-1.5 bg-white focus:outline-none focus:ring-1 focus:ring-blue-400/50 focus:border-blue-300"
                                 />
                               )}
+                            </div>
+                            <div>
+                              <label className="block text-[10px] text-zinc-500 mb-1">Valor reposición (€) <span className="text-zinc-400">· Anexo IV</span></label>
+                              <input
+                                type="text"
+                                value={row.valorReposicion ?? ''}
+                                onChange={e => updateEquipment(row.n, 'valorReposicion', e.target.value)}
+                                placeholder="ej: 350"
+                                className="w-full text-xs border border-zinc-200 rounded-lg px-2.5 py-1.5 bg-white focus:outline-none focus:ring-1 focus:ring-blue-400/50 focus:border-blue-300"
+                              />
                             </div>
                           </div>
                         </div>
