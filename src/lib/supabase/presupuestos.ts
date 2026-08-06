@@ -132,13 +132,13 @@ function rowToPresupuesto(row: PresupuestoRow): Presupuesto {
 
 // ---- Number generation ----
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function presupuestosTable(db: ReturnType<typeof getSupabaseClient>) {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   return (db as unknown as { from(t: string): any }).from('presupuestos')
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function dealsTable(db: ReturnType<typeof getSupabaseClient>) {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   return (db as unknown as { from(t: string): any }).from('deals')
 }
 
@@ -163,12 +163,21 @@ async function generatePresupuestoNumber(): Promise<string> {
   const db = getSupabaseClient()
   const year = new Date().getFullYear()
 
-  const { count } = await presupuestosTable(db)
-    .select('id', { count: 'exact', head: true })
+  // Use the highest existing base sequence + 1 (NOT the row count): counting
+  // breaks when offers are deleted or when versioned numbers (-vN) exist, which
+  // caused duplicate-key collisions on presupuestos_number_key.
+  const { data } = await presupuestosTable(db)
+    .select('number')
     .like('number', `O-${year}-%`)
 
-  const seq = (count ?? 0) + 1
-  return `O-${year}-${String(seq).padStart(4, '0')}`
+  let maxSeq = 0
+  for (const row of (data as { number: string }[] | null) ?? []) {
+    // Strip any -vN suffix, then read the 4-digit base sequence
+    const m = row.number.replace(/-v\d+$/, '').match(new RegExp(`^O-${year}-(\\d+)$`))
+    if (m) maxSeq = Math.max(maxSeq, parseInt(m[1], 10))
+  }
+
+  return `O-${year}-${String(maxSeq + 1).padStart(4, '0')}`
 }
 
 // =========================================
@@ -230,28 +239,36 @@ export async function getPresupuestosByDeal(dealId: string): Promise<Presupuesto
 
 export async function createPresupuesto(input: CreatePresupuestoInput): Promise<Presupuesto> {
   const db = getSupabaseClient()
-  const number = await generatePresupuestoNumber()
 
-  const { data, error } = await presupuestosTable(db)
-    .insert({
-      number,
-      deal_id: input.dealId ?? null,
-      client_name: input.clientName,
-      client_cif: input.clientCif ?? null,
-      client_address: input.clientAddress ?? null,
-      line_items: JSON.stringify(input.lineItems),
-      amount_net: input.amountNet,
-      vat_rate: input.vatRate,
-      amount_total: input.amountTotal,
-      status: 'draft',
-      valid_until: input.validUntil ?? null,
-      notes: input.notes ?? null,
-    })
-    .select()
-    .single()
+  // Retry on a unique-number collision (concurrent inserts can still race the
+  // max+1 generator); recompute the number and try again up to 5 times.
+  for (let attempt = 0; attempt < 5; attempt++) {
+    const number = await generatePresupuestoNumber()
+    const { data, error } = await presupuestosTable(db)
+      .insert({
+        number,
+        deal_id: input.dealId ?? null,
+        client_name: input.clientName,
+        client_cif: input.clientCif ?? null,
+        client_address: input.clientAddress ?? null,
+        line_items: JSON.stringify(input.lineItems),
+        amount_net: input.amountNet,
+        vat_rate: input.vatRate,
+        amount_total: input.amountTotal,
+        status: 'draft',
+        valid_until: input.validUntil ?? null,
+        notes: input.notes ?? null,
+      })
+      .select()
+      .single()
 
-  if (error) throw error
-  return rowToPresupuesto(data as PresupuestoRow)
+    if (!error) return rowToPresupuesto(data as PresupuestoRow)
+    // 23505 = unique_violation; on the number key, retry with a fresh number
+    const isDupNumber = (error as { code?: string }).code === '23505' && /number/.test(error.message ?? '')
+    if (!isDupNumber || attempt === 4) throw error
+  }
+  // Unreachable — the loop either returns or throws
+  throw new Error('No se pudo generar un número de oferta único')
 }
 
 export async function updatePresupuesto(id: string, input: UpdatePresupuestoInput): Promise<Presupuesto> {
