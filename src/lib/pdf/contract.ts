@@ -1,6 +1,6 @@
 // =====================================================================
 //  CONTRATO MACRO DE PRESTACIÓN DE SERVICIOS — Master Services Agreement
-//  Documento consolidado y bilingüe (ES/EN) aprobado por Legal (v1.4).
+//  Documento consolidado y bilingüe (ES/EN) aprobado por Legal (v1.7).
 //  Ref. PLT-SAAS-MACRO-001.
 //
 //  Estructura del PDF:
