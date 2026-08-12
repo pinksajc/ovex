@@ -163,8 +163,8 @@ const COMMON_CLAUSES: Clause[] = [
     bEs: 'El Cliente podrá exportar su información en formato estándar durante la vigencia y hasta 30 días tras la finalización; la primera exportación es gratuita.',
     bEn: 'The Client may export its data in a standard format during the term and up to 30 days after termination; the first export is free.' },
   { n: '11ª', tEs: 'Protección de datos y DPO', tEn: 'Data protection and DPO',
-    bEs: 'Según el módulo, Platomico actúa como Encargado (art. 28, Anexo III) o, en REN, como Corresponsable (art. 26). El contacto en materia de protección de datos es privacy@platomico.com. Platomico ha designado a D. Antonio Casanova como Delegado de Protección de Datos (DPD); su comunicación a la AEPD se encuentra en tramitación (documento PLT-DPO-002).',
-    bEn: 'Depending on the module, Platomico acts as Processor (Art. 28, Annex III) or, in REN, as Joint Controller (Art. 26). The data-protection contact is privacy@platomico.com. Platomico has appointed Mr. Antonio Casanova as Data Protection Officer (DPO); its notification to the AEPD is in progress (document PLT-DPO-002).' },
+    bEs: 'Según el módulo, Platomico actúa como Encargado (art. 28, Anexo III) o, en REN, como Corresponsable (art. 26). El contacto en materia de protección de datos es privacy@platomico.com. Platomico ha designado a D. Antonio Casanova como Delegado de Protección de Datos (DPD) el 12 de agosto de 2026, contactable en dpo@platomico.com, y ha comunicado su designación a la Agencia Española de Protección de Datos (AEPD) el 12 de agosto de 2026, conforme al art. 37.7 del RGPD y al art. 34.3 de la LOPDGDD (documento PLT-DPO-002).',
+    bEn: 'Depending on the module, Platomico acts as Processor (Art. 28, Annex III) or, in REN, as Joint Controller (Art. 26). The data-protection contact is privacy@platomico.com. Platomico appointed Mr. Antonio Casanova as Data Protection Officer (DPO) on 12 August 2026, reachable at dpo@platomico.com, and notified his designation to the Spanish Data Protection Agency (AEPD) on 12 August 2026, pursuant to Art. 37.7 GDPR and Art. 34.3 LOPDGDD (document PLT-DPO-002).' },
   { n: '12ª', tEs: 'Confidencialidad', tEn: 'Confidentiality',
     bEs: 'Cada parte mantendrá la confidencialidad de la información de la otra a la que efectivamente acceda, durante la vigencia y los 2 años siguientes. El Cliente accede únicamente a los datos societarios y de contacto de Platomico y al propio Contrato; no accede al código fuente, algoritmos ni know-how, cuya protección se rige por la Cláusula 13ª. La información personal se rige por el Anexo III (DPA).',
     bEn: 'Each party shall keep confidential the other’s information it actually accesses, during the term and for 2 years thereafter. The Client only accesses Platomico’s corporate and contact data and the Agreement itself; it does not access the source code, algorithms or know-how, whose protection is governed by Clause 13. Personal information is governed by Annex III (DPA).' },
@@ -318,6 +318,31 @@ const NDA_CLAUSES: Clause[] = [
   { n: '7ª', tEs: 'Ley y jurisdicción', tEn: 'Law and jurisdiction',
     bEs: 'Ley española; Juzgados y Tribunales de Madrid; prevalece el inglés en discrepancia.',
     bEn: 'Spanish law; Courts of Madrid; English prevails in case of discrepancy.' },
+]
+
+// Anexo I · Oferta comercial — cláusulas 1ª–7ª (bilingüe)
+const OFFER_CLAUSES: Clause[] = [
+  { n: '1ª', tEs: 'Naturaleza y perfección', tEn: 'Nature and formation',
+    bEs: 'La presente Oferta es una propuesta contractual del Proveedor cuya aceptación expresa (firma, sello o confirmación por correo electrónico) perfecciona el contrato mercantil conforme a los arts. 1254, 1258 y 1262 CC y 51 CCom, con independencia de que la firma del Contrato principal sea simultánea o posterior.',
+    bEn: 'This Offer is a contractual proposal by the Provider whose express acceptance (signature, stamp or email confirmation) forms the commercial contract under Arts. 1254, 1258 and 1262 Civil Code and 51 Commercial Code, whether the main Agreement is signed simultaneously or later.' },
+  { n: '2ª', tEs: 'Vigencia de la Oferta', tEn: 'Validity of the Offer',
+    bEs: 'Esta Oferta tendrá una validez de 15 días naturales desde su emisión; transcurridos sin aceptación, quedará sin efecto, sin perjuicio de que el Proveedor pueda mantenerla o emitir una nueva.',
+    bEn: 'This Offer shall be valid for 15 calendar days from issue; if not accepted within that period, it shall lapse, without prejudice to the Provider maintaining it or issuing a new one.' },
+  { n: '3ª', tEs: 'Set-up fee y puesta en marcha', tEn: 'Set-up fee and go-live',
+    bEs: 'El Set-up fee remunera la sesión de onboarding (instalación, configuración, carga de menú, precios e imágenes), el alta del Cliente y la formación inicial, y se factura conforme a la Cláusula 3ª del Contrato, con carácter previo o simultáneo a la puesta en marcha.',
+    bEn: 'The Set-up fee covers the onboarding session (installation, configuration, upload of menu, prices and images), Client set-up and initial training, and is invoiced under Clause 3 of the Agreement, before or simultaneously with go-live.' },
+  { n: '4ª', tEs: 'Forma de pago y facturación', tEn: 'Payment and invoicing',
+    bEs: 'El pago se realizará mediante __PAGO__. Las cuotas recurrentes se facturan mensualmente a mes vencido con pago a 30 días. El impago faculta a suspender el acceso al Servicio conforme a las Cláusulas 4ª y 5ª del Contrato.',
+    bEn: 'Payment shall be made by __PAGO__. Recurring fees are invoiced monthly in arrears, payable within 30 days. Non-payment entitles the Provider to suspend access to the Service under Clauses 4 and 5 of the Agreement.' },
+  { n: '5ª', tEs: 'Permanencia y renovación', tEn: 'Minimum term and renewal',
+    bEs: 'La aceptación de la Oferta implica la del período de permanencia mínima de 12 meses (con la opción de devolución de equipos o compensación de la Cláusula 18ª), la renovación automática anual y la actualización de precios conforme al IPC, según las Cláusulas 18ª, 17ª y 6ª del Contrato.',
+    bEn: 'Acceptance of the Offer implies acceptance of the 12-month minimum term (with the equipment-return or compensation option in Clause 18), the automatic annual renewal and the CPI price update, under Clauses 18, 17 and 6 of the Agreement.' },
+  { n: '6ª', tEs: 'Prevalencia', tEn: 'Prevalence',
+    bEs: 'En caso de contradicción sobre precio, forma de pago o condiciones de facturación, prevalece esta Oferta sobre el Contrato. Para el resto de extremos se aplica el Contrato y sus Anexos.',
+    bEn: 'In case of conflict over price, payment method or invoicing conditions, this Offer prevails over the Agreement. For all other matters, the Agreement and its Annexes apply.' },
+  { n: '7ª', tEs: 'Aceptación', tEn: 'Acceptance',
+    bEs: 'Mediante la firma o la aceptación expresa por correo electrónico, el Cliente manifiesta su conformidad con el contenido íntegro de esta Oferta y su incorporación como Anexo I al Contrato de Prestación de Servicios.',
+    bEn: 'By signing or expressly accepting by email, the Client agrees to the entire content of this Offer and its incorporation as Annex I to the Services Agreement.' },
 ]
 
 // Per-module DPA processing table (Anexo A) — only contracted modules shown
@@ -491,11 +516,6 @@ export async function generateContractPdf(
   <div class="contract-subtitle">Master Services Agreement — documento consolidado (contrato + anexos) · Ref. PLT-SAAS-MACRO-001 · v1.7</div>
   <div class="contract-en-sub">En Madrid, a ${today} · Oferta vinculada nº ${esc(presupuesto.number)}</div>
 
-  <div class="note-box">
-    Documento único. A cada Cliente se le aplican solo los módulos contratados en su Oferta (Anexo I). Las cláusulas específicas de cada servicio van resaltadas por color.<br/>
-    <span class="anx-en">Single document. Each Client is bound only by the modules contracted in its Offer (Annex I). Service-specific clauses are colour-highlighted.</span>
-  </div>
-
   <div class="section-label">Servicios contratados · Contracted services</div>
   <div class="legend">
     ${activeLegend.length > 0
@@ -529,8 +549,7 @@ export async function generateContractPdf(
   </div>
 
   <!-- Cuerpo común (mismo flujo) -->
-  <div class="anx-title" style="margin-top:24px;">Cuerpo común · Common body</div>
-  <div class="anx-subtitle">Cláusulas 1ª–23ª aplicables a todos los Servicios</div>
+  <div class="anx-subtitle" style="margin-top:22px;">Cláusulas 1ª–23ª aplicables a todos los Servicios</div>
   ${commonRendered.map((c) => renderClause(c)).join('')}
 
   <!-- Cláusulas específicas por servicio (mismo flujo) -->
@@ -556,10 +575,12 @@ export async function generateContractPdf(
   </table>
   <p style="font-size:8px;color:#94a3b8;margin-bottom:10px;">Importes sin IVA. / Amounts excl. VAT.</p>
 
-  <div class="clause"><div class="clause-num">Prevalencia · Prevalence</div><div class="clause-body">
-    <p>En caso de contradicción sobre precio, forma de pago o condiciones de facturación, prevalece esta Oferta sobre el Contrato. Para el resto de extremos se aplica el Contrato y sus Anexos. Forma de pago: <strong>${esc(formaPago)}</strong>.</p>
-    <p class="en">In case of conflict over price, payment method or invoicing conditions, this Offer prevails over the Agreement. For all other matters, the Agreement and its Annexes apply.</p>
-  </div></div>
+  <div class="section-label" style="margin-top:6px;">Cláusulas · Clauses</div>
+  ${OFFER_CLAUSES.map((c) => renderClause({
+    ...c,
+    bEs: c.bEs.replace(/__PAGO__/g, esc(formaPago)),
+    bEn: c.bEn.replace(/__PAGO__/g, esc(formaPago)),
+  })).join('')}
 
   ${notas && notas.trim() ? `<div class="notas-box"><div class="notas-title">Notas / Notes</div>${esc(notas)}</div>` : ''}
 
@@ -646,6 +667,7 @@ export async function generateContractPdf(
       </tbody>
     </table>
     <p style="font-size:8px;color:#64748b;line-height:1.5;">EEE = Espacio Económico Europeo. Las pasarelas de pago las contrata el Cliente (responsables independientes). Glovo/Uber/JustEat (REN) son responsables independientes. Ver PLT-VEN-001.</p>
+    <p style="font-size:8px;color:#94a3b8;font-style:italic;line-height:1.5;margin-top:3px;">EEA = European Economic Area. Payment gateways are contracted by the Client (independent controllers). Glovo/Uber/JustEat (REN) are independent controllers. See PLT-VEN-001.</p>
   </div>
 </div>
 

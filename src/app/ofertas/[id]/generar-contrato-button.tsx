@@ -40,6 +40,18 @@ interface EquipmentRow {
   valorReposicion?: string
 }
 
+// Default replacement value (€) by hardware family — pre-fills Anexo IV so every
+// device carries a reposición cost; the user can override per row.
+function defaultReplacementValue(serviceId?: string): string {
+  const id = serviceId ?? ''
+  if (id.includes('ipad')) return '400'
+  if (id.includes('lenovo')) return '150'
+  if (id.includes('bouncepad')) return '200'
+  if (id.includes('counter_stand')) return '120'
+  if (id.includes('xiaomi')) return '150'
+  return ''
+}
+
 function buildEquipmentRows(items: InvoiceLineItem[]): EquipmentRow[] {
   const rows: EquipmentRow[] = []
   let n = 1
@@ -60,6 +72,7 @@ function buildEquipmentRows(items: InvoiceLineItem[]): EquipmentRow[] {
         funcion: '',
         origen: 'Platomico',
         cuotaMensual: isRental ? String(item.unitPrice) : '',
+        valorReposicion: defaultReplacementValue(item.serviceId),
       })
     }
   }
