@@ -584,30 +584,32 @@ export async function generateContractPdf(
 
   ${notas && notas.trim() ? `<div class="notas-box"><div class="notas-title">Notas / Notes</div>${esc(notas)}</div>` : ''}
 
-  <div class="section-label">Firmas · Signatures</div>
-  <div class="sig-intro">
-    Y en prueba de conformidad, las partes suscriben el presente documento en Madrid, a ${today}.<br/>
-    <span class="anx-en">In witness whereof, the parties sign this document in Madrid, on ${today}.</span>
-  </div>
-  <div class="sig-cols">
-    <div class="sig-col">
-      <div class="sig-col-title">Por el Proveedor · Platomico, S.L.</div>
-      <div class="sig-name">César Augusto Castro Sáder</div>
-      <div class="sig-role">Administrador Único</div>
-      <div class="sig-nif">CIF B-22741094</div>
-      <div class="sig-presigned">✓ Firmado</div>
+  <div style="break-inside:avoid;">
+    <div class="section-label">Firmas · Signatures</div>
+    <div class="sig-intro">
+      Y en prueba de conformidad, las partes suscriben el presente documento en Madrid, a ${today}.<br/>
+      <span class="anx-en">In witness whereof, the parties sign this document in Madrid, on ${today}.</span>
     </div>
-    <div class="sig-col">
-      <div class="sig-col-title">Por el Cliente · ${esc(presupuesto.clientName)}</div>
-      <div class="sig-name">${esc(presupuesto.clientName)}</div>
-      ${presupuesto.clientCif ? `<div class="sig-role">NIF/CIF: ${esc(presupuesto.clientCif)}</div>` : ''}
-      <div style="margin-top:14px;">
-        <div class="sig-line-label">Representante</div>
-        <div class="sig-line">${contactName ? esc(contactName) : '&nbsp;'}</div>
-        <div class="sig-line-label">Cargo · DNI</div>
-        <div class="sig-line">&nbsp;</div>
-        <div class="sig-line-label">Firma · Fecha</div>
-        <div class="sig-line">&nbsp;</div>
+    <div class="sig-cols">
+      <div class="sig-col">
+        <div class="sig-col-title">Por el Proveedor · Platomico, S.L.</div>
+        <div class="sig-name">César Augusto Castro Sáder</div>
+        <div class="sig-role">Administrador Único</div>
+        <div class="sig-nif">CIF B-22741094</div>
+        <div class="sig-presigned">✓ Firmado</div>
+      </div>
+      <div class="sig-col">
+        <div class="sig-col-title">Por el Cliente · ${esc(presupuesto.clientName)}</div>
+        <div class="sig-name">${esc(presupuesto.clientName)}</div>
+        ${presupuesto.clientCif ? `<div class="sig-role">NIF/CIF: ${esc(presupuesto.clientCif)}</div>` : ''}
+        <div style="margin-top:14px;">
+          <div class="sig-line-label">Representante</div>
+          <div class="sig-line">${contactName ? esc(contactName) : '&nbsp;'}</div>
+          <div class="sig-line-label">Cargo · DNI</div>
+          <div class="sig-line">&nbsp;</div>
+          <div class="sig-line-label">Firma · Fecha</div>
+          <div class="sig-line">&nbsp;</div>
+        </div>
       </div>
     </div>
   </div>
@@ -699,23 +701,25 @@ export async function generateContractPdf(
   <div class="anx-subtitle">Non-Disclosure Agreement — PLT-NDA-001</div>
   ${NDA_CLAUSES.map((c) => renderClause(c)).join('')}
 
-  <div class="section-label">Firmas · Signatures</div>
-  <div class="sig-cols">
-    <div class="sig-col">
-      <div class="sig-col-title">Por el Proveedor · Platomico, S.L.</div>
-      <div class="sig-name">César Augusto Castro Sáder</div>
-      <div class="sig-role">Administrador Único · CIF B-22741094</div>
-      <div class="sig-presigned">✓ Firmado</div>
-    </div>
-    <div class="sig-col">
-      <div class="sig-col-title">Por el Cliente · ${esc(presupuesto.clientName)}</div>
-      <div class="sig-name">${esc(presupuesto.clientName)}</div>
-      ${presupuesto.clientCif ? `<div class="sig-role">NIF/CIF: ${esc(presupuesto.clientCif)}</div>` : ''}
-      <div style="margin-top:14px;">
-        <div class="sig-line-label">Representante · DNI</div>
-        <div class="sig-line">${contactName ? esc(contactName) : '&nbsp;'}</div>
-        <div class="sig-line-label">Firma · Fecha</div>
-        <div class="sig-line">&nbsp;</div>
+  <div style="break-inside:avoid;">
+    <div class="section-label">Firmas · Signatures</div>
+    <div class="sig-cols">
+      <div class="sig-col">
+        <div class="sig-col-title">Por el Proveedor · Platomico, S.L.</div>
+        <div class="sig-name">César Augusto Castro Sáder</div>
+        <div class="sig-role">Administrador Único · CIF B-22741094</div>
+        <div class="sig-presigned">✓ Firmado</div>
+      </div>
+      <div class="sig-col">
+        <div class="sig-col-title">Por el Cliente · ${esc(presupuesto.clientName)}</div>
+        <div class="sig-name">${esc(presupuesto.clientName)}</div>
+        ${presupuesto.clientCif ? `<div class="sig-role">NIF/CIF: ${esc(presupuesto.clientCif)}</div>` : ''}
+        <div style="margin-top:14px;">
+          <div class="sig-line-label">Representante · DNI</div>
+          <div class="sig-line">${contactName ? esc(contactName) : '&nbsp;'}</div>
+          <div class="sig-line-label">Firma · Fecha</div>
+          <div class="sig-line">&nbsp;</div>
+        </div>
       </div>
     </div>
   </div>
