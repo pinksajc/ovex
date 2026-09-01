@@ -73,6 +73,19 @@ export async function getTotalPaid(invoiceId: string): Promise<number> {
   return payments.reduce((sum, p) => sum + p.amount, 0)
 }
 
+/** Returns a map of invoiceId → totalPaid for all invoices that have at least one payment. */
+export async function getPaymentTotals(): Promise<Record<string, number>> {
+  const db = getSupabaseClient()
+  const { data, error } = await table(db)
+    .select('invoice_id, amount')
+  if (error) return {}
+  const map: Record<string, number> = {}
+  for (const row of (data as Array<{ invoice_id: string; amount: string }>) ?? []) {
+    map[row.invoice_id] = (map[row.invoice_id] ?? 0) + Number(row.amount)
+  }
+  return map
+}
+
 /**
  * After adding or removing a payment, recompute whether the invoice
  * status should be 'paid' or reverted.

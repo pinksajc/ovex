@@ -120,9 +120,11 @@ function sortInvoices(invoices: Invoice[], key: SortKey, dir: SortDir): Invoice[
 export function FacturasContent({
   invoices,
   invoiceFetchError,
+  paymentTotals = {},
 }: {
   invoices: Invoice[]
   invoiceFetchError: string | null
+  paymentTotals?: Record<string, number>
 }) {
   const [tab, setTab] = useState<TabKey>('all')
   const [invQuery, setInvQuery] = useState('')
@@ -235,12 +237,24 @@ export function FacturasContent({
             {invoices.length} factura{invoices.length !== 1 ? 's' : ''}
           </p>
         </div>
-        <Link
-          href="/facturas/nueva"
-          className="inline-flex items-center gap-1.5 text-xs font-medium bg-zinc-900 text-white hover:bg-zinc-700 px-3 py-1.5 rounded-lg transition-colors"
-        >
-          + Nueva factura
-        </Link>
+        <div className="flex items-center gap-2">
+          <a
+            href="/api/facturas/report-pdf"
+            download
+            className="inline-flex items-center gap-1.5 text-xs font-medium border border-zinc-200 text-zinc-700 hover:bg-zinc-50 hover:border-zinc-400 px-3 py-1.5 rounded-lg transition-colors"
+          >
+            <svg className="w-3.5 h-3.5" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M7 1v8M4 6l3 3 3-3" /><path d="M2 11h10" />
+            </svg>
+            Informe CEO
+          </a>
+          <Link
+            href="/facturas/nueva"
+            className="inline-flex items-center gap-1.5 text-xs font-medium bg-zinc-900 text-white hover:bg-zinc-700 px-3 py-1.5 rounded-lg transition-colors"
+          >
+            + Nueva factura
+          </Link>
+        </div>
       </div>
 
       <FilterSearchBar
@@ -354,9 +368,22 @@ export function FacturasContent({
                     <span className="font-mono text-xs font-semibold text-zinc-900">{formatEur(inv.amountTotal)}</span>
                   </td>
                   <td className="px-4 py-3">
-                    <span className={`inline-block text-[10px] font-semibold uppercase tracking-wide px-2 py-0.5 rounded-full ${INVOICE_STATUS_COLORS[inv.status]}`}>
-                      {INVOICE_STATUS_LABELS[inv.status]}
-                    </span>
+                    <div className="flex flex-col gap-1">
+                      <span className={`inline-block text-[10px] font-semibold uppercase tracking-wide px-2 py-0.5 rounded-full w-fit ${INVOICE_STATUS_COLORS[inv.status]}`}>
+                        {INVOICE_STATUS_LABELS[inv.status]}
+                      </span>
+                      {(() => {
+                        const paid = paymentTotals[inv.id] ?? 0
+                        if (paid > 0 && paid < inv.amountTotal && inv.status !== 'paid') {
+                          return (
+                            <span className="inline-block text-[9px] font-semibold uppercase tracking-wide px-2 py-0.5 rounded-full w-fit bg-amber-50 text-amber-700">
+                              Pago parcial
+                            </span>
+                          )
+                        }
+                        return null
+                      })()}
+                    </div>
                   </td>
                   <td className="px-4 py-3 text-xs text-zinc-400 whitespace-nowrap">{formatDate(inv.issuedAt)}</td>
                 </tr>
