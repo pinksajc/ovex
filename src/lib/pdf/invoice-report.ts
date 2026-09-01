@@ -51,25 +51,27 @@ export async function generateInvoiceReportPdf(input: InvoiceReportInput): Promi
 function buildReportHtml(input: InvoiceReportInput, logoUri: string): string {
   const { invoices, paymentsByInvoice, generatedAt } = input
 
-  // ── Summary numbers ──────────────────────────────────────────────────────
-  const billableInvoices = invoices.filter((i) => i.type !== 'proforma' || i.status !== 'converted')
+  // ── Separate ordinary/rectificativa from proformas ───────────────────────
+  const ordinaryInvoices = invoices.filter((i) => i.type !== 'proforma')
+  const proformaInvoices = invoices.filter((i) => i.type === 'proforma')
 
-  const totalBilled    = billableInvoices.reduce((s, i) => s + i.amountTotal, 0)
-  const totalPaidFull  = billableInvoices.filter((i) => i.status === 'paid').reduce((s, i) => s + i.amountTotal, 0)
+  // ── Summary numbers (ordinary + rectificativa only) ──────────────────────
+  const totalBilled    = ordinaryInvoices.reduce((s, i) => s + i.amountTotal, 0)
+  const totalPaidFull  = ordinaryInvoices.filter((i) => i.status === 'paid').reduce((s, i) => s + i.amountTotal, 0)
   const totalPartialPayments = Object.values(paymentsByInvoice).flat().reduce((s, p) => s + p.amount, 0)
   const totalCollected = totalPaidFull + Object.entries(paymentsByInvoice)
     .filter(([id]) => {
-      const inv = billableInvoices.find((i) => i.id === id)
+      const inv = ordinaryInvoices.find((i) => i.id === id)
       return inv && inv.status !== 'paid'
     })
     .reduce((s, [, ps]) => s + ps.reduce((ss, p) => ss + p.amount, 0), 0)
 
-  const totalOverdue   = billableInvoices.filter((i) => i.status === 'overdue').reduce((s, i) => s + i.amountTotal, 0)
-  const totalIssued    = billableInvoices.filter((i) => i.status === 'issued').reduce((s, i) => s + i.amountTotal, 0)
-  const totalDraft     = billableInvoices.filter((i) => i.status === 'draft').reduce((s, i) => s + i.amountTotal, 0)
+  const totalOverdue   = ordinaryInvoices.filter((i) => i.status === 'overdue').reduce((s, i) => s + i.amountTotal, 0)
+  const totalIssued    = ordinaryInvoices.filter((i) => i.status === 'issued').reduce((s, i) => s + i.amountTotal, 0)
+  const totalDraft     = ordinaryInvoices.filter((i) => i.status === 'draft').reduce((s, i) => s + i.amountTotal, 0)
 
   // Partially paid = has payments but status != 'paid'
-  const partiallyPaid = billableInvoices.filter((inv) => {
+  const partiallyPaid = ordinaryInvoices.filter((inv) => {
     const ps = paymentsByInvoice[inv.id] ?? []
     const paid = ps.reduce((s, p) => s + p.amount, 0)
     return paid > 0 && inv.status !== 'paid'
@@ -77,7 +79,15 @@ function buildReportHtml(input: InvoiceReportInput, logoUri: string): string {
 
   const totalPending = totalIssued + totalOverdue
 
-  const countByStatus = (s: InvoiceStatus) => billableInvoices.filter((i) => i.status === s).length
+  const countByStatus = (s: InvoiceStatus) => ordinaryInvoices.filter((i) => i.status === s).length
+
+  // ── Proforma metrics ─────────────────────────────────────────────────────
+  const proformaTotal      = proformaInvoices.reduce((s, i) => s + i.amountTotal, 0)
+  const proformaPending    = proformaInvoices.filter((i) => i.status !== 'converted').reduce((s, i) => s + i.amountTotal, 0)
+  const proformaConverted  = proformaInvoices.filter((i) => i.status === 'converted')
+  const proformaConvRate   = proformaInvoices.length > 0
+    ? ((proformaConverted.length / proformaInvoices.length) * 100).toFixed(0)
+    : '0'
 
   const imgOrText = logoUri
     ? `<img src="${logoUri}" style="height:22px;width:auto;display:block;" alt="Orvex"/>`
@@ -122,38 +132,42 @@ function buildReportHtml(input: InvoiceReportInput, logoUri: string): string {
   const p1 = pg(`
     <div style="margin-bottom:20px;">
       <div style="font-size:24px;font-weight:900;color:#0f172a;letter-spacing:-0.5px;margin-bottom:4px;">Informe de Facturación</div>
-      <div style="font-size:10px;color:#64748b;">${billableInvoices.length} facturas · Generado el ${generatedAt}</div>
+      <div style="font-size:10px;color:#64748b;">${invoices.length} documentos (${ordinaryInvoices.length} facturas · ${proformaInvoices.length} proformas) · Generado el ${generatedAt}</div>
     </div>
 
     <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:10px;margin-bottom:20px;">
-      ${kpiCard('Total facturado', eur(totalBilled), `${billableInvoices.length} facturas`)}
+      ${kpiCard('Total facturado', eur(totalBilled), `${ordinaryInvoices.length} facturas (excl. proformas)`)}
       ${kpiCard('Total cobrado', eur(totalCollected), 'Pagadas + pagos parciales', '#059669')}
       ${kpiCard('Pendiente de cobro', eur(totalPending), `${countByStatus('issued') + countByStatus('overdue')} facturas`, '#2563eb')}
       ${kpiCard('Vencido (sin pagar)', eur(totalOverdue), `${countByStatus('overdue')} facturas vencidas`, '#dc2626')}
     </div>
 
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px;">
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:20px;">
       <div style="background:#fff;border:1px solid #e8eef6;border-radius:10px;padding:16px;">
-        <div style="font-size:9px;font-weight:700;color:#1e3a5f;text-transform:uppercase;letter-spacing:1px;margin-bottom:12px;">Desglose por estado</div>
+        <div style="font-size:9px;font-weight:700;color:#1e3a5f;text-transform:uppercase;letter-spacing:1px;margin-bottom:12px;">Facturas — desglose por estado</div>
         ${statusRow('paid', totalPaidFull)}
         ${statusRow('issued', totalIssued)}
         ${statusRow('overdue', totalOverdue)}
         ${statusRow('draft', totalDraft)}
-        ${statusRow('converted', billableInvoices.filter((i) => i.status === 'converted').reduce((s, i) => s + i.amountTotal, 0))}
+        ${statusRow('converted', ordinaryInvoices.filter((i) => i.status === 'converted').reduce((s, i) => s + i.amountTotal, 0))}
+        <div style="margin-top:8px;padding-top:8px;border-top:1px solid #e8eef6;display:flex;justify-content:space-between;">
+          <span style="font-size:9px;font-weight:700;color:#64748b;">Tasa de cobro</span>
+          <span style="font-size:9px;font-weight:800;color:#059669;">${totalBilled > 0 ? ((totalCollected / totalBilled) * 100).toFixed(1) : 0}%</span>
+        </div>
       </div>
 
       <div style="background:#fff;border:1px solid #e8eef6;border-radius:10px;padding:16px;">
         <div style="font-size:9px;font-weight:700;color:#1e3a5f;text-transform:uppercase;letter-spacing:1px;margin-bottom:12px;">Cobros parciales</div>
         <div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid #f1f5f9;">
-          <span style="font-size:10px;color:#64748b;">Facturas con pago parcial</span>
+          <span style="font-size:10px;color:#64748b;">Con pago parcial</span>
           <span style="font-size:10px;font-weight:700;color:#0f172a;">${partiallyPaid.length}</span>
         </div>
         <div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid #f1f5f9;">
-          <span style="font-size:10px;color:#64748b;">Total cobrado (parciales)</span>
+          <span style="font-size:10px;color:#64748b;">Total cobrado</span>
           <span style="font-size:10px;font-weight:700;color:#059669;font-family:'Courier New',monospace;">${eur(totalPartialPayments)}</span>
         </div>
         <div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid #f1f5f9;">
-          <span style="font-size:10px;color:#64748b;">Pendiente en parciales</span>
+          <span style="font-size:10px;color:#64748b;">Pendiente</span>
           <span style="font-size:10px;font-weight:700;color:#dc2626;font-family:'Courier New',monospace;">${eur(
             partiallyPaid.reduce((s, inv) => {
               const paid = (paymentsByInvoice[inv.id] ?? []).reduce((ss, p) => ss + p.amount, 0)
@@ -161,10 +175,29 @@ function buildReportHtml(input: InvoiceReportInput, logoUri: string): string {
             }, 0)
           )}</span>
         </div>
-        <div style="margin-top:12px;padding:10px;background:#fefce8;border-radius:8px;border:1px solid #fde68a;">
-          <div style="font-size:9px;color:#92400e;line-height:1.6;">
-            <strong>Tasa de cobro:</strong> ${totalBilled > 0 ? ((totalCollected / totalBilled) * 100).toFixed(1) : 0}% del total facturado ha sido cobrado.
-          </div>
+      </div>
+
+      <div style="background:#f5f3ff;border:1px solid #ddd6fe;border-radius:10px;padding:16px;">
+        <div style="font-size:9px;font-weight:700;color:#5b21b6;text-transform:uppercase;letter-spacing:1px;margin-bottom:12px;">Proformas</div>
+        <div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid #ede9fe;">
+          <span style="font-size:10px;color:#64748b;">Total emitidas</span>
+          <span style="font-size:10px;font-weight:700;color:#0f172a;">${proformaInvoices.length}</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid #ede9fe;">
+          <span style="font-size:10px;color:#64748b;">Convertidas a factura</span>
+          <span style="font-size:10px;font-weight:700;color:#059669;">${proformaConverted.length} (${proformaConvRate}%)</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid #ede9fe;">
+          <span style="font-size:10px;color:#64748b;">Pendientes conversión</span>
+          <span style="font-size:10px;font-weight:700;color:#7c3aed;">${proformaInvoices.length - proformaConverted.length}</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid #ede9fe;">
+          <span style="font-size:10px;color:#64748b;">Valor total</span>
+          <span style="font-size:10px;font-weight:700;font-family:'Courier New',monospace;color:#5b21b6;">${eur(proformaTotal)}</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;padding:5px 0;">
+          <span style="font-size:10px;color:#64748b;">Valor pendiente</span>
+          <span style="font-size:10px;font-weight:700;font-family:'Courier New',monospace;color:#7c3aed;">${eur(proformaPending)}</span>
         </div>
       </div>
     </div>
@@ -225,45 +258,59 @@ function buildReportHtml(input: InvoiceReportInput, logoUri: string): string {
   `)
 
   // ── Page 3: Full invoice listing ─────────────────────────────────────────
-  const allRows = invoices
-    .filter((i) => i.status !== 'converted')
-    .map((inv) => {
-      const ps = paymentsByInvoice[inv.id] ?? []
-      const paid = ps.reduce((s, p) => s + p.amount, 0)
-      const isPartial = paid > 0 && inv.status !== 'paid'
-      return `
-        <tr style="border-bottom:1px solid #f1f5f9;">
-          <td style="padding:6px 8px;font-family:'Courier New',monospace;font-size:9.5px;font-weight:700;color:#0f172a;white-space:nowrap;">${inv.number}</td>
-          <td style="padding:6px 8px;font-size:9px;color:#94a3b8;white-space:nowrap;">${TYPE_LABELS[inv.type] ?? inv.type}</td>
-          <td style="padding:6px 8px;font-size:9.5px;color:#334155;">${inv.clientName}</td>
-          <td style="padding:6px 8px;font-size:9px;color:#64748b;white-space:nowrap;">${fmtDate(inv.issuedAt)}</td>
-          <td style="padding:6px 8px;text-align:right;font-size:9.5px;font-family:'Courier New',monospace;font-weight:600;color:#0f172a;white-space:nowrap;">${eur(inv.amountTotal)}</td>
-          <td style="padding:6px 8px;white-space:nowrap;">
-            <span style="display:inline-block;background:${STATUS_COLOR[inv.status]}18;color:${STATUS_COLOR[inv.status]};font-size:8px;font-weight:700;text-transform:uppercase;padding:2px 7px;border-radius:10px;">${STATUS_LABELS[inv.status]}</span>
-            ${isPartial ? `<span style="display:inline-block;background:#fef3c7;color:#b45309;font-size:7.5px;font-weight:700;text-transform:uppercase;padding:2px 6px;border-radius:10px;margin-left:3px;">Parcial</span>` : ''}
-          </td>
-          <td style="padding:6px 8px;text-align:right;font-size:9.5px;font-family:'Courier New',monospace;color:${paid > 0 ? '#059669' : '#d1d5db'};white-space:nowrap;">${paid > 0 ? eur(paid) : '—'}</td>
-        </tr>`
-    }).join('')
+  const TABLE_HEAD = `
+    <thead>
+      <tr style="background:#f8fafc;border-bottom:2px solid #e8eef6;">
+        <th style="padding:6px 8px;text-align:left;font-size:8px;font-weight:700;text-transform:uppercase;letter-spacing:0.8px;color:#64748b;">Número</th>
+        <th style="padding:6px 8px;text-align:left;font-size:8px;font-weight:700;text-transform:uppercase;letter-spacing:0.8px;color:#64748b;">Cliente</th>
+        <th style="padding:6px 8px;text-align:left;font-size:8px;font-weight:700;text-transform:uppercase;letter-spacing:0.8px;color:#64748b;">Emisión</th>
+        <th style="padding:6px 8px;text-align:right;font-size:8px;font-weight:700;text-transform:uppercase;letter-spacing:0.8px;color:#64748b;">Total</th>
+        <th style="padding:6px 8px;text-align:left;font-size:8px;font-weight:700;text-transform:uppercase;letter-spacing:0.8px;color:#64748b;">Estado</th>
+        <th style="padding:6px 8px;text-align:right;font-size:8px;font-weight:700;text-transform:uppercase;letter-spacing:0.8px;color:#64748b;">Cobrado</th>
+      </tr>
+    </thead>`
+
+  const invoiceRow = (inv: Invoice) => {
+    const ps = paymentsByInvoice[inv.id] ?? []
+    const paid = ps.reduce((s, p) => s + p.amount, 0)
+    const isPartial = paid > 0 && inv.status !== 'paid'
+    return `
+      <tr style="border-bottom:1px solid #f1f5f9;">
+        <td style="padding:5px 8px;font-family:'Courier New',monospace;font-size:9px;font-weight:700;color:#0f172a;white-space:nowrap;">${inv.number}</td>
+        <td style="padding:5px 8px;font-size:9px;color:#334155;">${inv.clientName}</td>
+        <td style="padding:5px 8px;font-size:9px;color:#64748b;white-space:nowrap;">${fmtDate(inv.issuedAt)}</td>
+        <td style="padding:5px 8px;text-align:right;font-size:9px;font-family:'Courier New',monospace;font-weight:600;color:#0f172a;white-space:nowrap;">${eur(inv.amountTotal)}</td>
+        <td style="padding:5px 8px;white-space:nowrap;">
+          <span style="display:inline-block;background:${STATUS_COLOR[inv.status]}18;color:${STATUS_COLOR[inv.status]};font-size:7.5px;font-weight:700;text-transform:uppercase;padding:1px 6px;border-radius:10px;">${STATUS_LABELS[inv.status]}</span>
+          ${isPartial ? `<span style="display:inline-block;background:#fef3c7;color:#b45309;font-size:7px;font-weight:700;text-transform:uppercase;padding:1px 5px;border-radius:10px;margin-left:2px;">Parcial</span>` : ''}
+        </td>
+        <td style="padding:5px 8px;text-align:right;font-size:9px;font-family:'Courier New',monospace;color:${paid > 0 ? '#059669' : '#d1d5db'};white-space:nowrap;">${paid > 0 ? eur(paid) : '—'}</td>
+      </tr>`
+  }
+
+  const ordinaryRows = ordinaryInvoices.map(invoiceRow).join('')
+  const proformaRows = proformaInvoices.map(invoiceRow).join('')
 
   const p3 = pg(`
-    <div style="margin-bottom:16px;">
-      <div style="font-size:18px;font-weight:800;color:#0f172a;margin-bottom:4px;">Listado completo de facturas</div>
-      <div style="font-size:10px;color:#64748b;">${invoices.filter((i) => i.status !== 'converted').length} facturas (excluye convertidas)</div>
+    <div style="margin-bottom:14px;">
+      <div style="font-size:18px;font-weight:800;color:#0f172a;margin-bottom:4px;">Listado completo</div>
+      <div style="font-size:10px;color:#64748b;">${invoices.length} documentos totales</div>
+    </div>
+
+    <div style="font-size:9px;font-weight:700;color:#1e3a5f;text-transform:uppercase;letter-spacing:1px;margin-bottom:6px;">
+      Facturas ordinarias y rectificativas (${ordinaryInvoices.length})
+    </div>
+    <table style="width:100%;border-collapse:collapse;font-family:Helvetica,sans-serif;margin-bottom:20px;">
+      ${TABLE_HEAD}
+      <tbody>${ordinaryRows}</tbody>
+    </table>
+
+    <div style="font-size:9px;font-weight:700;color:#5b21b6;text-transform:uppercase;letter-spacing:1px;margin-bottom:6px;">
+      Facturas proforma (${proformaInvoices.length})
     </div>
     <table style="width:100%;border-collapse:collapse;font-family:Helvetica,sans-serif;">
-      <thead>
-        <tr style="background:#f8fafc;border-bottom:2px solid #e8eef6;">
-          <th style="padding:7px 8px;text-align:left;font-size:8px;font-weight:700;text-transform:uppercase;letter-spacing:0.8px;color:#64748b;">Número</th>
-          <th style="padding:7px 8px;text-align:left;font-size:8px;font-weight:700;text-transform:uppercase;letter-spacing:0.8px;color:#64748b;">Tipo</th>
-          <th style="padding:7px 8px;text-align:left;font-size:8px;font-weight:700;text-transform:uppercase;letter-spacing:0.8px;color:#64748b;">Cliente</th>
-          <th style="padding:7px 8px;text-align:left;font-size:8px;font-weight:700;text-transform:uppercase;letter-spacing:0.8px;color:#64748b;">Emisión</th>
-          <th style="padding:7px 8px;text-align:right;font-size:8px;font-weight:700;text-transform:uppercase;letter-spacing:0.8px;color:#64748b;">Total</th>
-          <th style="padding:7px 8px;text-align:left;font-size:8px;font-weight:700;text-transform:uppercase;letter-spacing:0.8px;color:#64748b;">Estado</th>
-          <th style="padding:7px 8px;text-align:right;font-size:8px;font-weight:700;text-transform:uppercase;letter-spacing:0.8px;color:#64748b;">Cobrado</th>
-        </tr>
-      </thead>
-      <tbody>${allRows}</tbody>
+      ${TABLE_HEAD}
+      <tbody>${proformaRows || '<tr><td colspan="6" style="padding:12px;text-align:center;color:#94a3b8;font-size:9px;">Sin proformas</td></tr>'}</tbody>
     </table>
   `, true)
 
