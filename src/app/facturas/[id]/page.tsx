@@ -1,11 +1,13 @@
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import { getInvoice } from '@/lib/supabase/invoices'
+import { getPaymentsByInvoice } from '@/lib/supabase/invoice-payments'
 import { getCurrentUser } from '@/lib/auth'
 import { InvoiceActions, ConvertProformaButton, DeleteInvoiceButton } from './actions'
 import { FacturaPageShell } from './factura-page-shell'
 import { APPROVAL_CHIP, isDownloadBlocked } from '@/lib/approvals'
 import { DueDateEditor } from '@/components/facturas/due-date-editor'
+import { InvoicePaymentsPanel } from '@/components/facturas/invoice-payments-panel'
 import type { Invoice, InvoiceStatus } from '@/types'
 
 const STATUS_LABELS: Record<InvoiceStatus, string> = {
@@ -49,7 +51,7 @@ export default async function FacturaDetailPage({ params }: { params: Promise<{ 
     getCurrentUser(),
   ])
   if (!invoice) notFound()
-
+  const payments = await getPaymentsByInvoice(id).catch(() => [])
   const vatAmount = invoice.amountNet * (invoice.vatRate / 100)
 
   const approvalChip  = APPROVAL_CHIP[invoice.approvalStatus]
@@ -238,6 +240,16 @@ export default async function FacturaDetailPage({ params }: { params: Promise<{ 
               </div>
             </div>
           </div>
+
+          {/* Partial payments */}
+          {invoice.status !== 'draft' && invoice.status !== 'converted' && (
+            <InvoicePaymentsPanel
+              invoiceId={invoice.id}
+              invoiceTotal={invoice.amountTotal}
+              initialPayments={payments}
+              invoiceStatus={invoice.status}
+            />
+          )}
 
           {/* Actions */}
           <div className="bg-white border border-zinc-200 rounded-xl p-5">
