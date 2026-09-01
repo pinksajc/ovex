@@ -3,7 +3,7 @@
 import { useState, useCallback } from 'react'
 import Link from 'next/link'
 import { FilterSearchBar } from '@/components/ui/filter-search-bar'
-import type { Invoice, InvoiceStatus } from '@/types'
+import type { Invoice, InvoiceStatus, InvoiceType } from '@/types'
 
 const INVOICE_STATUS_LABELS: Record<InvoiceStatus, string> = {
   draft: 'Borrador',
@@ -19,6 +19,33 @@ const INVOICE_STATUS_COLORS: Record<InvoiceStatus, string> = {
   paid: 'bg-emerald-50 text-emerald-700',
   overdue: 'bg-red-50 text-red-700',
   converted: 'bg-zinc-100 text-zinc-500',
+}
+
+const INVOICE_TYPE_LABELS: Record<InvoiceType, string> = {
+  ordinary: 'Factura',
+  proforma: 'Proforma',
+  rectificativa: 'Rectificativa',
+}
+
+const INVOICE_TYPE_COLORS: Record<InvoiceType, string> = {
+  ordinary: 'bg-zinc-100 text-zinc-700',
+  proforma: 'bg-violet-50 text-violet-700',
+  rectificativa: 'bg-amber-50 text-amber-700',
+}
+
+// Sort order weights
+const STATUS_ORDER: Record<InvoiceStatus, number> = {
+  overdue: 0,
+  draft: 1,
+  issued: 2,
+  paid: 3,
+  converted: 4,
+}
+
+const TYPE_ORDER: Record<InvoiceType, number> = {
+  ordinary: 0,
+  proforma: 1,
+  rectificativa: 2,
 }
 
 function formatEur(n: number) {
@@ -51,6 +78,44 @@ function inDateRange(isoDate: string | null, desde: string, hasta: string): bool
 }
 
 type TabKey = InvoiceStatus | 'all' | 'proforma'
+type SortKey = 'number' | 'client' | 'type' | 'amount' | 'status' | 'date'
+type SortDir = 'asc' | 'desc'
+
+function SortIcon({ active, dir }: { active: boolean; dir: SortDir }) {
+  return (
+    <span className={`ml-1 inline-block transition-opacity ${active ? 'opacity-100' : 'opacity-0 group-hover:opacity-40'}`}>
+      {active && dir === 'desc' ? '↓' : '↑'}
+    </span>
+  )
+}
+
+function sortInvoices(invoices: Invoice[], key: SortKey, dir: SortDir): Invoice[] {
+  const sign = dir === 'asc' ? 1 : -1
+  return [...invoices].sort((a, b) => {
+    let cmp = 0
+    switch (key) {
+      case 'number':
+        cmp = a.number.localeCompare(b.number, 'es')
+        break
+      case 'client':
+        cmp = a.clientName.localeCompare(b.clientName, 'es')
+        break
+      case 'type':
+        cmp = TYPE_ORDER[a.type] - TYPE_ORDER[b.type]
+        break
+      case 'amount':
+        cmp = a.amountTotal - b.amountTotal
+        break
+      case 'status':
+        cmp = STATUS_ORDER[a.status] - STATUS_ORDER[b.status]
+        break
+      case 'date':
+        cmp = (a.issuedAt ?? '').localeCompare(b.issuedAt ?? '')
+        break
+    }
+    return cmp * sign
+  })
+}
 
 export function FacturasContent({
   invoices,
@@ -63,18 +128,31 @@ export function FacturasContent({
   const [invQuery, setInvQuery] = useState('')
   const [invDesde, setInvDesde] = useState('')
   const [invHasta, setInvHasta] = useState('')
+  const [sortKey, setSortKey] = useState<SortKey>('date')
+  const [sortDir, setSortDir] = useState<SortDir>('desc')
 
   // ── Bulk selection ────────────────────────────────────────────────────────
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [downloading, setDownloading] = useState(false)
 
-  const filteredInvoices = invoices.filter((inv) => {
+  const handleSort = (key: SortKey) => {
+    if (sortKey === key) {
+      setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'))
+    } else {
+      setSortKey(key)
+      setSortDir(key === 'status' || key === 'type' ? 'asc' : 'desc')
+    }
+  }
+
+  const filtered = invoices.filter((inv) => {
     if (tab === 'proforma' && inv.type !== 'proforma') return false
     if (tab !== 'all' && tab !== 'proforma' && inv.status !== tab) return false
     if (invQuery && !matchesText(invQuery, inv.number, inv.clientName, inv.clientCif)) return false
     if (!inDateRange(inv.issuedAt, invDesde, invHasta)) return false
     return true
   })
+
+  const filteredInvoices = sortInvoices(filtered, sortKey, sortDir)
 
   const invCount = (t: TabKey) => {
     if (t === 'all') return invoices.length
@@ -138,6 +216,16 @@ export function FacturasContent({
     }
   }
 
+  const ThSort = ({ col, label }: { col: SortKey; label: string }) => (
+    <th
+      className="text-left px-4 py-3 text-[10px] font-semibold text-zinc-400 uppercase tracking-widest cursor-pointer select-none group whitespace-nowrap"
+      onClick={() => handleSort(col)}
+    >
+      {label}
+      <SortIcon active={sortKey === col} dir={sortDir} />
+    </th>
+  )
+
   return (
     <div>
       <div className="mb-8 flex items-start justify-between flex-wrap gap-3">
@@ -164,11 +252,12 @@ export function FacturasContent({
       <div className="flex items-center gap-1 mb-6 bg-zinc-100 rounded-lg p-0.5 w-fit flex-wrap">
         {([
           ['all', 'Todas'],
-          ['proforma', 'Factura Proforma'],
+          ['proforma', 'Proforma'],
           ['draft', 'Borrador'],
           ['issued', 'Emitida'],
-          ['paid', 'Pagada'],
           ['overdue', 'Vencida'],
+          ['paid', 'Pagada'],
+          ['converted', 'Convertida'],
         ] as [TabKey, string][]).map(([key, label]) => (
           <button
             key={key}
@@ -209,7 +298,6 @@ export function FacturasContent({
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-zinc-100">
-                {/* Checkbox header */}
                 <th className="px-4 py-3 w-8">
                   <input
                     type="checkbox"
@@ -219,12 +307,16 @@ export function FacturasContent({
                     title={allVisibleSelected ? 'Deseleccionar todo' : 'Seleccionar todo'}
                   />
                 </th>
-                <th className="text-left px-5 py-3 text-[10px] font-semibold text-zinc-400 uppercase tracking-widest">Número</th>
-                <th className="text-left px-5 py-3 text-[10px] font-semibold text-zinc-400 uppercase tracking-widest">Cliente</th>
+                <ThSort col="number" label="Número" />
+                <ThSort col="type" label="Tipo" />
+                <ThSort col="client" label="Cliente" />
                 <th className="text-left px-4 py-3 text-[10px] font-semibold text-zinc-400 uppercase tracking-widest">Concepto</th>
-                <th className="text-right px-4 py-3 text-[10px] font-semibold text-zinc-400 uppercase tracking-widest">Total</th>
-                <th className="text-left px-4 py-3 text-[10px] font-semibold text-zinc-400 uppercase tracking-widest">Estado</th>
-                <th className="text-left px-4 py-3 text-[10px] font-semibold text-zinc-400 uppercase tracking-widest">Emisión</th>
+                <th className="text-right px-4 py-3 text-[10px] font-semibold text-zinc-400 uppercase tracking-widest cursor-pointer select-none group whitespace-nowrap" onClick={() => handleSort('amount')}>
+                  Total
+                  <SortIcon active={sortKey === 'amount'} dir={sortDir} />
+                </th>
+                <ThSort col="status" label="Estado" />
+                <ThSort col="date" label="Emisión" />
               </tr>
             </thead>
             <tbody className="divide-y divide-zinc-50">
@@ -233,7 +325,6 @@ export function FacturasContent({
                   key={inv.id}
                   className={`hover:bg-zinc-50 transition-colors ${selected.has(inv.id) ? 'bg-blue-50/40' : ''}`}
                 >
-                  {/* Row checkbox */}
                   <td className="px-4 py-3">
                     <input
                       type="checkbox"
@@ -242,18 +333,17 @@ export function FacturasContent({
                       className="rounded border-zinc-300 text-zinc-900 focus:ring-0 cursor-pointer"
                     />
                   </td>
-                  <td className="px-5 py-3">
+                  <td className="px-4 py-3">
                     <Link href={`/facturas/${inv.id}`} className="font-mono font-semibold text-zinc-900 hover:text-blue-700 text-xs">
                       {inv.number}
                     </Link>
-                    {inv.type === 'rectificativa' && (
-                      <span className="ml-2 text-[9px] uppercase tracking-wide text-amber-600 font-semibold">Rect.</span>
-                    )}
-                    {inv.type === 'proforma' && (
-                      <span className="ml-2 text-[9px] uppercase tracking-wide text-violet-600 font-semibold">Factura Proforma</span>
-                    )}
                   </td>
-                  <td className="px-5 py-3">
+                  <td className="px-4 py-3">
+                    <span className={`inline-block text-[10px] font-semibold uppercase tracking-wide px-2 py-0.5 rounded-full ${INVOICE_TYPE_COLORS[inv.type]}`}>
+                      {INVOICE_TYPE_LABELS[inv.type]}
+                    </span>
+                  </td>
+                  <td className="px-4 py-3">
                     <p className="text-xs font-medium text-zinc-800">{inv.clientName}</p>
                     {inv.clientCif && <p className="text-[10px] text-zinc-400">{inv.clientCif}</p>}
                   </td>
@@ -268,7 +358,7 @@ export function FacturasContent({
                       {INVOICE_STATUS_LABELS[inv.status]}
                     </span>
                   </td>
-                  <td className="px-4 py-3 text-xs text-zinc-400">{formatDate(inv.issuedAt)}</td>
+                  <td className="px-4 py-3 text-xs text-zinc-400 whitespace-nowrap">{formatDate(inv.issuedAt)}</td>
                 </tr>
               ))}
             </tbody>
