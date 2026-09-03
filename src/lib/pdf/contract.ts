@@ -364,8 +364,8 @@ const OFFER_CLAUSES: Clause[] = [
     bEs: 'El pago se realizará mediante __PAGO__. Las cuotas recurrentes se facturan mensualmente a mes vencido con pago a 30 días. El impago faculta a suspender el acceso al Servicio conforme a las Cláusulas 4ª y 5ª del Contrato.',
     bEn: 'Payment shall be made by __PAGO__. Recurring fees are invoiced monthly in arrears, payable within 30 days. Non-payment entitles the Provider to suspend access to the Service under Clauses 4 and 5 of the Agreement.' },
   { n: '5ª', tEs: 'Permanencia y renovación', tEn: 'Minimum term and renewal',
-    bEs: 'La aceptación de la Oferta implica la del período de permanencia mínima de 12 meses (con la opción de devolución de equipos o compensación de la Cláusula 18ª), la renovación automática anual y la actualización de precios conforme al IPC, según las Cláusulas 18ª, 17ª y 6ª del Contrato.',
-    bEn: 'Acceptance of the Offer implies acceptance of the 12-month minimum term (with the equipment-return or compensation option in Clause 18), the automatic annual renewal and the CPI price update, under Clauses 18, 17 and 6 of the Agreement.' },
+    bEs: 'La aceptación de la Oferta implica la del período de permanencia mínima de __PERMANENCIA__ meses (con la opción de devolución de equipos o compensación de la Cláusula 18ª), la renovación automática anual y la actualización de precios conforme al IPC, según las Cláusulas 18ª, 17ª y 6ª del Contrato.',
+    bEn: 'Acceptance of the Offer implies acceptance of the __PERMANENCIA__-month minimum term (with the equipment-return or compensation option in Clause 18), the automatic annual renewal and the CPI price update, under Clauses 18, 17 and 6 of the Agreement.' },
   { n: '6ª', tEs: 'Prevalencia', tEn: 'Prevalence',
     bEs: 'En caso de contradicción sobre precio, forma de pago o condiciones de facturación, prevalece esta Oferta sobre el Contrato. Para el resto de extremos se aplica el Contrato y sus Anexos.',
     bEn: 'In case of conflict over price, payment method or invoicing conditions, this Offer prevails over the Agreement. For all other matters, the Agreement and its Annexes apply.' },
@@ -640,8 +640,8 @@ export async function generateContractPdf(
   <div class="section-label" style="margin-top:6px;">Cláusulas · Clauses</div>
   ${OFFER_CLAUSES.map((c) => renderClause({
     ...c,
-    bEs: c.bEs.replace(/__PAGO__/g, esc(formaPago)),
-    bEn: c.bEn.replace(/__PAGO__/g, esc(PAGO_EN[formaPago] ?? formaPago)),
+    bEs: c.bEs.replace(/__PAGO__/g, esc(formaPago)).replace(/__PERMANENCIA__/g, String(permanenciaMeses)),
+    bEn: c.bEn.replace(/__PAGO__/g, esc(PAGO_EN[formaPago] ?? formaPago)).replace(/__PERMANENCIA__/g, String(permanenciaMeses)),
   })).join('')}
 
   ${notas && notas.trim() ? `<div class="notas-box"><div class="notas-title">Notas / Notes</div>${esc(notas)}</div>` : ''}
