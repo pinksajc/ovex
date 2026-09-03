@@ -1,6 +1,6 @@
 // =====================================================================
 //  CONTRATO MACRO DE PRESTACIÓN DE SERVICIOS — Master Services Agreement
-//  Documento consolidado y bilingüe (ES/EN) aprobado por Legal (v1.7).
+//  Documento consolidado y bilingüe (ES/EN) aprobado por Legal (v1.11, versión final).
 //  Ref. PLT-SAAS-MACRO-001.
 //
 //  Estructura del PDF:
@@ -131,6 +131,32 @@ function renderOfferRows(items: InvoiceLineItem[]): string {
 
 interface Clause { n: string; tEs: string; tEn: string; bEs: string; bEn: string }
 
+// Parte expositiva (EXPONEN · RECITALS) — v1.11, común a todos los contratos
+const RECITALS: Array<{ n: string; es: string; en: string }> = [
+  { n: 'I',
+    es: 'Que el Proveedor es titular y explota la plataforma tecnológica en modalidad de software como servicio (SaaS) comercializada bajo la marca «Platomico», que integra, entre otros, los módulos ROS, POS/Kiosk, REN, Whispr, Analítica/IA y Equipos.',
+    en: 'That the Provider owns and operates the software-as-a-service (SaaS) technology platform marketed under the «Platomico» brand, comprising, among others, the ROS, POS/Kiosk, REN, Whispr, Analytics/AI and Equipment modules.' },
+  { n: 'II',
+    es: 'Que el Cliente está interesado en contratar uno o varios de dichos Servicios, en los términos y con el alcance detallados en la Oferta (Anexo I).',
+    en: 'That the Client is interested in contracting one or more of such Services, on the terms and scope set out in the Offer (Annex I).' },
+  { n: 'III',
+    es: 'Que el presente contrato macro regula la totalidad de los Servicios, aplicándose a cada Cliente únicamente los módulos que haya contratado conforme a su Oferta.',
+    en: 'That this master agreement governs all the Services, each Client being bound only by the modules it has contracted under its Offer.' },
+  { n: 'IV',
+    es: 'Que las partes desean regular su relación mediante un instrumento único que integra el cuerpo común, las cláusulas específicas por servicio y los Anexos (I Oferta, II SLA, III DPA, IV Inventario y el Acuerdo de Confidencialidad), que forman parte inseparable del Contrato.',
+    en: 'That the parties wish to govern their relationship through a single instrument comprising the common body, the service-specific clauses and the Annexes (I Offer, II SLA, III DPA, IV Inventory and the Confidentiality Agreement), which form an inseparable part of the Agreement.' },
+  { n: 'V',
+    es: 'Que el tratamiento de datos personales derivado de la prestación de los Servicios se rige por el Anexo III (DPA) y, en el módulo REN, por el régimen de corresponsabilidad del artículo 26 del RGPD.',
+    en: 'That the processing of personal data arising from the provision of the Services is governed by Annex III (DPA) and, in the REN module, by the joint-controllership regime under Article 26 GDPR.' },
+]
+
+// Forma de pago → English label for the bilingual Offer clause 4ª
+const PAGO_EN: Record<string, string> = {
+  'Transferencia bancaria': 'bank transfer',
+  'Domiciliación bancaria (SEPA)': 'SEPA direct debit',
+  'Tarjeta de crédito/débito': 'credit/debit card',
+}
+
 const COMMON_CLAUSES: Clause[] = [
   { n: '1ª', tEs: 'Objeto', tEn: 'Subject matter',
     bEs: 'El Proveedor pone a disposición del Cliente el acceso a los Servicios comercializados bajo la marca "Platomico", contratados conforme a la Oferta (Anexo I). Este contrato macro regula todos los Servicios; a cada Cliente se le aplican únicamente los módulos que haya contratado.',
@@ -194,7 +220,7 @@ const COMMON_CLAUSES: Clause[] = [
     bEn: 'Neither party shall assign the agreement without prior written consent, save for corporate transactions with notice. The Provider may subcontract ancillary services while remaining liable.' },
   { n: '20ª', tEs: 'Modificación y nulidad parcial', tEn: 'Amendment and severability',
     bEs: 'Toda modificación del presente Contrato deberá realizarse por escrito y ser firmada por los representantes debidamente apoderados de ambas partes; las comunicaciones por correo ordinario o la mera tolerancia no constituyen modificación tácita de lo pactado. La nulidad, anulabilidad o ineficacia de una cláusula no afectará a la validez del resto del Contrato, que continuará vigente e interpretándose conforme a la voluntad original de las partes. Asimismo, cualquier cambio de alcance —alta, baja o modificación de servicios o módulos, y en particular la activación, modificación o cese de integraciones continuas con plataformas de terceros (cláusula 2ª bis, Apartado B)— requerirá una nueva Oferta (Anexo I), una adenda firmada por ambas partes o un nuevo contrato; no se admiten cambios verbales ni por mera práctica.',
-    bEn: 'Any amendment to this Agreement must be made in writing and signed by the duly authorised representatives of both parties; ordinary email or mere tolerance shall not constitute a tacit amendment. The nullity, voidability or ineffectiveness of a clause shall not affect the validity of the remainder of the Agreement, which shall remain in force and be construed in line with the parties’ original intent.' },
+    bEn: 'Any amendment to this Agreement must be made in writing and signed by the duly authorised representatives of both parties; ordinary email or mere tolerance shall not constitute a tacit amendment. The nullity, voidability or ineffectiveness of a clause shall not affect the validity of the remainder of the Agreement, which shall remain in force and be construed in line with the parties’ original intent. Likewise, any change of scope —adding, removing or modifying services or modules, and in particular the activation, modification or termination of ongoing integrations with third-party platforms (Clause 2ª bis, Section B)— shall require a new Offer (Annex I), an addendum signed by both parties or a new agreement; no verbal or practice-based changes are admitted.' },
   { n: '21ª', tEs: 'Notificaciones', tEn: 'Notices',
     bEs: 'Proveedor: Platomico, S.L., C/ Antonio Machado 9, Rozas de Puerto Real, 28649 Madrid — contacto general admin@platomico.com; protección de datos privacy@platomico.com. Cliente: __CLIENTE__.',
     bEn: 'Provider: Platomico, S.L., C/ Antonio Machado 9, Rozas de Puerto Real, 28649 Madrid — general admin@platomico.com; data protection privacy@platomico.com. Client: __CLIENTE__.' },
@@ -521,7 +547,7 @@ export async function generateContractPdf(
   ${lbl('Contrato y cláusulas')}
 
   <div class="contract-title">Contrato Macro de Prestación de Servicios</div>
-  <div class="contract-subtitle">Master Services Agreement — documento consolidado (contrato + anexos) · Ref. PLT-SAAS-MACRO-001 · v1.7</div>
+  <div class="contract-subtitle">Master Services Agreement — documento consolidado (contrato + anexos) · Ref. PLT-SAAS-MACRO-001 · v1.11</div>
   <div class="contract-en-sub">En Madrid, a ${today} · Oferta vinculada nº ${esc(presupuesto.number)}</div>
 
   <div class="section-label">Servicios contratados · Contracted services</div>
@@ -556,8 +582,29 @@ export async function generateContractPdf(
     </div>
   </div>
 
+  <!-- Capacidad + Expositivo (parte general, v1.11) -->
+  <div class="clause-body" style="margin-top:14px;">
+    <p>Las partes se reconocen recíprocamente la capacidad legal necesaria para obligarse en los términos del presente Contrato y, a tal efecto,</p>
+    <p class="en">The parties mutually acknowledge that they have the legal capacity required to be bound by the terms of this Agreement and, to that end,</p>
+  </div>
+
+  <div class="section-label">Exponen · Recitals</div>
+  ${RECITALS.map((r) => `
+  <div class="clause">
+    <div class="clause-body">
+      <p><strong>${r.n}.</strong> ${esc(r.es)}</p>
+      <p class="en">${r.n}. ${esc(r.en)}</p>
+    </div>
+  </div>`).join('')}
+
+  <div class="clause-body" style="margin-top:6px;">
+    <p>En su virtud, las partes acuerdan celebrar el presente <strong>CONTRATO MACRO DE PRESTACIÓN DE SERVICIOS</strong>, que se regirá por los anteriores Antecedentes, parte integrante del mismo, y por las siguientes <strong>ESTIPULACIONES</strong>:</p>
+    <p class="en">Accordingly, the parties agree to enter into this MASTER SERVICES AGREEMENT, which shall be governed by the foregoing Recitals, an integral part hereof, and by the following CLAUSES:</p>
+  </div>
+
   <!-- Cuerpo común (mismo flujo) -->
-  <div class="anx-subtitle" style="margin-top:22px;">Cláusulas 1ª–23ª aplicables a todos los Servicios</div>
+  <div class="anx-title" style="margin-top:18px;">Cuerpo común · Common body</div>
+  <div class="anx-subtitle">Cláusulas 1ª–23ª aplicables a todos los Servicios</div>
   ${commonRendered.map((c) => renderClause(c)).join('')}
 
   <!-- Cláusulas específicas por servicio (mismo flujo) -->
@@ -573,7 +620,7 @@ export async function generateContractPdf(
 <div style="break-before:page; ${PAGE}">
   ${lbl('Anexo I · Oferta comercial')}
   <div class="anx-title">Anexo I · Oferta comercial</div>
-  <div class="anx-subtitle">Commercial Offer · nº ${esc(presupuesto.number)} — PLT-OFC-001</div>
+  <div class="anx-subtitle">Commercial Offer · nº ${esc(presupuesto.number)} — PLT-OFC-001 · Fecha de emisión / Issue date: ${fmtDate(presupuesto.createdAt)}${presupuesto.validUntil ? ` · Válida hasta / Valid until: ${fmtDate(presupuesto.validUntil)}` : ''}</div>
 
   <table class="tbl">
     <thead><tr>
@@ -586,14 +633,15 @@ export async function generateContractPdf(
   <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:6px;padding:9px 13px;margin:10px 0;font-size:8.5px;color:#334155;line-height:1.7;">
     <strong>Integración continua con plataforma externa (cláusula 2ª bis, Apartado B):</strong>
     &nbsp;&nbsp;☐ No aplica &nbsp;&nbsp;&nbsp; ☐ Sí — Plataforma: ___________________________
-    <br/><span style="color:#94a3b8;font-style:italic;">Ongoing integration with external platform (Clause 2ª bis, Section B): &nbsp;☐ Not applicable &nbsp;&nbsp; ☐ Yes — Platform: ___________________________</span>
+    <br/><span style="color:#64748b;">(Los servicios, módulos y apartados aplicables a cada Cliente se seleccionan en esta Oferta.)</span>
+    <br/><span style="color:#94a3b8;font-style:italic;">Ongoing integration with external platform (Clause 2ª bis, Section B): &nbsp;☐ Not applicable &nbsp;&nbsp; ☐ Yes — Platform: ___________________________ (The services, modules and sections applicable to each Client are selected in this Offer.)</span>
   </div>
 
   <div class="section-label" style="margin-top:6px;">Cláusulas · Clauses</div>
   ${OFFER_CLAUSES.map((c) => renderClause({
     ...c,
     bEs: c.bEs.replace(/__PAGO__/g, esc(formaPago)),
-    bEn: c.bEn.replace(/__PAGO__/g, esc(formaPago)),
+    bEn: c.bEn.replace(/__PAGO__/g, esc(PAGO_EN[formaPago] ?? formaPago)),
   })).join('')}
 
   ${notas && notas.trim() ? `<div class="notas-box"><div class="notas-title">Notas / Notes</div>${esc(notas)}</div>` : ''}
