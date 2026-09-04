@@ -64,14 +64,6 @@ const SERVICE_COLOR: Record<ServiceKey, string> = {
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
-/** Fuente caligráfica (Great Vibes, OFL) para la firma estilizada de Platomico — embebida en el PDF. */
-function readSignatureFontDataUri(): string {
-  try {
-    const buf = fs.readFileSync(path.join(process.cwd(), 'public', 'fonts', 'GreatVibes-Regular.ttf'))
-    return `data:font/ttf;base64,${buf.toString('base64')}`
-  } catch { return '' }
-}
-
 function readLogoDataUri(): string {
   for (const { file, mime } of [
     { file: 'logo_platomico.png', mime: 'image/png' },
@@ -436,7 +428,6 @@ export async function generateContractPdf(
   params: ContractParams,
 ): Promise<Buffer> {
   const logo = readLogoDataUri()
-  const sigFont = readSignatureFontDataUri()
   const { duracionMeses, permanenciaMeses, formaPago, fechaInicio, notas, contactName, contactEmail, equipment } = params
 
   const today   = fmtDate(fechaInicio)
@@ -476,9 +467,10 @@ export async function generateContractPdf(
   // Firma de Platomico (trazo estilizado) — usada en Anexo I, contrato y NDA
   const platomicoSignature = `
         <div class="sig-scribble">
-          <div class="sig-script">César Castro</div>
-          <svg viewBox="0 0 240 14" width="170" height="10" aria-hidden="true" style="display:block;margin-top:-4px;">
-            <path d="M4 9 C 60 3, 150 12, 236 5" fill="none" stroke="#111827" stroke-width="1.2" stroke-linecap="round" opacity="0.8"/>
+          <svg viewBox="0 0 400 210" width="190" height="100" aria-label="Firma">
+            <path d="M 90 172 C 120 122, 198 34, 256 22 C 302 12, 306 58, 254 100 C 218 130, 170 158, 140 160 C 116 162, 120 132, 150 126 C 178 120, 194 142, 176 156 C 160 168, 144 146, 178 130 C 202 118, 226 126, 220 146 C 215 162, 194 158, 206 136 C 226 106, 306 114, 396 92"
+                  fill="none" stroke="#111827" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M 4 200 C 100 190, 240 172, 398 142" fill="none" stroke="#111827" stroke-width="6" stroke-linecap="round"/>
           </svg>
         </div>
         <div class="sig-line-label">Firma · Fecha: ${today}</div>`
@@ -573,9 +565,8 @@ export async function generateContractPdf(
   .sig-name { font-size:11.5px; font-weight:700; color:#1e3a5f; margin-bottom:3px; }
   .sig-role { font-size:11px; color:#334155; margin-bottom:2px; }
   .sig-nif  { font-size:11px; color:#475569; margin-bottom:10px; }
-  ${sigFont ? `@font-face { font-family:'PlatomicoSignature'; src:url(${sigFont}) format('truetype'); font-weight:400; font-style:normal; }` : ''}
-  .sig-scribble { margin:8px 0 2px; padding:0 6px 6px; border-bottom:1px solid #cbd5e1; }
-  .sig-script { font-family:'PlatomicoSignature','Snell Roundhand','Brush Script MT',cursive; font-size:34px; line-height:1.1; color:#111827; transform:rotate(-3deg); transform-origin:left bottom; padding-left:6px; }
+  .sig-scribble { margin:4px 0 2px; padding:0 0 4px; border-bottom:1px solid #cbd5e1; }
+  .sig-scribble svg { display:block; }
   .anx-block { break-inside:avoid; }
   .sig-line-label { font-size:9.5px; color:#475569; margin-bottom:5px; text-transform:uppercase; letter-spacing:0.7px; }
   .sig-line { font-size:11px; color:#1e293b; margin-bottom:16px; padding-bottom:4px; border-bottom:1px solid #cbd5e1; min-height:14px; }
