@@ -104,7 +104,7 @@ function isRecurring(unit: string | undefined): boolean {
 function renderOfferRows(items: InvoiceLineItem[]): string {
   const lines = items.filter((i) => i.type === 'line')
   if (lines.length === 0) {
-    return `<tr><td colspan="5" style="text-align:center;color:#64748b;font-style:italic;padding:10px;">Sin conceptos — ver Oferta ${''}</td></tr>`
+    return `<tr><td colspan="5" style="text-align:center;color:#475569;font-style:italic;padding:10px;">Sin conceptos — ver Oferta ${''}</td></tr>`
   }
   return lines.map((l) => {
     const period = isRecurring(l.unit) ? 'Mensual' : 'Único'
@@ -467,9 +467,13 @@ export async function generateContractPdf(
   // Firma de Platomico (trazo estilizado) — usada en Anexo I, contrato y NDA
   const platomicoSignature = `
         <div class="sig-scribble">
-          <svg viewBox="0 0 230 74" width="160" height="52" aria-label="Firma">
-            <path d="M8 50 C 18 12, 30 8, 37 38 S 49 64, 58 34 C 64 14, 71 12, 76 38 S 86 60, 95 34 C 102 12, 111 8, 121 30 C 128 46, 142 50, 154 30 C 160 20, 168 22, 174 34 C 180 46, 192 46, 214 22" fill="none" stroke="#1e3a5f" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
-            <path d="M52 58 C 96 52, 150 54, 206 46" fill="none" stroke="#1e3a5f" stroke-width="1.4" stroke-linecap="round" opacity="0.75"/>
+          <svg viewBox="0 0 260 92" width="175" height="62" aria-label="Firma">
+            <!-- Inicial C grande -->
+            <path d="M70 22 C 52 4, 16 12, 14 42 C 12 70, 44 82, 70 64" fill="none" stroke="#111827" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"/>
+            <!-- Trazo cursivo continuo -->
+            <path d="M70 64 C 76 44, 84 40, 86 58 C 88 70, 98 66, 102 52 C 106 40, 112 42, 114 56 C 116 68, 126 66, 130 52 C 136 36, 142 40, 142 58 C 144 72, 154 68, 160 50 C 168 30, 178 34, 178 54 C 180 70, 192 66, 202 46 C 212 26, 226 30, 240 40" fill="none" stroke="#111827" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+            <!-- Rúbrica -->
+            <path d="M26 80 C 80 72, 160 86, 252 68" fill="none" stroke="#111827" stroke-width="1.6" stroke-linecap="round" opacity="0.85"/>
           </svg>
         </div>
         <div class="sig-line-label">Firma · Fecha: ${today}</div>`
@@ -484,7 +488,7 @@ export async function generateContractPdf(
       <span class="pg-header-label">Contrato Marco · ${esc(t)}</span>
     </div>`
 
-  const PAGE = `width:210mm; padding:18mm 18mm 14mm; position:relative; font-family:Helvetica,Arial,sans-serif; font-size:11px; color:#1e293b; line-height:1.55;`
+  const PAGE = `width:210mm; padding:18mm 18mm 14mm; position:relative; font-family:Helvetica,Arial,sans-serif; font-size:11px; color:#0f172a; line-height:1.55;`
 
   // Active service clause blocks (in canonical order)
   const activeServiceOrder: ServiceKey[] = ['ros', 'posKiosk', 'whispr', 'analitica', 'equipos']
@@ -507,7 +511,7 @@ export async function generateContractPdf(
         <td>${esc(e.cuotaMensual) || '<span class="cell-placeholder">—</span>'}</td>
         <td class="right mono">${esc(e.valorReposicion) || '<span class="cell-placeholder">—</span>'}</td>
       </tr>`).join('')
-    : `<tr><td colspan="7" style="text-align:center;color:#64748b;font-style:italic;padding:8px;">Sin equipos registrados</td></tr>`
+    : `<tr><td colspan="7" style="text-align:center;color:#475569;font-style:italic;padding:8px;">Sin equipos registrados</td></tr>`
 
   const html = `<!DOCTYPE html>
 <html lang="es">
@@ -515,57 +519,59 @@ export async function generateContractPdf(
 <meta charset="UTF-8"/>
 <style>
   * { margin:0; padding:0; box-sizing:border-box; }
-  body { font-family: Helvetica, Arial, sans-serif; font-size: 11px; color: #1e293b; background:#fff; line-height:1.55; }
+  body { font-family: Helvetica, Arial, sans-serif; font-size: 11px; color: #0f172a; background:#fff; line-height:1.55; }
   .watermark { position: fixed; top:50%; left:50%; transform: translate(-50%,-50%) rotate(-45deg); font-size:64px; font-weight:900; color:rgba(0,0,0,0.035); letter-spacing:16px; text-transform:uppercase; pointer-events:none; user-select:none; white-space:nowrap; z-index:9999; }
   .logo { height:20px; object-fit:contain; }
   .pg-header { display:flex; align-items:center; justify-content:space-between; padding-bottom:10px; border-bottom:2px solid #1e3a5f; margin-bottom:16px; }
-  .pg-header-label { font-size:9.5px; font-weight:700; letter-spacing:1.4px; text-transform:uppercase; color:#64748b; }
+  .pg-header-label { font-size:9.5px; font-weight:700; letter-spacing:1.4px; text-transform:uppercase; color:#475569; }
   .contract-title { text-align:center; font-size:17px; font-weight:700; color:#1e3a5f; letter-spacing:0.5px; text-transform:uppercase; margin:14px 0 3px; }
-  .contract-subtitle { text-align:center; font-size:11px; color:#475569; margin-bottom:4px; }
-  .contract-en-sub { text-align:center; font-size:10px; color:#64748b; font-style:italic; margin-bottom:16px; }
-  .section-label { font-size:9.5px; font-weight:700; text-transform:uppercase; letter-spacing:1.1px; color:#64748b; margin:16px 0 9px; padding-bottom:5px; border-bottom:1px solid #f1f5f9; }
-  .note-box { background:#f0f4f8; border-radius:6px; padding:10px 13px; font-size:10px; color:#334155; line-height:1.6; margin-bottom:14px; }
+  .contract-subtitle { text-align:center; font-size:11px; color:#334155; margin-bottom:4px; }
+  .contract-en-sub { text-align:center; font-size:10px; color:#475569; font-style:italic; margin-bottom:16px; }
+  .section-label { font-size:9.5px; font-weight:700; text-transform:uppercase; letter-spacing:1.1px; color:#475569; margin:16px 0 9px; padding-bottom:5px; border-bottom:1px solid #f1f5f9; }
+  .note-box { background:#f0f4f8; border-radius:6px; padding:10px 13px; font-size:10px; color:#1e293b; line-height:1.6; margin-bottom:14px; }
   .legend { display:flex; flex-wrap:wrap; gap:6px; margin:10px 0 4px; }
-  .legend-item { display:inline-flex; align-items:center; gap:5px; font-size:9.5px; font-weight:600; color:#1e293b; border:1px solid #e2e8f0; border-radius:20px; padding:2px 9px; }
+  .legend-item { display:inline-flex; align-items:center; gap:5px; font-size:9.5px; font-weight:600; color:#0f172a; border:1px solid #e2e8f0; border-radius:20px; padding:2px 9px; }
   .legend-dot { width:8px; height:8px; border-radius:50%; }
   .party-block { background:#f8fafc; border-left:3px solid #1e3a5f; border-radius:0 6px 6px 0; padding:10px 13px; margin-bottom:10px; }
-  .party-role { font-size:9.5px; font-weight:700; text-transform:uppercase; letter-spacing:1px; color:#64748b; margin-bottom:4px; }
+  .party-role { font-size:9.5px; font-weight:700; text-transform:uppercase; letter-spacing:1px; color:#475569; margin-bottom:4px; }
   .party-name { font-size:12.5px; font-weight:700; color:#1e3a5f; margin-bottom:3px; }
-  .party-detail { font-size:11px; color:#334155; line-height:1.65; }
+  .party-detail { font-size:11px; color:#1e293b; line-height:1.65; }
   .clause { margin-bottom:11px; break-inside:avoid; }
   .clause-num { font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:0.6px; color:#1e3a5f; margin-bottom:3px; }
-  .clause-body { font-size:11px; color:#1e293b; line-height:1.6; }
+  .clause-body { font-size:11px; color:#0f172a; line-height:1.6; }
   .clause-body p { margin-bottom:4px; }
   .clause-body p:last-child { margin-bottom:0; }
-  .clause-body p.en { color:#64748b; font-style:italic; font-size:10px; line-height:1.5; }
+  .clause-body p.en { color:#334155; font-style:italic; font-size:10px; line-height:1.5; }
   .anx-title { font-size:14.5px; font-weight:700; color:#1e3a5f; text-transform:uppercase; letter-spacing:0.5px; margin-bottom:3px; }
-  .anx-subtitle { font-size:11px; color:#475569; margin-bottom:14px; }
-  .anx-en { font-style:italic; color:#64748b; }
+  .anx-subtitle { font-size:11px; color:#334155; margin-bottom:14px; }
+  .anx-en { font-style:italic; color:#334155; }
+  .anx-divider { border-top:2px solid #1e3a5f; margin:28px 0 18px; }
+  table.tbl, .clause, .sig-cols { break-inside:avoid; }
   table.tbl { width:100%; border-collapse:collapse; font-size:10px; margin:8px 0 14px; }
   table.tbl th { background:#1e3a5f; color:#fff; padding:6px 8px; font-size:9.5px; font-weight:700; text-transform:uppercase; letter-spacing:0.5px; text-align:left; }
   table.tbl th.right { text-align:right; }
-  table.tbl td { padding:6px 8px; border-bottom:1px solid #f1f5f9; color:#1e293b; vertical-align:top; }
+  table.tbl td { padding:6px 8px; border-bottom:1px solid #f1f5f9; color:#0f172a; vertical-align:top; }
   table.tbl td.right { text-align:right; }
   table.tbl tr:last-child td { border-bottom:none; }
   .mono { font-family:'Courier New', monospace; }
   .right { text-align:right; }
   .fw6 { font-weight:600; }
-  .cell-placeholder { color:#64748b; font-style:italic; }
+  .cell-placeholder { color:#475569; font-style:italic; }
   .notas-box { background:#fefce8; border:1px solid #fde68a; border-radius:6px; padding:9px 13px; margin:12px 0; font-size:11px; color:#78350f; line-height:1.6; }
   .notas-title { font-weight:700; margin-bottom:3px; font-size:9.5px; text-transform:uppercase; letter-spacing:0.7px; }
   /* Signatures */
-  .sig-intro { font-size:11px; color:#334155; line-height:1.7; text-align:center; margin:16px 0 20px; }
+  .sig-intro { font-size:11px; color:#1e293b; line-height:1.7; text-align:center; margin:16px 0 20px; }
   .sig-cols { width:100%; font-size:0; }
   .sig-col { display:inline-block; vertical-align:top; width:48%; border:1px solid #e2e8f0; border-radius:10px; padding:16px; margin-right:4%; box-sizing:border-box; font-size:11px; }
   .sig-col:last-child { margin-right:0; }
-  .sig-col-title { font-size:9.5px; font-weight:700; text-transform:uppercase; letter-spacing:1px; color:#64748b; margin-bottom:11px; padding-bottom:6px; border-bottom:1px solid #f1f5f9; }
+  .sig-col-title { font-size:9.5px; font-weight:700; text-transform:uppercase; letter-spacing:1px; color:#475569; margin-bottom:11px; padding-bottom:6px; border-bottom:1px solid #f1f5f9; }
   .sig-name { font-size:11.5px; font-weight:700; color:#1e3a5f; margin-bottom:3px; }
-  .sig-role { font-size:11px; color:#475569; margin-bottom:2px; }
-  .sig-nif  { font-size:11px; color:#64748b; margin-bottom:10px; }
+  .sig-role { font-size:11px; color:#334155; margin-bottom:2px; }
+  .sig-nif  { font-size:11px; color:#475569; margin-bottom:10px; }
   .sig-scribble { margin:6px 0 2px; padding-bottom:4px; border-bottom:1px solid #cbd5e1; }
   .sig-scribble svg { display:block; }
-  .sig-line-label { font-size:9.5px; color:#64748b; margin-bottom:5px; text-transform:uppercase; letter-spacing:0.7px; }
-  .sig-line { font-size:11px; color:#334155; margin-bottom:16px; padding-bottom:4px; border-bottom:1px solid #cbd5e1; min-height:14px; }
+  .sig-line-label { font-size:9.5px; color:#475569; margin-bottom:5px; text-transform:uppercase; letter-spacing:0.7px; }
+  .sig-line { font-size:11px; color:#1e293b; margin-bottom:16px; padding-bottom:4px; border-bottom:1px solid #cbd5e1; min-height:14px; }
 </style>
 </head>
 <body>
@@ -637,11 +643,9 @@ export async function generateContractPdf(
   ${serviceBlocks}
   ${renBlock ? `<div class="section-label" style="color:${SERVICE_COLOR.ren};">Módulo REN · Corresponsabilidad (art. 26)</div>${renBlock}` : ''}
   ` : ''}
-</div>
 
-<!-- ═══ ANEXO I · OFERTA + FIRMAS ═══ -->
-<div style="break-before:page; ${PAGE}">
-  ${lbl('Anexo I · Oferta comercial')}
+  <!-- ═══ ANEXO I · OFERTA + FIRMAS (sigue en flujo, sin salto forzado) ═══ -->
+  <div class="anx-divider"></div>
   <div class="anx-title">Anexo I · Oferta comercial</div>
   <div class="anx-subtitle">Commercial Offer · nº ${esc(presupuesto.number)} — PLT-OFC-001 · Fecha de emisión / Issue date: ${fmtDate(presupuesto.createdAt)}${presupuesto.validUntil ? ` · Válida hasta / Valid until: ${fmtDate(presupuesto.validUntil)}` : ''}</div>
 
@@ -651,13 +655,13 @@ export async function generateContractPdf(
     </tr></thead>
     <tbody>${renderOfferRows(items)}</tbody>
   </table>
-  <p style="font-size:9.5px;color:#64748b;margin-bottom:10px;">Importes sin IVA. / Amounts excl. VAT.</p>
+  <p style="font-size:9.5px;color:#475569;margin-bottom:10px;">Importes sin IVA. / Amounts excl. VAT.</p>
 
-  <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:6px;padding:9px 13px;margin:10px 0;font-size:10px;color:#1e293b;line-height:1.7;">
+  <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:6px;padding:9px 13px;margin:10px 0;font-size:10px;color:#0f172a;line-height:1.7;">
     <strong>Integración continua con plataforma externa (cláusula 2ª bis, Apartado B):</strong>
-    &nbsp;&nbsp;☐ No aplica &nbsp;&nbsp;&nbsp; ☐ Sí — Plataforma: ___________________________
-    <br/><span style="color:#475569;">(Los servicios, módulos y apartados aplicables a cada Cliente se seleccionan en esta Oferta.)</span>
-    <br/><span style="color:#64748b;font-style:italic;">Ongoing integration with external platform (Clause 2ª bis, Section B): &nbsp;☐ Not applicable &nbsp;&nbsp; ☐ Yes — Platform: ___________________________ (The services, modules and sections applicable to each Client are selected in this Offer.)</span>
+    &nbsp;&nbsp;☐ No aplica &nbsp;&nbsp;&nbsp; ☐ Sí — Plataforma: ______________
+    <br/><span style="color:#334155;">(Los servicios, módulos y apartados aplicables a cada Cliente se seleccionan en esta Oferta.)</span>
+    <br/><span style="color:#475569;font-style:italic;">Ongoing integration with external platform (Clause 2ª bis, Section B): &nbsp;☐ Not applicable &nbsp;&nbsp; ☐ Yes — Platform: ______________ (The services, modules and sections applicable to each Client are selected in this Offer.)</span>
   </div>
 
   <div class="section-label" style="margin-top:6px;">Cláusulas · Clauses</div>
@@ -698,15 +702,13 @@ export async function generateContractPdf(
       </div>
     </div>
   </div>
-</div>
 
-<!-- ═══ ANEXO II · SLA ═══ -->
-<div style="break-before:page; ${PAGE}">
-  ${lbl('Anexo II · SLA')}
+  <!-- ═══ ANEXO II · SLA (sigue en flujo) ═══ -->
+  <div class="anx-divider"></div>
   <div class="anx-title">Anexo II · Acuerdo de Nivel de Servicio (SLA)</div>
   <div class="anx-subtitle">Service Level Agreement — PLT-SLA-001</div>
-  <p style="font-size:10px;color:#334155;line-height:1.6;margin-bottom:6px;">Horas hábiles: L–V 9:00–18:00 (hora peninsular), excluidos festivos. Tiempo de respuesta: hasta la primera respuesta sustantiva. Tiempo de resolución: hasta el restablecimiento o workaround.</p>
-  <p style="font-size:9.5px;color:#64748b;font-style:italic;line-height:1.5;margin-bottom:12px;">Business hours: Mon–Fri 9:00–18:00 (mainland Spain), excluding holidays. Response: to first substantive response. Resolution: to restoration or workaround.</p>
+  <p style="font-size:10px;color:#1e293b;line-height:1.6;margin-bottom:6px;">Horas hábiles: L–V 9:00–18:00 (hora peninsular), excluidos festivos. Tiempo de respuesta: hasta la primera respuesta sustantiva. Tiempo de resolución: hasta el restablecimiento o workaround.</p>
+  <p style="font-size:9.5px;color:#475569;font-style:italic;line-height:1.5;margin-bottom:12px;">Business hours: Mon–Fri 9:00–18:00 (mainland Spain), excluding holidays. Response: to first substantive response. Resolution: to restoration or workaround.</p>
 
   <table class="tbl">
     <thead><tr><th>Severidad</th><th>Descripción</th><th>Respuesta</th><th>Resolución</th></tr></thead>
@@ -726,7 +728,7 @@ export async function generateContractPdf(
       <tr><td><strong>Pro</strong></td><td>Register o Kiosk</td><td>Teléfono + WhatsApp + CSM</td><td>24/7</td></tr>
     </tbody>
   </table>
-  <p style="font-size:9.5px;color:#475569;line-height:1.5;">Starter/Growth: tiempos best effort. Pro: nivel garantizado (su incumplimiento reiterado habilita la excepción de la Cl. 18ª). Exclusiones: fuerza mayor, fallos de terceros, uso indebido, mantenimiento notificado y equipos del Cliente.</p>
+  <p style="font-size:9.5px;color:#334155;line-height:1.5;">Starter/Growth: tiempos best effort. Pro: nivel garantizado (su incumplimiento reiterado habilita la excepción de la Cl. 18ª). Exclusiones: fuerza mayor, fallos de terceros, uso indebido, mantenimiento notificado y equipos del Cliente.</p>
 </div>
 
 <!-- ═══ ANEXO III · DPA ═══ -->
@@ -736,9 +738,8 @@ export async function generateContractPdf(
   <div class="anx-subtitle">Data Processing Agreement — Art. 28 GDPR — PLT-DPA-C-001</div>
   ${dpaRendered.map((c) => renderClause(c)).join('')}
 
-  <div style="break-before:page;">
-    ${lbl('Anexo III · DPA (tratamiento y subencargados)')}
-    <div class="section-label" style="break-after:avoid;">Anexo A · Tratamiento por módulo · Processing per module</div>
+  <div>
+    <div class="section-label" style="break-after:avoid;margin-top:22px;">Anexo A · Tratamiento por módulo · Processing per module</div>
     <table class="tbl" style="break-inside:avoid;">
       <thead><tr><th>Módulo</th><th>Tratamiento</th></tr></thead>
       <tbody>
@@ -754,8 +755,8 @@ export async function generateContractPdf(
         ${SUBPROCESSORS.map(([n, u, r, m]) => `<tr><td><strong>${esc(n)}</strong></td><td>${esc(u)}</td><td>${esc(r)}</td><td>${esc(m)}</td></tr>`).join('')}
       </tbody>
     </table>
-    <p style="font-size:9.5px;color:#475569;line-height:1.5;">EEE = Espacio Económico Europeo. Las pasarelas de pago las contrata el Cliente (responsables independientes).${hasRen ? REN_ONLY.anexoB_es : ''} Square (u otra plataforma de terceros) es fuente/plataforma del Cliente, responsable independiente y no subencargado de Platomico, tanto en la migración puntual (2ª bis, Ap. A) como en el acceso continuado (2ª bis, Ap. B). Ver PLT-VEN-001.</p>
-    <p style="font-size:9.5px;color:#64748b;font-style:italic;line-height:1.5;margin-top:3px;">EEA = European Economic Area. Payment gateways are contracted by the Client (independent controllers).${hasRen ? REN_ONLY.anexoB_en : ''} Square (or any other third-party platform) is the Client’s source/platform, an independent controller and not a sub-processor of Platomico, both for the one-off migration (Cl. 2ª bis, Sec. A) and for ongoing access (Cl. 2ª bis, Sec. B). See PLT-VEN-001.</p>
+    <p style="font-size:9.5px;color:#334155;line-height:1.5;">EEE = Espacio Económico Europeo. Las pasarelas de pago las contrata el Cliente (responsables independientes).${hasRen ? REN_ONLY.anexoB_es : ''} Square (u otra plataforma de terceros) es fuente/plataforma del Cliente, responsable independiente y no subencargado de Platomico, tanto en la migración puntual (2ª bis, Ap. A) como en el acceso continuado (2ª bis, Ap. B). Ver PLT-VEN-001.</p>
+    <p style="font-size:9.5px;color:#475569;font-style:italic;line-height:1.5;margin-top:3px;">EEA = European Economic Area. Payment gateways are contracted by the Client (independent controllers).${hasRen ? REN_ONLY.anexoB_en : ''} Square (or any other third-party platform) is the Client’s source/platform, an independent controller and not a sub-processor of Platomico, both for the one-off migration (Cl. 2ª bis, Sec. A) and for ongoing access (Cl. 2ª bis, Sec. B). See PLT-VEN-001.</p>
   </div>
 </div>
 
@@ -764,7 +765,7 @@ export async function generateContractPdf(
   ${lbl('Anexo IV · Inventario de equipos')}
   <div class="anx-title">Anexo IV · Inventario de Equipos</div>
   <div class="anx-subtitle">Equipment Inventory — PLT-INV-001</div>
-  <p style="font-size:10px;color:#334155;line-height:1.6;margin-bottom:10px;">Los equipos aportados por Platomico se ceden en comodato (arts. 1740 y ss. CC), vinculado a la vigencia; el Cliente los custodia con diligencia y los devuelve en 10 días desde la finalización, respondiendo del valor de reposición por pérdida o deterioro que exceda el desgaste ordinario. Los aportados por el Cliente permanecen de su propiedad.</p>
+  <p style="font-size:10px;color:#1e293b;line-height:1.6;margin-bottom:10px;">Los equipos aportados por Platomico se ceden en comodato (arts. 1740 y ss. CC), vinculado a la vigencia; el Cliente los custodia con diligencia y los devuelve en 10 días desde la finalización, respondiendo del valor de reposición por pérdida o deterioro que exceda el desgaste ordinario. Los aportados por el Cliente permanecen de su propiedad.</p>
 
   <div class="clause" style="border-left:3px solid ${SERVICE_COLOR.equipos};padding-left:10px;">
     <div class="clause-num" style="color:${SERVICE_COLOR.equipos}">E2. Responsabilidad y custodia del equipo en comodato</div>
