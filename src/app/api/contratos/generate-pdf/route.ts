@@ -94,6 +94,9 @@ export async function GET(req: Request) {
         'Content-Type': 'application/pdf',
         'Content-Disposition': `${inline ? 'inline' : 'attachment'}; filename="${filename}"`,
         'Content-Length': String(pdfBuffer.length),
+        // El contrato se regenera siempre con la plantilla vigente: nunca cachear (navegador ni CDN)
+        'Cache-Control': 'no-store, no-cache, must-revalidate, max-age=0',
+        'Pragma': 'no-cache',
       },
     })
   } catch (err) {
