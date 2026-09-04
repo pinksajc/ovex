@@ -64,6 +64,14 @@ const SERVICE_COLOR: Record<ServiceKey, string> = {
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
+/** Fuente caligráfica (Great Vibes, OFL) para la firma estilizada de Platomico — embebida en el PDF. */
+function readSignatureFontDataUri(): string {
+  try {
+    const buf = fs.readFileSync(path.join(process.cwd(), 'public', 'fonts', 'GreatVibes-Regular.ttf'))
+    return `data:font/ttf;base64,${buf.toString('base64')}`
+  } catch { return '' }
+}
+
 function readLogoDataUri(): string {
   for (const { file, mime } of [
     { file: 'logo_platomico.png', mime: 'image/png' },
@@ -428,6 +436,7 @@ export async function generateContractPdf(
   params: ContractParams,
 ): Promise<Buffer> {
   const logo = readLogoDataUri()
+  const sigFont = readSignatureFontDataUri()
   const { duracionMeses, permanenciaMeses, formaPago, fechaInicio, notas, contactName, contactEmail, equipment } = params
 
   const today   = fmtDate(fechaInicio)
@@ -467,13 +476,9 @@ export async function generateContractPdf(
   // Firma de Platomico (trazo estilizado) — usada en Anexo I, contrato y NDA
   const platomicoSignature = `
         <div class="sig-scribble">
-          <svg viewBox="0 0 260 92" width="175" height="62" aria-label="Firma">
-            <!-- Inicial C grande -->
-            <path d="M70 22 C 52 4, 16 12, 14 42 C 12 70, 44 82, 70 64" fill="none" stroke="#111827" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"/>
-            <!-- Trazo cursivo continuo -->
-            <path d="M70 64 C 76 44, 84 40, 86 58 C 88 70, 98 66, 102 52 C 106 40, 112 42, 114 56 C 116 68, 126 66, 130 52 C 136 36, 142 40, 142 58 C 144 72, 154 68, 160 50 C 168 30, 178 34, 178 54 C 180 70, 192 66, 202 46 C 212 26, 226 30, 240 40" fill="none" stroke="#111827" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
-            <!-- Rúbrica -->
-            <path d="M26 80 C 80 72, 160 86, 252 68" fill="none" stroke="#111827" stroke-width="1.6" stroke-linecap="round" opacity="0.85"/>
+          <div class="sig-script">César Castro</div>
+          <svg viewBox="0 0 240 14" width="170" height="10" aria-hidden="true" style="display:block;margin-top:-4px;">
+            <path d="M4 9 C 60 3, 150 12, 236 5" fill="none" stroke="#111827" stroke-width="1.2" stroke-linecap="round" opacity="0.8"/>
           </svg>
         </div>
         <div class="sig-line-label">Firma · Fecha: ${today}</div>`
@@ -568,8 +573,10 @@ export async function generateContractPdf(
   .sig-name { font-size:11.5px; font-weight:700; color:#1e3a5f; margin-bottom:3px; }
   .sig-role { font-size:11px; color:#334155; margin-bottom:2px; }
   .sig-nif  { font-size:11px; color:#475569; margin-bottom:10px; }
-  .sig-scribble { margin:6px 0 2px; padding-bottom:4px; border-bottom:1px solid #cbd5e1; }
-  .sig-scribble svg { display:block; }
+  ${sigFont ? `@font-face { font-family:'PlatomicoSignature'; src:url(${sigFont}) format('truetype'); font-weight:400; font-style:normal; }` : ''}
+  .sig-scribble { margin:8px 0 2px; padding:0 6px 6px; border-bottom:1px solid #cbd5e1; }
+  .sig-script { font-family:'PlatomicoSignature','Snell Roundhand','Brush Script MT',cursive; font-size:34px; line-height:1.1; color:#111827; transform:rotate(-3deg); transform-origin:left bottom; padding-left:6px; }
+  .anx-block { break-inside:avoid; }
   .sig-line-label { font-size:9.5px; color:#475569; margin-bottom:5px; text-transform:uppercase; letter-spacing:0.7px; }
   .sig-line { font-size:11px; color:#1e293b; margin-bottom:16px; padding-bottom:4px; border-bottom:1px solid #cbd5e1; min-height:14px; }
 </style>
@@ -703,7 +710,8 @@ export async function generateContractPdf(
     </div>
   </div>
 
-  <!-- ═══ ANEXO II · SLA (sigue en flujo) ═══ -->
+  <!-- ═══ ANEXO II · SLA (sigue en flujo; bloque indivisible para no dejar líneas huérfanas) ═══ -->
+  <div class="anx-block">
   <div class="anx-divider"></div>
   <div class="anx-title">Anexo II · Acuerdo de Nivel de Servicio (SLA)</div>
   <div class="anx-subtitle">Service Level Agreement — PLT-SLA-001</div>
@@ -729,6 +737,7 @@ export async function generateContractPdf(
     </tbody>
   </table>
   <p style="font-size:9.5px;color:#334155;line-height:1.5;">Starter/Growth: tiempos best effort. Pro: nivel garantizado (su incumplimiento reiterado habilita la excepción de la Cl. 18ª). Exclusiones: fuerza mayor, fallos de terceros, uso indebido, mantenimiento notificado y equipos del Cliente.</p>
+  </div>
 </div>
 
 <!-- ═══ ANEXO III · DPA ═══ -->
@@ -739,6 +748,7 @@ export async function generateContractPdf(
   ${dpaRendered.map((c) => renderClause(c)).join('')}
 
   <div>
+    <div class="anx-block">
     <div class="section-label" style="break-after:avoid;margin-top:22px;">Anexo A · Tratamiento por módulo · Processing per module</div>
     <table class="tbl" style="break-inside:avoid;">
       <thead><tr><th>Módulo</th><th>Tratamiento</th></tr></thead>
@@ -748,6 +758,8 @@ export async function generateContractPdf(
       </tbody>
     </table>
 
+    </div>
+    <div class="anx-block">
     <div class="section-label" style="break-after:avoid;">Anexo B · Subencargados y transferencias · Sub-processors</div>
     <table class="tbl" style="break-inside:avoid;">
       <thead><tr><th>Subencargado</th><th>Uso</th><th>Región</th><th>Mecanismo</th></tr></thead>
@@ -757,6 +769,7 @@ export async function generateContractPdf(
     </table>
     <p style="font-size:9.5px;color:#334155;line-height:1.5;">EEE = Espacio Económico Europeo. Las pasarelas de pago las contrata el Cliente (responsables independientes).${hasRen ? REN_ONLY.anexoB_es : ''} Square (u otra plataforma de terceros) es fuente/plataforma del Cliente, responsable independiente y no subencargado de Platomico, tanto en la migración puntual (2ª bis, Ap. A) como en el acceso continuado (2ª bis, Ap. B). Ver PLT-VEN-001.</p>
     <p style="font-size:9.5px;color:#475569;font-style:italic;line-height:1.5;margin-top:3px;">EEA = European Economic Area. Payment gateways are contracted by the Client (independent controllers).${hasRen ? REN_ONLY.anexoB_en : ''} Square (or any other third-party platform) is the Client’s source/platform, an independent controller and not a sub-processor of Platomico, both for the one-off migration (Cl. 2ª bis, Sec. A) and for ongoing access (Cl. 2ª bis, Sec. B). See PLT-VEN-001.</p>
+    </div>
   </div>
 </div>
 
